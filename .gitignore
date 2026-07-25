@@ -20,3 +20,8 @@ out/
 # backend
 backend/uploads/*
 !backend/uploads/.gitkeep
+
+# mobile build artifacts
+mobile/*.apk
+mobile/*.aab
+mobile/*.ipa
