@@ -38,6 +38,7 @@
       "expo-status-bar"
     ],
     "extra": {
+      "apiUrl": "http://139.59.139.30:3002/api/v1",
       "eas": {
         "projectId": "YOUR_EXPO_PROJECT_ID"
       }
