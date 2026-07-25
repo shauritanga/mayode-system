@@ -1,0 +1,162 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { farmersApi, farmsApi, mamcosApi, marketplaceApi, financeApi } from '@/lib/api';
+
+interface StatCard {
+  label: string;
+  value: string | number;
+  sub?: string;
+  icon: string;
+  color: string;
+}
+
+function StatCard({ label, value, sub, icon, color }: StatCard) {
+  return (
+    <div className="stat-card animate-fade-in" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div style={{
+        width: '52px', height: '52px', borderRadius: '14px',
+        background: `${color}18`, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', fontSize: '24px', flexShrink: 0,
+      }}>
+        {icon}
+      </div>
+      <div>
+        <div style={{ fontSize: '24px', fontWeight: 700, color: '#F9FAFB', fontFamily: 'Outfit, sans-serif', lineHeight: 1.2 }}>
+          {value}
+        </div>
+        <div style={{ fontSize: '13px', color: '#9CA3AF', fontWeight: 500 }}>{label}</div>
+        {sub && <div style={{ fontSize: '11px', color: color, marginTop: '2px', fontWeight: 500 }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  const [stats, setStats] = useState({
+    farmers: 0, farms: 0, mamcos: 0, listings: 0
+  });
+  const [prices, setPrices] = useState<{ commodity: string; price: number; market: string; recordedAt: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        const [farmersRes, farmsRes, mamcosRes, listingsRes, pricesRes] = await Promise.allSettled([
+          farmersApi.getAll(),
+          farmsApi.getAll(),
+          mamcosApi.getAll(),
+          marketplaceApi.getLandListings(),
+          marketplaceApi.getMarketPrices(),
+        ]);
+
+        setStats({
+          farmers: farmersRes.status === 'fulfilled' ? farmersRes.value.data?.total || farmersRes.value.data?.length || 0 : 0,
+          farms: farmsRes.status === 'fulfilled' ? farmsRes.value.data?.total || farmsRes.value.data?.length || 0 : 0,
+          mamcos: mamcosRes.status === 'fulfilled' ? mamcosRes.value.data?.length || 0 : 0,
+          listings: listingsRes.status === 'fulfilled' ? listingsRes.value.data?.length || 0 : 0,
+        });
+        if (pricesRes.status === 'fulfilled') {
+          setPrices(pricesRes.value.data?.slice(0, 5) || []);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
+  }, []);
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+          <div style={{ width: '4px', height: '28px', background: 'linear-gradient(to bottom, #10B981, #34D399)', borderRadius: '9999px' }} />
+          <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '26px', fontWeight: 800, color: '#F9FAFB' }}>
+            System Overview
+          </h1>
+        </div>
+        <p style={{ fontSize: '14px', color: '#6B7280', marginLeft: '16px' }}>
+          MAYODE GROUP — MAYOData Platform & M-LAX Marketplace
+        </p>
+      </div>
+
+      {/* Stats Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+        <StatCard label="Registered Farmers" value={loading ? '—' : stats.farmers} sub="Active members" icon="👤" color="#10B981" />
+        <StatCard label="Registered Farms" value={loading ? '—' : stats.farms} sub="GPS mapped" icon="🌾" color="#34D399" />
+        <StatCard label="AMCOS Schemes" value={loading ? '—' : stats.mamcos} sub="Active cooperatives" icon="🏛" color="#F59E0B" />
+        <StatCard label="M-LAX Listings" value={loading ? '—' : stats.listings} sub="Land & tractor ads" icon="🏪" color="#3B82F6" />
+      </div>
+
+      {/* Content Panels */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        {/* Market Prices */}
+        <div className="glass-card" style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#F9FAFB' }}>📊 Latest Market Prices</h2>
+            <span style={{ fontSize: '12px', color: '#6B7280' }}>TZS / kg</span>
+          </div>
+          {prices.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#4B5563', fontSize: '14px', padding: '32px 0' }}>
+              No market prices recorded yet
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {prices.map((p, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(31, 41, 55, 0.5)', borderRadius: '10px' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#F9FAFB' }}>{p.commodity}</div>
+                    <div style={{ fontSize: '11px', color: '#6B7280' }}>{p.market || 'Market unknown'}</div>
+                  </div>
+                  <div style={{ fontSize: '15px', fontWeight: 700, color: '#10B981' }}>
+                    {Number(p.price).toLocaleString()} <span style={{ fontSize: '11px', color: '#6B7280' }}>TZS</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="glass-card" style={{ padding: '24px' }}>
+          <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#F9FAFB', marginBottom: '20px' }}>⚡ Quick Actions</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {[
+              { label: 'Register New Farmer', href: '/dashboard/farmers', icon: '👤', color: '#10B981' },
+              { label: 'Register New Farm', href: '/dashboard/farms', icon: '🌾', color: '#34D399' },
+              { label: 'Log Crop Activity', href: '/dashboard/crop-cycles', icon: '🌱', color: '#F59E0B' },
+              { label: 'Receive Inventory', href: '/dashboard/inventory', icon: '📦', color: '#3B82F6' },
+              { label: 'Post Land Listing', href: '/dashboard/marketplace', icon: '🏪', color: '#8B5CF6' },
+            ].map((action) => (
+              <a
+                key={action.href}
+                href={action.href}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px',
+                  background: 'rgba(31, 41, 55, 0.5)', borderRadius: '10px', textDecoration: 'none',
+                  border: '1px solid transparent', transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget;
+                  el.style.borderColor = action.color + '40';
+                  el.style.background = action.color + '10';
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget;
+                  el.style.borderColor = 'transparent';
+                  el.style.background = 'rgba(31, 41, 55, 0.5)';
+                }}
+              >
+                <span style={{ fontSize: '18px', width: '28px', textAlign: 'center' }}>{action.icon}</span>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: '#D1D5DB' }}>{action.label}</span>
+                <span style={{ marginLeft: 'auto', fontSize: '14px', color: action.color }}>→</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

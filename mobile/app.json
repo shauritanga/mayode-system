@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "MAYODE",
+    "slug": "mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.mobile"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "scheme": "mayode",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#10B981",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "MAYODE Notifications"
+        }
+      ],
+      "expo-status-bar"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_EXPO_PROJECT_ID"
+      }
+    }
+  }
+}

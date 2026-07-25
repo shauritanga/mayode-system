@@ -1,0 +1,110 @@
+import axios from 'axios';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+export const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 15000,
+});
+
+// Attach Bearer token from localStorage on every request
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
+// Auto-refresh token on 401
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ── Auth ──
+export const authApi = {
+  login: (phone: string, password: string) =>
+    api.post('/auth/login', { phone, password }),
+  register: (data: object) => api.post('/auth/register', data),
+  logout: () => api.post('/auth/logout'),
+};
+
+// ── Farmers ──
+export const farmersApi = {
+  getAll: (params?: object) => api.get('/farmers', { params }),
+  getOne: (id: string) => api.get(`/farmers/${id}`),
+  update: (id: string, data: object) => api.patch(`/farmers/${id}`, data),
+};
+
+// ── MAMCOS ──
+export const mamcosApi = {
+  getAll: () => api.get('/mamcos'),
+  getOne: (id: string) => api.get(`/mamcos/${id}`),
+  create: (data: object) => api.post('/mamcos', data),
+  assignFarmer: (id: string, data: object) => api.post(`/mamcos/${id}/assign-farmer`, data),
+  dashboard: () => api.get('/mamcos/secretary-dashboard'),
+};
+
+// ── Farms ──
+export const farmsApi = {
+  getAll: (params?: object) => api.get('/farms', { params }),
+  getOne: (id: string) => api.get(`/farms/${id}`),
+  create: (data: object) => api.post('/farms', data),
+  updateBoundary: (id: string, data: object) => api.patch(`/farms/${id}/boundary`, data),
+};
+
+// ── Crop Cycles ──
+export const cropCyclesApi = {
+  getAll: (params?: object) => api.get('/crop-cycles', { params }),
+  getOne: (id: string) => api.get(`/crop-cycles/${id}`),
+  create: (data: object) => api.post('/crop-cycles', data),
+  logActivity: (data: object) => api.post('/crop-cycles/activity', data),
+};
+
+// ── Finance ──
+export const financeApi = {
+  getCropCycleSummary: (id: string) => api.get(`/finance/crop-cycle/${id}/summary`),
+  getFarmerSummary: (id: string) => api.get(`/finance/farmer/${id}/summary`),
+  addCost: (data: object) => api.post('/finance/costs', data),
+  addRevenue: (data: object) => api.post('/finance/revenue', data),
+};
+
+// ── Inventory ──
+export const inventoryApi = {
+  getAll: (params?: object) => api.get('/inventory', { params }),
+  receive: (data: object) => api.post('/inventory/receive', data),
+  createLot: (data: object) => api.post('/inventory/lots', data),
+};
+
+// ── Locations ──
+export const locationsApi = {
+  getRegions: () => api.get('/locations/regions'),
+  getDistricts: (regionId: string) => api.get(`/locations/regions/${regionId}/districts`),
+  getWards: (districtId: string) => api.get(`/locations/districts/${districtId}/wards`),
+};
+
+// ── Marketplace ──
+export const marketplaceApi = {
+  getLandListings: (params?: object) => api.get('/marketplace/land', { params }),
+  createLandListing: (data: object) => api.post('/marketplace/land', data),
+  getTractors: (params?: object) => api.get('/marketplace/tractors', { params }),
+  bookTractor: (data: object) => api.post('/marketplace/tractors/book', data),
+  getMarketPrices: (params?: object) => api.get('/marketplace/prices', { params }),
+};
+
+// ── AMCOS-first farm registry ──
+export const registryApi = {
+  list: (params?: object) => api.get('/farm-registry', { params }),
+  preRegister: (data: object) => api.post('/farm-registry', data),
+};

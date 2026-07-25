@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# env files
+.env
+.env.*
+!.env.example
+
+# build outputs
+dist/
+build/
+.next/
+out/
+
+# misc
+.DS_Store
+*.pem
+*.log
+
+# backend
+backend/uploads/*
+!backend/uploads/.gitkeep
