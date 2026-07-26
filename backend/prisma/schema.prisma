@@ -118,6 +118,7 @@ model Farmer {
   leasesAsRenter       FarmLease[]              @relation("LeaseRenter")
   seasonalAssignments  SeasonalFarmAssignment[] @relation("ActiveFarmer")
   rewardWins           RewardWinner[]
+  activities           Activity[]
 
   @@map("farmers")
 }
@@ -791,6 +792,23 @@ model Notification {
 
   @@index([userId, isRead])
   @@map("notifications")
+}
+
+// Lightweight audit trail of farmer-facing actions, shown as the "Recent
+// Activities" feed on the mobile dashboard (farm/plot/document events).
+model Activity {
+  id        String   @id @default(uuid())
+  farmerId  String   @map("farmer_id")
+  type      String                          // e.g., "farm.created", "plot.mapped"
+  title     String
+  subtitle  String?
+  icon      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  farmer Farmer @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+
+  @@index([farmerId, createdAt])
+  @@map("activities")
 }
 
 // ============================================================

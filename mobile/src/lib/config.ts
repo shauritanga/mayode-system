@@ -12,10 +12,11 @@ export const USE_LOCAL_DATA = false;
 
 /**
  * Push notifications require Firebase/FCM credentials (googleServicesFile) and a
- * real EAS projectId. Leave disabled while running local-first / in Expo dev —
- * otherwise getExpoPushTokenAsync throws. Enable once FCM is configured.
+ * real EAS projectId — both are configured (see app.json). Push tokens only
+ * resolve on a physical device with a native build that includes google-services.json,
+ * i.e. after `expo prebuild` + a real (non-Expo-Go) dev/release build.
  */
-export const ENABLE_PUSH_NOTIFICATIONS = false;
+export const ENABLE_PUSH_NOTIFICATIONS = true;
 
 /**
  * OpenWeatherMap API key for the home-screen weather card.

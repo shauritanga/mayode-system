@@ -17,7 +17,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.mobile"
+      "package": "com.anonymous.mobile",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -39,9 +40,11 @@
     ],
     "extra": {
       "apiUrl": "http://139.59.139.30:3002/api/v1",
+      "router": {},
       "eas": {
-        "projectId": "YOUR_EXPO_PROJECT_ID"
+        "projectId": "12fa966a-1b88-4a37-aadc-a648cc002a31"
       }
-    }
+    },
+    "owner": "shauritanga"
   }
 }

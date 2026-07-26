@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Tabs, useRouter, usePathname, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -66,6 +66,8 @@ function CustomBottomNav() {
 
   const isDashboard = pathname === '/' || pathname === '/(tabs)';
   const isFarms = pathname === '/farms' || pathname === '/(tabs)/farms';
+  const isActivities = pathname === '/activities';
+  const isMarketplace = pathname === '/marketplace' || pathname === '/(tabs)/marketplace';
   const isProfile = pathname === '/profile' || pathname === '/(tabs)/profile';
 
   return (
@@ -101,28 +103,34 @@ function CustomBottomNav() {
           </Text>
         </TouchableOpacity>
 
-        {/* Activities — coming soon */}
         <TouchableOpacity
           style={styles.navTab}
-          onPress={() => Alert.alert(t('comingSoon'), t('activitiesComingSoon'))}
+          onPress={() => router.push('/activities')}
         >
-          <View>
-            <HugeiconsIcon icon={TaskDaily01Icon} size={24} color="#9CA3AF" strokeWidth={1.5} />
-            <View style={styles.soonBadge}><Text style={styles.soonBadgeText}>{t('soon')}</Text></View>
-          </View>
-          <Text style={[styles.navText, { color: '#9CA3AF' }]}>{t('activities')}</Text>
+          <HugeiconsIcon
+            icon={TaskDaily01Icon}
+            size={24}
+            color={isActivities ? '#10B981' : '#6B7280'}
+            strokeWidth={isActivities ? 2 : 1.5}
+          />
+          <Text style={[styles.navText, isActivities && styles.navTextActive]}>
+            {t('activities')}
+          </Text>
         </TouchableOpacity>
 
-        {/* M-LAX — coming soon */}
         <TouchableOpacity
           style={styles.navTab}
-          onPress={() => Alert.alert(t('comingSoon'), t('marketplaceComingSoon'))}
+          onPress={() => router.push('/marketplace')}
         >
-          <View>
-            <HugeiconsIcon icon={ShoppingCart02Icon} size={24} color="#9CA3AF" strokeWidth={1.5} />
-            <View style={styles.soonBadge}><Text style={styles.soonBadgeText}>{t('soon')}</Text></View>
-          </View>
-          <Text style={[styles.navText, { color: '#9CA3AF' }]}>M-LAX</Text>
+          <HugeiconsIcon
+            icon={ShoppingCart02Icon}
+            size={24}
+            color={isMarketplace ? '#10B981' : '#6B7280'}
+            strokeWidth={isMarketplace ? 2 : 1.5}
+          />
+          <Text style={[styles.navText, isMarketplace && styles.navTextActive]}>
+            M-LAX
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -253,19 +261,5 @@ const styles = StyleSheet.create({
   navTextActive: {
     color: '#10B981',
     fontWeight: '700',
-  },
-  soonBadge: {
-    position: 'absolute',
-    top: -7,
-    right: -16,
-    backgroundColor: '#F59E0B',
-    borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  soonBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 8,
-    fontWeight: '800',
   },
 });

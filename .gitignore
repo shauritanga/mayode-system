@@ -25,3 +25,6 @@ backend/uploads/*
 mobile/*.apk
 mobile/*.aab
 mobile/*.ipa
+
+# server access credentials
+server-credentials.json

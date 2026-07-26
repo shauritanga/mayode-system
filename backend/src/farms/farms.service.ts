@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { MembershipsService } from '../memberships/memberships.service';
 import { DocumentsService } from '../uploads/documents.service';
+import { ActivitiesService } from '../activities/activities.service';
 import { CreateFarmDto, UpdateFarmDto, UpdateBoundaryDto } from './dto/farms.dto';
 import { QueryFarmsDto } from './dto/query-farms.dto';
 import { LinkDocumentDto } from '../farmers/dto/farmer-actions.dto';
@@ -15,6 +16,7 @@ export class FarmsService {
     private readonly ownership: OwnershipService,
     private readonly documents: DocumentsService,
     private readonly memberships: MembershipsService,
+    private readonly activities: ActivitiesService,
   ) {}
 
   /** Generate a unique Farm Code from the farmer's control number (e.g. MYD-00002-01). */
@@ -40,7 +42,7 @@ export class FarmsService {
 
     const farmCode = await this.generateFarmCode(dto.farmerId);
 
-    return this.prisma.farm.create({
+    const farm = await this.prisma.farm.create({
       data: {
         farmerId: dto.farmerId,
         mamcosId: dto.mamcosId || farmer.mamcosId,
@@ -77,6 +79,14 @@ export class FarmsService {
         mamcos: { select: { name: true } },
       },
     });
+    await this.activities.log(
+      dto.farmerId,
+      'farm.created',
+      `Registered farm ${farm.farmCode}`,
+      farm.name || farm.village || 'New farm',
+      '🌾',
+    );
+    return farm;
   }
 
   async findAll(query: QueryFarmsDto = {}) {
@@ -179,8 +189,8 @@ export class FarmsService {
 
   async updateBoundary(id: string, dto: UpdateBoundaryDto, user: RequestUser) {
     await this.ownership.assertFarmAccess(user, id);
-    await this.findOne(id);
-    return this.prisma.farm.update({
+    const existing = await this.findOne(id);
+    const farm = await this.prisma.farm.update({
       where: { id },
       data: {
         boundaryCoordinates: dto.boundaryCoordinates,
@@ -188,6 +198,14 @@ export class FarmsService {
         centerLongitude: dto.centerLng,
       },
     });
+    await this.activities.log(
+      existing.farmerId,
+      'farm.mapped',
+      `Mapped ${farm.farmCode} boundary`,
+      'GPS boundary saved',
+      '📍',
+    );
+    return farm;
   }
 
   async remove(id: string) {
@@ -201,7 +219,16 @@ export class FarmsService {
 
   async addDocument(farmId: string, dto: LinkDocumentDto, user: RequestUser) {
     await this.ownership.assertFarmAccess(user, farmId);
-    return this.documents.createForFarm(farmId, { ...dto, uploadedById: user.id });
+    const farm = await this.findOne(farmId);
+    const document = await this.documents.createForFarm(farmId, { ...dto, uploadedById: user.id });
+    await this.activities.log(
+      farm.farmerId,
+      'document.added',
+      `Uploaded ${(dto.type || 'document').toString().replace('_', ' ')}`,
+      dto.fileName || 'File attached',
+      '📄',
+    );
+    return document;
   }
 
   async listDocuments(farmId: string) {

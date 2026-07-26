@@ -123,10 +123,10 @@ export const plotsApi = {
 };
 
 // ── Activity feed ──
-// Backend feed endpoint not built yet; return empty so the UI renders gracefully.
 export const activitiesApi = {
-  listForFarmer: (_farmerId: string) => Promise.resolve({ data: [] as any[] }),
-  recentForFarmer: (_farmerId: string, _limit?: number) => Promise.resolve({ data: [] as any[] }),
+  listForFarmer: (farmerId: string) => api.get(`/activities/farmer/${farmerId}`),
+  recentForFarmer: (farmerId: string, limit?: number) =>
+    api.get(`/activities/farmer/${farmerId}`, { params: limit ? { limit } : undefined }),
 };
 
 // ── Crop Cycles ──

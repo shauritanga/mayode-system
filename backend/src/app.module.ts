@@ -31,6 +31,7 @@ import { MessagingModule } from './messaging/messaging.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { FarmReportsModule } from './farm-reports/farm-reports.module';
 import { FarmRegistryModule } from './farm-registry/farm-registry.module';
+import { ActivitiesModule } from './activities/activities.module';
 import { LoggerMiddleware } from './middleware/logger.middleware';
 
 @Module({
@@ -51,6 +52,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     CommonModule,
     NotificationsModule,
     UploadsModule,
+    ActivitiesModule,
 
     // Serve uploaded files (photos, documents) at /uploads
     ServeStaticModule.forRoot({

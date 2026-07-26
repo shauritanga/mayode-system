@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
+import { ActivitiesService } from '../activities/activities.service';
 import { CreatePlotDto, UpdatePlotDto, UpdatePlotBoundaryDto } from './dto/plots.dto';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class PlotsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ownership: OwnershipService,
+    private readonly activities: ActivitiesService,
   ) {}
 
   /** Generate a unique plot code derived from the parent farm, e.g. FP-JD-01-P1 */
@@ -24,7 +26,11 @@ export class PlotsService {
   async create(dto: CreatePlotDto, user: RequestUser) {
     await this.ownership.assertFarmAccess(user, dto.farmId);
     const plotCode = await this.generatePlotCode(dto.farmId);
-    return this.prisma.plot.create({
+    const farm = await this.prisma.farm.findUnique({
+      where: { id: dto.farmId },
+      select: { farmerId: true, farmCode: true },
+    });
+    const plot = await this.prisma.plot.create({
       data: {
         farmId: dto.farmId,
         plotCode,
@@ -34,6 +40,16 @@ export class PlotsService {
         irrigationStatus: dto.irrigationStatus,
       },
     });
+    if (farm) {
+      await this.activities.log(
+        farm.farmerId,
+        'plot.created',
+        `Added plot ${plot.plotCode}`,
+        `on ${farm.farmCode}`,
+        '🧩',
+      );
+    }
+    return plot;
   }
 
   findAll(farmId?: string) {
@@ -84,8 +100,8 @@ export class PlotsService {
 
   async updateBoundary(id: string, dto: UpdatePlotBoundaryDto, user: RequestUser) {
     await this.ownership.assertPlotAccess(user, id);
-    await this.findOne(id);
-    return this.prisma.plot.update({
+    const existing = await this.findOne(id);
+    const plot = await this.prisma.plot.update({
       where: { id },
       data: {
         boundaryCoordinates: dto.boundaryCoordinates,
@@ -93,6 +109,14 @@ export class PlotsService {
         centerLongitude: dto.centerLng,
       },
     });
+    await this.activities.log(
+      existing.farm.farmerId,
+      'plot.mapped',
+      `Mapped ${plot.plotCode} boundary`,
+      'GPS boundary saved',
+      '📍',
+    );
+    return plot;
   }
 
   async remove(id: string, user: RequestUser) {
