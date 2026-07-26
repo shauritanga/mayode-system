@@ -73,6 +73,20 @@ export class MembershipsService {
 
   // ----------------------------------------------------------- membership
 
+  /** Admin/staff: all memberships, optionally filtered by status. */
+  listAll(status?: MembershipStatus) {
+    return this.prisma.membership.findMany({
+      where: status ? { status } : undefined,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: { select: { id: true, phone: true } },
+        farmer: { select: { id: true, firstName: true, lastName: true, controlNumber: true } },
+        plan: { select: { id: true, name: true, priceTzs: true } },
+        farmingSeason: { select: { id: true, name: true } },
+      },
+    });
+  }
+
   /** Latest membership for the user plus a computed `active` flag. */
   async myMembership(userId: string) {
     const membership = await this.prisma.membership.findFirst({

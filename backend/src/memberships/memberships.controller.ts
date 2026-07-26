@@ -4,10 +4,11 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { MembershipStatus, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -43,6 +44,13 @@ export class MembershipsController {
   @ApiOperation({ summary: "Current user's membership status (active flag + latest membership)" })
   myMembership(@CurrentUser() user: { id: string }) {
     return this.memberships.myMembership(user.id);
+  }
+
+  @Get()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR)
+  @ApiOperation({ summary: 'All memberships, optionally filtered by status (staff only)' })
+  listAll(@Query('status') status?: MembershipStatus) {
+    return this.memberships.listAll(status);
   }
 
   @Post('start')

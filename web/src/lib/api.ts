@@ -108,3 +108,49 @@ export const registryApi = {
   list: (params?: object) => api.get('/farm-registry', { params }),
   preRegister: (data: object) => api.post('/farm-registry', data),
 };
+
+// ── Farming seasons ──
+export const farmingSeasonsApi = {
+  getAll: () => api.get('/farming-seasons'),
+  getCurrent: () => api.get('/farming-seasons/current'),
+  getOne: (id: string) => api.get(`/farming-seasons/${id}`),
+  create: (data: object) => api.post('/farming-seasons', data),
+  update: (id: string, data: object) => api.patch(`/farming-seasons/${id}`, data),
+};
+
+// ── Farm leases, seasonal assignments & ownerships ──
+export const farmLeasesApi = {
+  getAll: (params?: object) => api.get('/farm-leases', { params }),
+  officerVerify: (id: string, data: object) => api.patch(`/farm-leases/${id}/officer-verify`, data),
+};
+export const seasonalAssignmentsApi = {
+  getAll: () => api.get('/seasonal-assignments'),
+};
+export const farmOwnershipsApi = {
+  getAll: (params?: object) => api.get('/farm-ownerships', { params }),
+};
+
+// ── Memberships ──
+export const membershipsApi = {
+  getAll: (params?: object) => api.get('/memberships', { params }),
+  listPlans: () => api.get('/memberships/plans'),
+  createPlan: (data: object) => api.post('/memberships/plans', data),
+  approve: (id: string, data?: object) => api.post(`/memberships/${id}/approve`, data || {}),
+};
+
+// ── Farm alerts ──
+export const farmAlertsApi = {
+  getAll: () => api.get('/farm-alerts'),
+  generateAll: () => api.post('/farm-alerts/generate'),
+};
+
+// ── Rewards ──
+export const rewardsApi = {
+  listCampaigns: () => api.get('/rewards/campaigns'),
+  getCampaign: (id: string) => api.get(`/rewards/campaigns/${id}`),
+  createCampaign: (data: object) => api.post('/rewards/campaigns', data),
+  eligible: (id: string) => api.get(`/rewards/campaigns/${id}/eligible`),
+  select: (id: string) => api.post(`/rewards/campaigns/${id}/select`),
+  reproduce: (id: string) => api.get(`/rewards/campaigns/${id}/reproduce`),
+  approve: (id: string) => api.post(`/rewards/campaigns/${id}/approve`),
+};

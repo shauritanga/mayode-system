@@ -187,6 +187,20 @@ export class FarmLeasesService {
     });
   }
 
+  /** Admin/staff: all leases, optionally filtered by status. */
+  findAllLeases(status?: LeaseStatus) {
+    return this.prisma.farmLease.findMany({
+      where: status ? { status } : undefined,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        farm: { select: { id: true, farmCode: true, name: true } },
+        farmingSeason: { select: { id: true, name: true } },
+        ownerFarmer: { select: { id: true, firstName: true, lastName: true } },
+        renterFarmer: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+  }
+
   private async findLeaseOrFail(id: string) {
     const lease = await this.prisma.farmLease.findUnique({
       where: { id },
@@ -480,6 +494,19 @@ export class FarmLeasesService {
     });
   }
 
+  /** Admin/staff: all seasonal assignments. */
+  findAllAssignments() {
+    return this.prisma.seasonalFarmAssignment.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        farm: { select: { id: true, farmCode: true, name: true } },
+        farmingSeason: { select: { id: true, name: true } },
+        activeFarmer: { select: { id: true, firstName: true, lastName: true } },
+        lease: { select: { id: true } },
+      },
+    });
+  }
+
   // ------------------------------------------------------------ ownership
 
   /**
@@ -526,6 +553,18 @@ export class FarmLeasesService {
       where: { farmId },
       orderBy: { createdAt: 'desc' },
       include: {
+        ownerFarmer: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+  }
+
+  /** Admin/staff: all ownership records, optionally filtered by status. */
+  findAllOwnerships(status?: VerificationStatus) {
+    return this.prisma.farmOwnership.findMany({
+      where: status ? { confirmationStatus: status } : undefined,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        farm: { select: { id: true, farmCode: true, name: true } },
         ownerFarmer: { select: { id: true, firstName: true, lastName: true } },
       },
     });

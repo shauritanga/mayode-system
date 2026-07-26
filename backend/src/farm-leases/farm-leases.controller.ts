@@ -5,10 +5,11 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { LeaseStatus, UserRole, VerificationStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -21,6 +22,14 @@ import {
   OfficerVerifyLeaseDto,
   SelfOperateDto,
 } from './dto/farm-leases.dto';
+
+const STAFF_ROLES = [
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+  UserRole.FIELD_OFFICER,
+  UserRole.MAMCOS_SECRETARY,
+  UserRole.AUDITOR,
+];
 
 @ApiTags('farm-leases')
 @ApiBearerAuth()
@@ -40,6 +49,13 @@ export class FarmLeasesController {
   @ApiOperation({ summary: 'Leases where the current user is owner or renter' })
   findMine(@CurrentUser() user: RequestUser) {
     return this.leases.findMine(user);
+  }
+
+  @Get()
+  @Roles(...STAFF_ROLES)
+  @ApiOperation({ summary: 'All leases, optionally filtered by status (staff only)' })
+  findAll(@Query('status') status?: LeaseStatus) {
+    return this.leases.findAllLeases(status);
   }
 
   @Get('farm/:farmId')
@@ -97,6 +113,13 @@ export class SeasonalAssignmentsController {
   forFarm(@Param('farmId') farmId: string) {
     return this.leases.findAssignmentsForFarm(farmId);
   }
+
+  @Get()
+  @Roles(...STAFF_ROLES)
+  @ApiOperation({ summary: 'All seasonal assignments (staff only)' })
+  findAll() {
+    return this.leases.findAllAssignments();
+  }
 }
 
 @ApiTags('farm-ownerships')
@@ -121,5 +144,12 @@ export class FarmOwnershipsController {
   @ApiOperation({ summary: 'Ownership records for a farm' })
   forFarm(@Param('farmId') farmId: string) {
     return this.leases.findOwnershipForFarm(farmId);
+  }
+
+  @Get()
+  @Roles(...STAFF_ROLES)
+  @ApiOperation({ summary: 'All ownership records, optionally filtered by status (staff only)' })
+  findAll(@Query('status') status?: VerificationStatus) {
+    return this.leases.findAllOwnerships(status);
   }
 }
