@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "270274638680",
+    "project_id": "mayode-mobile",
+    "storage_bucket": "mayode-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:270274638680:android:de79d0bbd2b5980099ab2d",
+        "android_client_info": {
+          "package_name": "com.anonymous.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD_UF4vzPiNkElKhBpC6WZvtgt95Xj0UKI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
