@@ -8,6 +8,7 @@ import { useRouter, Stack } from 'expo-router';
 import { farmsApi, mamcosApi } from '../src/lib/data';
 import { useAuthStore } from '../src/store/auth.store';
 import { SearchableSelect } from '../src/components/SearchableSelect';
+import { getRegions, getDistricts, getWards } from '../src/local/locations';
 import { useI18n } from '../src/i18n';
 
 type FarmGrade = 'A' | 'B' | 'C';
@@ -51,6 +52,9 @@ export default function RegisterFarmScreen() {
     const sub = Keyboard.addListener('keyboardDidShow', () => scrollRef.current?.scrollToEnd({ animated: true }));
     return () => sub.remove();
   }, []);
+
+  const selectRegion = (v: string) => { setRegion(v); setDistrict(''); setWard(''); };
+  const selectDistrict = (v: string) => { setDistrict(v); setWard(''); };
 
   const selectedMamcosName = mamcosList.find((m) => m.id === mamcosId)?.name || '';
   const generatedFarmName = [
@@ -145,12 +149,32 @@ export default function RegisterFarmScreen() {
               onSelect={setSection}
               searchable={false}
             />
+            <SearchableSelect
+              label={t('region')}
+              value={region}
+              placeholder={t('selectRegion')}
+              options={getRegions()}
+              onSelect={selectRegion}
+            />
+            <SearchableSelect
+              label={t('district')}
+              value={district}
+              placeholder={t('selectDistrict')}
+              options={getDistricts(region)}
+              onSelect={selectDistrict}
+              disabled={!region}
+              disabledHint={t('selectRegionFirst')}
+            />
+            <SearchableSelect
+              label={t('ward')}
+              value={ward}
+              placeholder={t('selectWard')}
+              options={getWards(region, district)}
+              onSelect={setWard}
+              disabled={!district}
+              disabledHint={t('selectDistrictFirst')}
+            />
             <Field label={t('village')} value={village} onChangeText={setVillage} placeholder={t('villagePlaceholder')} />
-            <Field label={t('ward')} value={ward} onChangeText={setWard} placeholder={t('wardPlaceholder')} />
-            <View style={styles.twoCol}>
-              <View style={styles.col}><Field label={t('district')} value={district} onChangeText={setDistrict} placeholder="Mbarali" /></View>
-              <View style={styles.col}><Field label={t('region')} value={region} onChangeText={setRegion} placeholder="Mbeya" /></View>
-            </View>
             {mamcosList.length > 0 && (
               <SearchableSelect
                 label={t('cooperativeMamcos')}
