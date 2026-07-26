@@ -1,24 +1,42 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Home01Icon,
+  UserGroupIcon,
+  Plant01Icon,
+  ClipboardIcon,
+  Calendar01Icon,
+  HandshakeIcon,
+  StarIcon,
+  BellIcon,
+  GiftIcon,
+  Building05Icon,
+  WheatIcon,
+  Package01Icon,
+  Wallet01Icon,
+  ShoppingCart02Icon,
+  Location01Icon,
+} from '@hugeicons/core-free-icons';
 import { useAuthStore } from '@/store/auth.store';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: '▦' },
-  { href: '/dashboard/farmers', label: 'Farmers', icon: '👤' },
-  { href: '/dashboard/farms', label: 'Farms', icon: '🌾' },
-  { href: '/dashboard/farm-registry', label: 'Farm Registry', icon: '📋' },
-  { href: '/dashboard/seasons', label: 'Seasons', icon: '📅' },
-  { href: '/dashboard/leases', label: 'Leases', icon: '🤝' },
-  { href: '/dashboard/memberships', label: 'Memberships', icon: '⭐' },
-  { href: '/dashboard/alerts', label: 'Alerts', icon: '🔔' },
-  { href: '/dashboard/rewards', label: 'Rewards', icon: '🎁' },
-  { href: '/dashboard/mamcos', label: 'AMCOS', icon: '🏛' },
-  { href: '/dashboard/crop-cycles', label: 'Crop Cycles', icon: '🌱' },
-  { href: '/dashboard/inventory', label: 'Inventory', icon: '📦' },
-  { href: '/dashboard/finance', label: 'Finance', icon: '💰' },
-  { href: '/dashboard/marketplace', label: 'M-LAX Marketplace', icon: '🏪' },
-  { href: '/dashboard/locations', label: 'Locations', icon: '🗺' },
+  { href: '/dashboard', label: 'Dashboard', icon: Home01Icon },
+  { href: '/dashboard/farmers', label: 'Farmers', icon: UserGroupIcon },
+  { href: '/dashboard/farms', label: 'Farms', icon: Plant01Icon },
+  { href: '/dashboard/farm-registry', label: 'Farm Registry', icon: ClipboardIcon },
+  { href: '/dashboard/seasons', label: 'Seasons', icon: Calendar01Icon },
+  { href: '/dashboard/leases', label: 'Leases', icon: HandshakeIcon },
+  { href: '/dashboard/memberships', label: 'Memberships', icon: StarIcon },
+  { href: '/dashboard/alerts', label: 'Alerts', icon: BellIcon },
+  { href: '/dashboard/rewards', label: 'Rewards', icon: GiftIcon },
+  { href: '/dashboard/mamcos', label: 'AMCOS', icon: Building05Icon },
+  { href: '/dashboard/crop-cycles', label: 'Crop Cycles', icon: WheatIcon },
+  { href: '/dashboard/inventory', label: 'Inventory', icon: Package01Icon },
+  { href: '/dashboard/finance', label: 'Finance', icon: Wallet01Icon },
+  { href: '/dashboard/marketplace', label: 'M-LAX Marketplace', icon: ShoppingCart02Icon },
+  { href: '/dashboard/locations', label: 'Locations', icon: Location01Icon },
 ];
 
 export default function Sidebar() {
@@ -74,7 +92,9 @@ export default function Sidebar() {
               id={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
               className={`sidebar-link ${isActive ? 'active' : ''}`}
             >
-              <span style={{ fontSize: '16px', width: '20px', textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
+              <span style={{ width: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <HugeiconsIcon icon={item.icon} size={18} strokeWidth={1.8} />
+              </span>
               <span>{item.label}</span>
             </Link>
           );
