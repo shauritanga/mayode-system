@@ -36,7 +36,15 @@
           "androidCollapsedTitle": "MAYODE Notifications"
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "http://139.59.139.30:3002/api/v1",
