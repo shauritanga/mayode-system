@@ -1,6 +1,7 @@
 import {
   Injectable,
   ConflictException,
+  ForbiddenException,
   UnauthorizedException,
   InternalServerErrorException,
 } from '@nestjs/common';
@@ -10,7 +11,11 @@ import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, RefreshTokenDto, AuthResponseDto } from './dto/auth.dto';
+import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UserRole } from '@prisma/client';
+
+/** Roles only a SUPER_ADMIN may grant; an ADMIN cannot create peers or escalate to SUPER_ADMIN. */
+const SUPER_ADMIN_ONLY_ROLES: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN];
 
 @Injectable()
 export class AuthService {
@@ -111,10 +116,15 @@ export class AuthService {
   }
 
   /**
-   * User Registration with auto Control Number generation
+   * Public self-registration. Always creates a FARMER account — this endpoint
+   * is unauthenticated, so any other role (including staff and admin roles)
+   * must be created through UsersService.createStaffAccount by an existing
+   * SUPER_ADMIN/ADMIN. The `role` field on RegisterDto is intentionally
+   * ignored here; it only still exists on the DTO for backward-compatible
+   * request bodies (whitelist validation would otherwise reject it).
    */
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    const { phone, email, password, role, firstName, lastName, language } = registerDto;
+    const { phone, email, password, firstName, lastName, language } = registerDto;
 
     const existingUser = await this.prisma.user.findFirst({
       where: {
@@ -139,32 +149,20 @@ export class AuthService {
             phone,
             email,
             passwordHash,
-            role: role as unknown as UserRole,
+            role: UserRole.FARMER,
             language: language || 'sw',
           },
         });
 
-        if (role === 'FARMER') {
-          controlNumber = await this.generateControlNumber();
-          await prisma.farmer.create({
-            data: {
-              userId: user.id,
-              controlNumber,
-              firstName,
-              lastName,
-            },
-          });
-        } else if (role === 'FIELD_OFFICER') {
-          const employeeCode = await this.generateEmployeeCode();
-          await prisma.fieldOfficer.create({
-            data: {
-              userId: user.id,
-              employeeCode,
-              firstName,
-              lastName,
-            },
-          });
-        }
+        controlNumber = await this.generateControlNumber();
+        await prisma.farmer.create({
+          data: {
+            userId: user.id,
+            controlNumber,
+            firstName,
+            lastName,
+          },
+        });
 
         return user;
       });
@@ -173,6 +171,56 @@ export class AuthService {
     }
 
     return this.generateTokens(createdUser, controlNumber);
+  }
+
+  /**
+   * Staff/admin account creation — authenticated, SUPER_ADMIN/ADMIN only
+   * (enforced by RolesGuard at the controller). Unlike public register(),
+   * this accepts any role. A plain ADMIN may not create SUPER_ADMIN or ADMIN
+   * accounts — only a SUPER_ADMIN can grant those, to prevent privilege
+   * escalation via a compromised or careless ADMIN account.
+   */
+  async createStaffAccount(dto: CreateStaffUserDto, creatorRole: UserRole) {
+    if (SUPER_ADMIN_ONLY_ROLES.includes(dto.role) && creatorRole !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only a SUPER_ADMIN can create SUPER_ADMIN or ADMIN accounts');
+    }
+
+    const existingUser = await this.prisma.user.findFirst({
+      where: { OR: [{ phone: dto.phone }, { email: dto.email || undefined }] },
+    });
+    if (existingUser) {
+      throw new ConflictException('User with this phone number or email already exists');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(dto.password, salt);
+
+    return this.prisma.$transaction(async (prisma) => {
+      const user = await prisma.user.create({
+        data: {
+          phone: dto.phone,
+          email: dto.email,
+          passwordHash,
+          role: dto.role,
+          language: dto.language || 'sw',
+        },
+        select: { id: true, phone: true, email: true, role: true, createdAt: true },
+      });
+
+      if (dto.role === UserRole.FARMER) {
+        const controlNumber = await this.generateControlNumber();
+        await prisma.farmer.create({
+          data: { userId: user.id, controlNumber, firstName: dto.firstName, lastName: dto.lastName },
+        });
+      } else if (dto.role === UserRole.FIELD_OFFICER) {
+        const employeeCode = await this.generateEmployeeCode();
+        await prisma.fieldOfficer.create({
+          data: { userId: user.id, employeeCode, firstName: dto.firstName, lastName: dto.lastName },
+        });
+      }
+
+      return user;
+    });
   }
 
   /**
