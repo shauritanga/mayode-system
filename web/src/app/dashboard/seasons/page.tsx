@@ -102,10 +102,10 @@ export default function SeasonsPage() {
       <div style={{ marginBottom: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, #10B981, #34D399)', borderRadius: '9999px' }} />
-            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: '#F9FAFB' }}>Farming Seasons</h1>
+            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--accent), var(--green-400))', borderRadius: '9999px' }} />
+            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Farming Seasons</h1>
           </div>
-          <p style={{ fontSize: '13px', color: '#6B7280', marginLeft: '14px' }}>Configure farming-season periods — memberships and lease periods follow these</p>
+          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Configure farming-season periods — memberships and lease periods follow these</p>
         </div>
         <button className="btn-primary" onClick={() => setShowForm(s => !s)}>
           {showForm ? 'Close' : '+ New season'}
@@ -114,19 +114,19 @@ export default function SeasonsPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         {[
-          { label: 'Total seasons', value: seasons.length, color: '#10B981' },
-          { label: 'Open / active', value: active, color: '#3B82F6' },
+          { label: 'Total seasons', value: seasons.length, color: 'var(--accent)' },
+          { label: 'Open / active', value: active, color: 'var(--blue-500)' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>
-            <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>{s.label}</div>
+            <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {showForm && (
         <div className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
-          <h3 style={{ color: '#F9FAFB', fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>New farming season</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>New farming season</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
             <Field label="Season name *" value={form.name} onChange={v => set('name', v)} placeholder="2026/2027 Masika" />
             <div>
@@ -150,7 +150,7 @@ export default function SeasonsPage() {
               </select>
             </div>
           </div>
-          {error && <div style={{ color: '#F87171', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
+          {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
           <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
             <button className="btn-primary" onClick={submit} disabled={submitting}>
               {submitting ? 'Saving…' : 'Create season'}
@@ -162,9 +162,9 @@ export default function SeasonsPage() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>Loading seasons…</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading seasons…</div>
         ) : seasons.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>No farming seasons configured yet.</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No farming seasons configured yet.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -174,10 +174,10 @@ export default function SeasonsPage() {
               <tbody>
                 {seasons.map(s => (
                   <tr key={s.id}>
-                    <td style={{ color: '#F9FAFB', fontSize: '13px', fontWeight: 600 }}>{s.name}</td>
-                    <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{s.mamcos?.name || '—'}</td>
-                    <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{[s.region, s.crop].filter(Boolean).join(' · ') || '—'}</td>
-                    <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{fmtDate(s.startDate)} → {fmtDate(s.endDate)}</td>
+                    <td style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>{s.name}</td>
+                    <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{s.mamcos?.name || '—'}</td>
+                    <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{[s.region, s.crop].filter(Boolean).join(' · ') || '—'}</td>
+                    <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{fmtDate(s.startDate)} → {fmtDate(s.endDate)}</td>
                     <td>{statusBadge(s.status)}</td>
                     <td>
                       <select
@@ -205,7 +205,7 @@ function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: '#9CA3AF', marginBottom: '5px', fontWeight: 600 };
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: 'var(--neutral-400)', marginBottom: '5px', fontWeight: 600 };
 
 function Field({ label, value, onChange, placeholder, type }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
   return (

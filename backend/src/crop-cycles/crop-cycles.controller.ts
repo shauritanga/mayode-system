@@ -9,12 +9,25 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CropCyclesService } from './crop-cycles.service';
-import { CreateCropCycleDto, UpdateCropCycleDto, CreateActivityLogDto } from './dto/crop-cycles.dto';
+import {
+  CreateCropCycleDto,
+  UpdateCropCycleDto,
+  CreateActivityLogDto,
+} from './dto/crop-cycles.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { RequestUser } from '../common/ownership.service';
 import { UserRole } from '@prisma/client';
+
+const STAFF_ROLES = [
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+  UserRole.FIELD_OFFICER,
+  UserRole.MAMCOS_SECRETARY,
+  UserRole.AUDITOR,
+];
 
 @ApiTags('crop-cycles')
 @ApiBearerAuth()
@@ -24,47 +37,86 @@ export class CropCyclesController {
   constructor(private readonly cropCyclesService: CropCyclesService) {}
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.FARMER,
+  )
   @ApiOperation({ summary: 'Initiate a new seasonal crop cycle for a farm' })
-  create(@Body() createCropCycleDto: CreateCropCycleDto) {
-    return this.cropCyclesService.create(createCropCycleDto);
+  create(@Body() dto: CreateCropCycleDto, @CurrentUser() user: RequestUser) {
+    return this.cropCyclesService.create(dto, user);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all crop cycles across the system' })
+  @Roles(...STAFF_ROLES)
+  @ApiOperation({
+    summary: 'Get all crop cycles across the system (staff only)',
+  })
   findAll() {
     return this.cropCyclesService.findAll();
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get crop cycle details by ID (with activity logs, costs, revenues)' })
-  findOne(@Param('id') id: string) {
-    return this.cropCyclesService.findOne(id);
+  @ApiOperation({
+    summary:
+      'Get crop cycle details by ID (with activity logs, costs, revenues)',
+  })
+  findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.cropCyclesService.findOne(id, user);
   }
 
   @Get('farm/:farmId')
   @ApiOperation({ summary: 'Get all crop cycles for a specific farm' })
-  findByFarmId(@Param('farmId') farmId: string) {
-    return this.cropCyclesService.findByFarmId(farmId);
+  findByFarmId(
+    @Param('farmId') farmId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.cropCyclesService.findByFarmId(farmId, user);
   }
 
   @Get('farmer/:farmerId')
   @ApiOperation({ summary: 'Get all crop cycles owned by a specific farmer' })
-  findByFarmerId(@Param('farmerId') farmerId: string) {
-    return this.cropCyclesService.findByFarmerId(farmerId);
+  findByFarmerId(
+    @Param('farmerId') farmerId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.cropCyclesService.findByFarmerId(farmerId, user);
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
-  @ApiOperation({ summary: 'Update crop cycle status, harvest dates, or actual yields' })
-  update(@Param('id') id: string, @Body() updateCropCycleDto: UpdateCropCycleDto) {
-    return this.cropCyclesService.update(id, updateCropCycleDto);
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.FARMER,
+  )
+  @ApiOperation({
+    summary: 'Update crop cycle status, harvest dates, or actual yields',
+  })
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateCropCycleDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.cropCyclesService.update(id, dto, user);
   }
 
   @Post('activity')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
-  @ApiOperation({ summary: 'Log a farming activity (Land prep, weeding, harvest, etc.) with inputs & labor' })
-  logActivity(@CurrentUser() user: { id: string }, @Body() createActivityLogDto: CreateActivityLogDto) {
-    return this.cropCyclesService.logActivity(user.id, createActivityLogDto);
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.FARMER,
+  )
+  @ApiOperation({
+    summary:
+      'Log a farming activity (land prep, weeding, harvest, etc.) with inputs & labor',
+  })
+  logActivity(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: CreateActivityLogDto,
+  ) {
+    return this.cropCyclesService.logActivity(user, dto);
   }
 }

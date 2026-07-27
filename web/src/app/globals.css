@@ -2,7 +2,8 @@
 @import "tailwindcss";
 
 :root {
-  /* MAYODE brand palette */
+  /* MAYODE brand palette — accent hues stay constant across themes;
+     only neutrals/surfaces (below) flip for light mode. */
   --green-900: #064E3B;
   --green-800: #065F46;
   --green-700: #047857;
@@ -19,6 +20,18 @@
   --gold-300: #FCD34D;
   --gold-100: #FEF3C7;
 
+  --red-500: #EF4444;
+  --red-400: #F87171;
+  --red-300: #FCA5A5;
+
+  --blue-500: #3B82F6;
+  --blue-400: #60A5FA;
+  --blue-300: #93C5FD;
+
+  --purple-500: #8B5CF6;
+  --purple-400: #A78BFA;
+
+  /* Neutral scale — redefined per theme below */
   --neutral-950: #0A0A0A;
   --neutral-900: #111827;
   --neutral-800: #1F2937;
@@ -39,6 +52,42 @@
   --text-secondary: var(--neutral-400);
   --accent: var(--green-500);
   --accent-hover: var(--green-400);
+  --glass-bg: rgba(31, 41, 55, 0.6);
+  --glass-card-bg: rgba(17, 24, 39, 0.8);
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --surface-tint: rgba(31, 41, 55, 0.5);
+  --hover-tint-1: rgba(255, 255, 255, 0.02);
+  --hover-tint-2: rgba(255, 255, 255, 0.04);
+  --hover-tint-3: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Light theme — the toggle in the header/sidebar flips this attribute ── */
+:root[data-theme='light'] {
+  --neutral-950: #F1F3F5;
+  --neutral-900: #FFFFFF;
+  --neutral-800: #F3F4F6;
+  --neutral-700: #E5E7EB;
+  --neutral-600: #9CA3AF;
+  --neutral-500: #6B7280;
+  --neutral-400: #4B5563;
+  --neutral-300: #374151;
+  --neutral-200: #1F2937;
+  --neutral-100: #111827;
+  --neutral-50:  #0A0A0A;
+
+  --background: var(--neutral-950);
+  --surface: var(--neutral-900);
+  --surface-2: var(--neutral-800);
+  --border: var(--neutral-700);
+  --text-primary: #111827;
+  --text-secondary: var(--neutral-400);
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-card-bg: rgba(255, 255, 255, 0.85);
+  --shadow-color: rgba(17, 24, 39, 0.08);
+  --surface-tint: rgba(17, 24, 39, 0.045);
+  --hover-tint-1: rgba(17, 24, 39, 0.02);
+  --hover-tint-2: rgba(17, 24, 39, 0.04);
+  --hover-tint-3: rgba(17, 24, 39, 0.06);
 }
 
 @theme inline {
@@ -65,6 +114,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* ── Scrollbar ── */
@@ -73,18 +123,19 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--neutral-700); border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--neutral-600); }
 
-/* ── Glass morphism ── */
+/* ── Glass morphism ──
+   !important: Tailwind v4's preflight resets backdrop-filter via the
+   composed --tw-backdrop-* custom properties on the universal selector,
+   which otherwise wins over these rules. */
 .glass {
-  background: rgba(31, 41, 55, 0.6);
+  background: var(--glass-bg);
   backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .glass-card {
-  background: rgba(17, 24, 39, 0.8);
+  background: var(--glass-card-bg);
   backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(16, 185, 129, 0.12);
   border-radius: 16px;
 }
@@ -141,7 +192,7 @@ body {
 .stat-card:hover {
   border-color: rgba(16, 185, 129, 0.3);
   transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 32px var(--shadow-color);
 }
 
 /* ── Data table ── */
@@ -181,8 +232,8 @@ body {
 }
 .badge-green  { background: rgba(16, 185, 129, 0.15); color: var(--green-400); border: 1px solid rgba(16, 185, 129, 0.25); }
 .badge-gold   { background: rgba(245, 158, 11, 0.15); color: var(--gold-400); border: 1px solid rgba(245, 158, 11, 0.25); }
-.badge-red    { background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.25); }
-.badge-blue   { background: rgba(59, 130, 246, 0.15); color: #93C5FD; border: 1px solid rgba(59, 130, 246, 0.25); }
+.badge-red    { background: rgba(239, 68, 68, 0.15); color: var(--red-400); border: 1px solid rgba(239, 68, 68, 0.25); }
+.badge-blue   { background: rgba(59, 130, 246, 0.15); color: var(--blue-300); border: 1px solid rgba(59, 130, 246, 0.25); }
 .badge-gray   { background: rgba(107, 114, 128, 0.15); color: var(--neutral-400); border: 1px solid rgba(107, 114, 128, 0.25); }
 
 /* ── Button ── */
@@ -244,6 +295,108 @@ body {
 }
 .input-field::placeholder { color: var(--neutral-500); }
 .input-field select { background: var(--neutral-800); }
+
+/* ── Top header ── */
+.top-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 68px;
+  padding: 0 28px;
+  background: var(--glass-bg);
+  /* !important: Tailwind v4's preflight resets backdrop-filter via the
+     composed --tw-backdrop-* custom properties on the universal selector,
+     which otherwise wins over this rule. */
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+.icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.icon-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+.icon-btn-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--red-400);
+  border: 2px solid var(--surface);
+}
+
+.avatar-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, var(--green-800), var(--green-500));
+  color: #fff;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.dropdown-menu {
+  position: absolute;
+  min-width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px var(--shadow-color);
+  padding: 6px;
+  z-index: 60;
+  animation: fadeIn 0.15s ease forwards;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  text-decoration: none;
+}
+.dropdown-item:hover { background: var(--surface-2); }
+.dropdown-item.danger { color: var(--red-400); }
+.dropdown-item.danger:hover { background: rgba(239, 68, 68, 0.1); }
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 4px;
+}
 
 /* ── Animations ── */
 @keyframes fadeIn {

@@ -43,10 +43,10 @@ export default function FarmsPage() {
       <div style={{ marginBottom: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, #10B981, #34D399)', borderRadius: '9999px' }} />
-            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: '#F9FAFB' }}>Farms</h1>
+            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--accent), var(--green-400))', borderRadius: '9999px' }} />
+            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Farms</h1>
           </div>
-          <p style={{ fontSize: '13px', color: '#6B7280', marginLeft: '14px' }}>All registered farm parcels & GPS boundaries</p>
+          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>All registered farm parcels & GPS boundaries</p>
         </div>
         <input
           id="farms-search"
@@ -62,23 +62,23 @@ export default function FarmsPage() {
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         {[
-          { label: 'Total Farms', value: farms.length, color: '#10B981' },
-          { label: 'Verified', value: farms.filter(f => f.isVerified).length, color: '#34D399' },
-          { label: 'Currently Leased', value: farms.filter(f => f.isLeased).length, color: '#F59E0B' },
-          { label: 'Total Hectares', value: farms.reduce((a, f) => a + f.socialHectares, 0).toFixed(1), color: '#3B82F6' },
+          { label: 'Total Farms', value: farms.length, color: 'var(--accent)' },
+          { label: 'Verified', value: farms.filter(f => f.isVerified).length, color: 'var(--green-400)' },
+          { label: 'Currently Leased', value: farms.filter(f => f.isLeased).length, color: 'var(--gold-400)' },
+          { label: 'Total Hectares', value: farms.reduce((a, f) => a + f.socialHectares, 0).toFixed(1), color: 'var(--blue-500)' },
         ].map(stat => (
           <div key={stat.label} className="stat-card" style={{ padding: '16px' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: stat.color, fontFamily: 'Outfit, sans-serif' }}>{stat.value}</div>
-            <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>{stat.label}</div>
+            <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{stat.label}</div>
           </div>
         ))}
       </div>
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>Loading farms…</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading farms…</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>No farms found.</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No farms found.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -98,18 +98,18 @@ export default function FarmsPage() {
                 {filtered.map(farm => (
                   <tr key={farm.id}>
                     <td>
-                      <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#10B981', fontWeight: 600, background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--accent)', fontWeight: 600, background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>
                         {farm.farmCode}
                       </span>
                     </td>
                     <td>
-                      <div style={{ fontWeight: 600, color: '#F9FAFB', fontSize: '13px' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
                         {farm.farmer ? `${farm.farmer.firstName} ${farm.farmer.lastName}` : '—'}
                       </div>
-                      <div style={{ fontSize: '11px', color: '#6B7280' }}>{farm.farmer?.controlNumber}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{farm.farmer?.controlNumber}</div>
                     </td>
-                    <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{farm.mamcos?.name || '—'}</td>
-                    <td style={{ fontWeight: 600, color: '#F9FAFB' }}>{farm.socialHectares} ha</td>
+                    <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{farm.mamcos?.name || '—'}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{farm.socialHectares} ha</td>
                     <td>{gradeBadge(farm.grade)}</td>
                     <td>
                       <span className={`badge ${farm.hasIrrigation ? 'badge-green' : 'badge-gray'}`}>

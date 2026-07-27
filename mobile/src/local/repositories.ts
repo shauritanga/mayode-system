@@ -388,15 +388,141 @@ export const plotsApi = {
 // Crop cycles
 // ---------------------------------------------------------------------------
 
+const ACTIVITY_TYPE_ICONS: Record<string, string> = {
+  LAND_PREPARATION: '🚜', PLANTING: '🌱', FERTILIZING: '🧪', WEEDING: '🌿',
+  PEST_CONTROL: '🐛', IRRIGATION: '💧', HARVESTING: '🌾', DRYING: '☀️',
+  STORAGE: '📦', TRANSPORT: '🚚',
+};
+const COST_CATEGORY_ICONS: Record<string, string> = {
+  SEEDS: '🌱', FERTILIZER: '🧪', PESTICIDE: '🐛', HERBICIDE: '🌿', LABOR: '👷',
+  TILLAGE: '🚜', IRRIGATION: '💧', TRANSPORT: '🚚', MISCELLANEOUS: '💵',
+};
+
 export const cropCyclesApi = {
   async getAll() {
     return ok(await db.all(COLLECTIONS.cropCycles));
   },
+  async getOne(id: string) {
+    const cropCycle = await db.findById(COLLECTIONS.cropCycles, id);
+    if (!cropCycle) return fail('Crop cycle not found', 404);
+    const [activities, costs, revenues] = await Promise.all([
+      db.where(COLLECTIONS.activityLogs, (a) => a.cropCycleId === id),
+      db.where(COLLECTIONS.inputCosts, (c) => c.cropCycleId === id),
+      db.where(COLLECTIONS.revenues, (r) => r.cropCycleId === id),
+    ]);
+    activities.sort((a, b) => (a.activityDate < b.activityDate ? 1 : -1));
+    costs.sort((a, b) => (a.dateIncurred < b.dateIncurred ? 1 : -1));
+    revenues.sort((a, b) => (a.saleDate < b.saleDate ? 1 : -1));
+    return ok({ ...cropCycle, activities, costs, revenues });
+  },
   async getByFarmId(farmId: string) {
-    return ok(await db.where(COLLECTIONS.cropCycles, (c) => c.farmId === farmId));
+    const cycles = await db.where(COLLECTIONS.cropCycles, (c) => c.farmId === farmId);
+    cycles.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return ok(cycles);
+  },
+  async create(data: any) {
+    const farm = await db.findById(COLLECTIONS.farms, data.farmId);
+    const cropCycle = await db.insert(COLLECTIONS.cropCycles, {
+      ...data,
+      farmerId: farm?.farmerId,
+      status: 'PLANNED',
+      createdAt: nowIso(),
+    });
+    await logActivity(
+      farm?.farmerId,
+      'crop_cycle.started',
+      `Started crop cycle: ${data.season}`,
+      `${farm?.farmCode ?? ''}${data.riceVariety ? ` · ${data.riceVariety}` : ''}`,
+      '🌾',
+    );
+    return ok(cropCycle);
+  },
+  async update(id: string, data: any) {
+    const existing = await db.findById(COLLECTIONS.cropCycles, id);
+    const cropCycle = await db.update(COLLECTIONS.cropCycles, id, data);
+    if (data.status && existing && data.status !== existing.status) {
+      const farm = await db.findById(COLLECTIONS.farms, existing.farmId);
+      await logActivity(
+        existing.farmerId,
+        'crop_cycle.status',
+        `${existing.season} is now ${String(data.status).toLowerCase()}`,
+        farm?.farmCode,
+        data.status === 'HARVESTED' ? '🌾' : '🔄',
+      );
+    }
+    return ok(cropCycle);
   },
   async logActivity(data: any) {
-    return ok({ id: uid(), ...data, createdAt: nowIso() });
+    const cropCycle = await db.findById(COLLECTIONS.cropCycles, data.cropCycleId);
+    const activity = await db.insert(COLLECTIONS.activityLogs, { ...data, createdAt: nowIso() });
+    if (cropCycle) {
+      const farm = await db.findById(COLLECTIONS.farms, cropCycle.farmId);
+      const label = String(data.activityType).replace(/_/g, ' ').toLowerCase();
+      await logActivity(
+        cropCycle.farmerId,
+        'crop_cycle.activity',
+        `Logged ${label}`,
+        `${farm?.farmCode ?? ''} · ${cropCycle.season}`,
+        ACTIVITY_TYPE_ICONS[data.activityType] ?? '📝',
+      );
+    }
+    return ok(activity);
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Finance (expenses & revenue per crop cycle)
+// ---------------------------------------------------------------------------
+
+export const financeApi = {
+  async addCost(data: any) {
+    const cropCycle = await db.findById(COLLECTIONS.cropCycles, data.cropCycleId);
+    const cost = await db.insert(COLLECTIONS.inputCosts, { ...data, createdAt: nowIso() });
+    if (cropCycle) {
+      const farm = await db.findById(COLLECTIONS.farms, cropCycle.farmId);
+      await logActivity(
+        cropCycle.farmerId,
+        'expense.added',
+        `Recorded expense: ${data.itemName}`,
+        `TZS ${Number(data.totalCost).toLocaleString()} · ${farm?.farmCode ?? ''}`,
+        COST_CATEGORY_ICONS[data.category] ?? '💵',
+      );
+    }
+    return ok(cost);
+  },
+  async addRevenue(data: any) {
+    const cropCycle = await db.findById(COLLECTIONS.cropCycles, data.cropCycleId);
+    const revenue = await db.insert(COLLECTIONS.revenues, { ...data, createdAt: nowIso() });
+    if (cropCycle) {
+      const farm = await db.findById(COLLECTIONS.farms, cropCycle.farmId);
+      await logActivity(
+        cropCycle.farmerId,
+        'revenue.added',
+        `Sale recorded: ${data.quantityKg}kg`,
+        `TZS ${Number(data.totalRevenue).toLocaleString()} · ${farm?.farmCode ?? ''}`,
+        '💰',
+      );
+    }
+    return ok(revenue);
+  },
+  async getCropCycleSummary(cropCycleId: string) {
+    const costs = await db.where(COLLECTIONS.inputCosts, (c) => c.cropCycleId === cropCycleId);
+    const revenues = await db.where(COLLECTIONS.revenues, (r) => r.cropCycleId === cropCycleId);
+    const totalCosts = costs.reduce((sum, c) => sum + Number(c.totalCost || 0), 0);
+    const totalRevenues = revenues.reduce((sum, r) => sum + Number(r.totalRevenue || 0), 0);
+    const totalFairtradePremium = revenues.reduce((sum, r) => sum + Number(r.fairtradePremium || 0), 0);
+    return ok({
+      cropCycleId,
+      financials: {
+        totalCosts,
+        totalRevenues,
+        totalFairtradePremium,
+        netProfit: totalRevenues + totalFairtradePremium - totalCosts,
+        isProfitable: totalRevenues + totalFairtradePremium - totalCosts > 0,
+      },
+      costsDetail: costs,
+      revenuesDetail: revenues,
+    });
   },
 };
 
@@ -510,6 +636,16 @@ export const leasesApi = {
   async forFarm(_farmId: string) { return ok([]); },
   async renterConfirm(_id: string) { return ok({ success: true }); },
   async renterReject(_id: string) { return ok({ success: true }); },
+};
+
+export const correctionsApi = {
+  async submit(_farmId: string, data: any) { return ok({ id: uid(), reviewStatus: 'PENDING', ...data, createdAt: nowIso() }); },
+  async listForFarm(_farmId: string) { return ok([]); },
+};
+
+export const fieldSurveysApi = {
+  async create(_farmId: string, data: any) { return ok({ id: uid(), ...data, surveyDate: nowIso() }); },
+  async listForFarm(_farmId: string) { return ok([]); },
 };
 
 export const assignmentsApi = {

@@ -76,7 +76,7 @@ export default function MarketplacePage() {
     cursor: 'pointer',
     border: 'none',
     background: active ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
-    color: active ? '#10B981' : '#6B7280',
+    color: active ? 'var(--accent)' : 'var(--neutral-500)',
     borderColor: active ? 'rgba(16, 185, 129, 0.3)' : 'transparent',
     borderWidth: '1px',
     borderStyle: 'solid',
@@ -87,10 +87,10 @@ export default function MarketplacePage() {
     <div>
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-          <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, #8B5CF6, #A78BFA)', borderRadius: '9999px' }} />
-          <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: '#F9FAFB' }}>M-LAX Marketplace</h1>
+          <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--purple-500), var(--purple-400))', borderRadius: '9999px' }} />
+          <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>M-LAX Marketplace</h1>
         </div>
-        <p style={{ fontSize: '13px', color: '#6B7280', marginLeft: '14px' }}>Land Leasing, Tractor Services & Market Intelligence</p>
+        <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Land Leasing, Tractor Services & Market Intelligence</p>
       </div>
 
       {/* Tabs */}
@@ -101,14 +101,14 @@ export default function MarketplacePage() {
       </div>
 
       {loading ? (
-        <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>Loading marketplace data…</div>
+        <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading marketplace data…</div>
       ) : (
         <>
           {/* Land Listings */}
           {tab === 'land' && (
             <div className="glass-card" style={{ overflow: 'hidden' }}>
               {listings.length === 0 ? (
-                <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>No land listings posted yet.</div>
+                <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No land listings posted yet.</div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
                   <table className="data-table">
@@ -128,22 +128,22 @@ export default function MarketplacePage() {
                       {listings.map(l => (
                         <tr key={l.id}>
                           <td>
-                            <div style={{ fontSize: '12px', fontFamily: 'monospace', color: '#10B981', fontWeight: 600 }}>{l.farm?.farmCode}</div>
-                            <div style={{ fontSize: '11px', color: '#6B7280' }}>{l.farm?.socialHectares} ha · Grade {l.farm?.grade}</div>
+                            <div style={{ fontSize: '12px', fontFamily: 'monospace', color: 'var(--accent)', fontWeight: 600 }}>{l.farm?.farmCode}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{l.farm?.socialHectares} ha · Grade {l.farm?.grade}</div>
                           </td>
                           <td>
-                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#F9FAFB' }}>{l.owner?.firstName} {l.owner?.lastName}</div>
-                            <div style={{ fontSize: '11px', color: '#6B7280' }}>{l.owner?.controlNumber}</div>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{l.owner?.firstName} {l.owner?.lastName}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{l.owner?.controlNumber}</div>
                           </td>
-                          <td style={{ fontWeight: 700, color: '#10B981' }}>{Number(l.askingPrice).toLocaleString()} TZS</td>
-                          <td style={{ color: '#F59E0B', fontSize: '12px' }}>{l.suggestedPrice ? `${Number(l.suggestedPrice).toLocaleString()} TZS` : '—'}</td>
+                          <td style={{ fontWeight: 700, color: 'var(--accent)' }}>{Number(l.askingPrice).toLocaleString()} TZS</td>
+                          <td style={{ color: 'var(--gold-400)', fontSize: '12px' }}>{l.suggestedPrice ? `${Number(l.suggestedPrice).toLocaleString()} TZS` : '—'}</td>
                           <td>
                             <span className={`badge ${l.isFlashDeal ? 'badge-red' : l.dealType === 'RELATIONSHIP' ? 'badge-blue' : 'badge-gold'}`}>
                               {l.isFlashDeal ? '⚡ Flash' : l.dealType}
                             </span>
                           </td>
-                          <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{l.leaseDurationMonths} months</td>
-                          <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{(l.commissionRate * 100).toFixed(0)}%</td>
+                          <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{l.leaseDurationMonths} months</td>
+                          <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{(l.commissionRate * 100).toFixed(0)}%</td>
                           <td>{leaseStatusBadge(l.leaseStatus)}</td>
                         </tr>
                       ))}
@@ -158,25 +158,25 @@ export default function MarketplacePage() {
           {tab === 'tractors' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
               {tractors.length === 0 ? (
-                <div className="glass-card" style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px', gridColumn: '1/-1' }}>
+                <div className="glass-card" style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px', gridColumn: '1/-1' }}>
                   No tractors registered yet.
                 </div>
               ) : tractors.map((t, idx) => (
                 <div key={t.id} className="glass-card animate-fade-in" style={{ padding: '20px', animationDelay: `${idx * 0.05}s` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                     <div>
-                      <div style={{ fontSize: '15px', fontWeight: 700, color: '#F9FAFB' }}>{t.model || 'Unknown Model'}</div>
-                      <div style={{ fontSize: '12px', fontFamily: 'monospace', color: '#10B981', marginTop: '2px' }}>{t.registrationNo}</div>
+                      <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>{t.model || 'Unknown Model'}</div>
+                      <div style={{ fontSize: '12px', fontFamily: 'monospace', color: 'var(--accent)', marginTop: '2px' }}>{t.registrationNo}</div>
                     </div>
                     <span className={`badge ${t.isAvailable ? 'badge-green' : 'badge-red'}`}>
                       {t.isAvailable ? '✓ Available' : '✕ Booked'}
                     </span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px', color: '#9CA3AF' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px', color: 'var(--neutral-400)' }}>
                     <div>⚡ {t.horsePower ?? '—'} HP</div>
                     <div>📍 {t.location || '—'}</div>
                     <div>👤 {t.owner?.name || '—'}</div>
-                    <div style={{ color: '#10B981', fontWeight: 600 }}>
+                    <div style={{ color: 'var(--accent)', fontWeight: 600 }}>
                       {t.pricePerHectare ? `${Number(t.pricePerHectare).toLocaleString()} TZS/ha` : '—'}
                     </div>
                   </div>
@@ -189,7 +189,7 @@ export default function MarketplacePage() {
           {tab === 'prices' && (
             <div className="glass-card" style={{ overflow: 'hidden' }}>
               {prices.length === 0 ? (
-                <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>No market prices recorded yet.</div>
+                <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No market prices recorded yet.</div>
               ) : (
                 <table className="data-table">
                   <thead>
@@ -204,13 +204,13 @@ export default function MarketplacePage() {
                   <tbody>
                     {prices.map(p => (
                       <tr key={p.id}>
-                        <td style={{ fontWeight: 600, color: '#F9FAFB' }}>{p.commodity}</td>
-                        <td style={{ fontWeight: 700, color: '#10B981', fontSize: '15px' }}>
+                        <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.commodity}</td>
+                        <td style={{ fontWeight: 700, color: 'var(--accent)', fontSize: '15px' }}>
                           {Number(p.price).toLocaleString()}
                         </td>
-                        <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{p.market || '—'}</td>
-                        <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{p.source || '—'}</td>
-                        <td style={{ color: '#6B7280', fontSize: '12px' }}>
+                        <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{p.market || '—'}</td>
+                        <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{p.source || '—'}</td>
+                        <td style={{ color: 'var(--neutral-500)', fontSize: '12px' }}>
                           {new Date(p.recordedAt).toLocaleDateString('en-TZ', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </td>
                       </tr>

@@ -21,17 +21,17 @@ datasource db {
 // ============================================================
 
 model User {
-  id            String   @id @default(uuid())
-  email         String?  @unique
-  phone         String   @unique
-  passwordHash  String   @map("password_hash")
-  role          UserRole
-  isActive      Boolean  @default(true) @map("is_active")
-  language      String   @default("sw") // sw = Swahili, en = English
-  pushToken     String?  @map("push_token")  // Expo Push Notification Token
-  lastLoginAt   DateTime? @map("last_login_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id           String    @id @default(uuid())
+  email        String?   @unique
+  phone        String    @unique
+  passwordHash String    @map("password_hash")
+  role         UserRole
+  isActive     Boolean   @default(true) @map("is_active")
+  language     String    @default("sw") // sw = Swahili, en = English
+  pushToken    String?   @map("push_token") // Expo Push Notification Token
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   // Relations
   farmer          Farmer?
@@ -62,27 +62,27 @@ model RefreshToken {
 // ============================================================
 
 model Farmer {
-  id              String   @id @default(uuid())
-  userId          String   @unique @map("user_id")
-  controlNumber   String   @unique @map("control_number") // Auto-generated: MYD-00001
-  firstName       String   @map("first_name")
-  lastName        String   @map("last_name")
-  dateOfBirth     DateTime? @map("date_of_birth")
-  gender          Gender?
-  nationalId      String?  @unique @map("national_id")
-  photoUrl        String?  @map("photo_url")
-  village         String?
-  ward            String?
-  district        String?  @default("Mbarali")
-  region          String?  @default("Mbeya")
-  familySize      Int?     @map("family_size")
+  id            String    @id @default(uuid())
+  userId        String    @unique @map("user_id")
+  controlNumber String    @unique @map("control_number") // Auto-generated: MYD-00001
+  firstName     String    @map("first_name")
+  lastName      String    @map("last_name")
+  dateOfBirth   DateTime? @map("date_of_birth")
+  gender        Gender?
+  nationalId    String?   @unique @map("national_id")
+  photoUrl      String?   @map("photo_url")
+  village       String?
+  ward          String?
+  district      String?   @default("Mbarali")
+  region        String?   @default("Mbeya")
+  familySize    Int?      @map("family_size")
 
   // Extended profile (rice-production platform)
   email                  String?
-  residenceLatitude      Float?           @map("residence_latitude")
-  residenceLongitude     Float?           @map("residence_longitude")
-  educationLevel         EducationLevel?  @map("education_level")
-  farmingExperienceYears Int?             @map("farming_experience_years")
+  residenceLatitude      Float?          @map("residence_latitude")
+  residenceLongitude     Float?          @map("residence_longitude")
+  educationLevel         EducationLevel? @map("education_level")
+  farmingExperienceYears Int?            @map("farming_experience_years")
   dependents             Int?
 
   // Verification workflow
@@ -98,27 +98,27 @@ model Farmer {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   // Relations
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mamcosId          String?            @map("mamcos_id")
-  mamcos            Mamcos?            @relation(fields: [mamcosId], references: [id])
-  farms             Farm[]
-  cropCycles        CropCycle[]
-  payments          Payment[]          @relation("FarmerPayments")
-  landListings      LandListing[]      @relation("LandOwner")
-  rentals           LandListing[]      @relation("LandRenter")
-  tractorBookings   TractorBooking[]
-  inventoryRecords  InventoryRecord[]
-  loanRecords       LoanRecord[]
-  household         Household?
-  documents         Document[]
-  verifications     FarmerVerification[]
-  memberships          Membership[]
-  farmOwnerships       FarmOwnership[]          @relation("LegalOwner")
-  leasesAsOwner        FarmLease[]              @relation("LeaseOwner")
-  leasesAsRenter       FarmLease[]              @relation("LeaseRenter")
-  seasonalAssignments  SeasonalFarmAssignment[] @relation("ActiveFarmer")
-  rewardWins           RewardWinner[]
-  activities           Activity[]
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mamcosId            String?                  @map("mamcos_id")
+  mamcos              Mamcos?                  @relation(fields: [mamcosId], references: [id])
+  farms               Farm[]
+  cropCycles          CropCycle[]
+  payments            Payment[]                @relation("FarmerPayments")
+  landListings        LandListing[]            @relation("LandOwner")
+  rentals             LandListing[]            @relation("LandRenter")
+  tractorBookings     TractorBooking[]
+  inventoryRecords    InventoryRecord[]
+  loanRecords         LoanRecord[]
+  household           Household?
+  documents           Document[]
+  verifications       FarmerVerification[]
+  memberships         Membership[]
+  farmOwnerships      FarmOwnership[]          @relation("LegalOwner")
+  leasesAsOwner       FarmLease[]              @relation("LeaseOwner")
+  leasesAsRenter      FarmLease[]              @relation("LeaseRenter")
+  seasonalAssignments SeasonalFarmAssignment[] @relation("ActiveFarmer")
+  rewardWins          RewardWinner[]
+  activities          Activity[]
 
   @@map("farmers")
 }
@@ -128,14 +128,14 @@ model Farmer {
 // ============================================================
 
 model FieldOfficer {
-  id              String   @id @default(uuid())
-  userId          String   @unique @map("user_id")
-  employeeCode    String   @unique @map("employee_code")
-  firstName       String   @map("first_name")
-  lastName        String   @map("last_name")
-  assignedArea    String?  @map("assigned_area")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  userId       String   @unique @map("user_id")
+  employeeCode String   @unique @map("employee_code")
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  assignedArea String?  @map("assigned_area")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Relations
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -151,16 +151,16 @@ model FieldOfficer {
 // ============================================================
 
 model Mamcos {
-  id              String   @id @default(uuid())
-  name            String   @unique
-  location        String?
-  district        String?  @default("Mbarali")
-  totalHectares   Float?   @map("total_hectares")
-  chairmanName    String?  @map("chairman_name")
-  chairmanPhone   String?  @map("chairman_phone")
-  isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(uuid())
+  name          String   @unique
+  location      String?
+  district      String?  @default("Mbarali")
+  totalHectares Float?   @map("total_hectares")
+  chairmanName  String?  @map("chairman_name")
+  chairmanPhone String?  @map("chairman_phone")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
   secretary       MamcosSecretary?
@@ -173,14 +173,14 @@ model Mamcos {
 }
 
 model MamcosSecretary {
-  id              String   @id @default(uuid())
-  userId          String   @unique @map("user_id")
-  mamcosId        String   @unique @map("mamcos_id")
-  firstName       String   @map("first_name")
-  lastName        String   @map("last_name")
-  stabilityBonus  Float    @default(0) @map("stability_bonus")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  userId         String   @unique @map("user_id")
+  mamcosId       String   @unique @map("mamcos_id")
+  firstName      String   @map("first_name")
+  lastName       String   @map("last_name")
+  stabilityBonus Float    @default(0) @map("stability_bonus")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relations
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -194,82 +194,86 @@ model MamcosSecretary {
 // ============================================================
 
 model Farm {
-  id                String    @id @default(uuid())
-  farmCode          String    @unique @map("farm_code") // e.g., FP-JD-01
-  farmerId          String    @map("farmer_id")
-  mamcosId          String?   @map("mamcos_id")
-  name              String
-  plotNumber        String?   @map("plot_number")
-  blockNumber       String?   @map("block_number")
-  section           String?
-  village           String?
-  ward              String?
-  district          String?
-  region            String?
-  socialHectares    Float     @map("social_hectares")   // The "social" unit
-  actualAcres       Float?    @map("actual_acres")      // GPS-verified actual size
-  grade             FarmGrade @default(B)
-  vichuguuCount     Int       @default(0) @map("vichuguu_count")
-  hasIrrigation     Boolean   @default(false) @map("has_irrigation")
-  nearRoad          Boolean   @default(false) @map("near_road")
-  soilCondition     String?   @map("soil_condition")
-  photoUrls         String[]  @map("photo_urls")
+  id             String    @id @default(uuid())
+  farmCode       String    @unique @map("farm_code") // e.g., FP-JD-01
+  farmerId       String    @map("farmer_id")
+  mamcosId       String?   @map("mamcos_id")
+  name           String
+  plotNumber     String?   @map("plot_number")
+  blockNumber    String?   @map("block_number")
+  section        String?
+  village        String?
+  ward           String?
+  district       String?
+  region         String?
+  socialHectares Float     @map("social_hectares") // The "social" unit
+  actualAcres    Float?    @map("actual_acres") // GPS-verified actual size
+  grade          FarmGrade @default(B)
+  vichuguuCount  Int       @default(0) @map("vichuguu_count")
+  hasIrrigation  Boolean   @default(false) @map("has_irrigation")
+  nearRoad       Boolean   @default(false) @map("near_road")
+  soilCondition  String?   @map("soil_condition")
+  photoUrls      String[]  @map("photo_urls")
 
   // Extended farm characteristics
-  ownershipType     OwnershipType? @map("ownership_type")
-  ownerName         String?        @map("owner_name")
-  ownerPhone        String?        @map("owner_phone")
-  landTenure        String?        @map("land_tenure")
-  soilType          String?        @map("soil_type")
-  soilFertility     String?        @map("soil_fertility")
-  waterSource       String?        @map("water_source")
-  irrigationMethod  String?        @map("irrigation_method")
-  accessibility     String?
-  previousCrops     String[]       @map("previous_crops")
-  isVerified        Boolean   @default(false) @map("is_verified")
-  isAvailableForRent Boolean  @default(false) @map("is_available_for_rent")
-  isLeased          Boolean   @default(false) @map("is_leased")
-  leaseLockedUntil  DateTime? @map("lease_locked_until")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  ownershipType      OwnershipType? @map("ownership_type")
+  ownerName          String?        @map("owner_name")
+  ownerPhone         String?        @map("owner_phone")
+  landTenure         String?        @map("land_tenure")
+  soilType           String?        @map("soil_type")
+  soilFertility      String?        @map("soil_fertility")
+  waterSource        String?        @map("water_source")
+  irrigationMethod   String?        @map("irrigation_method")
+  accessibility      String?
+  previousCrops      String[]       @map("previous_crops")
+  isVerified         Boolean        @default(false) @map("is_verified")
+  isAvailableForRent Boolean        @default(false) @map("is_available_for_rent")
+  isLeased           Boolean        @default(false) @map("is_leased")
+  leaseLockedUntil   DateTime?      @map("lease_locked_until")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
 
   // GPS Boundary (stored as GeoJSON polygon via PostGIS)
   // We store coordinates as JSON since Prisma doesn't natively support PostGIS geometry
-  boundaryCoordinates Json?   @map("boundary_coordinates")
-  centerLatitude      Float?  @map("center_latitude")
-  centerLongitude     Float?  @map("center_longitude")
+  boundaryCoordinates Json?  @map("boundary_coordinates")
+  centerLatitude      Float? @map("center_latitude")
+  centerLongitude     Float? @map("center_longitude")
 
   // Relations
-  farmer            Farmer             @relation(fields: [farmerId], references: [id], onDelete: Cascade)
-  mamcos            Mamcos?            @relation(fields: [mamcosId], references: [id])
-  plots               Plot[]
-  cropCycles          CropCycle[]
-  landListings        LandListing[]
-  verifications       FarmVerification[]
-  inventoryRecords    InventoryRecord[]
-  documents           Document[]
-  ownerships          FarmOwnership[]
-  leases              FarmLease[]
-  seasonalAssignments SeasonalFarmAssignment[]
-  alerts              FarmAlert[]
-  photos              FarmPhoto[]
-  fieldSurveys        FarmFieldSurvey[]
+  farmer               Farmer                     @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  mamcos               Mamcos?                    @relation(fields: [mamcosId], references: [id])
+  plots                Plot[]
+  cropCycles           CropCycle[]
+  landListings         LandListing[]
+  verifications        FarmVerification[]
+  inventoryRecords     InventoryRecord[]
+  documents            Document[]
+  ownerships           FarmOwnership[]
+  leases               FarmLease[]
+  seasonalAssignments  SeasonalFarmAssignment[]
+  alerts               FarmAlert[]
+  photos               FarmPhoto[]
+  fieldSurveys         FarmFieldSurvey[]
+  disputes             Dispute[]
+  suggestedUpdates     SuggestedFarmUpdate[]
+  dataValues           FarmDataValue[]
+  confirmationRequests OwnerConfirmationRequest[]
 
   @@map("farms")
 }
 
 model FarmVerification {
-  id              String   @id @default(uuid())
-  farmId          String   @map("farm_id")
-  fieldOfficerId  String   @map("field_officer_id")
-  verifiedAt      DateTime @default(now()) @map("verified_at")
-  gpsVerified     Boolean  @default(false) @map("gps_verified")
-  neighborLeft    String?  @map("neighbor_left")
-  neighborRight   String?  @map("neighbor_right")
-  mamcosApproved  Boolean  @default(false) @map("mamcos_approved")
-  photoProofUrl   String?  @map("photo_proof_url")
-  notes           String?
-  createdAt       DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  farmId         String   @map("farm_id")
+  fieldOfficerId String   @map("field_officer_id")
+  verifiedAt     DateTime @default(now()) @map("verified_at")
+  gpsVerified    Boolean  @default(false) @map("gps_verified")
+  neighborLeft   String?  @map("neighbor_left")
+  neighborRight  String?  @map("neighbor_right")
+  mamcosApproved Boolean  @default(false) @map("mamcos_approved")
+  photoProofUrl  String?  @map("photo_proof_url")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
 
   // Relations
   farm         Farm         @relation(fields: [farmId], references: [id], onDelete: Cascade)
@@ -283,20 +287,20 @@ model FarmVerification {
 // ============================================================
 
 model CropCycle {
-  id              String         @id @default(uuid())
-  farmId          String         @map("farm_id")
-  plotId          String?        @map("plot_id")       // Farm → Plot → CropCycle (Phase 1+)
-  farmerId        String         @map("farmer_id")
-  season          String                               // e.g., "2025/2026 Main"
-  riceVariety     String?        @map("rice_variety")
-  plantingDate    DateTime?      @map("planting_date")
-  expectedHarvest DateTime?      @map("expected_harvest")
-  harvestDate     DateTime?      @map("harvest_date")
-  estimatedYieldKg Float?        @map("estimated_yield_kg")
-  actualYieldKg   Float?         @map("actual_yield_kg")
-  status          CropCycleStatus @default(PLANNED)
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
+  id               String          @id @default(uuid())
+  farmId           String          @map("farm_id")
+  plotId           String?         @map("plot_id") // Farm → Plot → CropCycle (Phase 1+)
+  farmerId         String          @map("farmer_id")
+  season           String // e.g., "2025/2026 Main"
+  riceVariety      String?         @map("rice_variety")
+  plantingDate     DateTime?       @map("planting_date")
+  expectedHarvest  DateTime?       @map("expected_harvest")
+  harvestDate      DateTime?       @map("harvest_date")
+  estimatedYieldKg Float?          @map("estimated_yield_kg")
+  actualYieldKg    Float?          @map("actual_yield_kg")
+  status           CropCycleStatus @default(PLANNED)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
 
   // Relations
   farm       Farm          @relation(fields: [farmId], references: [id])
@@ -310,19 +314,19 @@ model CropCycle {
 }
 
 model ActivityLog {
-  id              String       @id @default(uuid())
-  cropCycleId     String       @map("crop_cycle_id")
-  fieldOfficerId  String?      @map("field_officer_id")
-  activityType    ActivityType @map("activity_type")
-  activityDate    DateTime     @map("activity_date")
-  description     String?
-  inputsUsed      Json?        @map("inputs_used")  // { name, quantity, unit }
-  laborWorkers    Int?         @map("labor_workers")
-  laborHours      Float?       @map("labor_hours")
-  photoUrls       String[]     @map("photo_urls")
-  gpsLatitude     Float?       @map("gps_latitude")
-  gpsLongitude    Float?       @map("gps_longitude")
-  createdAt       DateTime     @default(now()) @map("created_at")
+  id             String       @id @default(uuid())
+  cropCycleId    String       @map("crop_cycle_id")
+  fieldOfficerId String?      @map("field_officer_id")
+  activityType   ActivityType @map("activity_type")
+  activityDate   DateTime     @map("activity_date")
+  description    String?
+  inputsUsed     Json?        @map("inputs_used") // { name, quantity, unit }
+  laborWorkers   Int?         @map("labor_workers")
+  laborHours     Float?       @map("labor_hours")
+  photoUrls      String[]     @map("photo_urls")
+  gpsLatitude    Float?       @map("gps_latitude")
+  gpsLongitude   Float?       @map("gps_longitude")
+  createdAt      DateTime     @default(now()) @map("created_at")
 
   // Relations
   cropCycle    CropCycle     @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
@@ -336,18 +340,18 @@ model ActivityLog {
 // ============================================================
 
 model InputCost {
-  id            String        @id @default(uuid())
-  cropCycleId   String        @map("crop_cycle_id")
-  category      CostCategory
-  itemName      String        @map("item_name")
-  quantity      Float?
-  unit          String?                              // kg, liters, bags, etc.
-  unitPrice     Float?        @map("unit_price")
-  totalCost     Float         @map("total_cost")     // In TZS
-  supplier      String?
-  receiptUrl    String?       @map("receipt_url")
-  dateIncurred  DateTime      @map("date_incurred")
-  createdAt     DateTime      @default(now()) @map("created_at")
+  id           String       @id @default(uuid())
+  cropCycleId  String       @map("crop_cycle_id")
+  category     CostCategory
+  itemName     String       @map("item_name")
+  quantity     Float?
+  unit         String? // kg, liters, bags, etc.
+  unitPrice    Float?       @map("unit_price")
+  totalCost    Float        @map("total_cost") // In TZS
+  supplier     String?
+  receiptUrl   String?      @map("receipt_url")
+  dateIncurred DateTime     @map("date_incurred")
+  createdAt    DateTime     @default(now()) @map("created_at")
 
   cropCycle CropCycle @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
 
@@ -355,16 +359,16 @@ model InputCost {
 }
 
 model Revenue {
-  id              String      @id @default(uuid())
-  cropCycleId     String      @map("crop_cycle_id")
-  revenueType     RevenueType @map("revenue_type")
-  quantityKg      Float       @map("quantity_kg")
-  pricePerKg      Float       @map("price_per_kg")
-  totalRevenue    Float       @map("total_revenue")   // In TZS
-  fairtradePremium Float?     @map("fairtrade_premium")
-  buyerId         String?     @map("buyer_id")
-  saleDate        DateTime    @map("sale_date")
-  createdAt       DateTime    @default(now()) @map("created_at")
+  id               String      @id @default(uuid())
+  cropCycleId      String      @map("crop_cycle_id")
+  revenueType      RevenueType @map("revenue_type")
+  quantityKg       Float       @map("quantity_kg")
+  pricePerKg       Float       @map("price_per_kg")
+  totalRevenue     Float       @map("total_revenue") // In TZS
+  fairtradePremium Float?      @map("fairtrade_premium")
+  buyerId          String?     @map("buyer_id")
+  saleDate         DateTime    @map("sale_date")
+  createdAt        DateTime    @default(now()) @map("created_at")
 
   cropCycle CropCycle @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
   buyer     Buyer?    @relation(fields: [buyerId], references: [id])
@@ -377,20 +381,20 @@ model Revenue {
 // ============================================================
 
 model Payment {
-  id              String        @id @default(uuid())
-  farmerId        String        @map("farmer_id")
-  membershipId    String?       @map("membership_id")
-  amount          Float                                // In TZS
-  paymentType     PaymentType   @map("payment_type")
-  status          PaymentStatus
-  mpesaRef        String?       @map("mpesa_ref")
-  orderReference  String?       @map("order_reference") // ClickPesa order reference
-  loanDeduction   Float?        @map("loan_deduction")
-  netAmount       Float?        @map("net_amount")
-  description     String?
-  paidAt          DateTime?     @map("paid_at")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  id             String        @id @default(uuid())
+  farmerId       String        @map("farmer_id")
+  membershipId   String?       @map("membership_id")
+  amount         Float // In TZS
+  paymentType    PaymentType   @map("payment_type")
+  status         PaymentStatus
+  mpesaRef       String?       @map("mpesa_ref")
+  orderReference String?       @map("order_reference") // ClickPesa order reference
+  loanDeduction  Float?        @map("loan_deduction")
+  netAmount      Float?        @map("net_amount")
+  description    String?
+  paidAt         DateTime?     @map("paid_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
   farmer     Farmer      @relation("FarmerPayments", fields: [farmerId], references: [id])
   membership Membership? @relation(fields: [membershipId], references: [id])
@@ -420,32 +424,32 @@ model LoanRecord {
 // ============================================================
 
 model InventoryRecord {
-  id              String          @id @default(uuid())
-  farmId          String          @map("farm_id")
-  farmerId        String          @map("farmer_id")
-  lotNumber       String?         @map("lot_number")
-  weightKg        Float           @map("weight_kg")
-  qualityGrade    String?         @map("quality_grade")
-  trackingCode    String          @unique @map("tracking_code")
-  warehouseLocation String?       @map("warehouse_location")
-  receivedDate    DateTime        @map("received_date")
-  status          InventoryStatus @default(RECEIVED)
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  id                String          @id @default(uuid())
+  farmId            String          @map("farm_id")
+  farmerId          String          @map("farmer_id")
+  lotNumber         String?         @map("lot_number")
+  weightKg          Float           @map("weight_kg")
+  qualityGrade      String?         @map("quality_grade")
+  trackingCode      String          @unique @map("tracking_code")
+  warehouseLocation String?         @map("warehouse_location")
+  receivedDate      DateTime        @map("received_date")
+  status            InventoryStatus @default(RECEIVED)
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
 
-  farm    Farm   @relation(fields: [farmId], references: [id])
-  farmer  Farmer @relation(fields: [farmerId], references: [id])
-  lot     Lot?   @relation(fields: [lotNumber], references: [lotNumber])
+  farm   Farm   @relation(fields: [farmId], references: [id])
+  farmer Farmer @relation(fields: [farmerId], references: [id])
+  lot    Lot?   @relation(fields: [lotNumber], references: [lotNumber])
 
   @@map("inventory_records")
 }
 
 model Lot {
-  id              String   @id @default(uuid())
-  lotNumber       String   @unique @map("lot_number")  // e.g., LOT-2025-001
-  totalWeightKg   Float    @map("total_weight_kg")
-  riceVariety     String?  @map("rice_variety")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  lotNumber     String   @unique @map("lot_number") // e.g., LOT-2025-001
+  totalWeightKg Float    @map("total_weight_kg")
+  riceVariety   String?  @map("rice_variety")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   inventoryRecords InventoryRecord[]
   sales            Sale[]
@@ -458,15 +462,15 @@ model Lot {
 // ============================================================
 
 model Buyer {
-  id                    String   @id @default(uuid())
-  name                  String
-  fairtradeCertNumber   String?  @unique @map("fairtrade_cert_number")
-  contactPerson         String?  @map("contact_person")
-  contactEmail          String?  @map("contact_email")
-  contactPhone          String?  @map("contact_phone")
-  isCertified           Boolean  @default(false) @map("is_certified")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  id                  String   @id @default(uuid())
+  name                String
+  fairtradeCertNumber String?  @unique @map("fairtrade_cert_number")
+  contactPerson       String?  @map("contact_person")
+  contactEmail        String?  @map("contact_email")
+  contactPhone        String?  @map("contact_phone")
+  isCertified         Boolean  @default(false) @map("is_certified")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   sales    Sale[]
   revenues Revenue[]
@@ -475,20 +479,20 @@ model Buyer {
 }
 
 model Sale {
-  id              String   @id @default(uuid())
-  invoiceNumber   String   @unique @map("invoice_number")
-  buyerId         String   @map("buyer_id")
-  lotId           String   @map("lot_id")
-  riceVariety     String?  @map("rice_variety")
-  quantityKg      Float    @map("quantity_kg")
-  packaging       String?
-  pricePerKg      Float    @map("price_per_kg")
-  fairtradePremium Float?  @map("fairtrade_premium")
-  totalRevenue    Float    @map("total_revenue")
-  paymentReceived Boolean  @default(false) @map("payment_received")
-  paymentDate     DateTime? @map("payment_date")
-  saleDate        DateTime @map("sale_date")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id               String    @id @default(uuid())
+  invoiceNumber    String    @unique @map("invoice_number")
+  buyerId          String    @map("buyer_id")
+  lotId            String    @map("lot_id")
+  riceVariety      String?   @map("rice_variety")
+  quantityKg       Float     @map("quantity_kg")
+  packaging        String?
+  pricePerKg       Float     @map("price_per_kg")
+  fairtradePremium Float?    @map("fairtrade_premium")
+  totalRevenue     Float     @map("total_revenue")
+  paymentReceived  Boolean   @default(false) @map("payment_received")
+  paymentDate      DateTime? @map("payment_date")
+  saleDate         DateTime  @map("sale_date")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
   buyer Buyer @relation(fields: [buyerId], references: [id])
   lot   Lot   @relation(fields: [lotId], references: [id])
@@ -501,33 +505,33 @@ model Sale {
 // ============================================================
 
 model LandListing {
-  id                  String       @id @default(uuid())
-  farmId              String       @map("farm_id")
-  ownerId             String       @map("owner_id")
-  renterId            String?      @map("renter_id")
-  askingPrice         Float        @map("asking_price")       // In TZS
-  suggestedPrice      Float?       @map("suggested_price")
-  finalPrice          Float?       @map("final_price")
-  dealType            DealType     @default(STANDARD) @map("deal_type")
-  commissionRate      Float        @map("commission_rate")
-  commissionAmount    Float?       @map("commission_amount")
-  leaseStatus         LeaseStatus  @default(DRAFT) @map("lease_status")
-  leaseDurationMonths Int          @map("lease_duration_months")
-  leaseStartDate      DateTime?    @map("lease_start_date")
-  leaseEndDate        DateTime?    @map("lease_end_date")
-  isFlashDeal         Boolean      @default(false) @map("is_flash_deal")
-  preferredRenterCode String?      @map("preferred_renter_code")
-  isMultiYear         Boolean      @default(false) @map("is_multi_year")
-  pricingModel        String?      @map("pricing_model")     // "fixed", "step_up", "rice_linked"
-  autoDropPrice       Float?       @map("auto_drop_price")   // Flexible pricing auto-drop
-  autoDropDays        Int?         @map("auto_drop_days")
-  createdAt           DateTime     @default(now()) @map("created_at")
-  updatedAt           DateTime     @updatedAt @map("updated_at")
+  id                  String      @id @default(uuid())
+  farmId              String      @map("farm_id")
+  ownerId             String      @map("owner_id")
+  renterId            String?     @map("renter_id")
+  askingPrice         Float       @map("asking_price") // In TZS
+  suggestedPrice      Float?      @map("suggested_price")
+  finalPrice          Float?      @map("final_price")
+  dealType            DealType    @default(STANDARD) @map("deal_type")
+  commissionRate      Float       @map("commission_rate")
+  commissionAmount    Float?      @map("commission_amount")
+  leaseStatus         LeaseStatus @default(DRAFT) @map("lease_status")
+  leaseDurationMonths Int         @map("lease_duration_months")
+  leaseStartDate      DateTime?   @map("lease_start_date")
+  leaseEndDate        DateTime?   @map("lease_end_date")
+  isFlashDeal         Boolean     @default(false) @map("is_flash_deal")
+  preferredRenterCode String?     @map("preferred_renter_code")
+  isMultiYear         Boolean     @default(false) @map("is_multi_year")
+  pricingModel        String?     @map("pricing_model") // "fixed", "step_up", "rice_linked"
+  autoDropPrice       Float?      @map("auto_drop_price") // Flexible pricing auto-drop
+  autoDropDays        Int?        @map("auto_drop_days")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
 
   // Relations
-  farm   Farm   @relation(fields: [farmId], references: [id])
-  owner  Farmer @relation("LandOwner", fields: [ownerId], references: [id])
-  renter Farmer? @relation("LandRenter", fields: [renterId], references: [id])
+  farm           Farm            @relation(fields: [farmId], references: [id])
+  owner          Farmer          @relation("LandOwner", fields: [ownerId], references: [id])
+  renter         Farmer?         @relation("LandRenter", fields: [renterId], references: [id])
   escrowPayments EscrowPayment[]
 
   @@map("land_listings")
@@ -538,12 +542,12 @@ model LandListing {
 // ============================================================
 
 model TractorOwner {
-  id              String   @id @default(uuid())
-  name            String
-  phone           String
-  location        String?
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  name      String
+  phone     String
+  location  String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   tractors Tractor[]
 
@@ -558,7 +562,7 @@ model Tractor {
   horsePower      Int?     @map("horse_power")
   isAvailable     Boolean  @default(true) @map("is_available")
   location        String?
-  pricePerHectare Float?   @map("price_per_hectare")   // Base price in TZS
+  pricePerHectare Float?   @map("price_per_hectare") // Base price in TZS
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -569,22 +573,22 @@ model Tractor {
 }
 
 model TractorBooking {
-  id              String        @id @default(uuid())
-  tractorId       String        @map("tractor_id")
-  farmerId        String        @map("farmer_id")
-  hectares        Float
-  terrainGrade    FarmGrade     @map("terrain_grade")
-  basePrice       Float         @map("base_price")
-  terrainSurcharge Float?       @map("terrain_surcharge")
-  totalPrice      Float         @map("total_price")
-  commissionRate  Float         @map("commission_rate")
-  commissionAmount Float        @map("commission_amount")
-  status          BookingStatus @default(PENDING)
-  scheduledDate   DateTime      @map("scheduled_date")
-  completedAt     DateTime?     @map("completed_at")
-  farmerConfirmed Boolean       @default(false) @map("farmer_confirmed")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  id               String        @id @default(uuid())
+  tractorId        String        @map("tractor_id")
+  farmerId         String        @map("farmer_id")
+  hectares         Float
+  terrainGrade     FarmGrade     @map("terrain_grade")
+  basePrice        Float         @map("base_price")
+  terrainSurcharge Float?        @map("terrain_surcharge")
+  totalPrice       Float         @map("total_price")
+  commissionRate   Float         @map("commission_rate")
+  commissionAmount Float         @map("commission_amount")
+  status           BookingStatus @default(PENDING)
+  scheduledDate    DateTime      @map("scheduled_date")
+  completedAt      DateTime?     @map("completed_at")
+  farmerConfirmed  Boolean       @default(false) @map("farmer_confirmed")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
 
   tractor Tractor @relation(fields: [tractorId], references: [id])
   farmer  Farmer  @relation(fields: [farmerId], references: [id])
@@ -597,15 +601,15 @@ model TractorBooking {
 // ============================================================
 
 model EscrowPayment {
-  id              String        @id @default(uuid())
-  listingId       String        @map("listing_id")
-  amount          Float
-  status          PaymentStatus
-  mpesaRef        String?       @map("mpesa_ref")
-  depositedAt     DateTime?     @map("deposited_at")
-  releasedAt      DateTime?     @map("released_at")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  id          String        @id @default(uuid())
+  listingId   String        @map("listing_id")
+  amount      Float
+  status      PaymentStatus
+  mpesaRef    String?       @map("mpesa_ref")
+  depositedAt DateTime?     @map("deposited_at")
+  releasedAt  DateTime?     @map("released_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
 
   listing LandListing @relation(fields: [listingId], references: [id])
 
@@ -617,13 +621,13 @@ model EscrowPayment {
 // ============================================================
 
 model MarketPrice {
-  id        String   @id @default(uuid())
-  commodity String                  // e.g., "rice_sack_100kg"
-  price     Float                   // In TZS
-  market    String?                 // e.g., "Mafinga"
-  source    String?
+  id         String   @id @default(uuid())
+  commodity  String // e.g., "rice_sack_100kg"
+  price      Float // In TZS
+  market     String? // e.g., "Mafinga"
+  source     String?
   recordedAt DateTime @map("recorded_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("market_prices")
 }
@@ -635,7 +639,7 @@ model MarketPrice {
 model AuditLog {
   id         String   @id @default(uuid())
   userId     String?  @map("user_id")
-  action     String                    // e.g., "farmer.create", "payment.release"
+  action     String // e.g., "farmer.create", "payment.release"
   entityType String   @map("entity_type")
   entityId   String   @map("entity_id")
   oldData    Json?    @map("old_data")
@@ -650,13 +654,13 @@ model AuditLog {
 }
 
 model SmsLog {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   phone     String
   message   String
-  type      String                  // "payment_confirmation", "alert", "notification"
-  status    String   @default("pending")
+  type      String // "payment_confirmation", "alert", "notification"
+  status    String    @default("pending")
   sentAt    DateTime? @map("sent_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   @@map("sms_logs")
 }
@@ -701,13 +705,13 @@ model Ward {
 
 model Plot {
   id                  String   @id @default(uuid())
-  plotCode            String   @unique @map("plot_code")   // e.g., FP-JD-01-P1
+  plotCode            String   @unique @map("plot_code") // e.g., FP-JD-01-P1
   farmId              String   @map("farm_id")
   name                String?
   sizeAcres           Float?   @map("size_acres")
   soilCondition       String?  @map("soil_condition")
   irrigationStatus    String?  @map("irrigation_status")
-  currentStage        String?  @map("current_stage")       // denormalized from active CropCycle
+  currentStage        String?  @map("current_stage") // denormalized from active CropCycle
   boundaryCoordinates Json?    @map("boundary_coordinates")
   centerLatitude      Float?   @map("center_latitude")
   centerLongitude     Float?   @map("center_longitude")
@@ -741,13 +745,13 @@ model FarmerVerification {
 }
 
 model Household {
-  id                  String  @id @default(uuid())
-  farmerId            String  @unique @map("farmer_id")
-  householdSize       Int?    @map("household_size")
+  id                  String   @id @default(uuid())
+  farmerId            String   @unique @map("farmer_id")
+  householdSize       Int?     @map("household_size")
   dependents          Int?
-  adultsCount         Int?    @map("adults_count")
-  childrenCount       Int?    @map("children_count")
-  primaryIncomeSource String? @map("primary_income_source")
+  adultsCount         Int?     @map("adults_count")
+  childrenCount       Int?     @map("children_count")
+  primaryIncomeSource String?  @map("primary_income_source")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
@@ -781,7 +785,7 @@ model Document {
 model Notification {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
-  type      String                          // e.g., "verification.pending", "activity.delayed"
+  type      String // e.g., "verification.pending", "activity.delayed"
   title     String
   body      String
   data      Json?
@@ -799,7 +803,7 @@ model Notification {
 model Activity {
   id        String   @id @default(uuid())
   farmerId  String   @map("farmer_id")
-  type      String                          // e.g., "farm.created", "plot.mapped"
+  type      String // e.g., "farm.created", "plot.mapped"
   title     String
   subtitle  String?
   icon      String?
@@ -835,6 +839,7 @@ model FarmingSeason {
   leases          FarmLease[]
   assignments     SeasonalFarmAssignment[]
   rewardCampaigns RewardCampaign[]
+  disputes        Dispute[]
 
   @@map("farming_seasons")
 }
@@ -876,14 +881,25 @@ model FarmLease {
   officerConfirmationStatus VerificationStatus @default(PENDING) @map("officer_confirmation_status")
   status                    LeaseStatus        @default(PENDING_VERIFICATION)
   notes                     String?
-  createdAt                 DateTime           @default(now()) @map("created_at")
-  updatedAt                 DateTime           @updatedAt @map("updated_at")
+  agreementDocumentUrl      String?            @map("agreement_document_url")
 
-  farm          Farm          @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  ownerFarmer   Farmer?       @relation("LeaseOwner", fields: [ownerFarmerId], references: [id])
-  renterFarmer  Farmer?       @relation("LeaseRenter", fields: [renterFarmerId], references: [id])
-  farmingSeason FarmingSeason @relation(fields: [farmingSeasonId], references: [id])
+  // Officer-assisted verification evidence trail (prompt.md §10 / prompt2.md §23).
+  officerVerificationMethod OfficerVerificationMethod? @map("officer_verification_method")
+  officerContactedName      String?                    @map("officer_contacted_name")
+  officerContactedPhone     String?                    @map("officer_contacted_phone")
+  officerEvidenceUrls       String[]                   @map("officer_evidence_urls")
+  officerDecidedAt          DateTime?                  @map("officer_decided_at")
+  officerDecidedByUserId    String?                    @map("officer_decided_by_user_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  farm          Farm                     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  ownerFarmer   Farmer?                  @relation("LeaseOwner", fields: [ownerFarmerId], references: [id])
+  renterFarmer  Farmer?                  @relation("LeaseRenter", fields: [renterFarmerId], references: [id])
+  farmingSeason FarmingSeason            @relation(fields: [farmingSeasonId], references: [id])
   assignments   SeasonalFarmAssignment[]
+  disputes      Dispute[]
 
   @@index([farmId, farmingSeasonId])
   @@index([renterPhone])
@@ -917,15 +933,15 @@ model SeasonalFarmAssignment {
 // ============================================================
 
 model MembershipPlan {
-  id           String   @id @default(uuid())
-  name         String   @unique
+  id           String                 @id @default(uuid())
+  name         String                 @unique
   description  String?
-  priceTzs     Float    @map("price_tzs")
+  priceTzs     Float                  @map("price_tzs")
   durationType MembershipDurationType @default(SEASON) @map("duration_type")
   features     String[]
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  isActive     Boolean                @default(true) @map("is_active")
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
 
   memberships Membership[]
 
@@ -933,23 +949,23 @@ model MembershipPlan {
 }
 
 model Membership {
-  id               String           @id @default(uuid())
-  userId           String           @map("user_id")
-  farmerId         String?          @map("farmer_id")
-  planId           String           @map("plan_id")
-  farmingSeasonId  String?          @map("farming_season_id")
-  status           MembershipStatus @default(PAYMENT_PENDING)
-  paymentStatus    PaymentStatus    @default(PENDING) @map("payment_status")
-  paymentReference String?          @map("payment_reference")
-  orderReference   String?          @unique @map("order_reference") // ClickPesa order reference
-  amountTzs        Float?           @map("amount_tzs")
-  startDate        DateTime?        @map("start_date")
-  endDate          DateTime?        @map("end_date")
-  activatedAt      DateTime?        @map("activated_at")
-  expiryReminderSentAt DateTime?    @map("expiry_reminder_sent_at")
-  approvedByUserId String?          @map("approved_by_user_id")
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
+  id                   String           @id @default(uuid())
+  userId               String           @map("user_id")
+  farmerId             String?          @map("farmer_id")
+  planId               String           @map("plan_id")
+  farmingSeasonId      String?          @map("farming_season_id")
+  status               MembershipStatus @default(PAYMENT_PENDING)
+  paymentStatus        PaymentStatus    @default(PENDING) @map("payment_status")
+  paymentReference     String?          @map("payment_reference")
+  orderReference       String?          @unique @map("order_reference") // ClickPesa order reference
+  amountTzs            Float?           @map("amount_tzs")
+  startDate            DateTime?        @map("start_date")
+  endDate              DateTime?        @map("end_date")
+  activatedAt          DateTime?        @map("activated_at")
+  expiryReminderSentAt DateTime?        @map("expiry_reminder_sent_at")
+  approvedByUserId     String?          @map("approved_by_user_id")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   farmer        Farmer?        @relation(fields: [farmerId], references: [id])
@@ -1016,12 +1032,12 @@ model RewardCampaign {
   status               RewardCampaignStatus @default(DRAFT)
 
   // Auditable selection record (prompt §16): reproducible from seed + snapshot.
-  selectionSeed             String?  @map("selection_seed")
-  selectionAlgorithmVersion String?  @map("selection_algorithm_version")
-  eligibleSnapshot          Json?    @map("eligible_snapshot") // farmer ids considered
+  selectionSeed             String?   @map("selection_seed")
+  selectionAlgorithmVersion String?   @map("selection_algorithm_version")
+  eligibleSnapshot          Json?     @map("eligible_snapshot") // farmer ids considered
   selectedAt                DateTime? @map("selected_at")
-  createdByUserId           String?  @map("created_by_user_id")
-  approvedByUserId          String?  @map("approved_by_user_id")
+  createdByUserId           String?   @map("created_by_user_id")
+  approvedByUserId          String?   @map("approved_by_user_id")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1033,18 +1049,18 @@ model RewardCampaign {
 }
 
 model RewardWinner {
-  id         String             @id @default(uuid())
-  campaignId String             @map("campaign_id")
-  farmerId   String             @map("farmer_id")
-  farmId     String?            @map("farm_id")
-  rewardType RewardType         @map("reward_type")
-  quantity   Int                @default(1)
-  status     RewardWinnerStatus @default(SELECTED)
-  notifiedAt DateTime?          @map("notified_at")
-  confirmedAt DateTime?         @map("confirmed_at")
-  notes      String?
-  createdAt  DateTime           @default(now()) @map("created_at")
-  updatedAt  DateTime           @updatedAt @map("updated_at")
+  id          String             @id @default(uuid())
+  campaignId  String             @map("campaign_id")
+  farmerId    String             @map("farmer_id")
+  farmId      String?            @map("farm_id")
+  rewardType  RewardType         @map("reward_type")
+  quantity    Int                @default(1)
+  status      RewardWinnerStatus @default(SELECTED)
+  notifiedAt  DateTime?          @map("notified_at")
+  confirmedAt DateTime?          @map("confirmed_at")
+  notes       String?
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
 
   campaign RewardCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   farmer   Farmer         @relation(fields: [farmerId], references: [id])
@@ -1063,34 +1079,138 @@ model RewardWinner {
 // owner has an account; when the owner registers and confirms, it is materialized
 // into a real Farm (`farmId` links the two).
 model FarmRegistryRecord {
-  id               String   @id @default(uuid())
-  sourceMamcosId   String?  @map("source_mamcos_id")
-  sourceOfficerId  String?  @map("source_officer_id") // user id who entered it
-  ownerName        String   @map("owner_name")
-  ownerPhone       String   @map("owner_phone")
-  ownerNationalId  String?  @map("owner_national_id")
-  name             String?
-  plotNumber       String?  @map("plot_number")
-  block            String?
-  canal            String?
-  scheme           String?
-  section          String?
-  village          String?
-  ward             String?
-  district         String?
-  region           String?
-  farmSizeHectares Float?   @map("farm_size_hectares")
-  status           FarmRegistryStatus @default(OWNER_CONFIRMATION_PENDING)
-  notes            String?
-  farmId           String?  @unique @map("farm_id") // set once claimed/materialized
-  claimedByFarmerId String? @map("claimed_by_farmer_id")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  id                String             @id @default(uuid())
+  sourceMamcosId    String?            @map("source_mamcos_id")
+  sourceOfficerId   String?            @map("source_officer_id") // user id who entered it
+  ownerName         String             @map("owner_name")
+  ownerPhone        String             @map("owner_phone")
+  ownerNationalId   String?            @map("owner_national_id")
+  name              String?
+  plotNumber        String?            @map("plot_number")
+  block             String?
+  canal             String?
+  scheme            String?
+  section           String?
+  village           String?
+  ward              String?
+  district          String?
+  region            String?
+  farmSizeHectares  Float?             @map("farm_size_hectares")
+  status            FarmRegistryStatus @default(OWNER_CONFIRMATION_PENDING)
+  notes             String?
+  farmId            String?            @unique @map("farm_id") // set once claimed/materialized
+  claimedByFarmerId String?            @map("claimed_by_farmer_id")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
 
-  mamcos Mamcos? @relation(fields: [sourceMamcosId], references: [id])
+  mamcos               Mamcos?                    @relation(fields: [sourceMamcosId], references: [id])
+  confirmationRequests OwnerConfirmationRequest[]
 
   @@index([ownerPhone, status])
   @@map("farm_registry_records")
+}
+
+// Expiring, auditable owner-confirmation request sent by SMS/USSD/app
+// (prompt2 §5 / prompt.md §10): records the exact message sent, the channel,
+// and the eventual response so a stale or repeated request can't be replayed.
+model OwnerConfirmationRequest {
+  id               String                    @id @default(uuid())
+  farmId           String?                   @map("farm_id")
+  registryRecordId String?                   @map("registry_record_id")
+  phone            String
+  channel          ConfirmationChannel       @default(SMS)
+  message          String
+  status           ConfirmationRequestStatus @default(SENT)
+  response         String?
+  resendCount      Int                       @default(0) @map("resend_count")
+  sentAt           DateTime                  @default(now()) @map("sent_at")
+  expiresAt        DateTime                  @map("expires_at")
+  respondedAt      DateTime?                 @map("responded_at")
+  createdAt        DateTime                  @default(now()) @map("created_at")
+
+  farm           Farm?               @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  registryRecord FarmRegistryRecord? @relation(fields: [registryRecordId], references: [id], onDelete: Cascade)
+
+  @@index([phone, status])
+  @@index([farmId])
+  @@index([registryRecordId])
+  @@map("owner_confirmation_requests")
+}
+
+// A farmer- or officer-submitted correction to a farm field. Never overwrites
+// verified data silently (prompt2 §19) — held for review, then merged.
+model SuggestedFarmUpdate {
+  id                String                @id @default(uuid())
+  farmId            String                @map("farm_id")
+  submittedByUserId String?               @map("submitted_by_user_id")
+  fieldName         String                @map("field_name")
+  currentValue      String?               @map("current_value")
+  suggestedValue    String                @map("suggested_value")
+  evidenceUrls      String[]              @map("evidence_urls")
+  reviewStatus      SuggestedUpdateStatus @default(PENDING) @map("review_status")
+  reviewedByUserId  String?               @map("reviewed_by_user_id")
+  reviewNotes       String?               @map("review_notes")
+  reviewedAt        DateTime?             @map("reviewed_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId, reviewStatus])
+  @@map("suggested_farm_updates")
+}
+
+// Source-tracked value for a single farm attribute (prompt2 §16/§18). Multiple
+// sources may report the same field; conflicting values are flagged rather
+// than silently overwritten, and an officer picks the approved final value.
+model FarmDataValue {
+  id                 String             @id @default(uuid())
+  farmId             String             @map("farm_id")
+  fieldName          String             @map("field_name")
+  value              String
+  sourceType         FarmDataSource     @map("source_type")
+  sourceId           String?            @map("source_id")
+  confidenceLevel    Int?               @map("confidence_level") // 0–100
+  verificationStatus VerificationStatus @default(PENDING) @map("verification_status")
+  hasConflict        Boolean            @default(false) @map("has_conflict")
+  recordedAt         DateTime           @default(now()) @map("recorded_at")
+  verifiedAt         DateTime?          @map("verified_at")
+  supersededById     String?            @map("superseded_by_id")
+
+  farm         Farm            @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  supersededBy FarmDataValue?  @relation("FarmDataValueSupersedes", fields: [supersededById], references: [id])
+  supersedes   FarmDataValue[] @relation("FarmDataValueSupersedes")
+
+  @@index([farmId, fieldName])
+  @@map("farm_data_values")
+}
+
+// Ownership/rental/boundary dispute (prompt.md §22). While OPEN, sensitive
+// farm access (leasing, ownership confirmation) is restricted until an
+// authorized officer resolves it.
+model Dispute {
+  id                String        @id @default(uuid())
+  farmId            String?       @map("farm_id")
+  leaseId           String?       @map("lease_id")
+  farmingSeasonId   String?       @map("farming_season_id")
+  type              DisputeType
+  description       String
+  claimantIds       String[]      @map("claimant_ids")
+  evidenceUrls      String[]      @map("evidence_urls")
+  raisedByUserId    String?       @map("raised_by_user_id")
+  assignedOfficerId String?       @map("assigned_officer_id")
+  status            DisputeStatus @default(OPEN)
+  resolution        String?
+  resolvedByUserId  String?       @map("resolved_by_user_id")
+  resolvedAt        DateTime?     @map("resolved_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  farm          Farm?          @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  lease         FarmLease?     @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  farmingSeason FarmingSeason? @relation(fields: [farmingSeasonId], references: [id])
+
+  @@index([farmId, status])
+  @@map("disputes")
 }
 
 // ============================================================
@@ -1116,11 +1236,11 @@ model FarmPhoto {
 // One field visit's data (owner comment §2.6 / prompt2 §15): GPS, soil, road &
 // water access, and physical characteristics collected by a MAYODE officer.
 model FarmFieldSurvey {
-  id                  String         @id @default(uuid())
-  farmId              String         @map("farm_id")
-  surveyedById        String?        @map("surveyed_by_id")
-  surveyDate          DateTime       @default(now()) @map("survey_date")
-  source              FarmDataSource @default(FIELD_OFFICER)
+  id           String         @id @default(uuid())
+  farmId       String         @map("farm_id")
+  surveyedById String?        @map("surveyed_by_id")
+  surveyDate   DateTime       @default(now()) @map("survey_date")
+  source       FarmDataSource @default(FIELD_OFFICER)
 
   // Soil
   soilPh            Float?  @map("soil_ph")
@@ -1270,6 +1390,19 @@ enum VerificationStatus {
   VERIFIED
   REJECTED
   SUSPENDED
+  NEEDS_MORE_INFO
+  DISPUTED
+}
+
+enum OfficerVerificationMethod {
+  PHONE_CALL
+  IN_PERSON
+  VIDEO_CALL
+  DOCUMENT_REVIEW
+  BLOCK_LEADER
+  CANAL_LEADER
+  COOPERATIVE_LEADER
+  NEIGHBOR
 }
 
 enum OwnershipType {
@@ -1434,4 +1567,47 @@ enum FarmRegistryStatus {
   DISPUTED
   INACTIVE
   ARCHIVED
+}
+
+enum ConfirmationChannel {
+  SMS
+  USSD
+  APP
+  OFFICER
+}
+
+enum ConfirmationRequestStatus {
+  SENT
+  CONFIRMED
+  REJECTED
+  EXPIRED
+}
+
+enum SuggestedUpdateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  MERGED
+}
+
+enum DisputeType {
+  OWNER_REJECTS_RENTER
+  DUPLICATE_RENTER_CLAIM
+  COOPERATIVE_OWNER_CONFLICT
+  UNKNOWN_OWNER
+  INCORRECT_PLOT_NUMBER
+  BOUNDARY_OVERLAP
+  NEIGHBOR_CONFLICT
+  PREVIOUS_RENTER_CLAIM
+  OWNERSHIP_TRANSFER_DISPUTE
+  OTHER
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  FIELD_VERIFICATION_REQUIRED
+  RESOLVED
+  REJECTED
+  ESCALATED
 }

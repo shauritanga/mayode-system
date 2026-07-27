@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DisputesModule } from '../disputes/disputes.module';
 import { FarmLeasesService } from './farm-leases.service';
 import {
   FarmLeasesController,
@@ -7,6 +8,7 @@ import {
 } from './farm-leases.controller';
 
 @Module({
+  imports: [DisputesModule],
   controllers: [
     FarmLeasesController,
     SeasonalAssignmentsController,

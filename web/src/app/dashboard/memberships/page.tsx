@@ -105,10 +105,10 @@ export default function MembershipsPage() {
       <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, #10B981, #34D399)', borderRadius: '9999px' }} />
-            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: '#F9FAFB' }}>Memberships</h1>
+            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--accent), var(--green-400))', borderRadius: '9999px' }} />
+            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Memberships</h1>
           </div>
-          <p style={{ fontSize: '13px', color: '#6B7280', marginLeft: '14px' }}>Premium plans and farmer membership status — gates farm analytics</p>
+          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Premium plans and farmer membership status — gates farm analytics</p>
         </div>
         {tab === 'plans' && (
           <button className="btn-primary" onClick={() => setShowForm(s => !s)}>
@@ -119,13 +119,13 @@ export default function MembershipsPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         {[
-          { label: 'Active members', value: active, color: '#10B981' },
-          { label: 'Awaiting payment', value: pending, color: '#F59E0B' },
-          { label: 'Plans', value: plans.length, color: '#3B82F6' },
+          { label: 'Active members', value: active, color: 'var(--accent)' },
+          { label: 'Awaiting payment', value: pending, color: 'var(--gold-400)' },
+          { label: 'Plans', value: plans.length, color: 'var(--blue-500)' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>
-            <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>{s.label}</div>
+            <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -145,7 +145,7 @@ export default function MembershipsPage() {
 
       {tab === 'plans' && showForm && (
         <div className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
-          <h3 style={{ color: '#F9FAFB', fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>New membership plan</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>New membership plan</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
             <Field label="Plan name *" value={form.name} onChange={v => set('name', v)} placeholder="Season Premium" />
             <Field label="Price (TZS) *" value={form.priceTzs} onChange={v => set('priceTzs', v)} placeholder="15000" />
@@ -160,7 +160,7 @@ export default function MembershipsPage() {
             <Field label="Description" value={form.description} onChange={v => set('description', v)} placeholder="Full analytics for one season" />
             <Field label="Features (comma-separated)" value={form.features} onChange={v => set('features', v)} placeholder="Farm analytics, Yield forecasts" />
           </div>
-          {error && <div style={{ color: '#F87171', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
+          {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
           <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
             <button className="btn-primary" onClick={submitPlan} disabled={submitting}>
               {submitting ? 'Saving…' : 'Create plan'}
@@ -172,10 +172,10 @@ export default function MembershipsPage() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>Loading…</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading…</div>
         ) : tab === 'members' ? (
           memberships.length === 0 ? (
-            <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>No memberships yet.</div>
+            <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No memberships yet.</div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table className="data-table">
@@ -185,11 +185,11 @@ export default function MembershipsPage() {
                 <tbody>
                   {memberships.map(m => (
                     <tr key={m.id}>
-                      <td style={{ color: '#F9FAFB', fontSize: '13px', fontWeight: 600 }}>{m.farmer ? `${m.farmer.firstName} ${m.farmer.lastName}` : '—'}</td>
-                      <td style={{ color: '#9CA3AF', fontSize: '12px', fontFamily: 'monospace' }}>{m.user?.phone || '—'}</td>
-                      <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{m.plan?.name || '—'}</td>
-                      <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{m.farmingSeason?.name || '—'}</td>
-                      <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{m.startDate ? `${fmtDate(m.startDate)} → ${fmtDate(m.endDate)}` : '—'}</td>
+                      <td style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>{m.farmer ? `${m.farmer.firstName} ${m.farmer.lastName}` : '—'}</td>
+                      <td style={{ color: 'var(--neutral-400)', fontSize: '12px', fontFamily: 'monospace' }}>{m.user?.phone || '—'}</td>
+                      <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{m.plan?.name || '—'}</td>
+                      <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{m.farmingSeason?.name || '—'}</td>
+                      <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{m.startDate ? `${fmtDate(m.startDate)} → ${fmtDate(m.endDate)}` : '—'}</td>
                       <td>{statusBadge(m.status)}</td>
                       <td>
                         {(m.status === 'PENDING' || m.status === 'PAYMENT_PENDING') && (
@@ -211,7 +211,7 @@ export default function MembershipsPage() {
           )
         ) : (
           plans.length === 0 ? (
-            <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>No plans yet.</div>
+            <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No plans yet.</div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table className="data-table">
@@ -221,10 +221,10 @@ export default function MembershipsPage() {
                 <tbody>
                   {plans.map(p => (
                     <tr key={p.id}>
-                      <td style={{ color: '#F9FAFB', fontSize: '13px', fontWeight: 600 }}>{p.name}</td>
-                      <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{p.priceTzs.toLocaleString()} TZS</td>
-                      <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{p.durationType}</td>
-                      <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{(p.features || []).join(', ') || '—'}</td>
+                      <td style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>{p.name}</td>
+                      <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{p.priceTzs.toLocaleString()} TZS</td>
+                      <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{p.durationType}</td>
+                      <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{(p.features || []).join(', ') || '—'}</td>
                       <td>{p.isActive ? <span className="badge badge-green">Active</span> : <span className="badge badge-gray">Inactive</span>}</td>
                     </tr>
                   ))}
@@ -243,7 +243,7 @@ function fmtDate(d?: string) {
   return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: '#9CA3AF', marginBottom: '5px', fontWeight: 600 };
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: 'var(--neutral-400)', marginBottom: '5px', fontWeight: 600 };
 
 function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (

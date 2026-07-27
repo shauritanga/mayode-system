@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Home01Icon,
@@ -18,8 +18,11 @@ import {
   Wallet01Icon,
   ShoppingCart02Icon,
   Location01Icon,
+  AlertCircleIcon,
+  FileEditIcon,
+  MapsSearchIcon,
 } from '@hugeicons/core-free-icons';
-import { useAuthStore } from '@/store/auth.store';
+import UserMenu from './UserMenu';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home01Icon },
@@ -28,6 +31,9 @@ const navItems = [
   { href: '/dashboard/farm-registry', label: 'Farm Registry', icon: ClipboardIcon },
   { href: '/dashboard/seasons', label: 'Seasons', icon: Calendar01Icon },
   { href: '/dashboard/leases', label: 'Leases', icon: HandshakeIcon },
+  { href: '/dashboard/disputes', label: 'Disputes', icon: AlertCircleIcon },
+  { href: '/dashboard/corrections', label: 'Corrections', icon: FileEditIcon },
+  { href: '/dashboard/field-surveys', label: 'Field Surveys', icon: MapsSearchIcon },
   { href: '/dashboard/memberships', label: 'Memberships', icon: StarIcon },
   { href: '/dashboard/alerts', label: 'Alerts', icon: BellIcon },
   { href: '/dashboard/rewards', label: 'Rewards', icon: GiftIcon },
@@ -41,13 +47,6 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { user, clearAuth } = useAuthStore();
-
-  const handleLogout = () => {
-    clearAuth();
-    router.push('/login');
-  };
 
   return (
     <aside style={{
@@ -68,15 +67,15 @@ export default function Sidebar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
             width: '40px', height: '40px', borderRadius: '12px',
-            background: 'linear-gradient(135deg, #065F46, #10B981)',
+            background: 'linear-gradient(135deg, var(--green-800), var(--green-500))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0, boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
           }}>
             <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, color: 'white', fontSize: '18px' }}>M</span>
           </div>
           <div>
-            <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '15px', color: '#F9FAFB', lineHeight: 1.2 }}>MAYODE</div>
-            <div style={{ fontSize: '10px', color: '#6B7280', fontWeight: 500 }}>GROUP PLATFORM</div>
+            <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)', lineHeight: 1.2 }}>MAYODE</div>
+            <div style={{ fontSize: '10px', color: 'var(--neutral-500)', fontWeight: 500 }}>GROUP PLATFORM</div>
           </div>
         </div>
       </div>
@@ -101,24 +100,9 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* User & Logout */}
+      {/* User menu (avatar + name + role, opens Profile/Sign Out) */}
       <div style={{ padding: '16px', borderTop: '1px solid var(--neutral-800)' }}>
-        {user && (
-          <div style={{ marginBottom: '12px', padding: '10px 12px', borderRadius: '10px', background: 'var(--neutral-800)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#F9FAFB', marginBottom: '2px' }}>
-              {user.firstName ? `${user.firstName} ${user.lastName}` : user.phone}
-            </div>
-            <div style={{ fontSize: '11px', color: '#6B7280' }}>{user.role}</div>
-          </div>
-        )}
-        <button
-          id="logout-btn"
-          onClick={handleLogout}
-          className="btn-secondary"
-          style={{ width: '100%', fontSize: '13px', padding: '8px 12px' }}
-        >
-          Sign Out
-        </button>
+        <UserMenu variant="sidebar" />
       </div>
     </aside>
   );

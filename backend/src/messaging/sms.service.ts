@@ -36,7 +36,8 @@ export class SmsService {
     private readonly prisma: PrismaService,
   ) {
     this.baseUrl =
-      this.config.get<string>('AT_BASE_URL') || 'https://api.africastalking.com';
+      this.config.get<string>('AT_BASE_URL') ||
+      'https://api.africastalking.com';
     this.username = this.config.get<string>('AT_USERNAME');
     this.apiKey = this.config.get<string>('AT_API_KEY');
     this.senderId = this.config.get<string>('AT_SENDER_ID');
@@ -47,7 +48,11 @@ export class SmsService {
   }
 
   /** Send an SMS and record it in SmsLog. Never throws — SMS is best-effort. */
-  async send(to: string, message: string, type = 'notification'): Promise<void> {
+  async send(
+    to: string,
+    message: string,
+    type = 'notification',
+  ): Promise<void> {
     const phone = normalizeMsisdn(to);
 
     if (!this.isConfigured()) {
@@ -75,15 +80,24 @@ export class SmsService {
       const ok = res.ok;
       await this.log(phone, message, type, ok ? 'sent' : 'failed');
       if (!ok) {
-        this.logger.error(`SMS to ${phone} failed: ${res.status} ${await res.text()}`);
+        this.logger.error(
+          `SMS to ${phone} failed: ${res.status} ${await res.text()}`,
+        );
       }
     } catch (e) {
       await this.log(phone, message, type, 'failed');
-      this.logger.error(`SMS to ${phone} error: ${e instanceof Error ? e.message : e}`);
+      this.logger.error(
+        `SMS to ${phone} error: ${e instanceof Error ? e.message : e}`,
+      );
     }
   }
 
-  private async log(phone: string, message: string, type: string, status: string) {
+  private async log(
+    phone: string,
+    message: string,
+    type: string,
+    status: string,
+  ) {
     try {
       await this.prisma.smsLog.create({
         data: {
@@ -91,11 +105,14 @@ export class SmsService {
           message,
           type,
           status,
-          sentAt: status === 'sent' || status === 'simulated' ? new Date() : null,
+          sentAt:
+            status === 'sent' || status === 'simulated' ? new Date() : null,
         },
       });
     } catch (e) {
-      this.logger.error(`Failed to record SmsLog: ${e instanceof Error ? e.message : e}`);
+      this.logger.error(
+        `Failed to record SmsLog: ${e instanceof Error ? e.message : e}`,
+      );
     }
   }
 }

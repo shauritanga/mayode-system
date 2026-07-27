@@ -130,6 +130,37 @@ export const farmOwnershipsApi = {
   getAll: (params?: object) => api.get('/farm-ownerships', { params }),
 };
 
+// ── Disputes ──
+export const disputesApi = {
+  getAll: (params?: object) => api.get('/disputes', { params }),
+  forFarm: (farmId: string) => api.get(`/disputes/farm/${farmId}`),
+  create: (data: object) => api.post('/disputes', data),
+  resolve: (id: string, data: object) => api.patch(`/disputes/${id}/resolve`, data),
+};
+
+// ── Suggested farm corrections & source-tracked data values ──
+export const farmCorrectionsApi = {
+  listAll: (params?: object) => api.get('/suggested-updates', { params }),
+  review: (id: string, data: object) => api.patch(`/suggested-updates/${id}/review`, data),
+  listConflicts: () => api.get('/farm-data-conflicts'),
+  listValuesForFarm: (farmId: string) => api.get(`/farms/${farmId}/data-values`),
+  recordValue: (farmId: string, data: object) => api.post(`/farms/${farmId}/data-values`, data),
+  resolveConflict: (farmId: string, fieldName: string, approvedValueId: string) =>
+    api.patch(`/farms/${farmId}/data-values/${fieldName}/resolve`, { approvedValueId }),
+};
+
+// ── Field surveys (MAYODE field data collection) ──
+export const fieldSurveysApi = {
+  listForFarm: (farmId: string) => api.get(`/farms/${farmId}/field-surveys`),
+  create: (farmId: string, data: object) => api.post(`/farms/${farmId}/field-surveys`, data),
+};
+
+// ── Owner-confirmation requests (AMCOS-first registry) ──
+export const confirmationRequestsApi = {
+  resend: (registryRecordId: string) => api.post(`/farm-registry/${registryRecordId}/resend-confirmation`),
+  listForRecord: (registryRecordId: string) => api.get(`/farm-registry/${registryRecordId}/confirmation-requests`),
+};
+
 // ── Memberships ──
 export const membershipsApi = {
   getAll: (params?: object) => api.get('/memberships', { params }),
@@ -153,4 +184,12 @@ export const rewardsApi = {
   select: (id: string) => api.post(`/rewards/campaigns/${id}/select`),
   reproduce: (id: string) => api.get(`/rewards/campaigns/${id}/reproduce`),
   approve: (id: string) => api.post(`/rewards/campaigns/${id}/approve`),
+};
+
+// ── Notifications (header bell) ──
+export const notificationsApi = {
+  list: (unreadOnly = false) => api.get('/notifications', { params: { unreadOnly } }),
+  unreadCount: () => api.get('/notifications/unread-count'),
+  markRead: (id: string) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.patch('/notifications/read-all'),
 };

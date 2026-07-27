@@ -115,10 +115,10 @@ export default function RewardsPage() {
       <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, #10B981, #34D399)', borderRadius: '9999px' }} />
-            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: '#F9FAFB' }}>Reward Campaigns</h1>
+            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--accent), var(--green-400))', borderRadius: '9999px' }} />
+            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Reward Campaigns</h1>
           </div>
-          <p style={{ fontSize: '13px', color: '#6B7280', marginLeft: '14px' }}>Auditable, reproducible random winner selection for farmer incentives</p>
+          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Auditable, reproducible random winner selection for farmer incentives</p>
         </div>
         <button className="btn-primary" onClick={() => setShowForm(s => !s)}>
           {showForm ? 'Close' : '+ New campaign'}
@@ -127,7 +127,7 @@ export default function RewardsPage() {
 
       {showForm && (
         <div className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
-          <h3 style={{ color: '#F9FAFB', fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>New reward campaign</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>New reward campaign</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
             <Field label="Campaign name *" value={form.name} onChange={v => set('name', v)} placeholder="Annual Fertilizer Support 2026" />
             <Field label="Sponsor" value={form.sponsor} onChange={v => set('sponsor', v)} />
@@ -141,7 +141,7 @@ export default function RewardsPage() {
             <Field label="Number of winners *" value={form.numberOfWinners} onChange={v => set('numberOfWinners', v)} placeholder="5" />
             <Field label="Description" value={form.description} onChange={v => set('description', v)} />
           </div>
-          {error && <div style={{ color: '#F87171', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
+          {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
           <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
             <button className="btn-primary" onClick={submit} disabled={submitting}>
               {submitting ? 'Saving…' : 'Create campaign'}
@@ -153,9 +153,9 @@ export default function RewardsPage() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>Loading campaigns…</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading campaigns…</div>
         ) : campaigns.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>No reward campaigns yet.</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No reward campaigns yet.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -166,9 +166,9 @@ export default function RewardsPage() {
                 {campaigns.map(c => (
                   <Fragment key={c.id}>
                     <tr>
-                      <td style={{ color: '#F9FAFB', fontSize: '13px', fontWeight: 600 }}>{c.name}</td>
-                      <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{c.rewardType.replace(/_/g, ' ')}{c.rewardQuantity ? ` × ${c.rewardQuantity}` : ''}</td>
-                      <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{c.numberOfWinners}</td>
+                      <td style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>{c.name}</td>
+                      <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{c.rewardType.replace(/_/g, ' ')}{c.rewardQuantity ? ` × ${c.rewardQuantity}` : ''}</td>
+                      <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{c.numberOfWinners}</td>
                       <td>{statusBadge(c.status)}</td>
                       <td style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                         <button className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px' }} onClick={() => toggleExpand(c.id)}>
@@ -188,9 +188,9 @@ export default function RewardsPage() {
                     </tr>
                     {expanded === c.id && (
                       <tr>
-                        <td colSpan={5} style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 16px' }}>
+                        <td colSpan={5} style={{ background: 'var(--hover-tint-1)', padding: '12px 16px' }}>
                           {!c.winners || c.winners.length === 0 ? (
-                            <span style={{ color: '#6B7280', fontSize: '12px' }}>No winners selected yet.</span>
+                            <span style={{ color: 'var(--neutral-500)', fontSize: '12px' }}>No winners selected yet.</span>
                           ) : (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                               {c.winners.map(w => (
@@ -214,7 +214,7 @@ export default function RewardsPage() {
   );
 }
 
-const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: '#9CA3AF', marginBottom: '5px', fontWeight: 600 };
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: 'var(--neutral-400)', marginBottom: '5px', fontWeight: 600 };
 
 function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (

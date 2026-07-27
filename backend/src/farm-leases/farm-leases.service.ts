@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import {
   AssignmentType,
+  DisputeType,
   LeaseStatus,
   OwnershipSource,
   Prisma,
@@ -16,6 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SmsService } from '../messaging/sms.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
+import { DisputesService } from '../disputes/disputes.service';
 import {
   ConfirmOwnershipDto,
   CreateFarmLeaseDto,
@@ -56,6 +58,7 @@ export class FarmLeasesService {
     private readonly ownership: OwnershipService,
     private readonly notifications: NotificationsService,
     private readonly sms: SmsService,
+    private readonly disputes: DisputesService,
   ) {}
 
   private async farmerForUser(userId: string) {
@@ -82,6 +85,13 @@ export class FarmLeasesService {
     // Only the farm's legal owner (or staff) may lease it out.
     await this.ownership.assertFarmAccess(user, dto.farmId);
 
+    // Data-integrity rule #12: restrict leasing while a dispute is open.
+    if (await this.disputes.hasOpenDispute(dto.farmId)) {
+      throw new ConflictException(
+        'This farm has an open dispute; leasing is restricted until it is resolved',
+      );
+    }
+
     const season = await this.prisma.farmingSeason.findUnique({
       where: { id: dto.farmingSeasonId },
       select: { id: true, name: true },
@@ -91,7 +101,9 @@ export class FarmLeasesService {
     const start = new Date(dto.leaseStartDate);
     const end = new Date(dto.leaseEndDate);
     if (end <= start) {
-      throw new BadRequestException('leaseEndDate must be after leaseStartDate');
+      throw new BadRequestException(
+        'leaseEndDate must be after leaseStartDate',
+      );
     }
 
     const renterPhone = normalizePhone(dto.renterPhone);
@@ -128,8 +140,12 @@ export class FarmLeasesService {
         leaseEndDate: end,
         ownerConfirmationStatus: VerificationStatus.VERIFIED,
         notes: dto.notes,
+        agreementDocumentUrl: dto.agreementDocumentUrl,
       },
-      include: { farm: { select: { farmCode: true, name: true } }, farmingSeason: true },
+      include: {
+        farm: { select: { farmCode: true, name: true } },
+        farmingSeason: true,
+      },
     });
 
     if (renterUser) {
@@ -155,7 +171,10 @@ export class FarmLeasesService {
   async findMine(user: RequestUser) {
     const [farmer, account] = await Promise.all([
       this.farmerForUser(user.id),
-      this.prisma.user.findUnique({ where: { id: user.id }, select: { phone: true } }),
+      this.prisma.user.findUnique({
+        where: { id: user.id },
+        select: { phone: true },
+      }),
     ]);
     const or: Prisma.FarmLeaseWhereInput[] = [];
     if (farmer) {
@@ -217,13 +236,18 @@ export class FarmLeasesService {
   ) {
     const [farmer, account] = await Promise.all([
       this.farmerForUser(user.id),
-      this.prisma.user.findUnique({ where: { id: user.id }, select: { phone: true } }),
+      this.prisma.user.findUnique({
+        where: { id: user.id },
+        select: { phone: true },
+      }),
     ]);
     const isRenterFarmer = farmer && lease.renterFarmerId === farmer.id;
     const isRenterPhone =
       account?.phone && normalizePhone(account.phone) === lease.renterPhone;
     if (!isRenterFarmer && !isRenterPhone) {
-      throw new ForbiddenException('Only the named renter can respond to this lease');
+      throw new ForbiddenException(
+        'Only the named renter can respond to this lease',
+      );
     }
     return farmer;
   }
@@ -236,7 +260,9 @@ export class FarmLeasesService {
   async renterConfirm(id: string, user: RequestUser) {
     const lease = await this.findLeaseOrFail(id);
     if (lease.status !== LeaseStatus.PENDING_VERIFICATION) {
-      throw new BadRequestException(`Lease is ${lease.status.toLowerCase()}, not awaiting confirmation`);
+      throw new BadRequestException(
+        `Lease is ${lease.status.toLowerCase()}, not awaiting confirmation`,
+      );
     }
     const renterFarmer = await this.assertRenter(lease, user);
     if (!renterFarmer) {
@@ -251,7 +277,9 @@ export class FarmLeasesService {
   async renterReject(id: string, user: RequestUser) {
     const lease = await this.findLeaseOrFail(id);
     if (lease.status !== LeaseStatus.PENDING_VERIFICATION) {
-      throw new BadRequestException(`Lease is ${lease.status.toLowerCase()}, not awaiting confirmation`);
+      throw new BadRequestException(
+        `Lease is ${lease.status.toLowerCase()}, not awaiting confirmation`,
+      );
     }
     await this.assertRenter(lease, user);
     return this.applyRenterReject(lease);
@@ -263,7 +291,10 @@ export class FarmLeasesService {
    * assignment until they register (there is no farmer to make active). The
    * owner is always notified in-app (if they have an account) and by SMS.
    */
-  private async applyRenterConfirm(lease: LeaseFull, renterFarmerId: string | null) {
+  private async applyRenterConfirm(
+    lease: LeaseFull,
+    renterFarmerId: string | null,
+  ) {
     let updated;
     if (renterFarmerId) {
       try {
@@ -293,7 +324,10 @@ export class FarmLeasesService {
           return u;
         });
       } catch (e) {
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === 'P2002'
+        ) {
           throw new ConflictException(
             'This farm already has an active seasonal operator for the selected season',
           );
@@ -362,7 +396,10 @@ export class FarmLeasesService {
   /** Pending leases awaiting confirmation from a given renter phone number. */
   async pendingLeasesByPhone(phone: string) {
     return this.prisma.farmLease.findMany({
-      where: { renterPhone: normalizePhone(phone), status: LeaseStatus.PENDING_VERIFICATION },
+      where: {
+        renterPhone: normalizePhone(phone),
+        status: LeaseStatus.PENDING_VERIFICATION,
+      },
       orderBy: { createdAt: 'desc' },
       include: LEASE_INCLUDE,
     });
@@ -380,7 +417,11 @@ export class FarmLeasesService {
       orderBy: { createdAt: 'desc' },
       include: LEASE_INCLUDE,
     });
-    if (!lease) return { ok: false as const, message: 'No pending lease found for this number.' };
+    if (!lease)
+      return {
+        ok: false as const,
+        message: 'No pending lease found for this number.',
+      };
 
     const account = await this.prisma.user.findUnique({
       where: { phone: p },
@@ -403,28 +444,106 @@ export class FarmLeasesService {
       orderBy: { createdAt: 'desc' },
       include: LEASE_INCLUDE,
     });
-    if (!lease) return { ok: false as const, message: 'No pending lease found for this number.' };
+    if (!lease)
+      return {
+        ok: false as const,
+        message: 'No pending lease found for this number.',
+      };
     await this.applyRenterReject(lease);
     return { ok: true as const, farmCode: lease.farm.farmCode };
   }
 
-  /** Officer-assisted verification (owner comment §8): final staff sign-off. */
-  async officerVerify(id: string, user: RequestUser, dto: OfficerVerifyLeaseDto) {
+  /**
+   * Officer-assisted verification (owner comment §8 / prompt.md §10): the
+   * officer records who they contacted, how, what evidence they gathered, and
+   * a final decision. VERIFIED confirms the seasonal assignment; REJECTED or
+   * DISPUTED close the lease and open an auditable dispute for review;
+   * NEEDS_MORE_INFO leaves it pending without granting or revoking access.
+   */
+  async officerVerify(
+    id: string,
+    user: RequestUser,
+    dto: OfficerVerifyLeaseDto,
+  ) {
     const lease = await this.findLeaseOrFail(id);
+
+    const evidenceFields = {
+      officerVerificationMethod: dto.method,
+      officerContactedName: dto.contactedName,
+      officerContactedPhone: dto.contactedPhone,
+      officerEvidenceUrls: dto.evidenceUrls ?? [],
+      officerDecidedAt: new Date(),
+      officerDecidedByUserId: user.id,
+      notes: dto.notes ?? lease.notes,
+    };
+
+    if (dto.decision === VerificationStatus.VERIFIED) {
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const result = await tx.farmLease.update({
+          where: { id },
+          data: {
+            officerConfirmationStatus: VerificationStatus.VERIFIED,
+            ...evidenceFields,
+          },
+        });
+        await tx.seasonalFarmAssignment.updateMany({
+          where: { leaseId: id },
+          data: { status: VerificationStatus.VERIFIED },
+        });
+        return result;
+      });
+      return updated;
+    }
+
+    if (dto.decision === VerificationStatus.NEEDS_MORE_INFO) {
+      return this.prisma.farmLease.update({
+        where: { id },
+        data: {
+          officerConfirmationStatus: VerificationStatus.NEEDS_MORE_INFO,
+          ...evidenceFields,
+        },
+      });
+    }
+
+    // REJECTED or DISPUTED: close operational access and open an auditable dispute.
+    const disputeType =
+      dto.decision === VerificationStatus.DISPUTED
+        ? DisputeType.COOPERATIVE_OWNER_CONFLICT
+        : DisputeType.OWNER_REJECTS_RENTER;
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.farmLease.update({
         where: { id },
         data: {
-          officerConfirmationStatus: VerificationStatus.VERIFIED,
-          notes: dto.notes ?? lease.notes,
+          officerConfirmationStatus: dto.decision,
+          status: LeaseStatus.TERMINATED,
+          ...evidenceFields,
         },
       });
       await tx.seasonalFarmAssignment.updateMany({
         where: { leaseId: id },
-        data: { status: VerificationStatus.VERIFIED },
+        data: { status: dto.decision },
       });
       return result;
     });
+
+    await this.disputes.createForLease(
+      id,
+      lease.farmId,
+      disputeType,
+      dto.notes ||
+        `Officer ${dto.decision.toLowerCase()} this lease during assisted verification (${dto.method}).`,
+      user,
+    );
+
+    if (lease.ownerFarmer?.userId) {
+      await this.notifications.create({
+        userId: lease.ownerFarmer.userId,
+        type: 'lease.officer_decision',
+        title: `Officer ${dto.decision === VerificationStatus.DISPUTED ? 'flagged a dispute on' : 'rejected'} your lease`,
+        body: `The lease for farm ${lease.farm.name} (${lease.farm.farmCode}) was ${dto.decision.toLowerCase()} during officer verification. It has been sent for review.`,
+        data: { leaseId: id, farmId: lease.farmId },
+      });
+    }
     return updated;
   }
 
@@ -458,7 +577,10 @@ export class FarmLeasesService {
         },
       });
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
         throw new ConflictException(
           'This farm already has a seasonal operator for the selected season',
         );
@@ -476,8 +598,12 @@ export class FarmLeasesService {
       orderBy: { createdAt: 'desc' },
       include: {
         farm: { select: { id: true, farmCode: true, name: true } },
-        farmingSeason: { select: { id: true, name: true, startDate: true, endDate: true } },
-        lease: { select: { id: true, leaseStartDate: true, leaseEndDate: true } },
+        farmingSeason: {
+          select: { id: true, name: true, startDate: true, endDate: true },
+        },
+        lease: {
+          select: { id: true, leaseStartDate: true, leaseEndDate: true },
+        },
       },
     });
   }
@@ -513,8 +639,17 @@ export class FarmLeasesService {
    * Owner confirms that a farm registered under their profile really belongs
    * to them (owner comment §13.2). Creates/updates the FarmOwnership record.
    */
-  async confirmOwnership(farmId: string, user: RequestUser, dto: ConfirmOwnershipDto) {
+  async confirmOwnership(
+    farmId: string,
+    user: RequestUser,
+    dto: ConfirmOwnershipDto,
+  ) {
     await this.ownership.assertFarmAccess(user, farmId);
+    if (await this.disputes.hasOpenDispute(farmId)) {
+      throw new ConflictException(
+        'This farm has an open dispute; ownership cannot be confirmed until it is resolved',
+      );
+    }
     const farm = await this.prisma.farm.findUnique({
       where: { id: farmId },
       select: { id: true, farmerId: true, ownerName: true, ownerPhone: true },

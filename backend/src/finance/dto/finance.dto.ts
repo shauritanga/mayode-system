@@ -1,14 +1,28 @@
-import { IsString, IsOptional, IsNumber, IsEnum, IsDateString, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsEnum,
+  IsDateString,
+  IsNotEmpty,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CostCategory, RevenueType } from '@prisma/client';
 
 export class CreateInputCostDto {
-  @ApiProperty({ example: 'crop-cycle-uuid-1234', description: 'ID of the active crop cycle' })
+  @ApiProperty({
+    example: 'crop-cycle-uuid-1234',
+    description: 'ID of the active crop cycle',
+  })
   @IsString()
   @IsNotEmpty()
   cropCycleId: string;
 
-  @ApiProperty({ example: 'FERTILIZER', enum: CostCategory, description: 'Category of production cost' })
+  @ApiProperty({
+    example: 'FERTILIZER',
+    enum: CostCategory,
+    description: 'Category of production cost',
+  })
   @IsEnum(CostCategory)
   category: CostCategory;
 
@@ -27,7 +41,10 @@ export class CreateInputCostDto {
   @IsOptional()
   unit?: string;
 
-  @ApiPropertyOptional({ example: 75000.0, description: 'Price per unit in TZS' })
+  @ApiPropertyOptional({
+    example: 75000.0,
+    description: 'Price per unit in TZS',
+  })
   @IsNumber()
   @IsOptional()
   unitPrice?: number;
@@ -46,39 +63,64 @@ export class CreateInputCostDto {
   @IsOptional()
   receiptUrl?: string;
 
-  @ApiProperty({ example: '2026-11-15T10:00:00Z', description: 'Date the cost was incurred' })
+  @ApiProperty({
+    example: '2026-11-15T10:00:00Z',
+    description: 'Date the cost was incurred',
+  })
   @IsDateString()
   dateIncurred: string;
 }
 
 export class CreateRevenueDto {
-  @ApiProperty({ example: 'crop-cycle-uuid-1234', description: 'ID of the active crop cycle' })
+  @ApiProperty({
+    example: 'crop-cycle-uuid-1234',
+    description: 'ID of the active crop cycle',
+  })
   @IsString()
   @IsNotEmpty()
   cropCycleId: string;
 
-  @ApiProperty({ example: 'FAIRTRADE_SALE', enum: RevenueType, description: 'Type of revenue sale' })
+  @ApiProperty({
+    example: 'FAIRTRADE_SALE',
+    enum: RevenueType,
+    description: 'Type of revenue sale',
+  })
   @IsEnum(RevenueType)
   revenueType: RevenueType;
 
-  @ApiProperty({ example: 4850.0, description: 'Quantity of rice sold in kilograms' })
+  @ApiProperty({
+    example: 4850.0,
+    description: 'Quantity of rice sold in kilograms',
+  })
   @IsNumber()
   quantityKg: number;
 
-  @ApiProperty({ example: 1200.0, description: 'Selling price per kilogram in TZS' })
+  @ApiProperty({
+    example: 1200.0,
+    description: 'Selling price per kilogram in TZS',
+  })
   @IsNumber()
   pricePerKg: number;
 
-  @ApiProperty({ example: 5820000.0, description: 'Total gross revenue in TZS' })
+  @ApiProperty({
+    example: 5820000.0,
+    description: 'Total gross revenue in TZS',
+  })
   @IsNumber()
   totalRevenue: number;
 
-  @ApiPropertyOptional({ example: 242500.0, description: 'Fairtrade premium earned in TZS' })
+  @ApiPropertyOptional({
+    example: 242500.0,
+    description: 'Fairtrade premium earned in TZS',
+  })
   @IsNumber()
   @IsOptional()
   fairtradePremium?: number;
 
-  @ApiPropertyOptional({ example: 'buyer-uuid-5678', description: 'ID of the verified buyer' })
+  @ApiPropertyOptional({
+    example: 'buyer-uuid-5678',
+    description: 'ID of the verified buyer',
+  })
   @IsString()
   @IsOptional()
   buyerId?: string;

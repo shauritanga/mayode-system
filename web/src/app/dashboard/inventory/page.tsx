@@ -48,10 +48,10 @@ export default function InventoryPage() {
       <div style={{ marginBottom: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, #3B82F6, #60A5FA)', borderRadius: '9999px' }} />
-            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: '#F9FAFB' }}>Inventory</h1>
+            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--blue-500), var(--blue-400))', borderRadius: '9999px' }} />
+            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Inventory</h1>
           </div>
-          <p style={{ fontSize: '13px', color: '#6B7280', marginLeft: '14px' }}>Warehouse receipts & Fairtrade batch tracking</p>
+          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Warehouse receipts & Fairtrade batch tracking</p>
         </div>
         <input
           id="inventory-search"
@@ -67,23 +67,23 @@ export default function InventoryPage() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         {[
-          { label: 'Total Receipts', value: records.length, color: '#3B82F6' },
-          { label: 'Total Weight', value: `${totalKg.toFixed(0)} kg`, color: '#10B981' },
-          { label: 'In Storage', value: records.filter(r => r.status === 'IN_STORAGE').length, color: '#F59E0B' },
-          { label: 'Batched', value: records.filter(r => r.status === 'BATCHED').length, color: '#8B5CF6' },
+          { label: 'Total Receipts', value: records.length, color: 'var(--blue-500)' },
+          { label: 'Total Weight', value: `${totalKg.toFixed(0)} kg`, color: 'var(--accent)' },
+          { label: 'In Storage', value: records.filter(r => r.status === 'IN_STORAGE').length, color: 'var(--gold-400)' },
+          { label: 'Batched', value: records.filter(r => r.status === 'BATCHED').length, color: 'var(--purple-500)' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>
-            <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>{s.label}</div>
+            <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>Loading inventory…</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading inventory…</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>No inventory records found.</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No inventory records found.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -103,22 +103,22 @@ export default function InventoryPage() {
                 {filtered.map(r => (
                   <tr key={r.id}>
                     <td>
-                      <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#3B82F6', fontWeight: 600, background: 'rgba(59, 130, 246, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--blue-500)', fontWeight: 600, background: 'rgba(59, 130, 246, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>
                         {r.trackingCode}
                       </span>
                     </td>
-                    <td style={{ fontSize: '13px', fontWeight: 600, color: '#F9FAFB' }}>
+                    <td style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {r.farmer ? `${r.farmer.firstName} ${r.farmer.lastName}` : '—'}
                     </td>
-                    <td style={{ fontFamily: 'monospace', fontSize: '12px', color: '#10B981' }}>{r.farm?.farmCode || '—'}</td>
-                    <td style={{ fontWeight: 700, color: '#F9FAFB' }}>{r.weightKg} kg</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--accent)' }}>{r.farm?.farmCode || '—'}</td>
+                    <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{r.weightKg} kg</td>
                     <td>
                       {r.qualityGrade
                         ? <span className="badge badge-green">{r.qualityGrade}</span>
-                        : <span style={{ color: '#4B5563', fontSize: '12px' }}>—</span>}
+                        : <span style={{ color: 'var(--neutral-600)', fontSize: '12px' }}>—</span>}
                     </td>
-                    <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{r.warehouseLocation || '—'}</td>
-                    <td style={{ color: '#6B7280', fontSize: '12px' }}>
+                    <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{r.warehouseLocation || '—'}</td>
+                    <td style={{ color: 'var(--neutral-500)', fontSize: '12px' }}>
                       {new Date(r.receivedDate).toLocaleDateString('en-TZ', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </td>
                     <td>{statusBadge(r.status)}</td>

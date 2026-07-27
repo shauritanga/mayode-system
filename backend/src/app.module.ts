@@ -31,6 +31,8 @@ import { MessagingModule } from './messaging/messaging.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { FarmReportsModule } from './farm-reports/farm-reports.module';
 import { FarmRegistryModule } from './farm-registry/farm-registry.module';
+import { DisputesModule } from './disputes/disputes.module';
+import { FarmCorrectionsModule } from './farm-corrections/farm-corrections.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { LoggerMiddleware } from './middleware/logger.middleware';
 
@@ -93,6 +95,8 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     RewardsModule,
     FarmReportsModule,
     FarmRegistryModule,
+    DisputesModule,
+    FarmCorrectionsModule,
   ],
   providers: [
     // Global audit trail for all mutating requests

@@ -60,10 +60,10 @@ export default function AlertsPage() {
       <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, #10B981, #34D399)', borderRadius: '9999px' }} />
-            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: '#F9FAFB' }}>Farm Alerts</h1>
+            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--accent), var(--green-400))', borderRadius: '9999px' }} />
+            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Farm Alerts</h1>
           </div>
-          <p style={{ fontSize: '13px', color: '#6B7280', marginLeft: '14px' }}>Rule-based farm-action recommendations — full detail gated behind membership</p>
+          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Rule-based farm-action recommendations — full detail gated behind membership</p>
         </div>
         <button className="btn-primary" onClick={generate} disabled={generating}>
           {generating ? 'Generating…' : 'Run alert generator'}
@@ -72,22 +72,22 @@ export default function AlertsPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         {[
-          { label: 'Total alerts', value: alerts.length, color: '#10B981' },
-          { label: 'Open', value: open, color: '#F59E0B' },
-          { label: 'High / critical', value: critical, color: '#F87171' },
+          { label: 'Total alerts', value: alerts.length, color: 'var(--accent)' },
+          { label: 'Open', value: open, color: 'var(--gold-400)' },
+          { label: 'High / critical', value: critical, color: 'var(--red-400)' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>
-            <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>{s.label}</div>
+            <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>Loading alerts…</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading alerts…</div>
         ) : alerts.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>No alerts yet. Run the generator to create rule-based alerts from crop-cycle data.</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No alerts yet. Run the generator to create rule-based alerts from crop-cycle data.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -97,10 +97,10 @@ export default function AlertsPage() {
               <tbody>
                 {alerts.map(a => (
                   <tr key={a.id}>
-                    <td style={{ color: '#F9FAFB', fontSize: '13px', fontWeight: 600 }}>{a.farmCode || '—'}</td>
-                    <td style={{ color: '#9CA3AF', fontSize: '12px' }}>{a.category.replace(/_/g, ' ')}</td>
-                    <td style={{ color: '#F9FAFB', fontSize: '13px' }}>{a.title}</td>
-                    <td style={{ color: '#9CA3AF', fontSize: '12px', maxWidth: '320px' }}>{a.previewMessage}</td>
+                    <td style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>{a.farmCode || '—'}</td>
+                    <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{a.category.replace(/_/g, ' ')}</td>
+                    <td style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{a.title}</td>
+                    <td style={{ color: 'var(--neutral-400)', fontSize: '12px', maxWidth: '320px' }}>{a.previewMessage}</td>
                     <td>{urgencyBadge(a.urgency)}</td>
                     <td>{statusBadge(a.status)}</td>
                   </tr>

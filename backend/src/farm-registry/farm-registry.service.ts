@@ -6,7 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ConfirmationChannel,
+  ConfirmationRequestStatus,
   FarmGrade,
+  FarmRegistryRecord,
   FarmRegistryStatus,
   OwnershipSource,
   Prisma,
@@ -16,7 +19,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SmsService, normalizeMsisdn } from '../messaging/sms.service';
 import { RequestUser } from '../common/ownership.service';
+import { DisputesService } from '../disputes/disputes.service';
 import { PreRegisterFarmDto } from './dto/farm-registry.dto';
+
+const REQUEST_TTL_HOURS = 72;
+const RESEND_COOLDOWN_MINUTES = 15;
+const MAX_RESENDS = 3;
 
 @Injectable()
 export class FarmRegistryService {
@@ -24,7 +32,130 @@ export class FarmRegistryService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly sms: SmsService,
+    private readonly disputes: DisputesService,
   ) {}
+
+  // ------------------------------------------------- confirmation requests
+
+  /**
+   * Send (or resend) an expiring owner-confirmation request (prompt2 §5 /
+   * prompt.md §10). Rate-limited so a stale request can't be replayed
+   * indefinitely and an owner can't be spammed with resends.
+   */
+  private async sendConfirmationRequest(
+    record: {
+      id: string;
+      ownerName: string;
+      ownerPhone: string;
+      name: string | null;
+    },
+    channel: ConfirmationChannel = ConfirmationChannel.SMS,
+  ) {
+    const active = await this.prisma.ownerConfirmationRequest.findFirst({
+      where: {
+        registryRecordId: record.id,
+        status: ConfirmationRequestStatus.SENT,
+      },
+      orderBy: { sentAt: 'desc' },
+    });
+
+    const now = new Date();
+    if (active) {
+      if (active.expiresAt > now) {
+        const cooldownUntil = new Date(
+          active.sentAt.getTime() + RESEND_COOLDOWN_MINUTES * 60_000,
+        );
+        if (now < cooldownUntil) {
+          throw new BadRequestException(
+            `Please wait before resending — try again after ${cooldownUntil.toISOString()}`,
+          );
+        }
+        if (active.resendCount >= MAX_RESENDS) {
+          throw new BadRequestException(
+            'Maximum resend attempts reached for this confirmation request',
+          );
+        }
+      } else {
+        await this.prisma.ownerConfirmationRequest.update({
+          where: { id: active.id },
+          data: { status: ConfirmationRequestStatus.EXPIRED },
+        });
+      }
+    }
+
+    const message = `MAYOData: AMCOS registered farm "${record.name || 'a farm'}" under your name. Reply 1 for YES or 2 for NO, or open the app to confirm.`;
+
+    const request = await this.prisma.ownerConfirmationRequest.create({
+      data: {
+        registryRecordId: record.id,
+        phone: record.ownerPhone,
+        channel,
+        message,
+        status: ConfirmationRequestStatus.SENT,
+        resendCount:
+          active && active.expiresAt > now ? active.resendCount + 1 : 0,
+        expiresAt: new Date(now.getTime() + REQUEST_TTL_HOURS * 60 * 60_000),
+      },
+    });
+
+    if (channel === ConfirmationChannel.SMS) {
+      await this.sms.send(
+        record.ownerPhone,
+        message,
+        'registry_owner_confirmation',
+      );
+    }
+    return request;
+  }
+
+  /** Staff-triggered resend for an owner who hasn't responded yet. */
+  async resendConfirmation(registryRecordId: string) {
+    const record = await this.prisma.farmRegistryRecord.findUnique({
+      where: { id: registryRecordId },
+    });
+    if (!record)
+      throw new NotFoundException(
+        `Registry record ${registryRecordId} not found`,
+      );
+    return this.sendConfirmationRequest(record);
+  }
+
+  listConfirmationRequests(registryRecordId: string) {
+    return this.prisma.ownerConfirmationRequest.findMany({
+      where: { registryRecordId },
+      orderBy: { sentAt: 'desc' },
+    });
+  }
+
+  /** Marks the active request answered; a no-op if it already expired (rule: don't reuse expired requests). */
+  private async respondToActiveRequest(
+    registryRecordId: string,
+    response: 'YES' | 'NO',
+  ) {
+    const active = await this.prisma.ownerConfirmationRequest.findFirst({
+      where: { registryRecordId, status: ConfirmationRequestStatus.SENT },
+      orderBy: { sentAt: 'desc' },
+    });
+    if (!active) return null;
+    if (active.expiresAt < new Date()) {
+      await this.prisma.ownerConfirmationRequest.update({
+        where: { id: active.id },
+        data: { status: ConfirmationRequestStatus.EXPIRED },
+      });
+      return null;
+    }
+    return this.prisma.ownerConfirmationRequest.update({
+      where: { id: active.id },
+      data: {
+        status:
+          response === 'YES'
+            ? ConfirmationRequestStatus.CONFIRMED
+            : ConfirmationRequestStatus.REJECTED,
+        response,
+        respondedAt: new Date(),
+      },
+    });
+  }
 
   private buildName(dto: PreRegisterFarmDto): string {
     if (dto.name?.trim()) return dto.name.trim();
@@ -51,7 +182,9 @@ export class FarmRegistryService {
           plotNumber: dto.plotNumber,
           block: dto.block,
           scheme: dto.scheme ?? null,
-          status: { notIn: [FarmRegistryStatus.ARCHIVED, FarmRegistryStatus.INACTIVE] },
+          status: {
+            notIn: [FarmRegistryStatus.ARCHIVED, FarmRegistryStatus.INACTIVE],
+          },
         },
         select: { id: true },
       });
@@ -85,7 +218,7 @@ export class FarmRegistryService {
       },
     });
 
-    // Notify the owner (in-app if they already have an account) + SMS.
+    // Notify the owner (in-app if they already have an account) + an expiring, auditable SMS confirmation request.
     const account = await this.prisma.user.findUnique({
       where: { phone: ownerPhone },
       select: { id: true },
@@ -99,11 +232,7 @@ export class FarmRegistryService {
         data: { registryId: record.id },
       });
     }
-    await this.sms.send(
-      ownerPhone,
-      `MAYOData: AMCOS has registered farm "${record.name}" under your name. Open the app to confirm it is yours, or reply for help.`,
-      'registry_owner_confirmation',
-    );
+    await this.sendConfirmationRequest(record);
 
     return record;
   }
@@ -148,18 +277,28 @@ export class FarmRegistryService {
       select: { id: true, controlNumber: true },
     });
     if (!farmer) {
-      throw new BadRequestException('Complete your farmer profile before claiming a farm');
+      throw new BadRequestException(
+        'Complete your farmer profile before claiming a farm',
+      );
     }
     return farmer;
   }
 
-  private async assertOwnerByPhone(record: { ownerPhone: string }, user: RequestUser) {
+  private async assertOwnerByPhone(
+    record: { ownerPhone: string },
+    user: RequestUser,
+  ) {
     const account = await this.prisma.user.findUnique({
       where: { id: user.id },
       select: { phone: true },
     });
-    if (!account?.phone || normalizeMsisdn(account.phone) !== record.ownerPhone) {
-      throw new ForbiddenException('This farm was not registered under your phone number');
+    if (
+      !account?.phone ||
+      normalizeMsisdn(account.phone) !== record.ownerPhone
+    ) {
+      throw new ForbiddenException(
+        'This farm was not registered under your phone number',
+      );
     }
   }
 
@@ -170,7 +309,9 @@ export class FarmRegistryService {
    * the owner didn't have to re-enter them (prompt2 §13.8).
    */
   async claim(id: string, user: RequestUser) {
-    const record = await this.prisma.farmRegistryRecord.findUnique({ where: { id } });
+    const record = await this.prisma.farmRegistryRecord.findUnique({
+      where: { id },
+    });
     if (!record) throw new NotFoundException(`Registry record ${id} not found`);
     if (record.status === FarmRegistryStatus.CLAIMED || record.farmId) {
       throw new BadRequestException('This farm has already been claimed');
@@ -178,8 +319,21 @@ export class FarmRegistryService {
     await this.assertOwnerByPhone(record, user);
     const farmer = await this.farmerForUserOrFail(user.id);
 
+    const result = await this.materializeClaim(record, farmer);
+    await this.respondToActiveRequest(id, 'YES');
+    return result;
+  }
+
+  /** Core materialization, shared by the in-app claim and the phone/USSD confirm path once an account exists. */
+  private async materializeClaim(
+    record: FarmRegistryRecord,
+    farmer: { id: string; controlNumber: string },
+  ) {
+    const id = record.id;
     // Generate the farm code from the farmer's control number (matches FarmsService).
-    const count = await this.prisma.farm.count({ where: { farmerId: farmer.id } });
+    const count = await this.prisma.farm.count({
+      where: { farmerId: farmer.id },
+    });
     const farmCode = `${farmer.controlNumber}-${(count + 1).toString().padStart(2, '0')}`;
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -239,16 +393,36 @@ export class FarmRegistryService {
     return result;
   }
 
-  /** Owner says the farm is not theirs → mark disputed and alert the officer. */
+  /** Owner says the farm is not theirs → mark disputed, open a Dispute, and alert the officer. */
   async reject(id: string, user: RequestUser) {
-    const record = await this.prisma.farmRegistryRecord.findUnique({ where: { id } });
+    const record = await this.prisma.farmRegistryRecord.findUnique({
+      where: { id },
+    });
     if (!record) throw new NotFoundException(`Registry record ${id} not found`);
     await this.assertOwnerByPhone(record, user);
 
+    const updated = await this.finalizeRejection(record, user);
+    await this.respondToActiveRequest(id, 'NO');
+    return updated;
+  }
+
+  private async finalizeRejection(
+    record: FarmRegistryRecord,
+    user?: RequestUser,
+  ) {
     const updated = await this.prisma.farmRegistryRecord.update({
-      where: { id },
+      where: { id: record.id },
       data: { status: FarmRegistryStatus.DISPUTED },
     });
+    await this.disputes.create(
+      {
+        farmId: record.farmId ?? undefined,
+        type: 'UNKNOWN_OWNER',
+        description: `${record.ownerName} says pre-registered farm "${record.name}" (registry record ${record.id}) does not belong to them.`,
+        assignedOfficerId: record.sourceOfficerId ?? undefined,
+      },
+      user,
+    );
     if (record.sourceOfficerId) {
       await this.notifications.create({
         userId: record.sourceOfficerId,
@@ -259,5 +433,79 @@ export class FarmRegistryService {
       });
     }
     return updated;
+  }
+
+  // ---------------------------------------------- feature-phone (SMS / USSD)
+
+  /** Pre-registered farms awaiting confirmation from a given owner phone number. */
+  async pendingByPhone(phone: string) {
+    const p = normalizeMsisdn(phone);
+    return this.prisma.farmRegistryRecord.findMany({
+      where: {
+        ownerPhone: p,
+        status: FarmRegistryStatus.OWNER_CONFIRMATION_PENDING,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Confirm the caller's most recent pending registry record by phone (SMS
+   * reply / USSD). If the caller already has a farmer account, the farm is
+   * fully materialized; otherwise the confirmation is recorded and the claim
+   * happens once they register (mirrors FarmLeasesService.confirmLeaseByPhone).
+   */
+  async confirmByPhone(phone: string) {
+    const p = normalizeMsisdn(phone);
+    const record = await this.prisma.farmRegistryRecord.findFirst({
+      where: {
+        ownerPhone: p,
+        status: FarmRegistryStatus.OWNER_CONFIRMATION_PENDING,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!record)
+      return {
+        ok: false as const,
+        message: 'No pending farm confirmation found for this number.',
+      };
+
+    const account = await this.prisma.user.findUnique({
+      where: { phone: p },
+      select: { farmer: { select: { id: true, controlNumber: true } } },
+    });
+
+    if (account?.farmer) {
+      await this.materializeClaim(record, account.farmer);
+      await this.respondToActiveRequest(record.id, 'YES');
+      return { ok: true as const, name: record.name, claimed: true };
+    }
+
+    await this.prisma.farmRegistryRecord.update({
+      where: { id: record.id },
+      data: { status: FarmRegistryStatus.OWNER_CONFIRMED },
+    });
+    await this.respondToActiveRequest(record.id, 'YES');
+    return { ok: true as const, name: record.name, claimed: false };
+  }
+
+  /** Reject the caller's most recent pending registry record by phone (SMS reply / USSD). */
+  async rejectByPhone(phone: string) {
+    const p = normalizeMsisdn(phone);
+    const record = await this.prisma.farmRegistryRecord.findFirst({
+      where: {
+        ownerPhone: p,
+        status: FarmRegistryStatus.OWNER_CONFIRMATION_PENDING,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!record)
+      return {
+        ok: false as const,
+        message: 'No pending farm confirmation found for this number.',
+      };
+    await this.finalizeRejection(record);
+    await this.respondToActiveRequest(record.id, 'NO');
+    return { ok: true as const, name: record.name };
   }
 }

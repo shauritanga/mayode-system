@@ -39,8 +39,16 @@ export class FarmLeasesController {
   constructor(private readonly leases: FarmLeasesService) {}
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
-  @ApiOperation({ summary: 'Owner adds a lease: names the renter for a farm and season (Add Lease)' })
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.FARMER,
+  )
+  @ApiOperation({
+    summary:
+      'Owner adds a lease: names the renter for a farm and season (Add Lease)',
+  })
   create(@Body() dto: CreateFarmLeaseDto, @CurrentUser() user: RequestUser) {
     return this.leases.create(dto, user);
   }
@@ -53,7 +61,9 @@ export class FarmLeasesController {
 
   @Get()
   @Roles(...STAFF_ROLES)
-  @ApiOperation({ summary: 'All leases, optionally filtered by status (staff only)' })
+  @ApiOperation({
+    summary: 'All leases, optionally filtered by status (staff only)',
+  })
   findAll(@Query('status') status?: LeaseStatus) {
     return this.leases.findAllLeases(status);
   }
@@ -65,7 +75,9 @@ export class FarmLeasesController {
   }
 
   @Patch(':id/renter-confirm')
-  @ApiOperation({ summary: 'Renter confirms the lease and becomes the active seasonal user' })
+  @ApiOperation({
+    summary: 'Renter confirms the lease and becomes the active seasonal user',
+  })
   renterConfirm(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.leases.renterConfirm(id, user);
   }
@@ -77,8 +89,15 @@ export class FarmLeasesController {
   }
 
   @Patch(':id/officer-verify')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY)
-  @ApiOperation({ summary: 'Officer-assisted verification of a lease (staff only)' })
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+  )
+  @ApiOperation({
+    summary: 'Officer-assisted verification of a lease (staff only)',
+  })
   officerVerify(
     @Param('id') id: string,
     @CurrentUser() user: RequestUser,
@@ -96,14 +115,24 @@ export class SeasonalAssignmentsController {
   constructor(private readonly leases: FarmLeasesService) {}
 
   @Post('self-operate')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
-  @ApiOperation({ summary: 'Owner declares self-farming for a season (OWNER_OPERATED assignment)' })
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.FARMER,
+  )
+  @ApiOperation({
+    summary:
+      'Owner declares self-farming for a season (OWNER_OPERATED assignment)',
+  })
   selfOperate(@Body() dto: SelfOperateDto, @CurrentUser() user: RequestUser) {
     return this.leases.selfOperate(dto, user);
   }
 
   @Get('mine')
-  @ApiOperation({ summary: 'Seasonal assignments where the current user is the active farmer' })
+  @ApiOperation({
+    summary: 'Seasonal assignments where the current user is the active farmer',
+  })
   mine(@CurrentUser() user: RequestUser) {
     return this.leases.myAssignments(user);
   }
@@ -130,8 +159,16 @@ export class FarmOwnershipsController {
   constructor(private readonly leases: FarmLeasesService) {}
 
   @Post('farm/:farmId/confirm')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
-  @ApiOperation({ summary: 'Owner confirms the farm registered under their profile belongs to them' })
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.FARMER,
+  )
+  @ApiOperation({
+    summary:
+      'Owner confirms the farm registered under their profile belongs to them',
+  })
   confirm(
     @Param('farmId') farmId: string,
     @CurrentUser() user: RequestUser,
@@ -148,7 +185,10 @@ export class FarmOwnershipsController {
 
   @Get()
   @Roles(...STAFF_ROLES)
-  @ApiOperation({ summary: 'All ownership records, optionally filtered by status (staff only)' })
+  @ApiOperation({
+    summary:
+      'All ownership records, optionally filtered by status (staff only)',
+  })
   findAll(@Query('status') status?: VerificationStatus) {
     return this.leases.findAllOwnerships(status);
   }

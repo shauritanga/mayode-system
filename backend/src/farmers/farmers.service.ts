@@ -5,7 +5,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { DocumentType, Prisma, UserRole, VerificationStatus } from '@prisma/client';
+import {
+  DocumentType,
+  Prisma,
+  UserRole,
+  VerificationStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FinanceService } from '../finance/finance.service';
 import { MembershipsService } from '../memberships/memberships.service';
@@ -107,8 +112,15 @@ export class FarmersService {
   // --------------------------------------------------------------------------
 
   async findAll(query: QueryFarmersDto) {
-    const { search, region, district, ward, village, mamcosId, verificationStatus } =
-      query;
+    const {
+      search,
+      region,
+      district,
+      ward,
+      village,
+      mamcosId,
+      verificationStatus,
+    } = query;
     const page = query.page && query.page > 0 ? query.page : 1;
     const pageSize = query.pageSize && query.pageSize > 0 ? query.pageSize : 20;
 
@@ -148,7 +160,12 @@ export class FarmersService {
 
     return {
       data,
-      pagination: { total, page, pageSize, totalPages: Math.ceil(total / pageSize) },
+      pagination: {
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      },
     };
   }
 
@@ -156,13 +173,17 @@ export class FarmersService {
     const farmer = await this.prisma.farmer.findUnique({
       where: { id },
       include: {
-        user: { select: { phone: true, email: true, isActive: true, language: true } },
+        user: {
+          select: { phone: true, email: true, isActive: true, language: true },
+        },
         mamcos: true,
         household: true,
         documents: { orderBy: { createdAt: 'desc' } },
         verifications: {
           include: {
-            fieldOfficer: { select: { employeeCode: true, firstName: true, lastName: true } },
+            fieldOfficer: {
+              select: { employeeCode: true, firstName: true, lastName: true },
+            },
           },
           orderBy: { verifiedAt: 'desc' },
         },
@@ -227,7 +248,11 @@ export class FarmersService {
     return officer;
   }
 
-  async verifyFarmer(officerUserId: string, farmerId: string, dto: VerifyFarmerDto) {
+  async verifyFarmer(
+    officerUserId: string,
+    farmerId: string,
+    dto: VerifyFarmerDto,
+  ) {
     const officer = await this.fieldOfficerFor(officerUserId);
     const farmer = await this.findOne(farmerId);
 
@@ -266,7 +291,11 @@ export class FarmersService {
     return result;
   }
 
-  async rejectFarmer(officerUserId: string, farmerId: string, dto: RejectFarmerDto) {
+  async rejectFarmer(
+    officerUserId: string,
+    farmerId: string,
+    dto: RejectFarmerDto,
+  ) {
     const officer = await this.fieldOfficerFor(officerUserId);
     const farmer = await this.findOne(farmerId);
 
@@ -298,7 +327,11 @@ export class FarmersService {
     return result;
   }
 
-  async suspendFarmer(officerUserId: string, farmerId: string, dto: SuspendFarmerDto) {
+  async suspendFarmer(
+    officerUserId: string,
+    farmerId: string,
+    dto: SuspendFarmerDto,
+  ) {
     const officer = await this.fieldOfficerFor(officerUserId);
     const farmer = await this.findOne(farmerId);
 
@@ -333,7 +366,11 @@ export class FarmersService {
   // Household & documents
   // --------------------------------------------------------------------------
 
-  async upsertHousehold(farmerId: string, dto: UpsertHouseholdDto, user: RequestUser) {
+  async upsertHousehold(
+    farmerId: string,
+    dto: UpsertHouseholdDto,
+    user: RequestUser,
+  ) {
     await this.ownership.assertFarmerAccess(user, farmerId);
     await this.findOne(farmerId);
     return this.prisma.household.upsert({
@@ -358,7 +395,11 @@ export class FarmersService {
    * PENDING, and queue an officer to review (officer verify/reject is the final
    * approval until automated facial matching is added).
    */
-  async submitIdentity(farmerId: string, dto: SubmitIdentityDto, user: RequestUser) {
+  async submitIdentity(
+    farmerId: string,
+    dto: SubmitIdentityDto,
+    user: RequestUser,
+  ) {
     await this.ownership.assertFarmerAccess(user, farmerId);
     const farmer = await this.findOne(farmerId);
 
@@ -380,13 +421,15 @@ export class FarmersService {
             uploadedById: user.id,
           },
           ...(dto.profilePhotoUrl
-            ? [{
-                farmerId,
-                type: DocumentType.PROFILE_PHOTO,
-                fileUrl: dto.profilePhotoUrl,
-                fileName: 'profile-photo',
-                uploadedById: user.id,
-              }]
+            ? [
+                {
+                  farmerId,
+                  type: DocumentType.PROFILE_PHOTO,
+                  fileUrl: dto.profilePhotoUrl,
+                  fileName: 'profile-photo',
+                  uploadedById: user.id,
+                },
+              ]
             : []),
         ],
       });
@@ -440,16 +483,22 @@ export class FarmersService {
         },
       },
     });
-    if (!farmer) throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
+    if (!farmer)
+      throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
 
     const cycles = farmer.cropCycles;
     const harvested = cycles.filter((c) => (c.actualYieldKg ?? 0) > 0);
-    const totalActualYieldKg = harvested.reduce((s, c) => s + (c.actualYieldKg ?? 0), 0);
+    const totalActualYieldKg = harvested.reduce(
+      (s, c) => s + (c.actualYieldKg ?? 0),
+      0,
+    );
     const totalEstimatedYieldKg = cycles.reduce(
       (s, c) => s + (c.estimatedYieldKg ?? 0),
       0,
     );
-    const avgYieldKg = harvested.length ? totalActualYieldKg / harvested.length : 0;
+    const avgYieldKg = harvested.length
+      ? totalActualYieldKg / harvested.length
+      : 0;
 
     return {
       farmerId,
@@ -487,7 +536,7 @@ export class FarmersService {
           'Activate your MAYOData membership to view the full financial analysis.',
       };
     }
-    return this.finance.getFarmerFinancialSummary(farmerId);
+    return this.finance.getFarmerFinancialSummary(farmerId, user);
   }
 
   /**
@@ -503,7 +552,8 @@ export class FarmersService {
         loanRecords: true,
       },
     });
-    if (!farmer) throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
+    if (!farmer)
+      throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
 
     // 1. Verification (max 25)
     const verificationScore =
@@ -522,7 +572,10 @@ export class FarmersService {
     for (const cycle of farmer.cropCycles) {
       overallCosts += cycle.costs.reduce((s, c) => s + c.totalCost, 0);
       overallRevenues += cycle.revenues.reduce((s, r) => s + r.totalRevenue, 0);
-      overallPremium += cycle.revenues.reduce((s, r) => s + (r.fairtradePremium || 0), 0);
+      overallPremium += cycle.revenues.reduce(
+        (s, r) => s + (r.fairtradePremium || 0),
+        0,
+      );
     }
     const netProfit = overallRevenues + overallPremium - overallCosts;
     let profitabilityScore = 0;
@@ -577,11 +630,23 @@ export class FarmersService {
       isBlacklisted: farmer.isBlacklisted,
       blacklistReason: farmer.blacklistReason,
       factors: {
-        verification: { score: verificationScore, max: 25, status: farmer.verificationStatus },
+        verification: {
+          score: verificationScore,
+          max: 25,
+          status: farmer.verificationStatus,
+        },
         production: { score: productionScore, max: 20, harvestedCycles },
         profitability: { score: profitabilityScore, max: 20, netProfit },
-        loanRepayment: { score: loanScore, max: 20, activeLoans: farmer.loanRecords.length },
-        cooperativeMembership: { score: cooperativeScore, max: 10, isMember: !!farmer.mamcosId },
+        loanRepayment: {
+          score: loanScore,
+          max: 20,
+          activeLoans: farmer.loanRecords.length,
+        },
+        cooperativeMembership: {
+          score: cooperativeScore,
+          max: 10,
+          isMember: !!farmer.mamcosId,
+        },
         experience: { score: experienceScore, max: 5, years },
       },
     };

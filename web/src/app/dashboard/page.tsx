@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { farmersApi, farmsApi, mamcosApi, marketplaceApi, financeApi } from '@/lib/api';
 
 interface StatCard {
@@ -21,10 +22,10 @@ function StatCard({ label, value, sub, icon, color }: StatCard) {
         {icon}
       </div>
       <div>
-        <div style={{ fontSize: '24px', fontWeight: 700, color: '#F9FAFB', fontFamily: 'Outfit, sans-serif', lineHeight: 1.2 }}>
+        <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Outfit, sans-serif', lineHeight: 1.2 }}>
           {value}
         </div>
-        <div style={{ fontSize: '13px', color: '#9CA3AF', fontWeight: 500 }}>{label}</div>
+        <div style={{ fontSize: '13px', color: 'var(--neutral-400)', fontWeight: 500 }}>{label}</div>
         {sub && <div style={{ fontSize: '11px', color: color, marginTop: '2px', fontWeight: 500 }}>{sub}</div>}
       </div>
     </div>
@@ -72,22 +73,22 @@ export default function DashboardPage() {
       {/* Header */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
-          <div style={{ width: '4px', height: '28px', background: 'linear-gradient(to bottom, #10B981, #34D399)', borderRadius: '9999px' }} />
-          <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '26px', fontWeight: 800, color: '#F9FAFB' }}>
+          <div style={{ width: '4px', height: '28px', background: 'linear-gradient(to bottom, var(--accent), var(--green-400))', borderRadius: '9999px' }} />
+          <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '26px', fontWeight: 800, color: 'var(--text-primary)' }}>
             System Overview
           </h1>
         </div>
-        <p style={{ fontSize: '14px', color: '#6B7280', marginLeft: '16px' }}>
+        <p style={{ fontSize: '14px', color: 'var(--neutral-500)', marginLeft: '16px' }}>
           MAYODE GROUP — MAYOData Platform & M-LAX Marketplace
         </p>
       </div>
 
       {/* Stats Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-        <StatCard label="Registered Farmers" value={loading ? '—' : stats.farmers} sub="Active members" icon="👤" color="#10B981" />
-        <StatCard label="Registered Farms" value={loading ? '—' : stats.farms} sub="GPS mapped" icon="🌾" color="#34D399" />
-        <StatCard label="AMCOS Schemes" value={loading ? '—' : stats.mamcos} sub="Active cooperatives" icon="🏛" color="#F59E0B" />
-        <StatCard label="M-LAX Listings" value={loading ? '—' : stats.listings} sub="Land & tractor ads" icon="🏪" color="#3B82F6" />
+        <StatCard label="Registered Farmers" value={loading ? '—' : stats.farmers} sub="Active members" icon="👤" color="var(--accent)" />
+        <StatCard label="Registered Farms" value={loading ? '—' : stats.farms} sub="GPS mapped" icon="🌾" color="var(--green-400)" />
+        <StatCard label="AMCOS Schemes" value={loading ? '—' : stats.mamcos} sub="Active cooperatives" icon="🏛" color="var(--gold-400)" />
+        <StatCard label="M-LAX Listings" value={loading ? '—' : stats.listings} sub="Land & tractor ads" icon="🏪" color="var(--blue-500)" />
       </div>
 
       {/* Content Panels */}
@@ -95,23 +96,23 @@ export default function DashboardPage() {
         {/* Market Prices */}
         <div className="glass-card" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#F9FAFB' }}>📊 Latest Market Prices</h2>
-            <span style={{ fontSize: '12px', color: '#6B7280' }}>TZS / kg</span>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>📊 Latest Market Prices</h2>
+            <span style={{ fontSize: '12px', color: 'var(--neutral-500)' }}>TZS / kg</span>
           </div>
           {prices.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#4B5563', fontSize: '14px', padding: '32px 0' }}>
+            <div style={{ textAlign: 'center', color: 'var(--neutral-600)', fontSize: '14px', padding: '32px 0' }}>
               No market prices recorded yet
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {prices.map((p, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(31, 41, 55, 0.5)', borderRadius: '10px' }}>
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface-tint)', borderRadius: '10px' }}>
                   <div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#F9FAFB' }}>{p.commodity}</div>
-                    <div style={{ fontSize: '11px', color: '#6B7280' }}>{p.market || 'Market unknown'}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{p.commodity}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{p.market || 'Market unknown'}</div>
                   </div>
-                  <div style={{ fontSize: '15px', fontWeight: 700, color: '#10B981' }}>
-                    {Number(p.price).toLocaleString()} <span style={{ fontSize: '11px', color: '#6B7280' }}>TZS</span>
+                  <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent)' }}>
+                    {Number(p.price).toLocaleString()} <span style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>TZS</span>
                   </div>
                 </div>
               ))}
@@ -121,21 +122,21 @@ export default function DashboardPage() {
 
         {/* Quick Actions */}
         <div className="glass-card" style={{ padding: '24px' }}>
-          <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#F9FAFB', marginBottom: '20px' }}>⚡ Quick Actions</h2>
+          <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '20px' }}>⚡ Quick Actions</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {[
-              { label: 'Register New Farmer', href: '/dashboard/farmers', icon: '👤', color: '#10B981' },
-              { label: 'Register New Farm', href: '/dashboard/farms', icon: '🌾', color: '#34D399' },
-              { label: 'Log Crop Activity', href: '/dashboard/crop-cycles', icon: '🌱', color: '#F59E0B' },
-              { label: 'Receive Inventory', href: '/dashboard/inventory', icon: '📦', color: '#3B82F6' },
-              { label: 'Post Land Listing', href: '/dashboard/marketplace', icon: '🏪', color: '#8B5CF6' },
+              { label: 'Register New Farmer', href: '/dashboard/farmers', icon: '👤', color: 'var(--accent)' },
+              { label: 'Register New Farm', href: '/dashboard/farms', icon: '🌾', color: 'var(--green-400)' },
+              { label: 'Log Crop Activity', href: '/dashboard/crop-cycles', icon: '🌱', color: 'var(--gold-400)' },
+              { label: 'Receive Inventory', href: '/dashboard/inventory', icon: '📦', color: 'var(--blue-500)' },
+              { label: 'Post Land Listing', href: '/dashboard/marketplace', icon: '🏪', color: 'var(--purple-500)' },
             ].map((action) => (
-              <a
+              <Link
                 key={action.href}
                 href={action.href}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px',
-                  background: 'rgba(31, 41, 55, 0.5)', borderRadius: '10px', textDecoration: 'none',
+                  background: 'var(--surface-tint)', borderRadius: '10px', textDecoration: 'none',
                   border: '1px solid transparent', transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={e => {
@@ -146,13 +147,13 @@ export default function DashboardPage() {
                 onMouseLeave={e => {
                   const el = e.currentTarget;
                   el.style.borderColor = 'transparent';
-                  el.style.background = 'rgba(31, 41, 55, 0.5)';
+                  el.style.background = 'var(--surface-tint)';
                 }}
               >
                 <span style={{ fontSize: '18px', width: '28px', textAlign: 'center' }}>{action.icon}</span>
-                <span style={{ fontSize: '13px', fontWeight: 500, color: '#D1D5DB' }}>{action.label}</span>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--neutral-300)' }}>{action.label}</span>
                 <span style={{ marginLeft: 'auto', fontSize: '14px', color: action.color }}>→</span>
-              </a>
+              </Link>
             ))}
           </div>
         </div>

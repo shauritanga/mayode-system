@@ -1,0 +1,261 @@
+import React, { useCallback, useState } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { Add01Icon, WheatIcon, Wallet01Icon, CoinsDollarIcon } from '@hugeicons/core-free-icons';
+import { cropCyclesApi } from '../../src/lib/data';
+import { timeAgo, useI18n } from '../../src/i18n';
+
+interface Activity {
+  id: string; activityType: string; activityDate: string; description?: string;
+  laborWorkers?: number; laborHours?: number;
+}
+interface Cost {
+  id: string; category: string; itemName: string; totalCost: number; dateIncurred: string;
+}
+interface Revenue {
+  id: string; revenueType: string; quantityKg: number; totalRevenue: number;
+  fairtradePremium?: number; saleDate: string;
+}
+interface CropCycle {
+  id: string; season: string; riceVariety?: string; status: string;
+  estimatedYieldKg?: number; actualYieldKg?: number;
+  farm?: { farmCode: string };
+  activities: Activity[]; costs: Cost[]; revenues: Revenue[];
+}
+
+type Tab = 'activities' | 'expenses' | 'sales';
+
+export default function CropCycleDetail() {
+  const { id } = useLocalSearchParams<{ id: string; farmCode?: string }>();
+  const router = useRouter();
+  const { t } = useI18n();
+  const [cycle, setCycle] = useState<CropCycle | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>('activities');
+  const [harvestOpen, setHarvestOpen] = useState(false);
+  const [actualYield, setActualYield] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      const res = await cropCyclesApi.getOne(id);
+      setCycle(res.data);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const markHarvested = async () => {
+    if (!actualYield.trim()) {
+      Alert.alert(t('markHarvested'), t('fillHarvestFields'));
+      return;
+    }
+    setSaving(true);
+    try {
+      await cropCyclesApi.update(id!, {
+        status: 'HARVESTED',
+        actualYieldKg: Number(actualYield),
+        harvestDate: new Date().toISOString(),
+      });
+      Alert.alert(t('markHarvested'), t('cropCycleUpdated'));
+      setHarvestOpen(false);
+      load();
+    } catch (e: any) {
+      Alert.alert(t('markHarvested'), e?.response?.data?.message || String(e?.message ?? e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading && !cycle) {
+    return <SafeAreaView style={styles.center}><ActivityIndicator color="#10B981" size="large" /></SafeAreaView>;
+  }
+  if (!cycle) {
+    return <SafeAreaView style={styles.center}><Text>{t('cropCycleDetail')}</Text></SafeAreaView>;
+  }
+
+  const totalExpenses = cycle.costs.reduce((s, c) => s + c.totalCost, 0);
+
+  return (
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <Stack.Screen options={{ headerShown: true, title: cycle.season }} />
+      <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <View style={styles.card}>
+          <Text style={styles.season}>{cycle.season}</Text>
+          <Text style={styles.sub}>
+            {cycle.farm?.farmCode} {cycle.riceVariety ? `· ${cycle.riceVariety}` : ''} · {cycle.status}
+          </Text>
+          {cycle.status !== 'HARVESTED' && cycle.status !== 'COMPLETED' && (
+            <TouchableOpacity style={styles.harvestBtn} onPress={() => setHarvestOpen((o) => !o)}>
+              <Text style={styles.harvestBtnText}>{t('markHarvested')}</Text>
+            </TouchableOpacity>
+          )}
+          {harvestOpen && (
+            <View style={{ marginTop: 10 }}>
+              <TextInput
+                style={styles.input}
+                placeholder={t('actualYieldKg')}
+                placeholderTextColor="#9CA3AF"
+                keyboardType="decimal-pad"
+                value={actualYield}
+                onChangeText={setActualYield}
+              />
+              <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={markHarvested} disabled={saving}>
+                <Text style={styles.saveBtnText}>{t('cropCycleUpdated')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.tabRow}>
+          <TouchableOpacity style={[styles.tabBtn, tab === 'activities' && styles.tabBtnActive]} onPress={() => setTab('activities')}>
+            <Text style={[styles.tabText, tab === 'activities' && styles.tabTextActive]}>{t('activitiesTab')} ({cycle.activities.length})</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tabBtn, tab === 'expenses' && styles.tabBtnActive]} onPress={() => setTab('expenses')}>
+            <Text style={[styles.tabText, tab === 'expenses' && styles.tabTextActive]}>{t('expensesTab')} ({cycle.costs.length})</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tabBtn, tab === 'sales' && styles.tabBtnActive]} onPress={() => setTab('sales')}>
+            <Text style={[styles.tabText, tab === 'sales' && styles.tabTextActive]}>{t('salesTab')} ({cycle.revenues.length})</Text>
+          </TouchableOpacity>
+        </View>
+
+        {tab === 'activities' ? (
+          <>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => router.push({ pathname: '/activity-new', params: { cropCycleId: cycle.id, farmCode: cycle.farm?.farmCode, season: cycle.season } })}
+            >
+              <HugeiconsIcon icon={Add01Icon} size={16} color="#10B981" strokeWidth={2} />
+              <Text style={styles.addBtnText}>{t('logActivity')}</Text>
+            </TouchableOpacity>
+            {cycle.activities.length === 0 ? (
+              <View style={styles.empty}>
+                <HugeiconsIcon icon={WheatIcon} size={36} color="#D1FAE5" strokeWidth={1.5} />
+                <Text style={styles.emptyText}>{t('noActivitiesYet')}</Text>
+              </View>
+            ) : (
+              cycle.activities.map((a) => (
+                <View key={a.id} style={styles.row}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>{a.activityType.replace(/_/g, ' ')}</Text>
+                    {!!a.description && <Text style={styles.rowSub} numberOfLines={1}>{a.description}</Text>}
+                    {(a.laborWorkers || a.laborHours) ? (
+                      <Text style={styles.rowSub}>
+                        {a.laborWorkers ? `${a.laborWorkers} workers` : ''} {a.laborHours ? `· ${a.laborHours}h` : ''}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.rowTime}>{timeAgo(a.activityDate, t)}</Text>
+                </View>
+              ))
+            )}
+          </>
+        ) : tab === 'expenses' ? (
+          <>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => router.push({ pathname: '/expense-new', params: { cropCycleId: cycle.id, farmCode: cycle.farm?.farmCode, season: cycle.season } })}
+            >
+              <HugeiconsIcon icon={Add01Icon} size={16} color="#10B981" strokeWidth={2} />
+              <Text style={styles.addBtnText}>{t('addExpense')}</Text>
+            </TouchableOpacity>
+            {cycle.costs.length === 0 ? (
+              <View style={styles.empty}>
+                <HugeiconsIcon icon={Wallet01Icon} size={36} color="#D1FAE5" strokeWidth={1.5} />
+                <Text style={styles.emptyText}>{t('noExpensesYet')}</Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>{t('totalExpenses')}</Text>
+                  <Text style={styles.totalValue}>TZS {totalExpenses.toLocaleString()}</Text>
+                </View>
+                {cycle.costs.map((c) => (
+                  <View key={c.id} style={styles.row}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rowTitle}>{c.itemName}</Text>
+                      <Text style={styles.rowSub}>{c.category.replace(/_/g, ' ')}</Text>
+                    </View>
+                    <Text style={styles.rowAmount}>TZS {c.totalCost.toLocaleString()}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => router.push({ pathname: '/revenue-new', params: { cropCycleId: cycle.id, farmCode: cycle.farm?.farmCode, season: cycle.season } })}
+            >
+              <HugeiconsIcon icon={Add01Icon} size={16} color="#10B981" strokeWidth={2} />
+              <Text style={styles.addBtnText}>{t('recordSale')}</Text>
+            </TouchableOpacity>
+            {cycle.revenues.length === 0 ? (
+              <View style={styles.empty}>
+                <HugeiconsIcon icon={CoinsDollarIcon} size={36} color="#D1FAE5" strokeWidth={1.5} />
+                <Text style={styles.emptyText}>{t('noSalesYet')}</Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>{t('totalRevenue')}</Text>
+                  <Text style={styles.totalValue}>
+                    TZS {cycle.revenues.reduce((s, r) => s + r.totalRevenue + (r.fairtradePremium ?? 0), 0).toLocaleString()}
+                  </Text>
+                </View>
+                {cycle.revenues.map((r) => (
+                  <View key={r.id} style={styles.row}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rowTitle}>{r.quantityKg}kg</Text>
+                      <Text style={styles.rowSub}>{r.revenueType.replace(/_/g, ' ')}</Text>
+                    </View>
+                    <Text style={styles.rowAmount}>TZS {r.totalRevenue.toLocaleString()}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F3F4F6' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E5E7EB' },
+  season: { fontSize: 18, fontWeight: '900', color: '#111827' },
+  sub: { fontSize: 12, color: '#6B7280', marginTop: 4 },
+  harvestBtn: { marginTop: 10, alignSelf: 'flex-start', backgroundColor: '#FEF3C7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  harvestBtnText: { color: '#B45309', fontWeight: '700', fontSize: 12 },
+  input: { backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111827', marginBottom: 10 },
+  saveBtn: { backgroundColor: '#065F46', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  saveBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  tabRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  tabBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center' },
+  tabBtnActive: { backgroundColor: '#065F46', borderColor: '#065F46' },
+  tabText: { fontSize: 13, fontWeight: '700', color: '#374151' },
+  tabTextActive: { color: '#fff' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#10B981', paddingVertical: 11, borderRadius: 12, marginBottom: 12 },
+  addBtnText: { color: '#10B981', fontWeight: '800', fontSize: 13 },
+  empty: { alignItems: 'center', marginTop: 30, paddingHorizontal: 24 },
+  emptyText: { color: '#6B7280', textAlign: 'center', marginTop: 10, lineHeight: 20 },
+  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' },
+  rowTitle: { fontSize: 14, fontWeight: '700', color: '#111827', textTransform: 'capitalize' },
+  rowSub: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  rowTime: { fontSize: 11, color: '#9CA3AF', marginLeft: 8 },
+  rowAmount: { fontSize: 13, fontWeight: '800', color: '#111827' },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#ECFDF5', borderRadius: 12, padding: 14, marginBottom: 12 },
+  totalLabel: { fontSize: 13, color: '#065F46', fontWeight: '700' },
+  totalValue: { fontSize: 14, color: '#065F46', fontWeight: '900' },
+});

@@ -129,11 +129,58 @@ export const activitiesApi = {
     api.get(`/activities/farmer/${farmerId}`, { params: limit ? { limit } : undefined }),
 };
 
-// ── Crop Cycles ──
+// ── Crop Cycles (starting a season, farming activities) ──
 export const cropCyclesApi = {
   getAll: (params?: object) => api.get('/crop-cycles', { params }),
+  getOne: (id: string) => api.get(`/crop-cycles/${id}`),
   getByFarmId: (farmId: string) => api.get(`/crop-cycles/farm/${farmId}`),
-  logActivity: (data: object) => api.post('/crop-cycles/activity', data),
+  create: (data: {
+    farmId: string;
+    season: string;
+    riceVariety?: string;
+    plantingDate?: string;
+    expectedHarvest?: string;
+    estimatedYieldKg?: number;
+  }) => api.post('/crop-cycles', data),
+  update: (id: string, data: object) => api.patch(`/crop-cycles/${id}`, data),
+  logActivity: (data: {
+    cropCycleId: string;
+    activityType: string;
+    activityDate: string;
+    description?: string;
+    inputsUsed?: Record<string, unknown>;
+    laborWorkers?: number;
+    laborHours?: number;
+    photoUrls?: string[];
+    gpsLatitude?: number;
+    gpsLongitude?: number;
+  }) => api.post('/crop-cycles/activity', data),
+};
+
+// ── Finance (expenses & revenue per crop cycle) ──
+export const financeApi = {
+  addCost: (data: {
+    cropCycleId: string;
+    category: string;
+    itemName: string;
+    quantity?: number;
+    unit?: string;
+    unitPrice?: number;
+    totalCost: number;
+    supplier?: string;
+    receiptUrl?: string;
+    dateIncurred: string;
+  }) => api.post('/finance/cost', data),
+  addRevenue: (data: {
+    cropCycleId: string;
+    revenueType: string;
+    quantityKg: number;
+    pricePerKg: number;
+    totalRevenue: number;
+    fairtradePremium?: number;
+    saleDate: string;
+  }) => api.post('/finance/revenue', data),
+  getCropCycleSummary: (cropCycleId: string) => api.get(`/finance/crop-cycle/${cropCycleId}/summary`),
 };
 
 // ── Locations ──
@@ -190,11 +237,25 @@ export const leasesApi = {
     leaseStartDate: string;
     leaseEndDate: string;
     notes?: string;
+    agreementDocumentUrl?: string;
   }) => api.post('/farm-leases', data),
   mine: () => api.get('/farm-leases/mine'),
   forFarm: (farmId: string) => api.get(`/farm-leases/farm/${farmId}`),
   renterConfirm: (id: string) => api.patch(`/farm-leases/${id}/renter-confirm`),
   renterReject: (id: string) => api.patch(`/farm-leases/${id}/renter-reject`),
+};
+
+// ── Suggested farm corrections ("Add More Details" / "Suggest Correction") ──
+export const correctionsApi = {
+  submit: (farmId: string, data: { fieldName: string; suggestedValue: string; evidenceUrls?: string[] }) =>
+    api.post(`/farms/${farmId}/suggested-updates`, data),
+  listForFarm: (farmId: string) => api.get(`/farms/${farmId}/suggested-updates`),
+};
+
+// ── Field surveys (MAYODE field data collection) ──
+export const fieldSurveysApi = {
+  create: (farmId: string, data: object) => api.post(`/farms/${farmId}/field-surveys`, data),
+  listForFarm: (farmId: string) => api.get(`/farms/${farmId}/field-surveys`),
 };
 
 // ── Seasonal assignments (active farmer per farm & season) ──

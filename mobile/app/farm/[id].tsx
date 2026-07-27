@@ -7,10 +7,13 @@ import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from 'expo-rou
 import { WebView } from 'react-native-webview';
 import * as ImagePicker from 'expo-image-picker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Add01Icon, Location01Icon, Layers01Icon, Edit02Icon, SquareLock02Icon, CheckmarkCircle02Icon, UserMultiple02Icon, Camera01Icon, File01Icon } from '@hugeicons/core-free-icons';
+import { Add01Icon, Location01Icon, Layers01Icon, Edit02Icon, SquareLock02Icon, CheckmarkCircle02Icon, UserMultiple02Icon, Camera01Icon, File01Icon, WheatIcon } from '@hugeicons/core-free-icons';
 import { farmsApi, ownershipApi, assignmentsApi, seasonsApi, uploadsApi } from '../../src/lib/data';
 import { boundaryPreviewHtml } from '../../src/lib/leaflet-preview-html';
 import { useI18n } from '../../src/i18n';
+import { useAuthStore } from '../../src/store/auth.store';
+
+const STAFF_ROLES = ['SUPER_ADMIN', 'ADMIN', 'FIELD_OFFICER', 'MAMCOS_SECRETARY'];
 
 interface Plot {
   id: string; plotCode: string; name?: string; sizeAcres?: number;
@@ -43,6 +46,7 @@ export default function FarmDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { t } = useI18n();
+  const { user } = useAuthStore();
   const [farm, setFarm] = useState<Farm | null>(null);
   const [prod, setProd] = useState<Productivity | null>(null);
   const [ownerships, setOwnerships] = useState<Ownership[]>([]);
@@ -184,6 +188,15 @@ export default function FarmDetail() {
           )}
         </View>
 
+        {/* Farming activities: crop cycles, activity log, expenses — a free feature */}
+        <TouchableOpacity
+          style={styles.reportBtn}
+          onPress={() => router.push({ pathname: '/crop-cycles/[farmId]', params: { farmId: farm.id, farmCode: farm.farmCode } })}
+        >
+          <HugeiconsIcon icon={WheatIcon} size={18} color="#fff" strokeWidth={2} />
+          <Text style={styles.reportBtnText}>{t('farmingActivities')}</Text>
+        </TouchableOpacity>
+
         {/* Printable analytics report (premium) */}
         <TouchableOpacity
           style={styles.reportBtn}
@@ -192,6 +205,26 @@ export default function FarmDetail() {
           <HugeiconsIcon icon={File01Icon} size={18} color="#fff" strokeWidth={2} />
           <Text style={styles.reportBtnText}>{t('viewFarmReport')}</Text>
         </TouchableOpacity>
+
+        {/* Suggest a correction (prompt2 §19) — never overwrites data directly, held for officer review */}
+        <TouchableOpacity
+          style={styles.correctionBtn}
+          onPress={() => router.push({ pathname: '/farm-correction', params: { farmId: farm.id, farmCode: farm.farmCode } })}
+        >
+          <HugeiconsIcon icon={Edit02Icon} size={16} color="#065F46" strokeWidth={2} />
+          <Text style={styles.correctionBtnText}>{t('suggestCorrection')}</Text>
+        </TouchableOpacity>
+
+        {/* Field survey — staff only (screen itself gates by role) */}
+        {STAFF_ROLES.includes(user?.role ?? '') && (
+          <TouchableOpacity
+            style={styles.correctionBtn}
+            onPress={() => router.push({ pathname: '/field-survey', params: { farmId: farm.id, farmCode: farm.farmCode } })}
+          >
+            <HugeiconsIcon icon={Location01Icon} size={16} color="#065F46" strokeWidth={2} />
+            <Text style={styles.correctionBtnText}>{t('recordFieldSurvey')}</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Productivity — premium-gated by the backend */}
         {prod && (
@@ -495,4 +528,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#065F46', paddingVertical: 14, borderRadius: 14, marginBottom: 18,
   },
   reportBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  correctionBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#065F46',
+    paddingVertical: 12, borderRadius: 14, marginBottom: 12,
+  },
+  correctionBtnText: { color: '#065F46', fontWeight: '800', fontSize: 14 },
 });

@@ -43,22 +43,22 @@ export default function FinancePage() {
     <div>
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-          <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, #F59E0B, #FCD34D)', borderRadius: '9999px' }} />
-          <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: '#F9FAFB' }}>Finance & Profitability</h1>
+          <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--gold-400), var(--gold-300))', borderRadius: '9999px' }} />
+          <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Finance & Profitability</h1>
         </div>
-        <p style={{ fontSize: '13px', color: '#6B7280', marginLeft: '14px' }}>Automated profit/loss analytics per farmer</p>
+        <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Automated profit/loss analytics per farmer</p>
       </div>
 
       {/* Farmer selector */}
       <div className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
-        <div style={{ fontSize: '14px', fontWeight: 600, color: '#F9FAFB', marginBottom: '16px' }}>Select Farmer to Analyse</div>
+        <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>Select Farmer to Analyse</div>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <select
             id="farmer-select"
             value={farmerId}
             onChange={e => setFarmerId(e.target.value)}
             className="input-field"
-            style={{ flex: '1', minWidth: '200px', maxWidth: '360px', background: '#1F2937', color: farmerId ? '#F9FAFB' : '#6B7280' }}
+            style={{ flex: '1', minWidth: '200px', maxWidth: '360px', background: 'var(--neutral-800)', color: farmerId ? 'var(--text-primary)' : 'var(--neutral-500)' }}
           >
             <option value="">— Select a farmer —</option>
             {farmers.map(f => (
@@ -84,22 +84,22 @@ export default function FinancePage() {
         <div className="animate-fade-in">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
             {[
-              { label: 'Total Revenue', value: `${Number(summary.totalRevenue).toLocaleString()} TZS`, color: '#10B981', icon: '📈' },
-              { label: 'Total Costs', value: `${Number(summary.totalCosts).toLocaleString()} TZS`, color: '#EF4444', icon: '📉' },
+              { label: 'Total Revenue', value: `${Number(summary.totalRevenue).toLocaleString()} TZS`, color: 'var(--accent)', icon: '📈' },
+              { label: 'Total Costs', value: `${Number(summary.totalCosts).toLocaleString()} TZS`, color: 'var(--red-500)', icon: '📉' },
               {
                 label: 'Net Profit / Loss',
                 value: `${summary.netProfit >= 0 ? '+' : ''}${Number(summary.netProfit).toLocaleString()} TZS`,
-                color: isProfit ? '#10B981' : '#EF4444',
+                color: isProfit ? 'var(--accent)' : 'var(--red-500)',
                 icon: isProfit ? '✅' : '⚠️',
               },
-              { label: 'Total Yield', value: summary.totalYieldKg ? `${summary.totalYieldKg.toFixed(0)} kg` : '—', color: '#F59E0B', icon: '🌾' },
-              { label: 'Cost per kg', value: summary.costPerKg ? `${summary.costPerKg.toFixed(0)} TZS` : '—', color: '#9CA3AF', icon: '⚖️' },
-              { label: 'Revenue per kg', value: summary.revenuePerKg ? `${summary.revenuePerKg.toFixed(0)} TZS` : '—', color: '#34D399', icon: '💰' },
+              { label: 'Total Yield', value: summary.totalYieldKg ? `${summary.totalYieldKg.toFixed(0)} kg` : '—', color: 'var(--gold-400)', icon: '🌾' },
+              { label: 'Cost per kg', value: summary.costPerKg ? `${summary.costPerKg.toFixed(0)} TZS` : '—', color: 'var(--neutral-400)', icon: '⚖️' },
+              { label: 'Revenue per kg', value: summary.revenuePerKg ? `${summary.revenuePerKg.toFixed(0)} TZS` : '—', color: 'var(--green-400)', icon: '💰' },
             ].map(stat => (
               <div key={stat.label} className="stat-card" style={{ padding: '20px' }}>
                 <div style={{ fontSize: '20px', marginBottom: '8px' }}>{stat.icon}</div>
                 <div style={{ fontSize: '18px', fontWeight: 700, color: stat.color, fontFamily: 'Outfit, sans-serif', marginBottom: '4px' }}>{stat.value}</div>
-                <div style={{ fontSize: '12px', color: '#6B7280' }}>{stat.label}</div>
+                <div style={{ fontSize: '12px', color: 'var(--neutral-500)' }}>{stat.label}</div>
               </div>
             ))}
           </div>
@@ -111,10 +111,10 @@ export default function FinancePage() {
             background: isProfit ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
             border: `1px solid ${isProfit ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
           }}>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: isProfit ? '#10B981' : '#EF4444', marginBottom: '4px' }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: isProfit ? 'var(--accent)' : 'var(--red-500)', marginBottom: '4px' }}>
               {isProfit ? '✅ Farm is Profitable' : '⚠️ Farm is Operating at a Loss'}
             </div>
-            <div style={{ fontSize: '13px', color: '#9CA3AF' }}>
+            <div style={{ fontSize: '13px', color: 'var(--neutral-400)' }}>
               {isProfit
                 ? `This farmer has generated a net profit of ${Number(summary.netProfit).toLocaleString()} TZS across all crop cycles.`
                 : `This farmer has incurred a net loss of ${Math.abs(summary.netProfit).toLocaleString()} TZS. Review input costs and yield performance.`}
@@ -126,7 +126,7 @@ export default function FinancePage() {
       {!summary && !loading && (
         <div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>📊</div>
-          <div style={{ fontSize: '15px', fontWeight: 600, color: '#6B7280' }}>Select a farmer to view their financial profitability summary</div>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--neutral-500)' }}>Select a farmer to view their financial profitability summary</div>
         </div>
       )}
     </div>
