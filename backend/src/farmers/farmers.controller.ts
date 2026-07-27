@@ -38,7 +38,7 @@ export class FarmersController {
   constructor(private readonly farmersService: FarmersService) {}
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER)
   @ApiOperation({ summary: 'Register a new farmer (provisions login + profile)' })
   create(@Body() dto: CreateFarmerDto) {
     return this.farmersService.create(dto);
@@ -46,13 +46,13 @@ export class FarmersController {
 
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY, UserRole.AUDITOR)
-  @ApiOperation({ summary: 'List farmers (search, filter by location/cooperative/status, paginated)' })
+  @ApiOperation({ summary: 'List farmers (search, filter by location/cooperative/status, paginated) — Admin read-only for reporting/Finance farmer lookup' })
   findAll(@Query() query: QueryFarmersDto) {
     return this.farmersService.findAll(query);
   }
 
   @Get('overview')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY, UserRole.AUDITOR)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY, UserRole.AUDITOR)
   @ApiOperation({ summary: 'Farmer dashboard aggregates (counts by status and region)' })
   overview() {
     return this.farmersService.getOverview();
@@ -77,7 +77,7 @@ export class FarmersController {
   }
 
   @Get(':id/credit-readiness')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FINANCIAL_PROVIDER, UserRole.MAMCOS_SECRETARY)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FINANCIAL_PROVIDER, UserRole.MAMCOS_SECRETARY)
   @ApiOperation({ summary: 'Compute & persist credit-readiness score with factor breakdown' })
   getCreditReadiness(@Param('id') id: string) {
     return this.farmersService.getCreditReadiness(id);
@@ -115,7 +115,7 @@ export class FarmersController {
   }
 
   @Post(':id/verify')
-  @Roles(UserRole.FIELD_OFFICER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.FIELD_OFFICER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Verify a farmer (Field Officer / Admin)' })
   verify(
     @Param('id') id: string,
@@ -126,7 +126,7 @@ export class FarmersController {
   }
 
   @Post(':id/reject')
-  @Roles(UserRole.FIELD_OFFICER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.FIELD_OFFICER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Reject a farmer application with a reason' })
   reject(
     @Param('id') id: string,
@@ -137,7 +137,7 @@ export class FarmersController {
   }
 
   @Post(':id/suspend')
-  @Roles(UserRole.FIELD_OFFICER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.FIELD_OFFICER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Suspend a farmer with a reason' })
   suspend(
     @Param('id') id: string,
@@ -181,7 +181,7 @@ export class FarmersController {
   }
 
   @Delete('documents/:documentId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({ summary: 'Delete a document by ID' })
   removeDocument(@Param('documentId') documentId: string) {
     return this.farmersService.removeDocument(documentId);

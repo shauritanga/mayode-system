@@ -56,4 +56,14 @@ export class CreateStaffUserDto {
   @IsString()
   @IsOptional()
   language?: string;
+
+  @ApiPropertyOptional({ description: 'Required for an AMCOS Leader account' })
+  @IsString()
+  @IsOptional()
+  mamcosId?: string;
+
+  @ApiPropertyOptional({ description: 'Field Officer operational area' })
+  @IsString()
+  @IsOptional()
+  assignedArea?: string;
 }

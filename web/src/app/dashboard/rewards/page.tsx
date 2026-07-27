@@ -1,6 +1,7 @@
 'use client';
 import { Fragment, useEffect, useState } from 'react';
 import { rewardsApi } from '@/lib/api';
+import Modal from '@/components/Modal';
 
 interface Winner {
   id: string;
@@ -120,20 +121,32 @@ export default function RewardsPage() {
           </div>
           <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Auditable, reproducible random winner selection for farmer incentives</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(s => !s)}>
-          {showForm ? 'Close' : '+ New campaign'}
+        <button className="btn-primary" onClick={() => setShowForm(true)}>
+          + New campaign
         </button>
       </div>
 
       {showForm && (
-        <div className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>New reward campaign</h3>
+        <Modal
+          title="New reward campaign"
+          subtitle="Selection is seeded and reproducible — every winner pick is auditable"
+          onClose={() => { setShowForm(false); setError(''); }}
+          width="600px"
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => { setShowForm(false); setError(''); }} disabled={submitting}>Cancel</button>
+              <button className="btn-primary" onClick={submit} disabled={submitting}>
+                {submitting ? 'Saving…' : 'Create campaign'}
+              </button>
+            </>
+          }
+        >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
             <Field label="Campaign name *" value={form.name} onChange={v => set('name', v)} placeholder="Annual Fertilizer Support 2026" />
             <Field label="Sponsor" value={form.sponsor} onChange={v => set('sponsor', v)} />
             <div>
               <label style={labelStyle}>Reward type</label>
-              <select className="input" value={form.rewardType} onChange={e => set('rewardType', e.target.value)}>
+              <select className="input-field" value={form.rewardType} onChange={e => set('rewardType', e.target.value)}>
                 {REWARD_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
               </select>
             </div>
@@ -142,13 +155,7 @@ export default function RewardsPage() {
             <Field label="Description" value={form.description} onChange={v => set('description', v)} />
           </div>
           {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
-          <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
-            <button className="btn-primary" onClick={submit} disabled={submitting}>
-              {submitting ? 'Saving…' : 'Create campaign'}
-            </button>
-            <button className="btn-secondary" onClick={() => { setShowForm(false); setError(''); }}>Cancel</button>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
@@ -220,7 +227,7 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
   return (
     <div>
       <label style={labelStyle}>{label}</label>
-      <input className="input" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+      <input className="input-field" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
     </div>
   );
 }

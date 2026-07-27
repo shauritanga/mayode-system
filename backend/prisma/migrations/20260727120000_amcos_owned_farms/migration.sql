@@ -1,0 +1,1 @@
+ALTER TABLE "farms" ALTER COLUMN "farmer_id" DROP NOT NULL;

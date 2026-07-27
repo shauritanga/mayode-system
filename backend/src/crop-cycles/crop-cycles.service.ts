@@ -44,10 +44,11 @@ export class CropCyclesService {
     if (!farm) {
       throw new NotFoundException(`Farm with ID ${dto.farmId} not found`);
     }
-    const farmerId =
-      dto.farmerId && dto.farmerId !== farm.farmerId
-        ? await this.assertKnownFarmer(dto.farmerId)
-        : farm.farmerId;
+    const requester = await this.prisma.farmer.findUnique({ where: { userId: user.id }, select: { id: true } });
+    const farmerId = dto.farmerId
+      ? await this.assertKnownFarmer(dto.farmerId)
+      : requester?.id;
+    if (!farmerId) throw new NotFoundException('A renter farmer profile is required to start a crop cycle');
 
     const cropCycle = await this.prisma.cropCycle.create({
       data: {

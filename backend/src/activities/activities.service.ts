@@ -10,7 +10,7 @@ export class ActivitiesService {
   ) {}
 
   /** Record a farmer-facing activity event. Called from other services (farms, plots, uploads). */
-  async log(farmerId: string, type: string, title: string, subtitle?: string, icon?: string) {
+  async log(farmerId: string | null | undefined, type: string, title: string, subtitle?: string, icon?: string) {
     if (!farmerId) return;
     return this.prisma.activity.create({
       data: { farmerId, type, title, subtitle, icon },

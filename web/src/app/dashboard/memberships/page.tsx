@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { membershipsApi } from '@/lib/api';
+import Modal from '@/components/Modal';
 
 interface Plan {
   id: string;
@@ -111,8 +112,8 @@ export default function MembershipsPage() {
           <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Premium plans and farmer membership status — gates farm analytics</p>
         </div>
         {tab === 'plans' && (
-          <button className="btn-primary" onClick={() => setShowForm(s => !s)}>
-            {showForm ? 'Close' : '+ New plan'}
+          <button className="btn-primary" onClick={() => setShowForm(true)}>
+            + New plan
           </button>
         )}
       </div>
@@ -144,14 +145,25 @@ export default function MembershipsPage() {
       </div>
 
       {tab === 'plans' && showForm && (
-        <div className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>New membership plan</h3>
+        <Modal
+          title="New membership plan"
+          onClose={() => { setShowForm(false); setError(''); }}
+          width="600px"
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => { setShowForm(false); setError(''); }} disabled={submitting}>Cancel</button>
+              <button className="btn-primary" onClick={submitPlan} disabled={submitting}>
+                {submitting ? 'Saving…' : 'Create plan'}
+              </button>
+            </>
+          }
+        >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
             <Field label="Plan name *" value={form.name} onChange={v => set('name', v)} placeholder="Season Premium" />
             <Field label="Price (TZS) *" value={form.priceTzs} onChange={v => set('priceTzs', v)} placeholder="15000" />
             <div>
               <label style={labelStyle}>Duration type</label>
-              <select className="input" value={form.durationType} onChange={e => set('durationType', e.target.value)}>
+              <select className="input-field" value={form.durationType} onChange={e => set('durationType', e.target.value)}>
                 <option value="SEASON">Season</option>
                 <option value="ANNUAL">Annual</option>
                 <option value="CUSTOM">Custom</option>
@@ -161,13 +173,7 @@ export default function MembershipsPage() {
             <Field label="Features (comma-separated)" value={form.features} onChange={v => set('features', v)} placeholder="Farm analytics, Yield forecasts" />
           </div>
           {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
-          <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
-            <button className="btn-primary" onClick={submitPlan} disabled={submitting}>
-              {submitting ? 'Saving…' : 'Create plan'}
-            </button>
-            <button className="btn-secondary" onClick={() => { setShowForm(false); setError(''); }}>Cancel</button>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
@@ -249,7 +255,7 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
   return (
     <div>
       <label style={labelStyle}>{label}</label>
-      <input className="input" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+      <input className="input-field" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
     </div>
   );
 }

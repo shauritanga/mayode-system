@@ -37,7 +37,11 @@ export class MamcosService {
     const mamcos = await this.prisma.mamcos.findUnique({
       where: { id },
       include: {
-        secretary: true,
+        secretary: {
+          include: {
+            user: { select: { phone: true, isActive: true } },
+          },
+        },
         farmers: {
           select: { id: true, controlNumber: true, firstName: true, lastName: true, creditScore: true },
         },

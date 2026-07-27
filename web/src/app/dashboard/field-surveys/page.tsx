@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { farmsApi, fieldSurveysApi } from '@/lib/api';
+import Modal from '@/components/Modal';
 
 interface Farm { id: string; farmCode: string; name?: string; village?: string }
 interface Survey {
@@ -32,6 +33,7 @@ export default function FieldSurveysPage() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Farm | null>(null);
   const [surveys, setSurveys] = useState<Survey[]>([]);
+  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -47,6 +49,7 @@ export default function FieldSurveysPage() {
   const selectFarm = (farm: Farm) => {
     setSelected(farm);
     setForm(EMPTY_FORM);
+    setShowForm(false);
     loadSurveys(farm.id);
   };
 
@@ -78,6 +81,7 @@ export default function FieldSurveysPage() {
         longitude: form.longitude ? Number(form.longitude) : undefined,
       });
       setForm(EMPTY_FORM);
+      setShowForm(false);
       loadSurveys(selected.id);
     } catch (e: any) {
       setError(e?.response?.data?.message || 'Failed to record survey');
@@ -116,33 +120,49 @@ export default function FieldSurveysPage() {
 
       {selected && (
         <>
-          <div className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '14px' }}>
-              New survey — {selected.farmCode} {selected.name ? `(${selected.name})` : ''}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              {selected.farmCode} {selected.name ? `(${selected.name})` : ''}
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
-              <Field label="Soil pH" value={form.soilPh} onChange={v => set('soilPh', v)} />
-              <Field label="Soil texture" value={form.soilTexture} onChange={v => set('soilTexture', v)} />
-              <Field label="Organic matter (%)" value={form.soilOrganicMatter} onChange={v => set('soilOrganicMatter', v)} />
-              <Field label="Road distance (m)" value={form.roadDistanceMeters} onChange={v => set('roadDistanceMeters', v)} />
-              <Field label="Road access (GOOD/FAIR/POOR)" value={form.roadAccessQuality} onChange={v => set('roadAccessQuality', v)} />
-              <Field label="Water source" value={form.waterSource} onChange={v => set('waterSource', v)} />
-              <Field label="Water distance (m)" value={form.waterDistanceMeters} onChange={v => set('waterDistanceMeters', v)} />
-              <Field label="Water reliability" value={form.waterReliability} onChange={v => set('waterReliability', v)} />
-              <Field label="Slope" value={form.slope} onChange={v => set('slope', v)} />
-              <Field label="Flood risk" value={form.floodRisk} onChange={v => set('floodRisk', v)} />
-              <Field label="Latitude" value={form.latitude} onChange={v => set('latitude', v)} />
-              <Field label="Longitude" value={form.longitude} onChange={v => set('longitude', v)} />
-            </div>
-            <div style={{ marginTop: '12px' }}>
-              <label style={{ display: 'block', fontSize: '12px', color: 'var(--neutral-400)', marginBottom: '6px' }}>Observations</label>
-              <textarea className="input-field" rows={3} value={form.observations} onChange={e => set('observations', e.target.value)} style={{ resize: 'vertical' }} />
-            </div>
-            {error && <p style={{ color: 'var(--red-400)', fontSize: '12px', marginTop: '10px' }}>{error}</p>}
-            <button className="btn-primary" style={{ marginTop: '14px' }} onClick={submit} disabled={submitting}>
-              {submitting ? 'Saving…' : 'Record survey'}
-            </button>
+            <button className="btn-primary" onClick={() => setShowForm(true)}>+ New survey</button>
           </div>
+
+          {showForm && (
+            <Modal
+              title="New field survey"
+              subtitle={`${selected.farmCode}${selected.name ? ` · ${selected.name}` : ''}`}
+              onClose={() => { setShowForm(false); setError(''); }}
+              width="680px"
+              footer={
+                <>
+                  <button className="btn-secondary" onClick={() => { setShowForm(false); setError(''); }} disabled={submitting}>Cancel</button>
+                  <button className="btn-primary" onClick={submit} disabled={submitting}>
+                    {submitting ? 'Saving…' : 'Record survey'}
+                  </button>
+                </>
+              }
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+                <Field label="Soil pH" value={form.soilPh} onChange={v => set('soilPh', v)} />
+                <Field label="Soil texture" value={form.soilTexture} onChange={v => set('soilTexture', v)} />
+                <Field label="Organic matter (%)" value={form.soilOrganicMatter} onChange={v => set('soilOrganicMatter', v)} />
+                <Field label="Road distance (m)" value={form.roadDistanceMeters} onChange={v => set('roadDistanceMeters', v)} />
+                <Field label="Road access (GOOD/FAIR/POOR)" value={form.roadAccessQuality} onChange={v => set('roadAccessQuality', v)} />
+                <Field label="Water source" value={form.waterSource} onChange={v => set('waterSource', v)} />
+                <Field label="Water distance (m)" value={form.waterDistanceMeters} onChange={v => set('waterDistanceMeters', v)} />
+                <Field label="Water reliability" value={form.waterReliability} onChange={v => set('waterReliability', v)} />
+                <Field label="Slope" value={form.slope} onChange={v => set('slope', v)} />
+                <Field label="Flood risk" value={form.floodRisk} onChange={v => set('floodRisk', v)} />
+                <Field label="Latitude" value={form.latitude} onChange={v => set('latitude', v)} />
+                <Field label="Longitude" value={form.longitude} onChange={v => set('longitude', v)} />
+              </div>
+              <div style={{ marginTop: '12px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--neutral-400)', marginBottom: '6px' }}>Observations</label>
+                <textarea className="input-field" rows={3} value={form.observations} onChange={e => set('observations', e.target.value)} style={{ resize: 'vertical' }} />
+              </div>
+              {error && <p style={{ color: 'var(--red-400)', fontSize: '12px', marginTop: '10px' }}>{error}</p>}
+            </Modal>
+          )}
 
           <div className="glass-card" style={{ overflow: 'hidden' }}>
             {surveys.length === 0 ? (

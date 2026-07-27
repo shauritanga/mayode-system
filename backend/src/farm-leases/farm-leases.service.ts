@@ -11,6 +11,7 @@ import {
   LeaseStatus,
   OwnershipSource,
   Prisma,
+  UserRole,
   VerificationStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -70,20 +71,27 @@ export class FarmLeasesService {
 
   // --------------------------------------------------------------- leases
 
-  /**
-   * Owner-initiated lease (owner comment §13.3): the owner names the renter;
-   * the renter is notified and must confirm before becoming the active
-   * seasonal user. Owner confirmation is implicit (they created the lease).
-   */
+  /** AMCOS assigns a renter; the renter then accepts and a field officer verifies. */
   async create(dto: CreateFarmLeaseDto, user: RequestUser) {
     const farm = await this.prisma.farm.findUnique({
       where: { id: dto.farmId },
-      select: { id: true, farmCode: true, name: true, farmerId: true },
+      select: { id: true, farmCode: true, name: true, farmerId: true, mamcosId: true, isVerified: true },
     });
     if (!farm) throw new NotFoundException(`Farm ${dto.farmId} not found`);
+    if (!farm.farmerId) throw new ConflictException('Owner-operated assignments are not available for AMCOS-owned farms; assign a renter instead');
 
-    // Only the farm's legal owner (or staff) may lease it out.
-    await this.ownership.assertFarmAccess(user, dto.farmId);
+    if (!farm.isVerified) {
+      throw new ConflictException('AMCOS must approve the mapped farm boundary before assigning a renter');
+    }
+
+    // Farms belong to AMCOS. Staff may assign only inside their AMCOS; farmers
+    // never create leases for land they do not own.
+    if (user.role === 'MAMCOS_SECRETARY') {
+      const secretary = await this.prisma.mamcosSecretary.findUnique({ where: { userId: user.id }, select: { mamcosId: true } });
+      if (!secretary || secretary.mamcosId !== farm.mamcosId) {
+        throw new ForbiddenException('You can only assign renters for your own AMCOS farms');
+      }
+    }
 
     // Data-integrity rule #12: restrict leasing while a dispute is open.
     if (await this.disputes.hasOpenDispute(dto.farmId)) {
@@ -131,7 +139,8 @@ export class FarmLeasesService {
     const lease = await this.prisma.farmLease.create({
       data: {
         farmId: dto.farmId,
-        ownerFarmerId: farm.farmerId,
+        // Legacy owner fields are deliberately empty for AMCOS-owned farms.
+        ownerFarmerId: null,
         renterFarmerId: renterUser?.farmer?.id,
         renterName: dto.renterName,
         renterPhone,
@@ -206,10 +215,16 @@ export class FarmLeasesService {
     });
   }
 
-  /** Admin/staff: all leases, optionally filtered by status. */
-  findAllLeases(status?: LeaseStatus) {
+  /** Admin/staff: leases, scoped to the officer's AMCOS when applicable. */
+  async findAllLeases(status?: LeaseStatus, user?: RequestUser) {
+    const where: Prisma.FarmLeaseWhereInput = status ? { status } : {};
+    if (user?.role === UserRole.MAMCOS_SECRETARY) {
+      const secretary = await this.prisma.mamcosSecretary.findUnique({ where: { userId: user.id }, select: { mamcosId: true } });
+      if (!secretary) throw new ForbiddenException('AMCOS officer profile is missing');
+      where.farm = { mamcosId: secretary.mamcosId };
+    }
     return this.prisma.farmLease.findMany({
-      where: status ? { status } : undefined,
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
         farm: { select: { id: true, farmCode: true, name: true } },
@@ -560,6 +575,7 @@ export class FarmLeasesService {
       select: { farmerId: true },
     });
     if (!farm) throw new NotFoundException(`Farm ${dto.farmId} not found`);
+    if (!farm.farmerId) throw new ConflictException('Owner-operated assignments are not available for AMCOS-owned farms; assign a renter instead');
     const season = await this.prisma.farmingSeason.findUnique({
       where: { id: dto.farmingSeasonId },
       select: { id: true },

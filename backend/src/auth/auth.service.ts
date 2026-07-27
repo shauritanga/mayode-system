@@ -4,6 +4,8 @@ import {
   ForbiddenException,
   UnauthorizedException,
   InternalServerErrorException,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -283,8 +285,16 @@ export class AuthService {
             employeeCode,
             firstName: dto.firstName,
             lastName: dto.lastName,
+            assignedArea: dto.assignedArea,
           },
         });
+      } else if (dto.role === UserRole.MAMCOS_SECRETARY) {
+        if (!dto.mamcosId) throw new BadRequestException('mamcosId is required for an AMCOS Leader');
+        const mamcos = await prisma.mamcos.findUnique({ where: { id: dto.mamcosId }, select: { id: true } });
+        if (!mamcos) throw new NotFoundException('AMCOS not found');
+        const existing = await prisma.mamcosSecretary.findUnique({ where: { mamcosId: dto.mamcosId } });
+        if (existing) throw new ConflictException('This AMCOS already has a Leader; reassign the current Leader instead');
+        await prisma.mamcosSecretary.create({ data: { userId: user.id, mamcosId: dto.mamcosId, firstName: dto.firstName, lastName: dto.lastName } });
       }
 
       return user;

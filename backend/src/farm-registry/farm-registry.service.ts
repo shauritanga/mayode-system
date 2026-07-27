@@ -174,7 +174,7 @@ export class FarmRegistryService {
    * (scheme, block, plotNumber) where those are provided.
    */
   async preRegister(dto: PreRegisterFarmDto, user: RequestUser) {
-    const ownerPhone = normalizeMsisdn(dto.ownerPhone);
+    const ownerPhone = dto.ownerPhone ? normalizeMsisdn(dto.ownerPhone) : '';
 
     if (dto.plotNumber && dto.block) {
       const existing = await this.prisma.farmRegistryRecord.findFirst({
@@ -199,7 +199,7 @@ export class FarmRegistryService {
       data: {
         sourceMamcosId: dto.sourceMamcosId,
         sourceOfficerId: user.id,
-        ownerName: dto.ownerName,
+        ownerName: dto.ownerName || 'AMCOS',
         ownerPhone,
         ownerNationalId: dto.ownerNationalId,
         name: this.buildName(dto),
@@ -213,34 +213,51 @@ export class FarmRegistryService {
         district: dto.district,
         region: dto.region,
         farmSizeHectares: dto.farmSizeHectares,
-        status: FarmRegistryStatus.OWNER_CONFIRMATION_PENDING,
+        status: FarmRegistryStatus.PRE_REGISTERED,
         notes: dto.notes,
       },
     });
 
-    // Notify the owner (in-app if they already have an account) + an expiring, auditable SMS confirmation request.
-    const account = await this.prisma.user.findUnique({
-      where: { phone: ownerPhone },
-      select: { id: true },
+    // Create the official AMCOS farm immediately. Mapping happens before a
+    // renter is assigned, so there is intentionally no farmerId here.
+    const farm = await this.prisma.farm.create({
+      data: {
+        farmCode: `AMCOS-${record.id.slice(0, 8).toUpperCase()}`,
+        mamcosId: record.sourceMamcosId,
+        name: record.name || this.buildName(dto),
+        plotNumber: record.plotNumber,
+        blockNumber: record.block,
+        section: record.section,
+        village: record.village,
+        ward: record.ward,
+        district: record.district,
+        region: record.region,
+        socialHectares: record.farmSizeHectares || 0.1,
+        grade: FarmGrade.C,
+        ownershipType: 'LEASED',
+        ownerName: 'AMCOS',
+        photoUrls: [],
+      },
     });
-    if (account) {
-      await this.notifications.create({
-        userId: account.id,
-        type: 'registry.owner_confirmation',
-        title: 'Confirm your farm',
-        body: `A cooperative registered ${record.name} under your name. Open MAYOData to confirm it belongs to you.`,
-        data: { registryId: record.id },
-      });
-    }
-    await this.sendConfirmationRequest(record);
-
-    return record;
+    const updated = await this.prisma.farmRegistryRecord.update({
+      where: { id: record.id },
+      data: { farmId: farm.id },
+      include: { mamcos: { select: { id: true, name: true } } },
+    });
+    return { ...updated, farm };
   }
 
-  listAll(status?: FarmRegistryStatus, mamcosId?: string) {
+  async listAll(status?: FarmRegistryStatus, mamcosId?: string, user?: RequestUser) {
     const where: Prisma.FarmRegistryRecordWhereInput = {};
     if (status) where.status = status;
-    if (mamcosId) where.sourceMamcosId = mamcosId;
+    if (user?.role === 'MAMCOS_SECRETARY') {
+      const secretary = await this.prisma.mamcosSecretary.findUnique({
+        where: { userId: user.id }, select: { mamcosId: true },
+      });
+      if (!secretary) throw new ForbiddenException('AMCOS officer profile is missing');
+      // AMCOS officers may never widen their own registry scope via a query parameter.
+      where.sourceMamcosId = secretary.mamcosId;
+    } else if (mamcosId) where.sourceMamcosId = mamcosId;
     return this.prisma.farmRegistryRecord.findMany({
       where,
       orderBy: { createdAt: 'desc' },

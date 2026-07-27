@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { registryApi, mamcosApi } from '@/lib/api';
+import Modal from '@/components/Modal';
 
 interface RegistryRecord {
   id: string;
@@ -93,8 +94,8 @@ export default function FarmRegistryPage() {
           </div>
           <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Pre-register farms &amp; owners — the AMCOS-first registry</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(s => !s)}>
-          {showForm ? 'Close' : '+ Pre-register farm'}
+        <button className="btn-primary" onClick={() => setShowForm(true)}>
+          + Pre-register farm
         </button>
       </div>
 
@@ -114,14 +115,26 @@ export default function FarmRegistryPage() {
 
       {/* Pre-registration form */}
       {showForm && (
-        <div className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Pre-register a farm under a known owner</h3>
+        <Modal
+          title="Pre-register a farm under a known owner"
+          subtitle="The owner is notified by SMS/app to confirm and complete their profile"
+          onClose={() => { setShowForm(false); setError(''); }}
+          width="720px"
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => { setShowForm(false); setError(''); }} disabled={submitting}>Cancel</button>
+              <button className="btn-primary" onClick={submit} disabled={submitting}>
+                {submitting ? 'Saving…' : 'Pre-register & notify owner'}
+              </button>
+            </>
+          }
+        >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
             <Field label="Owner name *" value={form.ownerName} onChange={v => set('ownerName', v)} />
             <Field label="Owner phone *" value={form.ownerPhone} onChange={v => set('ownerPhone', v)} placeholder="+255712345678" />
             <div>
               <label style={labelStyle}>Responsible AMCOS</label>
-              <select className="input" value={form.sourceMamcosId} onChange={e => set('sourceMamcosId', e.target.value)}>
+              <select className="input-field" value={form.sourceMamcosId} onChange={e => set('sourceMamcosId', e.target.value)}>
                 <option value="">— select —</option>
                 {mamcos.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
@@ -137,13 +150,7 @@ export default function FarmRegistryPage() {
             <Field label="Size (hectares)" value={form.farmSizeHectares} onChange={v => set('farmSizeHectares', v)} placeholder="2.5" />
           </div>
           {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
-          <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
-            <button className="btn-primary" onClick={submit} disabled={submitting}>
-              {submitting ? 'Saving…' : 'Pre-register & notify owner'}
-            </button>
-            <button className="btn-secondary" onClick={() => { setShowForm(false); setError(''); }}>Cancel</button>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Registry table */}
@@ -184,7 +191,7 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
   return (
     <div>
       <label style={labelStyle}>{label}</label>
-      <input className="input" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+      <input className="input-field" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
     </div>
   );
 }

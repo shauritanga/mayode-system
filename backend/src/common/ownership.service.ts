@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from '@prisma/client';
+import { UserRole, VerificationStatus } from '@prisma/client';
 
 export interface RequestUser {
   id: string;
@@ -18,8 +18,10 @@ const PRIVILEGED_ROLES: UserRole[] = [
 
 /**
  * OwnershipService — row-level authorization. Privileged staff bypass; a FARMER
- * may only touch resources belonging to their own farmer profile. Call these
- * from services before performing a mutation.
+ * may only touch resources for farms they are actively assigned to operate.
+ * `Farm.farmerId` is retained as legacy/import metadata; it is not the access
+ * authority for renter-operated AMCOS farms. Call these from services before
+ * performing a mutation.
  */
 @Injectable()
 export class OwnershipService {
@@ -48,14 +50,23 @@ export class OwnershipService {
 
   async assertFarmAccess(user: RequestUser, farmId: string): Promise<void> {
     if (this.isPrivileged(user)) return;
-    const farm = await this.prisma.farm.findUnique({
-      where: { id: farmId },
-      select: { farmerId: true },
-    });
-    if (!farm) throw new NotFoundException(`Farm with ID ${farmId} not found`);
     const ownFarmerId = await this.farmerIdForUser(user.id);
-    if (ownFarmerId !== farm.farmerId) {
-      throw new ForbiddenException('You can only access your own farms');
+    if (!ownFarmerId) {
+      throw new ForbiddenException('A farmer profile is required to access a farm');
+    }
+    const assignment = await this.prisma.seasonalFarmAssignment.findFirst({
+      where: {
+        farmId,
+        activeFarmerId: ownFarmerId,
+        status: VerificationStatus.VERIFIED,
+        farmingSeason: { status: 'ACTIVE' },
+      },
+      select: { id: true },
+    });
+    if (!assignment) {
+      throw new ForbiddenException(
+        'You need an active, field-verified seasonal assignment to access this farm',
+      );
     }
   }
 
@@ -63,12 +74,9 @@ export class OwnershipService {
     if (this.isPrivileged(user)) return;
     const plot = await this.prisma.plot.findUnique({
       where: { id: plotId },
-      select: { farm: { select: { farmerId: true } } },
+      select: { farmId: true },
     });
     if (!plot) throw new NotFoundException(`Plot with ID ${plotId} not found`);
-    const ownFarmerId = await this.farmerIdForUser(user.id);
-    if (ownFarmerId !== plot.farm.farmerId) {
-      throw new ForbiddenException('You can only access plots on your own farms');
-    }
+    await this.assertFarmAccess(user, plot.farmId);
   }
 }

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { MembershipsService } from '../memberships/memberships.service';
@@ -89,10 +89,16 @@ export class FarmsService {
     return farm;
   }
 
-  async findAll(query: QueryFarmsDto = {}) {
+  async findAll(query: QueryFarmsDto = {}, user?: RequestUser) {
     const { search, mamcosId, farmerId, village, grade, isVerified } = query;
+    let scopedMamcosId = mamcosId;
+    if (user?.role === UserRole.MAMCOS_SECRETARY) {
+      const secretary = await this.prisma.mamcosSecretary.findUnique({ where: { userId: user.id }, select: { mamcosId: true } });
+      if (!secretary) throw new NotFoundException('AMCOS officer profile is missing');
+      scopedMamcosId = secretary.mamcosId;
+    }
     const where: Prisma.FarmWhereInput = {
-      ...(mamcosId ? { mamcosId } : {}),
+      ...(scopedMamcosId ? { mamcosId: scopedMamcosId } : {}),
       ...(farmerId ? { farmerId } : {}),
       ...(village ? { village } : {}),
       ...(grade ? { grade } : {}),
@@ -206,6 +212,21 @@ export class FarmsService {
       '📍',
     );
     return farm;
+  }
+
+  /** AMCOS accepts a field-mapped boundary as the official farm geometry. */
+  async reviewBoundary(id: string, user: RequestUser) {
+    const farm = await this.findOne(id);
+    if (!farm.boundaryCoordinates || farm.centerLatitude == null || farm.centerLongitude == null) {
+      throw new NotFoundException('A GPS boundary must be mapped before AMCOS can approve this farm');
+    }
+    if (user.role === 'MAMCOS_SECRETARY') {
+      const secretary = await this.prisma.mamcosSecretary.findUnique({ where: { userId: user.id }, select: { mamcosId: true } });
+      if (!secretary || secretary.mamcosId !== farm.mamcosId) {
+        throw new NotFoundException('This farm is outside your assigned AMCOS');
+      }
+    }
+    return this.prisma.farm.update({ where: { id }, data: { isVerified: true } });
   }
 
   async remove(id: string) {

@@ -29,7 +29,7 @@ export class FarmsController {
   constructor(private readonly farmsService: FarmsService) {}
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({ summary: 'Register a new farm with auto-generated Farm Code (e.g., FP-JD-01)' })
   create(@Body() dto: CreateFarmDto, @CurrentUser() user: RequestUser) {
     return this.farmsService.create(dto, user);
@@ -37,12 +37,12 @@ export class FarmsController {
 
   @Get()
   @ApiOperation({ summary: 'List farms (filter by farmer/cooperative/grade/verified/village)' })
-  findAll(@Query() query: QueryFarmsDto) {
-    return this.farmsService.findAll(query);
+  findAll(@Query() query: QueryFarmsDto, @CurrentUser() user: RequestUser) {
+    return this.farmsService.findAll(query, user);
   }
 
   @Get('overview')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY, UserRole.AUDITOR)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY, UserRole.AUDITOR)
   @ApiOperation({ summary: 'Farm/plot dashboard aggregates (mapped, verified, by grade)' })
   overview() {
     return this.farmsService.getOverview();
@@ -76,7 +76,7 @@ export class FarmsController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({ summary: 'Update farm profile details' })
   update(
     @Param('id') id: string,
@@ -87,7 +87,7 @@ export class FarmsController {
   }
 
   @Patch(':id/boundary')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({ summary: 'Update farm GPS boundary (GeoJSON Polygon) and center Lat/Lng' })
   updateBoundary(
     @Param('id') id: string,
@@ -97,8 +97,15 @@ export class FarmsController {
     return this.farmsService.updateBoundary(id, dto, user);
   }
 
+  @Post(':id/review-boundary')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.MAMCOS_SECRETARY)
+  @ApiOperation({ summary: 'AMCOS reviews and approves a mapped farm boundary' })
+  reviewBoundary(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.farmsService.reviewBoundary(id, user);
+  }
+
   @Post(':id/documents')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({ summary: 'Link an uploaded file as a document on the farm' })
   addDocument(
     @Param('id') id: string,
@@ -109,8 +116,8 @@ export class FarmsController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Delete a farm record (Admin only)' })
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Delete a farm record (Super Admin only)' })
   remove(@Param('id') id: string) {
     return this.farmsService.remove(id);
   }

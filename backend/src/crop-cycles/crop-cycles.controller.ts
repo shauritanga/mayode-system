@@ -23,7 +23,6 @@ import { UserRole } from '@prisma/client';
 
 const STAFF_ROLES = [
   UserRole.SUPER_ADMIN,
-  UserRole.ADMIN,
   UserRole.FIELD_OFFICER,
   UserRole.MAMCOS_SECRETARY,
   UserRole.AUDITOR,
@@ -39,7 +38,6 @@ export class CropCyclesController {
   @Post()
   @Roles(
     UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.FARMER,
   )
@@ -87,7 +85,6 @@ export class CropCyclesController {
   @Patch(':id')
   @Roles(
     UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.FARMER,
   )
@@ -105,7 +102,6 @@ export class CropCyclesController {
   @Post('activity')
   @Roles(
     UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.FARMER,
   )

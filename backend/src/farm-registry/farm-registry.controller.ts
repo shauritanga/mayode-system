@@ -32,7 +32,6 @@ export class FarmRegistryController {
   @Post()
   @Roles(
     UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.MAMCOS_SECRETARY,
   )
@@ -49,7 +48,6 @@ export class FarmRegistryController {
   @Get()
   @Roles(
     UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
@@ -60,8 +58,9 @@ export class FarmRegistryController {
   list(
     @Query('status') status?: FarmRegistryStatus,
     @Query('mamcosId') mamcosId?: string,
+    @CurrentUser() user?: RequestUser,
   ) {
-    return this.registry.listAll(status, mamcosId);
+    return this.registry.listAll(status, mamcosId, user);
   }
 
   @Get('mine')
@@ -76,7 +75,6 @@ export class FarmRegistryController {
   @Post(':id/claim')
   @Roles(
     UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.FARMER,
   )
@@ -91,7 +89,6 @@ export class FarmRegistryController {
   @Post(':id/reject')
   @Roles(
     UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.FARMER,
   )
@@ -106,7 +103,6 @@ export class FarmRegistryController {
   @Post(':id/resend-confirmation')
   @Roles(
     UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.MAMCOS_SECRETARY,
   )
@@ -120,7 +116,6 @@ export class FarmRegistryController {
   @Get(':id/confirmation-requests')
   @Roles(
     UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,

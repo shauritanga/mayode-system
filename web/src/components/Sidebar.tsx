@@ -23,30 +23,33 @@ import {
   MapsSearchIcon,
 } from '@hugeicons/core-free-icons';
 import UserMenu from './UserMenu';
+import { useAuthStore } from '@/store/auth.store';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: Home01Icon },
-  { href: '/dashboard/farmers', label: 'Farmers', icon: UserGroupIcon },
-  { href: '/dashboard/farms', label: 'Farms', icon: Plant01Icon },
-  { href: '/dashboard/farm-registry', label: 'Farm Registry', icon: ClipboardIcon },
-  { href: '/dashboard/seasons', label: 'Seasons', icon: Calendar01Icon },
-  { href: '/dashboard/leases', label: 'Leases', icon: HandshakeIcon },
-  { href: '/dashboard/disputes', label: 'Disputes', icon: AlertCircleIcon },
-  { href: '/dashboard/corrections', label: 'Corrections', icon: FileEditIcon },
-  { href: '/dashboard/field-surveys', label: 'Field Surveys', icon: MapsSearchIcon },
-  { href: '/dashboard/memberships', label: 'Memberships', icon: StarIcon },
-  { href: '/dashboard/alerts', label: 'Alerts', icon: BellIcon },
-  { href: '/dashboard/rewards', label: 'Rewards', icon: GiftIcon },
-  { href: '/dashboard/mamcos', label: 'AMCOS', icon: Building05Icon },
-  { href: '/dashboard/crop-cycles', label: 'Crop Cycles', icon: WheatIcon },
-  { href: '/dashboard/inventory', label: 'Inventory', icon: Package01Icon },
-  { href: '/dashboard/finance', label: 'Finance', icon: Wallet01Icon },
-  { href: '/dashboard/marketplace', label: 'M-LAX Marketplace', icon: ShoppingCart02Icon },
-  { href: '/dashboard/locations', label: 'Locations', icon: Location01Icon },
+  { href: '/dashboard', label: 'Dashboard', icon: Home01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/farmers', label: 'Farmers', icon: UserGroupIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/farms', label: 'Farms', icon: Plant01Icon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/farm-registry', label: 'Farm Registry', icon: ClipboardIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/seasons', label: 'Seasons', icon: Calendar01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { href: '/dashboard/leases', label: 'Renter Assignments', icon: HandshakeIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/disputes', label: 'Disputes', icon: AlertCircleIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/corrections', label: 'Corrections', icon: FileEditIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/field-surveys', label: 'Field Surveys', icon: MapsSearchIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/memberships', label: 'Memberships', icon: StarIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { href: '/dashboard/alerts', label: 'Alerts', icon: BellIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { href: '/dashboard/rewards', label: 'Rewards', icon: GiftIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { href: '/dashboard/mamcos', label: 'AMCOS', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { href: '/dashboard/crop-cycles', label: 'Crop Cycles', icon: WheatIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/inventory', label: 'Inventory', icon: Package01Icon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/finance', label: 'Finance', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { href: '/dashboard/marketplace', label: 'M-LAX Marketplace', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { href: '/dashboard/locations', label: 'Locations', icon: Location01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const role = useAuthStore((state) => state.user?.role);
+  const visibleItems = navItems.filter((item) => role && item.roles.includes(role));
 
   return (
     <aside style={{
@@ -82,7 +85,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav style={{ flex: 1, padding: '16px 12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
           return (
             <Link

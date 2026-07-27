@@ -55,7 +55,7 @@ export interface PublicAlert {
 }
 
 type AlertWithFarm = FarmAlert & {
-  farm?: { farmCode: string; name: string | null; farmerId: string } | null;
+  farm?: { farmCode: string; name: string | null; farmerId: string | null } | null;
 };
 
 @Injectable()
@@ -141,10 +141,11 @@ export class FarmAlertsService {
 
     // Notify the farm's farmer (deep-links to the alert; the mobile app shows a
     // teaser to free users and the full detail to members).
-    const farmer = await this.prisma.farmer.findUnique({
-      where: { id: alert.farmerId ?? farm.farmerId },
+    const recipientFarmerId = alert.farmerId ?? farm.farmerId;
+    const farmer = recipientFarmerId ? await this.prisma.farmer.findUnique({
+      where: { id: recipientFarmerId },
       select: { userId: true },
-    });
+    }) : null;
     if (farmer) {
       await this.notifications.create({
         userId: farmer.userId,

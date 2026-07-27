@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { farmingSeasonsApi, mamcosApi } from '@/lib/api';
+import Modal from '@/components/Modal';
 
 interface Season {
   id: string;
@@ -107,8 +108,8 @@ export default function SeasonsPage() {
           </div>
           <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Configure farming-season periods — memberships and lease periods follow these</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(s => !s)}>
-          {showForm ? 'Close' : '+ New season'}
+        <button className="btn-primary" onClick={() => setShowForm(true)}>
+          + New season
         </button>
       </div>
 
@@ -125,13 +126,25 @@ export default function SeasonsPage() {
       </div>
 
       {showForm && (
-        <div className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>New farming season</h3>
+        <Modal
+          title="New farming season"
+          subtitle="Memberships and lease periods follow this season's dates"
+          onClose={() => { setShowForm(false); setError(''); }}
+          width="600px"
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => { setShowForm(false); setError(''); }} disabled={submitting}>Cancel</button>
+              <button className="btn-primary" onClick={submit} disabled={submitting}>
+                {submitting ? 'Saving…' : 'Create season'}
+              </button>
+            </>
+          }
+        >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
             <Field label="Season name *" value={form.name} onChange={v => set('name', v)} placeholder="2026/2027 Masika" />
             <div>
               <label style={labelStyle}>AMCOS</label>
-              <select className="input" value={form.mamcosId} onChange={e => set('mamcosId', e.target.value)}>
+              <select className="input-field" value={form.mamcosId} onChange={e => set('mamcosId', e.target.value)}>
                 <option value="">— all / not scoped —</option>
                 {mamcos.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
@@ -145,19 +158,13 @@ export default function SeasonsPage() {
             <Field label="Verification deadline" value={form.verificationDeadline} onChange={v => set('verificationDeadline', v)} type="date" />
             <div>
               <label style={labelStyle}>Status</label>
-              <select className="input" value={form.status} onChange={e => set('status', e.target.value)}>
+              <select className="input-field" value={form.status} onChange={e => set('status', e.target.value)}>
                 {STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
               </select>
             </div>
           </div>
           {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
-          <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
-            <button className="btn-primary" onClick={submit} disabled={submitting}>
-              {submitting ? 'Saving…' : 'Create season'}
-            </button>
-            <button className="btn-secondary" onClick={() => { setShowForm(false); setError(''); }}>Cancel</button>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
@@ -181,7 +188,7 @@ export default function SeasonsPage() {
                     <td>{statusBadge(s.status)}</td>
                     <td>
                       <select
-                        className="input"
+                        className="input-field"
                         style={{ padding: '4px 8px', fontSize: '12px', width: 'auto' }}
                         value={s.status}
                         onChange={e => updateStatus(s.id, e.target.value)}
@@ -211,7 +218,7 @@ function Field({ label, value, onChange, placeholder, type }: { label: string; v
   return (
     <div>
       <label style={labelStyle}>{label}</label>
-      <input className="input" type={type || 'text'} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+      <input className="input-field" type={type || 'text'} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
     </div>
   );
 }

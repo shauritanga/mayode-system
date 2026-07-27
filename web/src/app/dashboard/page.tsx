@@ -2,6 +2,23 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { farmersApi, farmsApi, mamcosApi, marketplaceApi, financeApi } from '@/lib/api';
+import { useAuthStore } from '@/store/auth.store';
+
+const AMCOS_OPS_ACTIONS = [
+  { label: 'Register New Farmer', href: '/dashboard/farmers', icon: '👤', color: 'var(--accent)' },
+  { label: 'Register New Farm', href: '/dashboard/farms', icon: '🌾', color: 'var(--green-400)' },
+  { label: 'Log Crop Activity', href: '/dashboard/crop-cycles', icon: '🌱', color: 'var(--gold-400)' },
+  { label: 'Receive Inventory', href: '/dashboard/inventory', icon: '📦', color: 'var(--blue-500)' },
+  { label: 'Post Land Listing', href: '/dashboard/marketplace', icon: '🏪', color: 'var(--purple-500)' },
+];
+
+const ADMIN_ACTIONS = [
+  { label: 'Manage Seasons', href: '/dashboard/seasons', icon: '📅', color: 'var(--accent)' },
+  { label: 'Review Disputes', href: '/dashboard/disputes', icon: '⚠️', color: 'var(--red-400)' },
+  { label: 'Manage AMCOS', href: '/dashboard/mamcos', icon: '🏛', color: 'var(--gold-400)' },
+  { label: 'New Reward Campaign', href: '/dashboard/rewards', icon: '🎁', color: 'var(--blue-500)' },
+  { label: 'Post Land Listing', href: '/dashboard/marketplace', icon: '🏪', color: 'var(--purple-500)' },
+];
 
 interface StatCard {
   label: string;
@@ -33,6 +50,8 @@ function StatCard({ label, value, sub, icon, color }: StatCard) {
 }
 
 export default function DashboardPage() {
+  const role = useAuthStore((state) => state.user?.role);
+  const quickActions = role === 'ADMIN' ? ADMIN_ACTIONS : AMCOS_OPS_ACTIONS;
   const [stats, setStats] = useState({
     farmers: 0, farms: 0, mamcos: 0, listings: 0
   });
@@ -124,13 +143,7 @@ export default function DashboardPage() {
         <div className="glass-card" style={{ padding: '24px' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '20px' }}>⚡ Quick Actions</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {[
-              { label: 'Register New Farmer', href: '/dashboard/farmers', icon: '👤', color: 'var(--accent)' },
-              { label: 'Register New Farm', href: '/dashboard/farms', icon: '🌾', color: 'var(--green-400)' },
-              { label: 'Log Crop Activity', href: '/dashboard/crop-cycles', icon: '🌱', color: 'var(--gold-400)' },
-              { label: 'Receive Inventory', href: '/dashboard/inventory', icon: '📦', color: 'var(--blue-500)' },
-              { label: 'Post Land Listing', href: '/dashboard/marketplace', icon: '🏪', color: 'var(--purple-500)' },
-            ].map((action) => (
+            {quickActions.map((action) => (
               <Link
                 key={action.href}
                 href={action.href}

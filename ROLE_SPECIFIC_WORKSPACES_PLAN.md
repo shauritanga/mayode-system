@@ -1,5 +1,11 @@
 # Role-specific MAYOData Workspaces
 
+> Implementation note (2026-07-27): role-aware workspace context, renter
+> assignment authorization, AMCOS-scoped registry/lease lists, mobile role
+> dashboards, and web role-aware navigation have been implemented. The
+> remaining fresh-start database migration (retiring legacy farmer-owned farm
+> records) must be applied deliberately before production data is introduced.
+
 ## Summary
 
 Transform MAYOData into one role-adaptive platform with four complete workspaces:

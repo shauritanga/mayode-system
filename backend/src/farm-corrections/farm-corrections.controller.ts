@@ -25,7 +25,6 @@ import {
 
 const STAFF_ROLES = [
   UserRole.SUPER_ADMIN,
-  UserRole.ADMIN,
   UserRole.FIELD_OFFICER,
   UserRole.MAMCOS_SECRETARY,
   UserRole.AUDITOR,

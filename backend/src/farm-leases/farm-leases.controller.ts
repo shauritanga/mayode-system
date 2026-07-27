@@ -25,7 +25,6 @@ import {
 
 const STAFF_ROLES = [
   UserRole.SUPER_ADMIN,
-  UserRole.ADMIN,
   UserRole.FIELD_OFFICER,
   UserRole.MAMCOS_SECRETARY,
   UserRole.AUDITOR,
@@ -39,12 +38,7 @@ export class FarmLeasesController {
   constructor(private readonly leases: FarmLeasesService) {}
 
   @Post()
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
-    UserRole.FIELD_OFFICER,
-    UserRole.FARMER,
-  )
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY)
   @ApiOperation({
     summary:
       'Owner adds a lease: names the renter for a farm and season (Add Lease)',
@@ -64,8 +58,8 @@ export class FarmLeasesController {
   @ApiOperation({
     summary: 'All leases, optionally filtered by status (staff only)',
   })
-  findAll(@Query('status') status?: LeaseStatus) {
-    return this.leases.findAllLeases(status);
+  findAll(@Query('status') status?: LeaseStatus, @CurrentUser() user?: RequestUser) {
+    return this.leases.findAllLeases(status, user);
   }
 
   @Get('farm/:farmId')
@@ -91,7 +85,6 @@ export class FarmLeasesController {
   @Patch(':id/officer-verify')
   @Roles(
     UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.MAMCOS_SECRETARY,
   )
@@ -117,7 +110,6 @@ export class SeasonalAssignmentsController {
   @Post('self-operate')
   @Roles(
     UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.FARMER,
   )
@@ -161,7 +153,6 @@ export class FarmOwnershipsController {
   @Post('farm/:farmId/confirm')
   @Roles(
     UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.FARMER,
   )

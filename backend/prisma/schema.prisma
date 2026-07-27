@@ -198,7 +198,9 @@ model MamcosSecretary {
 model Farm {
   id             String    @id @default(uuid())
   farmCode       String    @unique @map("farm_code") // e.g., FP-JD-01
-  farmerId       String    @map("farmer_id")
+  // Official farms are owned by AMCOS. This remains only for legacy records;
+  // a verified SeasonalFarmAssignment grants renter operating access.
+  farmerId       String?   @map("farmer_id")
   mamcosId       String?   @map("mamcos_id")
   name           String
   plotNumber     String?   @map("plot_number")
@@ -242,7 +244,7 @@ model Farm {
   centerLongitude     Float? @map("center_longitude")
 
   // Relations
-  farmer               Farmer                     @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  farmer               Farmer?                    @relation(fields: [farmerId], references: [id], onDelete: SetNull)
   mamcos               Mamcos?                    @relation(fields: [mamcosId], references: [id])
   plots                Plot[]
   cropCycles           CropCycle[]

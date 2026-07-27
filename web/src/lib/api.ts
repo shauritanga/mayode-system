@@ -38,6 +38,11 @@ export const authApi = {
     api.post('/auth/login', { phone, password }),
   register: (data: object) => api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
+  createStaff: (data: object) => api.post('/auth/staff', data),
+};
+export const usersApi = {
+  getAll: () => api.get('/users'),
+  update: (id: string, data: object) => api.patch(`/users/${id}`, data),
 };
 
 // ── Farmers ──
@@ -52,6 +57,8 @@ export const mamcosApi = {
   getAll: () => api.get('/mamcos'),
   getOne: (id: string) => api.get(`/mamcos/${id}`),
   create: (data: object) => api.post('/mamcos', data),
+  update: (id: string, data: object) => api.patch(`/mamcos/${id}`, data),
+  assignSecretary: (id: string, data: object) => api.post(`/mamcos/${id}/secretary`, data),
   assignFarmer: (id: string, data: object) => api.post(`/mamcos/${id}/assign-farmer`, data),
   dashboard: () => api.get('/mamcos/secretary-dashboard'),
 };
@@ -82,8 +89,8 @@ export const financeApi = {
 
 // ── Inventory ──
 export const inventoryApi = {
-  getAll: (params?: object) => api.get('/inventory', { params }),
-  receive: (data: object) => api.post('/inventory/receive', data),
+  getAll: (params?: object) => api.get('/inventory/records', { params }),
+  receive: (data: object) => api.post('/inventory/records', data),
   createLot: (data: object) => api.post('/inventory/lots', data),
 };
 

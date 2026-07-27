@@ -50,7 +50,7 @@ export class FarmReportsController {
   // ---- Field survey (MAYODE field data collection) ----
 
   @Post(':id/field-surveys')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY)
   @ApiOperation({ summary: 'Record on-site field data — soil, road, water, physical (staff)' })
   createSurvey(@Param('id') id: string, @Body() dto: CreateFieldSurveyDto, @CurrentUser() user: RequestUser) {
     return this.reports.createFieldSurvey(id, dto, user);

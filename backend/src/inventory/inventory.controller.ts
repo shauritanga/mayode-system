@@ -23,7 +23,7 @@ export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
   @Post('records')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY, UserRole.FIELD_OFFICER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.MAMCOS_SECRETARY, UserRole.FIELD_OFFICER)
   @ApiOperation({ summary: 'Receive harvest inventory at warehouse with auto-generated tracking code (INV-YYYY-XXXX)' })
   receiveInventory(@Body() createInventoryRecordDto: CreateInventoryRecordDto) {
     return this.inventoryService.receiveInventory(createInventoryRecordDto);
@@ -42,14 +42,14 @@ export class InventoryController {
   }
 
   @Patch('records/:id/status')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.MAMCOS_SECRETARY)
   @ApiOperation({ summary: 'Update inventory warehouse storage status and location' })
   updateStatus(@Param('id') id: string, @Body() updateInventoryStatusDto: UpdateInventoryStatusDto) {
     return this.inventoryService.updateStatus(id, updateInventoryStatusDto);
   }
 
   @Post('lots')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.MAMCOS_SECRETARY)
   @ApiOperation({ summary: 'Combine multiple inventory records into a single Fairtrade export Lot' })
   createLot(@Body() createLotDto: CreateLotDto) {
     return this.inventoryService.createLot(createLotDto);
