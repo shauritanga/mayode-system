@@ -12,6 +12,8 @@ export class UsersService {
         id: true,
         phone: true,
         email: true,
+        firstName: true,
+        lastName: true,
         role: true,
         isActive: true,
         language: true,
@@ -28,6 +30,8 @@ export class UsersService {
         id: true,
         phone: true,
         email: true,
+        firstName: true,
+        lastName: true,
         role: true,
         isActive: true,
         language: true,
@@ -55,6 +59,8 @@ export class UsersService {
         id: true,
         phone: true,
         email: true,
+        firstName: true,
+        lastName: true,
         role: true,
         isActive: true,
         language: true,
@@ -66,7 +72,10 @@ export class UsersService {
   async remove(id: string) {
     await this.findOne(id); // Ensure user exists
     await this.prisma.user.delete({ where: { id } });
-    return { success: true, message: `User with ID ${id} deleted successfully` };
+    return {
+      success: true,
+      message: `User with ID ${id} deleted successfully`,
+    };
   }
 
   async updatePushToken(userId: string, pushToken: string) {

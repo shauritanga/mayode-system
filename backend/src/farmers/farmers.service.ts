@@ -76,6 +76,8 @@ export class FarmersService {
           phone: dto.phone,
           email: dto.email,
           passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
           role: UserRole.FARMER,
         },
       });

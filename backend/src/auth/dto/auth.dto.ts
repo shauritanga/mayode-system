@@ -22,10 +22,15 @@ export enum UserRole {
 
 // ---- Register DTO ----
 export class RegisterDto {
-  @ApiProperty({ example: '+255768680433', description: 'Phone number with country code' })
+  @ApiProperty({
+    example: '+255768680433',
+    description: 'Phone number with country code',
+  })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^\+?[0-9]{10,15}$/, { message: 'Phone number must be valid (10-15 digits)' })
+  @Matches(/^\+?[0-9]{10,15}$/, {
+    message: 'Phone number must be valid (10-15 digits)',
+  })
   phone: string;
 
   @ApiPropertyOptional({ example: 'farmer@example.com' })
@@ -52,7 +57,10 @@ export class RegisterDto {
   @IsNotEmpty()
   lastName: string;
 
-  @ApiPropertyOptional({ example: 'sw', description: 'Language preference: sw or en' })
+  @ApiPropertyOptional({
+    example: 'sw',
+    description: 'Language preference: sw or en',
+  })
   @IsString()
   @IsOptional()
   language?: string;
@@ -92,6 +100,8 @@ export class AuthResponseDto {
     id: string;
     phone: string;
     email?: string;
+    firstName?: string;
+    lastName?: string;
     role: string;
     controlNumber?: string;
   };

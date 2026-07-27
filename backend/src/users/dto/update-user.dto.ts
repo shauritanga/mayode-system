@@ -7,12 +7,25 @@ export class UpdateUserDto {
   @IsOptional()
   email?: string;
 
+  @ApiPropertyOptional({ example: 'Elisha' })
+  @IsString()
+  @IsOptional()
+  firstName?: string;
+
+  @ApiPropertyOptional({ example: 'Mayode' })
+  @IsString()
+  @IsOptional()
+  lastName?: string;
+
   @ApiPropertyOptional({ example: '+255768680433' })
   @IsString()
   @IsOptional()
   phone?: string;
 
-  @ApiPropertyOptional({ example: 'en', description: 'Language preference: sw or en' })
+  @ApiPropertyOptional({
+    example: 'en',
+    description: 'Language preference: sw or en',
+  })
   @IsString()
   @IsOptional()
   language?: string;

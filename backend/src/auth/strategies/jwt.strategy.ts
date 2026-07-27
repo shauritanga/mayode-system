@@ -13,7 +13,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET') || 'mayode-super-secret-key-change-in-production-2026',
+      secretOrKey:
+        configService.get<string>('JWT_SECRET') ||
+        'mayode-super-secret-key-change-in-production-2026',
     });
   }
 

@@ -13,9 +13,12 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET') || 'mayode-super-secret-key-change-in-production-2026',
+        secret:
+          configService.get<string>('JWT_SECRET') ||
+          'mayode-super-secret-key-change-in-production-2026',
         signOptions: {
-          expiresIn: (configService.get<string>('JWT_EXPIRES_IN') || '15m') as any,
+          expiresIn: (configService.get<string>('JWT_EXPIRES_IN') ||
+            '15m') as any,
         },
       }),
     }),

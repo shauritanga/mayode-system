@@ -25,6 +25,8 @@ model User {
   email        String?   @unique
   phone        String    @unique
   passwordHash String    @map("password_hash")
+  firstName    String?   @map("first_name")
+  lastName     String?   @map("last_name")
   role         UserRole
   isActive     Boolean   @default(true) @map("is_active")
   language     String    @default("sw") // sw = Swahili, en = English

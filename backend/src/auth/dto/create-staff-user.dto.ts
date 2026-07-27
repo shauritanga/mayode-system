@@ -20,7 +20,9 @@ export class CreateStaffUserDto {
   @ApiProperty({ example: '+255768680433' })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^\+?[0-9]{10,15}$/, { message: 'Phone number must be valid (10-15 digits)' })
+  @Matches(/^\+?[0-9]{10,15}$/, {
+    message: 'Phone number must be valid (10-15 digits)',
+  })
   phone: string;
 
   @ApiPropertyOptional({ example: 'officer@mayode.or.tz' })
@@ -47,7 +49,10 @@ export class CreateStaffUserDto {
   @IsNotEmpty()
   lastName: string;
 
-  @ApiPropertyOptional({ example: 'sw', description: 'Language preference: sw or en' })
+  @ApiPropertyOptional({
+    example: 'sw',
+    description: 'Language preference: sw or en',
+  })
   @IsString()
   @IsOptional()
   language?: string;

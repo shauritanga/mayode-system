@@ -54,8 +54,19 @@ export class UsersController {
 
   @Put('push-token')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Register or update the Expo Push Notification token for the authenticated user' })
-  @ApiBody({ schema: { type: 'object', properties: { token: { type: 'string', example: 'ExponentPushToken[xxxxxx]' } }, required: ['token'] } })
+  @ApiOperation({
+    summary:
+      'Register or update the Expo Push Notification token for the authenticated user',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', example: 'ExponentPushToken[xxxxxx]' },
+      },
+      required: ['token'],
+    },
+  })
   updatePushToken(
     @CurrentUser() user: { id: string },
     @Body('token') token: string,

@@ -10,12 +10,20 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
-import { RegisterDto, LoginDto, RefreshTokenDto, AuthResponseDto } from './dto/auth.dto';
+import {
+  RegisterDto,
+  LoginDto,
+  RefreshTokenDto,
+  AuthResponseDto,
+} from './dto/auth.dto';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UserRole } from '@prisma/client';
 
 /** Roles only a SUPER_ADMIN may grant; an ADMIN cannot create peers or escalate to SUPER_ADMIN. */
-const SUPER_ADMIN_ONLY_ROLES: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN];
+const SUPER_ADMIN_ONLY_ROLES: UserRole[] = [
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+];
 
 @Injectable()
 export class AuthService {
@@ -29,7 +37,8 @@ export class AuthService {
    * Helper to generate unique Control Number for Farmers (MYD-XXXXX)
    */
   private async generateControlNumber(): Promise<string> {
-    const prefix = this.configService.get<string>('CONTROL_NUMBER_PREFIX') || 'MYD';
+    const prefix =
+      this.configService.get<string>('CONTROL_NUMBER_PREFIX') || 'MYD';
     const lastFarmer = await this.prisma.farmer.findFirst({
       where: { controlNumber: { startsWith: prefix } },
       orderBy: { controlNumber: 'desc' },
@@ -39,7 +48,10 @@ export class AuthService {
       return `${prefix}-00001`;
     }
 
-    const lastNumber = parseInt(lastFarmer.controlNumber.replace(`${prefix}-`, ''), 10);
+    const lastNumber = parseInt(
+      lastFarmer.controlNumber.replace(`${prefix}-`, ''),
+      10,
+    );
     const nextNumber = lastNumber + 1;
     const padded = nextNumber.toString().padStart(5, '0');
     return `${prefix}-${padded}`;
@@ -57,7 +69,10 @@ export class AuthService {
       return 'FO-0001';
     }
 
-    const lastNumber = parseInt(lastOfficer.employeeCode.replace('FO-', ''), 10);
+    const lastNumber = parseInt(
+      lastOfficer.employeeCode.replace('FO-', ''),
+      10,
+    );
     const nextNumber = lastNumber + 1;
     const padded = nextNumber.toString().padStart(4, '0');
     return `FO-${padded}`;
@@ -66,7 +81,17 @@ export class AuthService {
   /**
    * Helper to generate tokens and store refresh token
    */
-  private async generateTokens(user: { id: string; phone: string; role: UserRole; email?: string | null }, controlNumber?: string): Promise<AuthResponseDto> {
+  private async generateTokens(
+    user: {
+      id: string;
+      phone: string;
+      role: UserRole;
+      email?: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    },
+    controlNumber?: string,
+  ): Promise<AuthResponseDto> {
     const accessTokenPayload = {
       sub: user.id,
       phone: user.phone,
@@ -82,12 +107,18 @@ export class AuthService {
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(accessTokenPayload, {
-        secret: this.configService.get<string>('JWT_SECRET') || 'mayode-super-secret-key-change-in-production-2026',
-        expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') || '15m') as any,
+        secret:
+          this.configService.get<string>('JWT_SECRET') ||
+          'mayode-super-secret-key-change-in-production-2026',
+        expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') ||
+          '15m') as any,
       }),
       this.jwtService.signAsync(refreshTokenPayload, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET') || 'mayode-refresh-secret-key-change-in-production-2026',
-        expiresIn: (this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d') as any,
+        secret:
+          this.configService.get<string>('JWT_REFRESH_SECRET') ||
+          'mayode-refresh-secret-key-change-in-production-2026',
+        expiresIn: (this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ||
+          '7d') as any,
       }),
     ]);
 
@@ -109,6 +140,8 @@ export class AuthService {
         id: user.id,
         phone: user.phone,
         email: user.email || undefined,
+        firstName: user.firstName || undefined,
+        lastName: user.lastName || undefined,
         role: user.role,
         controlNumber,
       },
@@ -124,7 +157,8 @@ export class AuthService {
    * request bodies (whitelist validation would otherwise reject it).
    */
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    const { phone, email, password, firstName, lastName, language } = registerDto;
+    const { phone, email, password, firstName, lastName, language } =
+      registerDto;
 
     const existingUser = await this.prisma.user.findFirst({
       where: {
@@ -133,7 +167,9 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException('User with this phone number or email already exists');
+      throw new ConflictException(
+        'User with this phone number or email already exists',
+      );
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -149,6 +185,8 @@ export class AuthService {
             phone,
             email,
             passwordHash,
+            firstName,
+            lastName,
             role: UserRole.FARMER,
             language: language || 'sw',
           },
@@ -167,7 +205,10 @@ export class AuthService {
         return user;
       });
     } catch (error) {
-      throw new InternalServerErrorException('Failed to create user account: ' + (error instanceof Error ? error.message : String(error)));
+      throw new InternalServerErrorException(
+        'Failed to create user account: ' +
+          (error instanceof Error ? error.message : String(error)),
+      );
     }
 
     return this.generateTokens(createdUser, controlNumber);
@@ -181,15 +222,22 @@ export class AuthService {
    * escalation via a compromised or careless ADMIN account.
    */
   async createStaffAccount(dto: CreateStaffUserDto, creatorRole: UserRole) {
-    if (SUPER_ADMIN_ONLY_ROLES.includes(dto.role) && creatorRole !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException('Only a SUPER_ADMIN can create SUPER_ADMIN or ADMIN accounts');
+    if (
+      SUPER_ADMIN_ONLY_ROLES.includes(dto.role) &&
+      creatorRole !== UserRole.SUPER_ADMIN
+    ) {
+      throw new ForbiddenException(
+        'Only a SUPER_ADMIN can create SUPER_ADMIN or ADMIN accounts',
+      );
     }
 
     const existingUser = await this.prisma.user.findFirst({
       where: { OR: [{ phone: dto.phone }, { email: dto.email || undefined }] },
     });
     if (existingUser) {
-      throw new ConflictException('User with this phone number or email already exists');
+      throw new ConflictException(
+        'User with this phone number or email already exists',
+      );
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -201,21 +249,41 @@ export class AuthService {
           phone: dto.phone,
           email: dto.email,
           passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
           role: dto.role,
           language: dto.language || 'sw',
         },
-        select: { id: true, phone: true, email: true, role: true, createdAt: true },
+        select: {
+          id: true,
+          phone: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          createdAt: true,
+        },
       });
 
       if (dto.role === UserRole.FARMER) {
         const controlNumber = await this.generateControlNumber();
         await prisma.farmer.create({
-          data: { userId: user.id, controlNumber, firstName: dto.firstName, lastName: dto.lastName },
+          data: {
+            userId: user.id,
+            controlNumber,
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+          },
         });
       } else if (dto.role === UserRole.FIELD_OFFICER) {
         const employeeCode = await this.generateEmployeeCode();
         await prisma.fieldOfficer.create({
-          data: { userId: user.id, employeeCode, firstName: dto.firstName, lastName: dto.lastName },
+          data: {
+            userId: user.id,
+            employeeCode,
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+          },
         });
       }
 
@@ -237,7 +305,9 @@ export class AuthService {
     });
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Invalid credentials or inactive account');
+      throw new UnauthorizedException(
+        'Invalid credentials or inactive account',
+      );
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
@@ -280,7 +350,9 @@ export class AuthService {
 
     try {
       await this.jwtService.verifyAsync(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET') || 'mayode-refresh-secret-key-change-in-production-2026',
+        secret:
+          this.configService.get<string>('JWT_REFRESH_SECRET') ||
+          'mayode-refresh-secret-key-change-in-production-2026',
       });
     } catch {
       await this.prisma.refreshToken.delete({ where: { id: storedToken.id } });
@@ -289,7 +361,10 @@ export class AuthService {
 
     await this.prisma.refreshToken.delete({ where: { id: storedToken.id } });
 
-    return this.generateTokens(storedToken.user, storedToken.user.farmer?.controlNumber);
+    return this.generateTokens(
+      storedToken.user,
+      storedToken.user.farmer?.controlNumber,
+    );
   }
 
   /**
@@ -299,6 +374,9 @@ export class AuthService {
     await this.prisma.refreshToken.deleteMany({
       where: { userId },
     });
-    return { success: true, message: 'Logged out successfully across all devices' };
+    return {
+      success: true,
+      message: 'Logged out successfully across all devices',
+    };
   }
 }
