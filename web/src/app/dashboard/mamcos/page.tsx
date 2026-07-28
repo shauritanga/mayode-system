@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { authApi, mamcosApi } from '@/lib/api';
 import Modal from '@/components/Modal';
+import { useAuthStore } from '@/store/auth.store';
 
 interface Mamcos {
   id: string;
@@ -17,9 +18,11 @@ interface Mamcos {
 }
 
 const EMPTY_LEADER_FORM = { firstName: '', lastName: '', phone: '', password: '', mamcosId: '' };
-const EMPTY_OFFICER_FORM = { firstName: '', lastName: '', phone: '', password: '', assignedArea: '' };
+const EMPTY_OFFICER_FORM = { firstName: '', lastName: '', phone: '', password: '', assignedArea: '', mamcosId: '' };
 
 export default function MamcosPage() {
+  const role = useAuthStore((state) => state.user?.role);
+  const isSecretary = role === 'MAMCOS_SECRETARY';
   const [mamcos, setMamcos] = useState<Mamcos[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -31,16 +34,30 @@ export default function MamcosPage() {
   const [staffForm, setStaffForm] = useState<any>({ ...EMPTY_LEADER_FORM });
   const [officerForm, setOfficerForm] = useState<any>({ ...EMPTY_OFFICER_FORM });
 
+  // A Secretary only ever sees their own AMCOS, resolved server-side from
+  // their own profile — never the full cooperative list.
   const load = () => {
     setLoading(true);
-    mamcosApi.getAll()
-      .then(res => setMamcos(res.data || []))
-      .catch(console.error).finally(() => setLoading(false));
+    if (isSecretary) {
+      mamcosApi.dashboard()
+        .then(res => {
+          const m = res.data?.mamcos;
+          const scoped: Mamcos[] = m ? [{ ...m, _count: { farmers: m.farmers?.length ?? 0, farms: m.farms?.length ?? 0 } }] : [];
+          setMamcos(scoped);
+          setOfficerForm((f: any) => ({ ...f, mamcosId: m?.id ?? '' }));
+        })
+        .catch(console.error).finally(() => setLoading(false));
+    } else {
+      mamcosApi.getAll()
+        .then(res => setMamcos(res.data || []))
+        .catch(console.error).finally(() => setLoading(false));
+    }
   };
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSecretary]);
 
   const createMamcos = async (e: React.FormEvent) => {
     e.preventDefault(); setCreating(true); setMessage('');
@@ -54,7 +71,12 @@ export default function MamcosPage() {
   };
   const createOfficer = async (e: React.FormEvent) => {
     e.preventDefault(); setCreating(true); setMessage('');
-    try { await authApi.createStaff({ ...officerForm, role: 'FIELD_OFFICER' }); setMessage('Field Officer account created successfully.'); setOfficerForm({ ...EMPTY_OFFICER_FORM }); setShowOfficerForm(false); }
+    try {
+      await authApi.createStaff({ ...officerForm, role: 'FIELD_OFFICER' });
+      setMessage('Field Officer account created successfully.');
+      setOfficerForm({ ...EMPTY_OFFICER_FORM, mamcosId: isSecretary ? officerForm.mamcosId : '' });
+      setShowOfficerForm(false);
+    }
     catch (e: any) { setMessage(e?.response?.data?.message || 'Could not create Field Officer account.'); } finally { setCreating(false); }
   };
 
@@ -66,12 +88,12 @@ export default function MamcosPage() {
             <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--gold-400), var(--gold-300))', borderRadius: '9999px' }} />
             <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>AMCOS Cooperatives</h1>
           </div>
-          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Registered cooperative management schemes</p>
+          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>{isSecretary ? 'Your cooperative scheme' : 'Registered cooperative management schemes'}</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn-secondary" onClick={() => setShowStaffForm(true)}>+ Assign AMCOS Leader</button>
+          {!isSecretary && <button className="btn-secondary" onClick={() => setShowStaffForm(true)}>+ Assign AMCOS Leader</button>}
           <button className="btn-secondary" onClick={() => setShowOfficerForm(true)}>+ Create Field Officer</button>
-          <button className="btn-primary" onClick={() => setShowMamcosForm(true)}>+ New AMCOS</button>
+          {!isSecretary && <button className="btn-primary" onClick={() => setShowMamcosForm(true)}>+ New AMCOS</button>}
         </div>
       </div>
 
@@ -133,6 +155,9 @@ export default function MamcosPage() {
           }
         >
           <form onSubmit={createOfficer} style={{ display: 'grid', gap: '9px' }}>
+            {!isSecretary && (
+              <select className="input-field" required value={officerForm.mamcosId} onChange={e => setOfficerForm({ ...officerForm, mamcosId: e.target.value })}><option value="">Select AMCOS</option>{mamcos.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+            )}
             <input className="input-field" placeholder="First name" required value={officerForm.firstName} onChange={e => setOfficerForm({ ...officerForm, firstName: e.target.value })} />
             <input className="input-field" placeholder="Last name" required value={officerForm.lastName} onChange={e => setOfficerForm({ ...officerForm, lastName: e.target.value })} />
             <input className="input-field" placeholder="Phone +255…" required value={officerForm.phone} onChange={e => setOfficerForm({ ...officerForm, phone: e.target.value })} />

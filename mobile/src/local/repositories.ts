@@ -114,6 +114,14 @@ export const authApi = {
   async logout() {
     return ok({ success: true });
   },
+  async createFieldOfficer(data: any) {
+    const userId = uid();
+    await db.insert(COLLECTIONS.users, {
+      id: userId, phone: data.phone, password: data.password, role: 'FIELD_OFFICER',
+      firstName: data.firstName, lastName: data.lastName, email: null, createdAt: nowIso(),
+    });
+    return ok({ id: userId, phone: data.phone, firstName: data.firstName, lastName: data.lastName, role: 'FIELD_OFFICER', createdAt: nowIso() });
+  },
 };
 
 // ---------------------------------------------------------------------------

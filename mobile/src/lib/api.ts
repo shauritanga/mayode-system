@@ -124,6 +124,10 @@ export const authApi = {
   register: (data: { phone: string; password: string; firstName: string; lastName: string; role: string }) =>
     api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
+  // AMCOS Secretary self-service: mamcosId is resolved server-side from the
+  // caller's own AMCOS, so it's never sent from here.
+  createFieldOfficer: (data: { phone: string; password: string; firstName: string; lastName: string; assignedArea?: string }) =>
+    api.post('/auth/staff', { ...data, role: 'FIELD_OFFICER' }),
 };
 
 // ── Users ──

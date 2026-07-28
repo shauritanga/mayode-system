@@ -64,6 +64,12 @@ export default function RoleWorkspaceDashboard({ role }: Props) {
           </TouchableOpacity>)}
         </>}
         {role === 'MAMCOS_SECRETARY' && <View style={styles.note}><HugeiconsIcon icon={Alert02Icon} size={20} color="#B45309" strokeWidth={2} /><Text style={styles.noteText}>Your workspace is restricted to your assigned AMCOS.</Text></View>}
+        {role === 'MAMCOS_SECRETARY' && (
+          <TouchableOpacity style={styles.secondary} onPress={() => router.push('/officer-new')}>
+            <HugeiconsIcon icon={UserGroupIcon} size={19} color="#065F46" strokeWidth={2} />
+            <Text style={styles.secondaryText}>Create Field Officer</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity style={styles.primary} onPress={() => router.push(copy.route as any)}><HugeiconsIcon icon={Plant01Icon} size={19} color="#fff" strokeWidth={2} /><Text style={styles.primaryText}>{copy.primary}</Text></TouchableOpacity>
       </>}
     </ScrollView>
@@ -85,4 +91,5 @@ const styles = StyleSheet.create({
   queue: { backgroundColor: '#fff', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 9 }, queueTitle: { color: '#111827', fontSize: 14, fontWeight: '700' }, queueSub: { color: '#6B7280', fontSize: 12, marginTop: 3 },
   note: { marginTop: 18, backgroundColor: '#FFFBEB', borderRadius: 14, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'center' }, noteText: { flex: 1, color: '#92400E', fontSize: 13, lineHeight: 18 },
   primary: { backgroundColor: '#059669', borderRadius: 14, padding: 16, marginTop: 24, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }, primaryText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  secondary: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#065F46', borderRadius: 14, padding: 15, marginTop: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }, secondaryText: { color: '#065F46', fontSize: 14, fontWeight: '800' },
 });

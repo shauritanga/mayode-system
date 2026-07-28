@@ -698,6 +698,10 @@ const en = {
   totalCropCycles: 'Crop cycles',
   harvestedCycles: 'Harvested cycles',
   yieldAccuracy: 'Yield accuracy',
+  // AMCOS Secretary: create field officer
+  createFieldOfficer: 'Create Field Officer',
+  officerCreated: 'Field Officer account created successfully.',
+  assignedAreaLabel: 'Assigned area (optional)',
 };
 
 const sw: Record<keyof typeof en, string> = {
@@ -1374,6 +1378,10 @@ const sw: Record<keyof typeof en, string> = {
   totalCropCycles: 'Misimu ya kilimo',
   harvestedCycles: 'Misimu iliyovunwa',
   yieldAccuracy: 'Usahihi wa mavuno',
+  // AMCOS Secretary: create field officer
+  createFieldOfficer: 'Unda Afisa Shambani',
+  officerCreated: 'Akaunti ya Afisa Shambani imeundwa.',
+  assignedAreaLabel: 'Eneo alilopangiwa (si lazima)',
 };
 
 export type TranslationKey = keyof typeof en;

@@ -51,11 +51,11 @@ export class AuthController {
 
   @Post('staff')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @ApiBearerAuth()
   @ApiOperation({
     summary:
-      'Create a staff/admin account of any role (SUPER_ADMIN/ADMIN only). A plain ADMIN cannot create SUPER_ADMIN or ADMIN accounts.',
+      'Create a staff account. SUPER_ADMIN/ADMIN can create any role (a plain ADMIN cannot create SUPER_ADMIN or ADMIN accounts). An AMCOS Secretary can only create Field Officer accounts, scoped to their own AMCOS.',
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -67,9 +67,9 @@ export class AuthController {
   })
   async createStaffAccount(
     @Body() dto: CreateStaffUserDto,
-    @CurrentUser() user: { role: UserRole },
+    @CurrentUser() user: { id: string; role: UserRole },
   ) {
-    return this.authService.createStaffAccount(dto, user.role);
+    return this.authService.createStaffAccount(dto, user.role, user.id);
   }
 
   @Post('login')

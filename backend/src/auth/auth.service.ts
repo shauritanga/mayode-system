@@ -223,7 +223,11 @@ export class AuthService {
    * accounts — only a SUPER_ADMIN can grant those, to prevent privilege
    * escalation via a compromised or careless ADMIN account.
    */
-  async createStaffAccount(dto: CreateStaffUserDto, creatorRole: UserRole) {
+  async createStaffAccount(
+    dto: CreateStaffUserDto,
+    creatorRole: UserRole,
+    creatorUserId: string,
+  ) {
     if (
       SUPER_ADMIN_ONLY_ROLES.includes(dto.role) &&
       creatorRole !== UserRole.SUPER_ADMIN
@@ -231,6 +235,26 @@ export class AuthService {
       throw new ForbiddenException(
         'Only a SUPER_ADMIN can create SUPER_ADMIN or ADMIN accounts',
       );
+    }
+
+    // An AMCOS Secretary may only self-service Field Officer accounts for
+    // their own cooperative — the mamcosId is resolved server-side and any
+    // client-supplied value is ignored, so a secretary can never create an
+    // officer under a different AMCOS.
+    if (creatorRole === UserRole.MAMCOS_SECRETARY) {
+      if (dto.role !== UserRole.FIELD_OFFICER) {
+        throw new ForbiddenException(
+          'AMCOS secretaries can only create Field Officer accounts',
+        );
+      }
+      const secretary = await this.prisma.mamcosSecretary.findUnique({
+        where: { userId: creatorUserId },
+        select: { mamcosId: true },
+      });
+      if (!secretary) {
+        throw new ForbiddenException('AMCOS secretary profile not found');
+      }
+      dto.mamcosId = secretary.mamcosId;
     }
 
     const existingUser = await this.prisma.user.findFirst({
