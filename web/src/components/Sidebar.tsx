@@ -21,12 +21,14 @@ import {
   AlertCircleIcon,
   FileEditIcon,
   MapsSearchIcon,
+  UserAdd01Icon,
 } from '@hugeicons/core-free-icons';
 import UserMenu from './UserMenu';
 import { useAuthStore } from '@/store/auth.store';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/staff', label: 'Staff', icon: UserAdd01Icon, roles: ['MAMCOS_SECRETARY'] },
   { href: '/dashboard/farmers', label: 'Farmers', icon: UserGroupIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
   { href: '/dashboard/farms', label: 'Farms', icon: Plant01Icon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
   { href: '/dashboard/farm-registry', label: 'Farm Registry', icon: ClipboardIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
