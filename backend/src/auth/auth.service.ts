@@ -19,7 +19,7 @@ import {
   AuthResponseDto,
 } from './dto/auth.dto';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
-import { UserRole } from '@prisma/client';
+import { UserRole, MamcosStaffRole } from '@prisma/client';
 
 /** Roles only a SUPER_ADMIN may grant; an ADMIN cannot create peers or escalate to SUPER_ADMIN. */
 const SUPER_ADMIN_ONLY_ROLES: UserRole[] = [
@@ -63,11 +63,12 @@ export class AuthService {
    * Helper to generate unique Employee Code for Field Officers (FO-XXXX)
    */
   private async generateEmployeeCode(): Promise<string> {
-    const lastOfficer = await this.prisma.fieldOfficer.findFirst({
+    const lastOfficer = await this.prisma.mamcosStaff.findFirst({
+      where: { role: MamcosStaffRole.FIELD_OFFICER },
       orderBy: { employeeCode: 'desc' },
     });
 
-    if (!lastOfficer) {
+    if (!lastOfficer || !lastOfficer.employeeCode) {
       return 'FO-0001';
     }
 
@@ -247,11 +248,11 @@ export class AuthService {
           'AMCOS secretaries can only create Field Officer accounts',
         );
       }
-      const secretary = await this.prisma.mamcosSecretary.findUnique({
-        where: { userId: creatorUserId },
+      const secretary = await this.prisma.mamcosStaff.findFirst({
+        where: { userId: creatorUserId, role: MamcosStaffRole.SECRETARY },
         select: { mamcosId: true },
       });
-      if (!secretary) {
+      if (!secretary || !secretary.mamcosId) {
         throw new ForbiddenException('AMCOS secretary profile not found');
       }
       dto.mamcosId = secretary.mamcosId;
@@ -306,9 +307,10 @@ export class AuthService {
         const mamcos = await prisma.mamcos.findUnique({ where: { id: dto.mamcosId }, select: { id: true } });
         if (!mamcos) throw new NotFoundException('AMCOS not found');
         const employeeCode = await this.generateEmployeeCode();
-        await prisma.fieldOfficer.create({
+        await prisma.mamcosStaff.create({
           data: {
             userId: user.id,
+            role: MamcosStaffRole.FIELD_OFFICER,
             employeeCode,
             firstName: dto.firstName,
             lastName: dto.lastName,
@@ -320,9 +322,9 @@ export class AuthService {
         if (!dto.mamcosId) throw new BadRequestException('mamcosId is required for an AMCOS Leader');
         const mamcos = await prisma.mamcos.findUnique({ where: { id: dto.mamcosId }, select: { id: true } });
         if (!mamcos) throw new NotFoundException('AMCOS not found');
-        const existing = await prisma.mamcosSecretary.findUnique({ where: { mamcosId: dto.mamcosId } });
+        const existing = await prisma.mamcosStaff.findFirst({ where: { mamcosId: dto.mamcosId, role: MamcosStaffRole.SECRETARY } });
         if (existing) throw new ConflictException('This AMCOS already has a Leader; reassign the current Leader instead');
-        await prisma.mamcosSecretary.create({ data: { userId: user.id, mamcosId: dto.mamcosId, firstName: dto.firstName, lastName: dto.lastName } });
+        await prisma.mamcosStaff.create({ data: { userId: user.id, role: MamcosStaffRole.SECRETARY, mamcosId: dto.mamcosId, firstName: dto.firstName, lastName: dto.lastName } });
       }
 
       return user;

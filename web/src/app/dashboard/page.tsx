@@ -60,6 +60,8 @@ export default function DashboardPage() {
     farmers: 0, farms: 0, mamcos: 0, listings: 0
   });
   const [mamcosName, setMamcosName] = useState('');
+  const [secretaryName, setSecretaryName] = useState('');
+  const [officers, setOfficers] = useState<{ id: string; employeeCode: string; firstName: string; lastName: string; assignedArea?: string; user?: { phone: string; isActive: boolean } }[]>([]);
   const [prices, setPrices] = useState<{ commodity: string; price: number; market: string; recordedAt: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showOfficerForm, setShowOfficerForm] = useState(false);
@@ -76,8 +78,11 @@ export default function DashboardPage() {
             marketplaceApi.getLandListings(),
             marketplaceApi.getMarketPrices(),
           ]);
-          const m = dashRes.status === 'fulfilled' ? dashRes.value.data?.mamcos : null;
+          const secretary = dashRes.status === 'fulfilled' ? dashRes.value.data : null;
+          const m = secretary?.mamcos;
           setMamcosName(m?.name || '');
+          setSecretaryName(secretary ? `${secretary.firstName} ${secretary.lastName}` : '');
+          setOfficers(m?.fieldOfficers ?? []);
           setStats({
             farmers: m?.farmers?.length ?? 0,
             farms: m?.farms?.length ?? 0,
@@ -122,6 +127,10 @@ export default function DashboardPage() {
       setMessage('Field Officer account created successfully.');
       setOfficerForm({ ...EMPTY_OFFICER_FORM });
       setShowOfficerForm(false);
+      if (isSecretary) {
+        const res = await mamcosApi.dashboard();
+        setOfficers(res.data?.mamcos?.fieldOfficers ?? []);
+      }
     } catch (err: any) {
       setMessage(err?.response?.data?.message || 'Could not create Field Officer account.');
     } finally {
@@ -233,6 +242,41 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {isSecretary && (
+        <div className="glass-card" style={{ padding: '24px', marginTop: '20px' }}>
+          <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '20px' }}>👥 AMCOS Staff</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {secretaryName && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: 'var(--surface-tint)', borderRadius: '10px' }}>
+                <span style={{ fontSize: '18px', width: '28px', textAlign: 'center' }}>🧑‍💼</span>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{secretaryName}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>AMCOS Leader (you)</div>
+                </div>
+              </div>
+            )}
+            {officers.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--neutral-600)', fontSize: '14px', padding: '24px 0' }}>
+                No field officers yet — use "Create Field Officer" above to add one.
+              </div>
+            ) : officers.map((o) => (
+              <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: 'var(--surface-tint)', borderRadius: '10px' }}>
+                <span style={{ fontSize: '18px', width: '28px', textAlign: 'center' }}>🧑‍🌾</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{o.firstName} {o.lastName}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>
+                    {o.employeeCode} · {o.user?.phone || 'No phone'}{o.assignedArea ? ` · ${o.assignedArea}` : ''}
+                  </div>
+                </div>
+                <span className={`badge ${o.user?.isActive !== false ? 'badge-green' : 'badge-gray'}`}>
+                  {o.user?.isActive !== false ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {showOfficerForm && (
         <Modal

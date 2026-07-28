@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { MamcosStaffRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { ActivitiesService } from '../activities/activities.service';
@@ -252,8 +252,8 @@ export class CropCyclesService {
   async logActivity(user: RequestUser, dto: CreateActivityLogDto) {
     const cropCycle = await this.findOne(dto.cropCycleId, user); // verifies existence + ownership
 
-    const fieldOfficer = await this.prisma.fieldOfficer.findUnique({
-      where: { userId: user.id },
+    const fieldOfficer = await this.prisma.mamcosStaff.findFirst({
+      where: { userId: user.id, role: MamcosStaffRole.FIELD_OFFICER },
     });
 
     const activity = await this.prisma.activityLog.create({

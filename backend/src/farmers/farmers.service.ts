@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import {
   DocumentType,
+  MamcosStaffRole,
   Prisma,
   UserRole,
   VerificationStatus,
@@ -239,8 +240,8 @@ export class FarmersService {
   // --------------------------------------------------------------------------
 
   private async fieldOfficerFor(userId: string) {
-    const officer = await this.prisma.fieldOfficer.findUnique({
-      where: { userId },
+    const officer = await this.prisma.mamcosStaff.findFirst({
+      where: { userId, role: MamcosStaffRole.FIELD_OFFICER },
     });
     if (!officer) {
       throw new NotFoundException(

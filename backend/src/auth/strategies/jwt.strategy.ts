@@ -24,8 +24,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       where: { id: payload.sub },
       include: {
         farmer: true,
-        fieldOfficer: true,
-        mamcosSecretary: true,
       },
     });
 

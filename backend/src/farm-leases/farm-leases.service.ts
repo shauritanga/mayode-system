@@ -9,6 +9,7 @@ import {
   AssignmentType,
   DisputeType,
   LeaseStatus,
+  MamcosStaffRole,
   OwnershipSource,
   Prisma,
   UserRole,
@@ -87,7 +88,7 @@ export class FarmLeasesService {
     // Farms belong to AMCOS. Staff may assign only inside their AMCOS; farmers
     // never create leases for land they do not own.
     if (user.role === 'MAMCOS_SECRETARY') {
-      const secretary = await this.prisma.mamcosSecretary.findUnique({ where: { userId: user.id }, select: { mamcosId: true } });
+      const secretary = await this.prisma.mamcosStaff.findFirst({ where: { userId: user.id, role: MamcosStaffRole.SECRETARY }, select: { mamcosId: true } });
       if (!secretary || secretary.mamcosId !== farm.mamcosId) {
         throw new ForbiddenException('You can only assign renters for your own AMCOS farms');
       }
@@ -219,7 +220,7 @@ export class FarmLeasesService {
   async findAllLeases(status?: LeaseStatus, user?: RequestUser) {
     const where: Prisma.FarmLeaseWhereInput = status ? { status } : {};
     if (user?.role === UserRole.MAMCOS_SECRETARY) {
-      const secretary = await this.prisma.mamcosSecretary.findUnique({ where: { userId: user.id }, select: { mamcosId: true } });
+      const secretary = await this.prisma.mamcosStaff.findFirst({ where: { userId: user.id, role: MamcosStaffRole.SECRETARY }, select: { mamcosId: true } });
       if (!secretary) throw new ForbiddenException('AMCOS officer profile is missing');
       where.farm = { mamcosId: secretary.mamcosId };
     }

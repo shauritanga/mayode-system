@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { MamcosStaffRole, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ActivitiesService } from '../activities/activities.service';
 import type { RequestUser } from '../common/ownership.service';
@@ -15,10 +15,10 @@ export class FieldOfficerVisitsService {
     private readonly activities: ActivitiesService,
   ) {}
 
-  /** Resolve the calling officer's FieldOfficer row and require they're scoped to an AMCOS. */
+  /** Resolve the calling officer's MamcosStaff row and require they're scoped to an AMCOS. */
   private async requireOfficerWithMamcos(userId: string) {
-    const officer = await this.prisma.fieldOfficer.findUnique({
-      where: { userId },
+    const officer = await this.prisma.mamcosStaff.findFirst({
+      where: { userId, role: MamcosStaffRole.FIELD_OFFICER },
       select: { id: true, mamcosId: true },
     });
     if (!officer) {
@@ -107,10 +107,11 @@ export class FieldOfficerVisitsService {
 
   async findForFarmer(farmerId: string, user: RequestUser) {
     if (user.role === UserRole.FIELD_OFFICER || user.role === UserRole.MAMCOS_SECRETARY) {
+      // userId is unique across the whole staff table, so one query covers
+      // either role — the caller's auth role (checked above) already
+      // determines which one we expect to find.
       const [scope, farmer] = await Promise.all([
-        user.role === UserRole.FIELD_OFFICER
-          ? this.prisma.fieldOfficer.findUnique({ where: { userId: user.id }, select: { mamcosId: true } })
-          : this.prisma.mamcosSecretary.findUnique({ where: { userId: user.id }, select: { mamcosId: true } }),
+        this.prisma.mamcosStaff.findUnique({ where: { userId: user.id }, select: { mamcosId: true } }),
         this.prisma.farmer.findUnique({ where: { id: farmerId }, select: { mamcosId: true } }),
       ]);
       if (!farmer) throw new NotFoundException(`Farmer with ID ${farmerId} not found`);

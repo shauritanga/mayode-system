@@ -38,8 +38,7 @@ export class UsersService {
         lastLoginAt: true,
         createdAt: true,
         farmer: true,
-        fieldOfficer: true,
-        mamcosSecretary: true,
+        mamcosStaff: true,
       },
     });
 

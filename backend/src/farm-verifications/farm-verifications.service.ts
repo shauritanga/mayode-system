@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { MamcosStaffRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { VerifyFarmDto } from './dto/verify-farm.dto';
 
@@ -10,8 +11,8 @@ export class FarmVerificationsService {
     const { farmId, neighborLeft, neighborRight, mamcosApprovalStatus, photoProofUrl, notes } = verifyFarmDto;
 
     // Find the field officer profile
-    const fieldOfficer = await this.prisma.fieldOfficer.findUnique({
-      where: { userId: officerUserId },
+    const fieldOfficer = await this.prisma.mamcosStaff.findFirst({
+      where: { userId: officerUserId, role: MamcosStaffRole.FIELD_OFFICER },
     });
 
     if (!fieldOfficer) {

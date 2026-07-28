@@ -37,8 +37,7 @@ model User {
 
   // Relations
   farmer          Farmer?
-  fieldOfficer    FieldOfficer?
-  mamcosSecretary MamcosSecretary?
+  mamcosStaff     MamcosStaff?
   refreshTokens   RefreshToken[]
   auditLogs       AuditLog[]
   notifications   Notification[]
@@ -130,18 +129,32 @@ model Farmer {
 // CORE: Field Officer
 // ============================================================
 
-model FieldOfficer {
-  id           String   @id @default(uuid())
-  userId       String   @unique @map("user_id")
-  employeeCode String   @unique @map("employee_code")
-  firstName    String   @map("first_name")
-  lastName     String   @map("last_name")
-  assignedArea String?  @map("assigned_area")
-  // Nullable: existing officers predate AMCOS scoping. Not unique — many
-  // officers can belong to the same AMCOS (unlike MamcosSecretary.mamcosId).
-  mamcosId     String?  @map("mamcos_id")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+enum MamcosStaffRole {
+  SECRETARY
+  FIELD_OFFICER
+}
+
+// A staff member belonging to one AMCOS, with a role. Unifies what used to
+// be two separate tables (FieldOfficer, MamcosSecretary) so a future staff
+// role is just a new enum value, not a new model. "One secretary per AMCOS"
+// is enforced via a partial unique index added by raw SQL in the migration
+// (mamcos_id WHERE role = 'SECRETARY') — Prisma's schema DSL can't express
+// partial indexes, so it isn't declared here, but the DB still enforces it.
+model MamcosStaff {
+  id             String          @id @default(uuid())
+  userId         String          @unique @map("user_id")
+  // Nullable: existing officers predate AMCOS scoping.
+  mamcosId       String?         @map("mamcos_id")
+  role           MamcosStaffRole
+  firstName      String          @map("first_name")
+  lastName       String          @map("last_name")
+  // Field-officer only.
+  employeeCode   String?         @unique @map("employee_code")
+  assignedArea   String?         @map("assigned_area")
+  // Secretary only.
+  stabilityBonus Float           @default(0) @map("stability_bonus")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
 
   // Relations
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -152,7 +165,7 @@ model FieldOfficer {
   visits              FieldOfficerVisit[]
 
   @@index([mamcosId])
-  @@map("field_officers")
+  @@map("mamcos_staff")
 }
 
 // ============================================================
@@ -172,31 +185,13 @@ model Mamcos {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
-  secretary       MamcosSecretary?
-  fieldOfficers   FieldOfficer[]
+  staff           MamcosStaff[]
   farmers         Farmer[]
   farms           Farm[]
   farmingSeasons  FarmingSeason[]
   registryRecords FarmRegistryRecord[]
 
   @@map("mamcos")
-}
-
-model MamcosSecretary {
-  id             String   @id @default(uuid())
-  userId         String   @unique @map("user_id")
-  mamcosId       String   @unique @map("mamcos_id")
-  firstName      String   @map("first_name")
-  lastName       String   @map("last_name")
-  stabilityBonus Float    @default(0) @map("stability_bonus")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mamcos Mamcos @relation(fields: [mamcosId], references: [id])
-
-  @@map("mamcos_secretaries")
 }
 
 // ============================================================
@@ -289,8 +284,8 @@ model FarmVerification {
   createdAt      DateTime @default(now()) @map("created_at")
 
   // Relations
-  farm         Farm         @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  fieldOfficer FieldOfficer @relation(fields: [fieldOfficerId], references: [id])
+  farm         Farm        @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  fieldOfficer MamcosStaff @relation(fields: [fieldOfficerId], references: [id])
 
   @@map("farm_verifications")
 }
@@ -343,8 +338,8 @@ model ActivityLog {
   createdAt      DateTime     @default(now()) @map("created_at")
 
   // Relations
-  cropCycle    CropCycle     @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
-  fieldOfficer FieldOfficer? @relation(fields: [fieldOfficerId], references: [id])
+  cropCycle    CropCycle    @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
+  fieldOfficer MamcosStaff? @relation(fields: [fieldOfficerId], references: [id])
 
   @@map("activity_logs")
 }
@@ -751,8 +746,8 @@ model FarmerVerification {
   gpsLongitude      Float?             @map("gps_longitude")
   verifiedAt        DateTime           @default(now()) @map("verified_at")
 
-  farmer       Farmer       @relation(fields: [farmerId], references: [id], onDelete: Cascade)
-  fieldOfficer FieldOfficer @relation(fields: [fieldOfficerId], references: [id])
+  farmer       Farmer      @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  fieldOfficer MamcosStaff @relation(fields: [fieldOfficerId], references: [id])
 
   @@index([farmerId])
   @@map("farmer_verifications")
@@ -857,10 +852,10 @@ model FieldOfficerVisit {
   visitedAt      DateTime                 @map("visited_at")
   createdAt      DateTime                 @default(now()) @map("created_at")
 
-  fieldOfficer FieldOfficer @relation(fields: [fieldOfficerId], references: [id], onDelete: Cascade)
-  farmer       Farmer       @relation(fields: [farmerId], references: [id], onDelete: Cascade)
-  farm         Farm?        @relation(fields: [farmId], references: [id])
-  cropCycle    CropCycle?   @relation(fields: [cropCycleId], references: [id])
+  fieldOfficer MamcosStaff @relation(fields: [fieldOfficerId], references: [id], onDelete: Cascade)
+  farmer       Farmer      @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  farm         Farm?       @relation(fields: [farmId], references: [id])
+  cropCycle    CropCycle?  @relation(fields: [cropCycleId], references: [id])
 
   @@index([fieldOfficerId, visitedAt])
   @@index([farmerId, visitedAt])

@@ -11,6 +11,7 @@ import {
   FarmGrade,
   FarmRegistryRecord,
   FarmRegistryStatus,
+  MamcosStaffRole,
   OwnershipSource,
   Prisma,
   VerificationStatus,
@@ -251,8 +252,8 @@ export class FarmRegistryService {
     const where: Prisma.FarmRegistryRecordWhereInput = {};
     if (status) where.status = status;
     if (user?.role === 'MAMCOS_SECRETARY') {
-      const secretary = await this.prisma.mamcosSecretary.findUnique({
-        where: { userId: user.id }, select: { mamcosId: true },
+      const secretary = await this.prisma.mamcosStaff.findFirst({
+        where: { userId: user.id, role: MamcosStaffRole.SECRETARY }, select: { mamcosId: true },
       });
       if (!secretary) throw new ForbiddenException('AMCOS officer profile is missing');
       // AMCOS officers may never widen their own registry scope via a query parameter.

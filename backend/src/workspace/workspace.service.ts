@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { FarmRegistryStatus, LeaseStatus, UserRole, VerificationStatus } from '@prisma/client';
+import { FarmRegistryStatus, LeaseStatus, MamcosStaffRole, UserRole, VerificationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RequestUser } from '../common/ownership.service';
 
@@ -50,8 +50,8 @@ export class WorkspaceService {
   }
 
   private async officerContext(userId: string) {
-    const officer = await this.prisma.fieldOfficer.findUnique({
-      where: { userId },
+    const officer = await this.prisma.mamcosStaff.findFirst({
+      where: { userId, role: MamcosStaffRole.FIELD_OFFICER },
       select: { id: true, assignedArea: true, mamcosId: true, mamcos: { select: { id: true, name: true } } },
     });
     if (!officer) throw new ForbiddenException('Field officer profile is missing');
@@ -79,7 +79,7 @@ export class WorkspaceService {
   }
 
   private async mamcosContext(userId: string) {
-    const secretary = await this.prisma.mamcosSecretary.findUnique({ where: { userId }, select: { mamcosId: true, mamcos: { select: { id: true, name: true } } } });
+    const secretary = await this.prisma.mamcosStaff.findFirst({ where: { userId, role: MamcosStaffRole.SECRETARY }, select: { mamcosId: true, mamcos: { select: { id: true, name: true } } } });
     if (!secretary) throw new ForbiddenException('AMCOS officer profile is missing');
     const mamcosId = secretary.mamcosId;
     const [unassignedFarms, pendingRenterAcceptance, pendingFieldVerification, disputes] = await Promise.all([

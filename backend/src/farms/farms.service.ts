@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
+import { MamcosStaffRole, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { MembershipsService } from '../memberships/memberships.service';
@@ -93,9 +93,9 @@ export class FarmsService {
     const { search, mamcosId, farmerId, village, grade, isVerified } = query;
     let scopedMamcosId = mamcosId;
     if (user?.role === UserRole.MAMCOS_SECRETARY) {
-      const secretary = await this.prisma.mamcosSecretary.findUnique({ where: { userId: user.id }, select: { mamcosId: true } });
+      const secretary = await this.prisma.mamcosStaff.findFirst({ where: { userId: user.id, role: MamcosStaffRole.SECRETARY }, select: { mamcosId: true } });
       if (!secretary) throw new NotFoundException('AMCOS officer profile is missing');
-      scopedMamcosId = secretary.mamcosId;
+      scopedMamcosId = secretary.mamcosId ?? undefined;
     }
     const where: Prisma.FarmWhereInput = {
       ...(scopedMamcosId ? { mamcosId: scopedMamcosId } : {}),
@@ -221,7 +221,7 @@ export class FarmsService {
       throw new NotFoundException('A GPS boundary must be mapped before AMCOS can approve this farm');
     }
     if (user.role === 'MAMCOS_SECRETARY') {
-      const secretary = await this.prisma.mamcosSecretary.findUnique({ where: { userId: user.id }, select: { mamcosId: true } });
+      const secretary = await this.prisma.mamcosStaff.findFirst({ where: { userId: user.id, role: MamcosStaffRole.SECRETARY }, select: { mamcosId: true } });
       if (!secretary || secretary.mamcosId !== farm.mamcosId) {
         throw new NotFoundException('This farm is outside your assigned AMCOS');
       }
