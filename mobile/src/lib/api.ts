@@ -228,6 +228,7 @@ export const cropCyclesApi = {
     gpsLatitude?: number;
     gpsLongitude?: number;
   }) => api.post('/crop-cycles/activity', data),
+  calendar: (params?: { from?: string; to?: string }) => api.get('/crop-cycles/calendar', { params }),
 };
 
 // ── Finance (expenses & revenue per crop cycle) ──

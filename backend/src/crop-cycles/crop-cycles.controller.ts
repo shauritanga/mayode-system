@@ -5,6 +5,7 @@ import {
   Body,
   Patch,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -13,6 +14,7 @@ import {
   CreateCropCycleDto,
   UpdateCropCycleDto,
   CreateActivityLogDto,
+  CalendarQueryDto,
 } from './dto/crop-cycles.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -53,6 +55,13 @@ export class CropCyclesController {
   })
   findAll() {
     return this.cropCyclesService.findAll();
+  }
+
+  @Get('calendar')
+  @Roles(UserRole.FARMER)
+  @ApiOperation({ summary: "Combined calendar: own activity log entries + upcoming planting/harvest milestones across all the farmer's farms" })
+  calendar(@CurrentUser() user: RequestUser, @Query() query: CalendarQueryDto) {
+    return this.cropCyclesService.calendarForSelf(user.id, query.from, query.to);
   }
 
   @Get(':id')

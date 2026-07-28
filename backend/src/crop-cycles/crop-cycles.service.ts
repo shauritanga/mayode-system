@@ -156,6 +156,61 @@ export class CropCyclesService {
     });
   }
 
+  /**
+   * Combined calendar for a farmer: their own logged activities plus
+   * upcoming/past planting & harvest dates, merged across every farm.
+   */
+  async calendarForSelf(userId: string, fromStr?: string, toStr?: string) {
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!farmer) throw new NotFoundException('Farmer profile not found');
+
+    const now = new Date();
+    const from = fromStr ? new Date(fromStr) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = toStr ? new Date(toStr) : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const [cycles, activityLogs] = await Promise.all([
+      this.prisma.cropCycle.findMany({
+        where: {
+          farmerId: farmer.id,
+          OR: [
+            { plantingDate: { gte: from, lte: to } },
+            { expectedHarvest: { gte: from, lte: to } },
+            { harvestDate: { gte: from, lte: to } },
+          ],
+        },
+        include: { farm: { select: { id: true, farmCode: true, name: true } } },
+      }),
+      this.prisma.activityLog.findMany({
+        where: { cropCycle: { farmerId: farmer.id }, activityDate: { gte: from, lte: to } },
+        include: {
+          cropCycle: { select: { id: true, farm: { select: { id: true, farmCode: true, name: true } } } },
+        },
+      }),
+    ]);
+
+    const entries = [
+      ...activityLogs.map((a) => ({
+        type: 'ACTIVITY' as const,
+        date: a.activityDate,
+        id: a.id,
+        activityType: a.activityType,
+        cropCycleId: a.cropCycleId,
+        farm: a.cropCycle.farm,
+      })),
+      ...cycles
+        .filter((c) => c.plantingDate && c.plantingDate >= from && c.plantingDate <= to)
+        .map((c) => ({ type: 'PLANTING' as const, date: c.plantingDate as Date, id: c.id, cropCycleId: c.id, farm: c.farm })),
+      ...cycles
+        .filter((c) => c.expectedHarvest && c.expectedHarvest >= from && c.expectedHarvest <= to)
+        .map((c) => ({ type: 'HARVEST' as const, date: c.expectedHarvest as Date, id: c.id, cropCycleId: c.id, farm: c.farm })),
+    ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    return entries;
+  }
+
   async update(id: string, dto: UpdateCropCycleDto, user: RequestUser) {
     const existing = await this.findOne(id, user); // also verifies existence + ownership
 

@@ -475,7 +475,8 @@ export class FarmersService {
   // Analytics: production, financial, credit-readiness
   // --------------------------------------------------------------------------
 
-  async getProductionSummary(farmerId: string) {
+  async getProductionSummary(farmerId: string, user: RequestUser) {
+    await this.ownership.assertFarmerAccess(user, farmerId);
     const farmer = await this.prisma.farmer.findUnique({
       where: { id: farmerId },
       include: {
@@ -546,7 +547,8 @@ export class FarmersService {
    * profitability, loan repayment, cooperative membership and experience. The
    * resulting score is persisted onto Farmer.creditScore.
    */
-  async getCreditReadiness(farmerId: string) {
+  async getCreditReadiness(farmerId: string, user: RequestUser) {
+    await this.ownership.assertFarmerAccess(user, farmerId);
     const farmer = await this.prisma.farmer.findUnique({
       where: { id: farmerId },
       include: {

@@ -202,6 +202,27 @@ export const farmersApi = {
     const updated = await db.update(COLLECTIONS.farmers, id, { verificationStatus: 'SUSPENDED', ...data });
     return ok(updated ?? { verificationStatus: 'SUSPENDED' });
   },
+  async productionSummary(farmerId: string) {
+    return ok({
+      farmerId, controlNumber: '', totalCropCycles: 0, harvestedCycles: 0,
+      totalActualYieldKg: 0, totalEstimatedYieldKg: 0, avgYieldKgPerCycle: 0, yieldAccuracy: null, cycles: [],
+    });
+  },
+  async financialSummary(farmerId: string) {
+    return ok({
+      locked: true, code: 'MEMBERSHIP_REQUIRED', farmerId,
+      message: 'Activate your MAYOData membership to view the full financial analysis.',
+    });
+  },
+  async creditReadiness(farmerId: string) {
+    return ok({
+      farmerId, controlNumber: '', creditScore: 0, creditReady: false, isBlacklisted: false, blacklistReason: null,
+      factors: {
+        verification: { score: 0, max: 25 }, production: { score: 0, max: 20 }, profitability: { score: 0, max: 20 },
+        loanRepayment: { score: 0, max: 20 }, cooperativeMembership: { score: 0, max: 10 }, experience: { score: 0, max: 5 },
+      },
+    });
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -485,6 +506,7 @@ export const cropCyclesApi = {
     }
     return ok(activity);
   },
+  async calendar(_params?: any) { return ok([]); },
 };
 
 // ---------------------------------------------------------------------------

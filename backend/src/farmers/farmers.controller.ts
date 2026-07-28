@@ -77,16 +77,16 @@ export class FarmersController {
   }
 
   @Get(':id/credit-readiness')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FINANCIAL_PROVIDER, UserRole.MAMCOS_SECRETARY)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FINANCIAL_PROVIDER, UserRole.MAMCOS_SECRETARY, UserRole.FARMER)
   @ApiOperation({ summary: 'Compute & persist credit-readiness score with factor breakdown' })
-  getCreditReadiness(@Param('id') id: string) {
-    return this.farmersService.getCreditReadiness(id);
+  getCreditReadiness(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.farmersService.getCreditReadiness(id, user);
   }
 
   @Get(':id/production-summary')
   @ApiOperation({ summary: 'Farmer production history summary (yields per cycle)' })
-  getProductionSummary(@Param('id') id: string) {
-    return this.farmersService.getProductionSummary(id);
+  getProductionSummary(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.farmersService.getProductionSummary(id, user);
   }
 
   @Get(':id/financial-summary')

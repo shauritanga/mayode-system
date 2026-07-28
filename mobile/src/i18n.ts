@@ -678,6 +678,26 @@ const en = {
   farmersManaged: 'Farmers managed',
   visitsThisWeek: 'Visits this week',
   pendingVerifications: 'Pending verifications',
+  // Farmer: finances & credit dashboard
+  finances: 'Finances',
+  totalCosts: 'Total costs',
+  totalRevenues: 'Total revenues',
+  fairtradePremium: 'Fairtrade premium',
+  profitable: 'Profitable',
+  notProfitable: 'Not yet profitable',
+  creditScore: 'Credit score',
+  creditReady: 'Credit ready',
+  notCreditReady: 'Not yet credit ready',
+  verificationFactor: 'Verification',
+  productionFactor: 'Production',
+  profitabilityFactor: 'Profitability',
+  loanRepaymentFactor: 'Loan repayment',
+  cooperativeMembershipFactor: 'Cooperative membership',
+  experienceFactor: 'Farming experience',
+  productionSummary: 'Production summary',
+  totalCropCycles: 'Crop cycles',
+  harvestedCycles: 'Harvested cycles',
+  yieldAccuracy: 'Yield accuracy',
 };
 
 const sw: Record<keyof typeof en, string> = {
@@ -1334,6 +1354,26 @@ const sw: Record<keyof typeof en, string> = {
   farmersManaged: 'Wakulima unaosimamia',
   visitsThisWeek: 'Ziara wiki hii',
   pendingVerifications: 'Uthibitishaji unaosubiri',
+  // Farmer: finances & credit dashboard
+  finances: 'Fedha',
+  totalCosts: 'Gharama jumla',
+  totalRevenues: 'Mapato jumla',
+  fairtradePremium: 'Nyongeza ya Fairtrade',
+  profitable: 'Inafaida',
+  notProfitable: 'Bado hakuna faida',
+  creditScore: 'Alama ya mkopo',
+  creditReady: 'Tayari kwa mkopo',
+  notCreditReady: 'Bado hajatayari kwa mkopo',
+  verificationFactor: 'Uthibitishaji',
+  productionFactor: 'Uzalishaji',
+  profitabilityFactor: 'Ufaida',
+  loanRepaymentFactor: 'Urejeshaji wa mkopo',
+  cooperativeMembershipFactor: 'Uanachama wa ushirika',
+  experienceFactor: 'Uzoefu wa kilimo',
+  productionSummary: 'Muhtasari wa uzalishaji',
+  totalCropCycles: 'Misimu ya kilimo',
+  harvestedCycles: 'Misimu iliyovunwa',
+  yieldAccuracy: 'Usahihi wa mavuno',
 };
 
 export type TranslationKey = keyof typeof en;

@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Location01Icon, Notification03Icon, ArrowRight01Icon, BellIcon, Alert02Icon, SquareLock02Icon, Plant01Icon } from '@hugeicons/core-free-icons';
+import { Location01Icon, Notification03Icon, ArrowRight01Icon, BellIcon, Alert02Icon, SquareLock02Icon, Plant01Icon, Wallet01Icon, ShoppingCart02Icon } from '@hugeicons/core-free-icons';
 import { useAuthStore } from '../../src/store/auth.store';
 import { farmsApi, activitiesApi, alertsApi, registryApi } from '../../src/lib/data';
 import { fetchWeatherHere, WeatherData } from '../../src/services/weather.service';
@@ -148,6 +148,18 @@ function FarmerDashboardTab() {
 
         {/* ── Body ── */}
         <View style={styles.body}>
+          {/* Quick links to screens that no longer live in the bottom tab bar */}
+          <View style={styles.quickLinksRow}>
+            <TouchableOpacity style={styles.quickLink} onPress={() => router.push('/finances')}>
+              <HugeiconsIcon icon={Wallet01Icon} size={20} color="#065F46" strokeWidth={2} />
+              <Text style={styles.quickLinkText}>{t('finances')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickLink} onPress={() => router.push('/marketplace')}>
+              <HugeiconsIcon icon={ShoppingCart02Icon} size={20} color="#065F46" strokeWidth={2} />
+              <Text style={styles.quickLinkText}>{t('marketplace')}</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* AMCOS pre-registered farms awaiting the owner's confirmation */}
           {claimable.length > 0 && (
             <TouchableOpacity style={styles.claimBanner} onPress={() => router.push('/claim-farms')}>
@@ -389,6 +401,12 @@ const styles = StyleSheet.create({
   },
   alertTitle: { fontSize: 14, fontWeight: '800', color: '#92400E' },
   alertPreview: { fontSize: 12, color: '#B45309', marginTop: 2 },
+  quickLinksRow: { flexDirection: 'row', gap: 10, marginBottom: 22 },
+  quickLink: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#fff', borderRadius: 14, paddingVertical: 14, borderWidth: 1, borderColor: '#E5E7EB',
+  },
+  quickLinkText: { fontSize: 13, fontWeight: '700', color: '#065F46' },
   claimBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#D1FAE5',
     borderRadius: 14, padding: 14, marginBottom: 22, borderWidth: 1, borderColor: '#6EE7B7',

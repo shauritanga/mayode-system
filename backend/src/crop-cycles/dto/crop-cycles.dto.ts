@@ -193,3 +193,15 @@ export class CreateActivityLogDto {
   @IsOptional()
   gpsLongitude?: number;
 }
+
+export class CalendarQueryDto {
+  @ApiPropertyOptional({ description: 'ISO date, inclusive lower bound; defaults to start of current month' })
+  @IsDateString()
+  @IsOptional()
+  from?: string;
+
+  @ApiPropertyOptional({ description: 'ISO date, inclusive upper bound; defaults to end of current month' })
+  @IsDateString()
+  @IsOptional()
+  to?: string;
+}

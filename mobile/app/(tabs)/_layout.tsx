@@ -4,7 +4,7 @@ import { Tabs, useRouter, usePathname, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Home01Icon, Plant01Icon, ShoppingCart02Icon, UserCircleIcon, Notification03Icon, BellIcon, TaskDaily01Icon, UserGroupIcon, Calendar01Icon } from '@hugeicons/core-free-icons';
+import { Home01Icon, Plant01Icon, UserCircleIcon, Notification03Icon, BellIcon, TaskDaily01Icon, UserGroupIcon, Calendar01Icon } from '@hugeicons/core-free-icons';
 import { notificationsApi } from '../../src/lib/data';
 import { useI18n } from '../../src/i18n';
 import { useAuthStore } from '../../src/store/auth.store';
@@ -97,7 +97,7 @@ function CustomBottomNav() {
   const isDashboard = pathname === '/' || pathname === '/(tabs)';
   const isFarms = pathname === '/farms' || pathname === '/(tabs)/farms';
   const isActivities = pathname === '/activities';
-  const isMarketplace = pathname === '/marketplace' || pathname === '/(tabs)/marketplace';
+  const isCalendar = pathname === '/calendar';
   const isProfile = pathname === '/profile' || pathname === '/(tabs)/profile';
 
   return (
@@ -150,16 +150,16 @@ function CustomBottomNav() {
 
         <TouchableOpacity
           style={styles.navTab}
-          onPress={() => router.push('/marketplace')}
+          onPress={() => router.push('/calendar')}
         >
           <HugeiconsIcon
-            icon={ShoppingCart02Icon}
+            icon={Calendar01Icon}
             size={24}
-            color={isMarketplace ? '#10B981' : '#6B7280'}
-            strokeWidth={isMarketplace ? 2 : 1.5}
+            color={isCalendar ? '#10B981' : '#6B7280'}
+            strokeWidth={isCalendar ? 2 : 1.5}
           />
-          <Text style={[styles.navText, isMarketplace && styles.navTextActive]}>
-            M-LAX
+          <Text style={[styles.navText, isCalendar && styles.navTextActive]}>
+            {t('calendar')}
           </Text>
         </TouchableOpacity>
 
