@@ -4,8 +4,17 @@ import Link from 'next/link';
 import { farmersApi, farmsApi, mamcosApi, marketplaceApi, financeApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 
-const AMCOS_OPS_ACTIONS = [
+// A Secretary can manage their own AMCOS's staff/inventory/marketplace
+// listings, but backend permissions don't let them register farmers/farms
+// or log crop activity directly (those stay Field Officer/Farmer actions).
+const SECRETARY_ACTIONS = [
   { label: 'Manage Staff', href: '/dashboard/staff', icon: '🧑‍🌾', color: 'var(--gold-400)' },
+  { label: 'Receive Inventory', href: '/dashboard/inventory', icon: '📦', color: 'var(--blue-500)' },
+  { label: 'Post Land Listing', href: '/dashboard/marketplace', icon: '🏪', color: 'var(--purple-500)' },
+];
+
+// SUPER_ADMIN has blanket backend permission for these, unlike a Secretary.
+const SUPER_ADMIN_OPS_ACTIONS = [
   { label: 'Register New Farmer', href: '/dashboard/farmers', icon: '👤', color: 'var(--accent)' },
   { label: 'Register New Farm', href: '/dashboard/farms', icon: '🌾', color: 'var(--green-400)' },
   { label: 'Log Crop Activity', href: '/dashboard/crop-cycles', icon: '🌱', color: 'var(--gold-400)' },
@@ -53,7 +62,7 @@ function StatCard({ label, value, sub, icon, color }: StatCard) {
 export default function DashboardPage() {
   const role = useAuthStore((state) => state.user?.role);
   const isSecretary = role === 'MAMCOS_SECRETARY';
-  const quickActions = role === 'ADMIN' ? ADMIN_ACTIONS : AMCOS_OPS_ACTIONS;
+  const quickActions = role === 'ADMIN' ? ADMIN_ACTIONS : isSecretary ? SECRETARY_ACTIONS : SUPER_ADMIN_OPS_ACTIONS;
   const [stats, setStats] = useState({
     farmers: 0, farms: 0, mamcos: 0, listings: 0
   });
