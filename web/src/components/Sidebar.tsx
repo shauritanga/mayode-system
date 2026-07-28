@@ -38,7 +38,7 @@ const navItems = [
   { href: '/dashboard/memberships', label: 'Memberships', icon: StarIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
   { href: '/dashboard/alerts', label: 'Alerts', icon: BellIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
   { href: '/dashboard/rewards', label: 'Rewards', icon: GiftIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
-  { href: '/dashboard/mamcos', label: 'AMCOS', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/mamcos', label: 'AMCOS', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
   { href: '/dashboard/crop-cycles', label: 'Crop Cycles', icon: WheatIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
   { href: '/dashboard/inventory', label: 'Inventory', icon: Package01Icon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
   { href: '/dashboard/finance', label: 'Finance', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
