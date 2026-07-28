@@ -2,13 +2,21 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { mamcosApi } from '@/lib/api';
+import { authApi, mamcosApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 
 interface Secretary {
   firstName: string;
   lastName: string;
   stabilityBonus: number;
+  user?: { phone: string; isActive: boolean };
+}
+interface OfficerRow {
+  id: string;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  assignedArea?: string | null;
   user?: { phone: string; isActive: boolean };
 }
 interface FarmerRow { id: string; controlNumber: string; firstName: string; lastName: string; creditScore: number }
@@ -23,9 +31,13 @@ interface MamcosDetail {
   totalHectares?: number;
   isActive: boolean;
   secretary?: Secretary | null;
+  fieldOfficers: OfficerRow[];
   farmers: FarmerRow[];
   farms: FarmRow[];
 }
+
+const EMPTY_LEADER_FORM = { firstName: '', lastName: '', phone: '', password: '' };
+const EMPTY_OFFICER_FORM = { firstName: '', lastName: '', phone: '', password: '', assignedArea: '' };
 
 export default function MamcosDetailPage() {
   const params = useParams();
@@ -37,6 +49,12 @@ export default function MamcosDetailPage() {
   const [form, setForm] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showLeaderForm, setShowLeaderForm] = useState(false);
+  const [leaderForm, setLeaderForm] = useState<any>({ ...EMPTY_LEADER_FORM });
+  const [showOfficerForm, setShowOfficerForm] = useState(false);
+  const [officerForm, setOfficerForm] = useState<any>({ ...EMPTY_OFFICER_FORM });
+  const [staffMessage, setStaffMessage] = useState('');
+  const [staffSaving, setStaffSaving] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -47,6 +65,32 @@ export default function MamcosDetailPage() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  const assignLeader = async (e: React.FormEvent) => {
+    e.preventDefault(); setStaffSaving(true); setStaffMessage('');
+    try {
+      await authApi.createStaff({ ...leaderForm, role: 'MAMCOS_SECRETARY', mamcosId: id });
+      setStaffMessage('AMCOS Leader assigned successfully.');
+      setLeaderForm({ ...EMPTY_LEADER_FORM });
+      setShowLeaderForm(false);
+      load();
+    } catch (e: any) {
+      setStaffMessage(e?.response?.data?.message || 'Could not assign AMCOS Leader.');
+    } finally { setStaffSaving(false); }
+  };
+
+  const addOfficer = async (e: React.FormEvent) => {
+    e.preventDefault(); setStaffSaving(true); setStaffMessage('');
+    try {
+      await authApi.createStaff({ ...officerForm, role: 'FIELD_OFFICER', mamcosId: id });
+      setStaffMessage('Field Officer added successfully.');
+      setOfficerForm({ ...EMPTY_OFFICER_FORM });
+      setShowOfficerForm(false);
+      load();
+    } catch (e: any) {
+      setStaffMessage(e?.response?.data?.message || 'Could not add Field Officer.');
+    } finally { setStaffSaving(false); }
+  };
 
   const openEdit = () => {
     if (!mamcos) return;
@@ -132,7 +176,10 @@ export default function MamcosDetailPage() {
               </div>
             </div>
           ) : (
-            <p style={{ marginTop: '10px', fontSize: '13px', color: 'var(--neutral-500)' }}>No leader assigned yet.</p>
+            <>
+              <p style={{ marginTop: '10px', marginBottom: '10px', fontSize: '13px', color: 'var(--neutral-500)' }}>No leader assigned yet.</p>
+              <button className="btn-secondary" style={{ fontSize: '12px', padding: '7px 10px' }} onClick={() => setShowLeaderForm(true)}>+ Assign Leader</button>
+            </>
           )}
         </div>
 
@@ -147,6 +194,35 @@ export default function MamcosDetailPage() {
             <p style={{ marginTop: '10px', fontSize: '13px', color: 'var(--neutral-500)' }}>Not recorded.</p>
           )}
         </div>
+      </div>
+
+      {staffMessage && <div className="glass-card" style={{ padding: '12px 16px', marginBottom: '16px', color: 'var(--accent)' }}>{staffMessage}</div>}
+
+      <div className="glass-card" style={{ overflow: 'hidden', marginBottom: '24px' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--hover-tint-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Field Officers</span>
+          <button className="btn-secondary" style={{ fontSize: '12px', padding: '6px 10px' }} onClick={() => setShowOfficerForm(true)}>+ Add Field Officer</button>
+        </div>
+        {mamcos.fieldOfficers.length === 0 ? (
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>No field officers assigned to this AMCOS yet.</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead><tr><th>Employee code</th><th>Name</th><th>Phone</th><th>Assigned area</th><th>Status</th></tr></thead>
+              <tbody>
+                {mamcos.fieldOfficers.map(o => (
+                  <tr key={o.id}>
+                    <td style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--neutral-400)' }}>{o.employeeCode}</td>
+                    <td style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{o.firstName} {o.lastName}</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--neutral-400)' }}>{o.user?.phone || '—'}</td>
+                    <td style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{o.assignedArea || '—'}</td>
+                    <td><span className={`badge ${o.user?.isActive ? 'badge-green' : 'badge-gray'}`}>{o.user?.isActive ? 'Active' : 'Inactive'}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="glass-card" style={{ overflow: 'hidden', marginBottom: '24px' }}>
@@ -218,6 +294,49 @@ export default function MamcosDetailPage() {
               Active
             </label>
             {error && <div style={{ color: 'var(--red-400)', fontSize: '13px' }}>{error}</div>}
+          </form>
+        </Modal>
+      )}
+
+      {showLeaderForm && (
+        <Modal
+          title="Assign AMCOS Leader"
+          onClose={() => setShowLeaderForm(false)}
+          width="480px"
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => setShowLeaderForm(false)} disabled={staffSaving}>Cancel</button>
+              <button className="btn-primary" onClick={assignLeader} disabled={staffSaving}>{staffSaving ? 'Saving…' : 'Create leader account'}</button>
+            </>
+          }
+        >
+          <form onSubmit={assignLeader} style={{ display: 'grid', gap: '9px' }}>
+            <input className="input-field" placeholder="First name" required value={leaderForm.firstName} onChange={e => setLeaderForm({ ...leaderForm, firstName: e.target.value })} />
+            <input className="input-field" placeholder="Last name" required value={leaderForm.lastName} onChange={e => setLeaderForm({ ...leaderForm, lastName: e.target.value })} />
+            <input className="input-field" placeholder="Phone +255…" required value={leaderForm.phone} onChange={e => setLeaderForm({ ...leaderForm, phone: e.target.value })} />
+            <input className="input-field" type="password" minLength={6} placeholder="Temporary password" required value={leaderForm.password} onChange={e => setLeaderForm({ ...leaderForm, password: e.target.value })} />
+          </form>
+        </Modal>
+      )}
+
+      {showOfficerForm && (
+        <Modal
+          title="Add Field Officer"
+          onClose={() => setShowOfficerForm(false)}
+          width="480px"
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => setShowOfficerForm(false)} disabled={staffSaving}>Cancel</button>
+              <button className="btn-primary" onClick={addOfficer} disabled={staffSaving}>{staffSaving ? 'Saving…' : 'Create staff account'}</button>
+            </>
+          }
+        >
+          <form onSubmit={addOfficer} style={{ display: 'grid', gap: '9px' }}>
+            <input className="input-field" placeholder="First name" required value={officerForm.firstName} onChange={e => setOfficerForm({ ...officerForm, firstName: e.target.value })} />
+            <input className="input-field" placeholder="Last name" required value={officerForm.lastName} onChange={e => setOfficerForm({ ...officerForm, lastName: e.target.value })} />
+            <input className="input-field" placeholder="Phone +255…" required value={officerForm.phone} onChange={e => setOfficerForm({ ...officerForm, phone: e.target.value })} />
+            <input className="input-field" type="password" minLength={6} placeholder="Temporary password" required value={officerForm.password} onChange={e => setOfficerForm({ ...officerForm, password: e.target.value })} />
+            <input className="input-field" placeholder="Assigned area" value={officerForm.assignedArea} onChange={e => setOfficerForm({ ...officerForm, assignedArea: e.target.value })} />
           </form>
         </Modal>
       )}
