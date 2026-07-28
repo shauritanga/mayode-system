@@ -5,18 +5,23 @@ import { farmersApi, farmsApi, mamcosApi, marketplaceApi, financeApi } from '@/l
 import { useAuthStore } from '@/store/auth.store';
 
 // A Secretary can manage their own AMCOS's staff/inventory/marketplace
-// listings, but backend permissions don't let them register farmers/farms
-// or log crop activity directly (those stay Field Officer/Farmer actions).
+// listings and pre-register farms (POST /farm-registry), but backend
+// permissions don't let them register farmers directly or log crop
+// activity (those stay Field Officer/Farmer actions).
 const SECRETARY_ACTIONS = [
   { label: 'Manage Staff', href: '/dashboard/staff', icon: '🧑‍🌾', color: 'var(--gold-400)' },
+  { label: 'Register New Farm', href: '/dashboard/farm-registry', icon: '🌾', color: 'var(--green-400)' },
   { label: 'Receive Inventory', href: '/dashboard/inventory', icon: '📦', color: 'var(--blue-500)' },
   { label: 'Post Land Listing', href: '/dashboard/marketplace', icon: '🏪', color: 'var(--purple-500)' },
 ];
 
 // SUPER_ADMIN has blanket backend permission for these, unlike a Secretary.
+// "Register New Farm" goes to Farm Registry (the AMCOS pre-registration
+// workflow), not the plain Farms list — the Farms page is browse-only and
+// has no creation form.
 const SUPER_ADMIN_OPS_ACTIONS = [
   { label: 'Register New Farmer', href: '/dashboard/farmers', icon: '👤', color: 'var(--accent)' },
-  { label: 'Register New Farm', href: '/dashboard/farms', icon: '🌾', color: 'var(--green-400)' },
+  { label: 'Register New Farm', href: '/dashboard/farm-registry', icon: '🌾', color: 'var(--green-400)' },
   { label: 'Log Crop Activity', href: '/dashboard/crop-cycles', icon: '🌱', color: 'var(--gold-400)' },
   { label: 'Receive Inventory', href: '/dashboard/inventory', icon: '📦', color: 'var(--blue-500)' },
   { label: 'Post Land Listing', href: '/dashboard/marketplace', icon: '🏪', color: 'var(--purple-500)' },
