@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { farmLeasesApi, seasonalAssignmentsApi, farmOwnershipsApi } from '@/lib/api';
+import { farmLeasesApi, seasonalAssignmentsApi, farmOwnershipsApi, farmsApi, farmingSeasonsApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 
 const OFFICER_METHODS = [
@@ -59,6 +59,7 @@ export default function LeasesPage() {
   const [ownerships, setOwnerships] = useState<Ownership[]>([]);
   const [loading, setLoading] = useState(true);
   const [verifyTarget, setVerifyTarget] = useState<Lease | null>(null);
+  const [showAssignForm, setShowAssignForm] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -76,12 +77,15 @@ export default function LeasesPage() {
 
   return (
     <div>
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-          <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--accent), var(--green-400))', borderRadius: '9999px' }} />
-          <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Leases &amp; Seasonal Assignments</h1>
+      <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--accent), var(--green-400))', borderRadius: '9999px' }} />
+            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Leases &amp; Seasonal Assignments</h1>
+          </div>
+          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Owner-added leases, active seasonal farmers, and ownership confirmations</p>
         </div>
-        <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Owner-added leases, active seasonal farmers, and ownership confirmations</p>
+        <button className="btn-primary" onClick={() => setShowAssignForm(true)}>+ Assign renter for this season</button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
@@ -207,7 +211,120 @@ export default function LeasesPage() {
           onDone={() => { setVerifyTarget(null); load(); }}
         />
       )}
+
+      {showAssignForm && (
+        <AssignRenterModal
+          onClose={() => setShowAssignForm(false)}
+          onDone={() => { setShowAssignForm(false); load(); }}
+        />
+      )}
     </div>
+  );
+}
+
+function AssignRenterModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [farms, setFarms] = useState<{ id: string; farmCode: string; name?: string }[]>([]);
+  const [season, setSeason] = useState<{ id: string; name: string } | null>(null);
+  const [loadingOptions, setLoadingOptions] = useState(true);
+  const [farmId, setFarmId] = useState('');
+  const [renterName, setRenterName] = useState('');
+  const [renterPhone, setRenterPhone] = useState('');
+  const [start, setStart] = useState('');
+  const [end, setEnd] = useState('');
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setLoadingOptions(true);
+    Promise.all([
+      farmsApi.getAll({ isVerified: 'true' }).then(res => setFarms(res.data?.data || res.data || [])),
+      farmingSeasonsApi.getCurrent().then(res => {
+        setSeason(res.data ?? null);
+        if (res.data?.startDate) setStart(String(res.data.startDate).slice(0, 10));
+        if (res.data?.endDate) setEnd(String(res.data.endDate).slice(0, 10));
+      }).catch(() => setSeason(null)),
+    ]).finally(() => setLoadingOptions(false));
+  }, []);
+
+  const submit = async () => {
+    if (!farmId || !renterPhone.trim() || !start.trim() || !end.trim()) {
+      setError('Select a farm and fill in renter phone, lease start and end dates.');
+      return;
+    }
+    if (!season?.id) {
+      setError('No active farming season found.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      await farmLeasesApi.create({
+        farmId,
+        farmingSeasonId: season.id,
+        renterPhone: renterPhone.trim(),
+        renterName: renterName.trim() || undefined,
+        leaseStartDate: start.trim(),
+        leaseEndDate: end.trim(),
+        notes: notes.trim() || undefined,
+      });
+      onDone();
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Could not assign renter for this season.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Assign renter for this season"
+      subtitle="Only verified (boundary-approved) farms can be assigned"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button className="btn-primary" onClick={submit} disabled={submitting || loadingOptions}>
+            {submitting ? 'Saving…' : 'Assign renter'}
+          </button>
+        </>
+      }
+    >
+      {loadingOptions ? (
+        <p style={{ fontSize: '13px', color: 'var(--neutral-500)' }}>Loading farms and season…</p>
+      ) : (
+        <>
+          <label style={fieldLabelStyle}>Farm</label>
+          <select className="input-field" value={farmId} onChange={e => setFarmId(e.target.value)} style={{ marginBottom: '12px' }}>
+            <option value="">Select a verified farm</option>
+            {farms.map(f => <option key={f.id} value={f.id}>{f.farmCode}{f.name ? ` · ${f.name}` : ''}</option>)}
+          </select>
+
+          <label style={fieldLabelStyle}>Farming season</label>
+          <input className="input-field" value={season?.name || 'No active season'} disabled style={{ marginBottom: '12px' }} />
+
+          <label style={fieldLabelStyle}>Renter phone</label>
+          <input className="input-field" value={renterPhone} onChange={e => setRenterPhone(e.target.value)}
+            placeholder="+255712345678" style={{ marginBottom: '12px' }} />
+
+          <label style={fieldLabelStyle}>Renter name</label>
+          <input className="input-field" value={renterName} onChange={e => setRenterName(e.target.value)}
+            placeholder="John Mushi" style={{ marginBottom: '12px' }} />
+
+          <label style={fieldLabelStyle}>Lease start date</label>
+          <input className="input-field" type="date" value={start} onChange={e => setStart(e.target.value)} style={{ marginBottom: '12px' }} />
+
+          <label style={fieldLabelStyle}>Lease end date</label>
+          <input className="input-field" type="date" value={end} onChange={e => setEnd(e.target.value)} style={{ marginBottom: '12px' }} />
+
+          <label style={fieldLabelStyle}>Notes</label>
+          <textarea className="input-field" value={notes} onChange={e => setNotes(e.target.value)}
+            rows={3} style={{ marginBottom: '12px', resize: 'vertical' }} />
+        </>
+      )}
+
+      {error && <p style={{ color: 'var(--red-400)', fontSize: '12px' }}>{error}</p>}
+    </Modal>
   );
 }
 

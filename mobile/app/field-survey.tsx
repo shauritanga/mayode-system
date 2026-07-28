@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Location01Icon, CheckmarkCircle02Icon } from '@hugeicons/core-free-icons';
-import { fieldSurveysApi } from '../src/lib/data';
+import { Location01Icon, CheckmarkCircle02Icon, Camera01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
+import { fieldSurveysApi, farmsApi, uploadsApi } from '../src/lib/data';
 import { getCurrentPoint } from '../src/services/location.service';
 import { useI18n } from '../src/i18n';
 import { useAuthStore } from '../src/store/auth.store';
@@ -46,6 +47,8 @@ export default function FieldSurveyScreen() {
   const [capturingGps, setCapturingGps] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(false);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -81,6 +84,29 @@ export default function FieldSurveyScreen() {
     }
   };
 
+  const addPhoto = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) return;
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 });
+    if (result.canceled || !result.assets?.length) return;
+    const asset = result.assets[0];
+    setUploadingPhoto(true);
+    try {
+      const up = await uploadsApi.uploadFile({
+        uri: asset.uri,
+        name: asset.fileName || `field-survey-${Date.now()}.jpg`,
+        type: asset.mimeType || 'image/jpeg',
+      });
+      setPhotoUrls((prev) => [...prev, up.data.url]);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const removePhoto = (url: string) => {
+    setPhotoUrls((prev) => prev.filter((u) => u !== url));
+  };
+
   const submit = async () => {
     setSubmitting(true);
     try {
@@ -100,6 +126,12 @@ export default function FieldSurveyScreen() {
         latitude: draft.latitude ?? undefined,
         longitude: draft.longitude ?? undefined,
       });
+      await Promise.all(photoUrls.map((url) => farmsApi.addPhoto(farmId!, {
+        url,
+        caption: t('fieldSurveyPhotoCaption'),
+        latitude: draft.latitude ?? undefined,
+        longitude: draft.longitude ?? undefined,
+      })));
       await AsyncStorage.removeItem(draftKey);
       Alert.alert(t('fieldSurvey'), t('surveySubmitted'), [{ text: 'OK', onPress: () => router.back() }]);
     } catch (e: any) {
@@ -164,6 +196,25 @@ export default function FieldSurveyScreen() {
           <Field label={t('observationsLabel')} value={draft.observations} onChangeText={(v: string) => set('observations', v)} multiline />
         </View>
 
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>{t('surveyPhotos')}</Text>
+          <View style={styles.photoRow}>
+            {photoUrls.map((url) => (
+              <View key={url} style={styles.thumbWrap}>
+                <Image source={{ uri: url }} style={styles.thumb} />
+                <TouchableOpacity style={styles.thumbRemove} onPress={() => removePhoto(url)}>
+                  <HugeiconsIcon icon={Cancel01Icon} size={12} color="#fff" strokeWidth={2.5} />
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity style={styles.addThumb} onPress={addPhoto} disabled={uploadingPhoto}>
+              {uploadingPhoto ? <ActivityIndicator size="small" color="#10B981" /> : (
+                <HugeiconsIcon icon={Camera01Icon} size={20} color="#10B981" strokeWidth={2} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <TouchableOpacity style={styles.draftBtn} onPress={saveDraft}>
           <Text style={styles.draftBtnText}>{t('saveDraft')}</Text>
         </TouchableOpacity>
@@ -201,6 +252,11 @@ const styles = StyleSheet.create({
   inputMultiline: { minHeight: 70, textAlignVertical: 'top' },
   gpsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#10B981', paddingVertical: 13, borderRadius: 12 },
   gpsBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  thumbWrap: { width: 64, height: 64 },
+  thumb: { width: 64, height: 64, borderRadius: 10 },
+  thumbRemove: { position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: '#DC2626', alignItems: 'center', justifyContent: 'center' },
+  addThumb: { width: 64, height: 64, borderRadius: 10, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   draftBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#065F46', paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginBottom: 10 },
   draftBtnText: { color: '#065F46', fontWeight: '800', fontSize: 15 },
   submitBtn: { backgroundColor: '#065F46', paddingVertical: 15, borderRadius: 14, alignItems: 'center' },

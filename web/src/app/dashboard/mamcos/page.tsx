@@ -17,6 +17,7 @@ interface Mamcos {
 }
 
 const EMPTY_LEADER_FORM = { firstName: '', lastName: '', phone: '', password: '', mamcosId: '' };
+const EMPTY_OFFICER_FORM = { firstName: '', lastName: '', phone: '', password: '', assignedArea: '' };
 
 export default function MamcosPage() {
   const [mamcos, setMamcos] = useState<Mamcos[]>([]);
@@ -25,8 +26,10 @@ export default function MamcosPage() {
   const [creating, setCreating] = useState(false);
   const [showMamcosForm, setShowMamcosForm] = useState(false);
   const [showStaffForm, setShowStaffForm] = useState(false);
+  const [showOfficerForm, setShowOfficerForm] = useState(false);
   const [form, setForm] = useState<any>({ name: '', location: '', district: 'Mbarali', totalHectares: '' });
   const [staffForm, setStaffForm] = useState<any>({ ...EMPTY_LEADER_FORM });
+  const [officerForm, setOfficerForm] = useState<any>({ ...EMPTY_OFFICER_FORM });
 
   const load = () => {
     setLoading(true);
@@ -49,6 +52,11 @@ export default function MamcosPage() {
     try { await authApi.createStaff({ ...staffForm, role: 'MAMCOS_SECRETARY' }); setMessage('AMCOS Leader account created successfully.'); setStaffForm({ ...EMPTY_LEADER_FORM }); setShowStaffForm(false); load(); }
     catch (e: any) { setMessage(e?.response?.data?.message || 'Could not create AMCOS Leader account.'); } finally { setCreating(false); }
   };
+  const createOfficer = async (e: React.FormEvent) => {
+    e.preventDefault(); setCreating(true); setMessage('');
+    try { await authApi.createStaff({ ...officerForm, role: 'FIELD_OFFICER' }); setMessage('Field Officer account created successfully.'); setOfficerForm({ ...EMPTY_OFFICER_FORM }); setShowOfficerForm(false); }
+    catch (e: any) { setMessage(e?.response?.data?.message || 'Could not create Field Officer account.'); } finally { setCreating(false); }
+  };
 
   return (
     <div>
@@ -62,6 +70,7 @@ export default function MamcosPage() {
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="btn-secondary" onClick={() => setShowStaffForm(true)}>+ Assign AMCOS Leader</button>
+          <button className="btn-secondary" onClick={() => setShowOfficerForm(true)}>+ Create Field Officer</button>
           <button className="btn-primary" onClick={() => setShowMamcosForm(true)}>+ New AMCOS</button>
         </div>
       </div>
@@ -92,7 +101,6 @@ export default function MamcosPage() {
       {showStaffForm && (
         <Modal
           title="Assign AMCOS Leader"
-          subtitle="Field officers and other cooperative staff are assigned by the leader from their own AMCOS dashboard"
           onClose={() => setShowStaffForm(false)}
           width="480px"
           footer={
@@ -108,6 +116,28 @@ export default function MamcosPage() {
             <input className="input-field" placeholder="Last name" required value={staffForm.lastName} onChange={e => setStaffForm({ ...staffForm, lastName: e.target.value })} />
             <input className="input-field" placeholder="Phone +255…" required value={staffForm.phone} onChange={e => setStaffForm({ ...staffForm, phone: e.target.value })} />
             <input className="input-field" type="password" minLength={6} placeholder="Temporary password" required value={staffForm.password} onChange={e => setStaffForm({ ...staffForm, password: e.target.value })} />
+          </form>
+        </Modal>
+      )}
+
+      {showOfficerForm && (
+        <Modal
+          title="Create Field Officer"
+          onClose={() => setShowOfficerForm(false)}
+          width="480px"
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => setShowOfficerForm(false)} disabled={creating}>Cancel</button>
+              <button className="btn-primary" onClick={createOfficer} disabled={creating}>{creating ? 'Saving…' : 'Create staff account'}</button>
+            </>
+          }
+        >
+          <form onSubmit={createOfficer} style={{ display: 'grid', gap: '9px' }}>
+            <input className="input-field" placeholder="First name" required value={officerForm.firstName} onChange={e => setOfficerForm({ ...officerForm, firstName: e.target.value })} />
+            <input className="input-field" placeholder="Last name" required value={officerForm.lastName} onChange={e => setOfficerForm({ ...officerForm, lastName: e.target.value })} />
+            <input className="input-field" placeholder="Phone +255…" required value={officerForm.phone} onChange={e => setOfficerForm({ ...officerForm, phone: e.target.value })} />
+            <input className="input-field" type="password" minLength={6} placeholder="Temporary password" required value={officerForm.password} onChange={e => setOfficerForm({ ...officerForm, password: e.target.value })} />
+            <input className="input-field" placeholder="Assigned area" value={officerForm.assignedArea} onChange={e => setOfficerForm({ ...officerForm, assignedArea: e.target.value })} />
           </form>
         </Modal>
       )}

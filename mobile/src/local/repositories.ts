@@ -190,6 +190,18 @@ export const farmersApi = {
     const updated = await db.update(COLLECTIONS.farmers, id, { nationalId: data.idNumber, photoUrl: data.profilePhotoUrl ?? data.faceCaptureUrl, verificationStatus: 'PENDING' });
     return ok(updated ?? { verificationStatus: 'PENDING' });
   },
+  async verify(id: string, _data: any) {
+    const updated = await db.update(COLLECTIONS.farmers, id, { verificationStatus: 'VERIFIED' });
+    return ok(updated ?? { verificationStatus: 'VERIFIED' });
+  },
+  async reject(id: string, data: { rejectionReason: string; notes?: string }) {
+    const updated = await db.update(COLLECTIONS.farmers, id, { verificationStatus: 'REJECTED', ...data });
+    return ok(updated ?? { verificationStatus: 'REJECTED' });
+  },
+  async suspend(id: string, data: { reason: string }) {
+    const updated = await db.update(COLLECTIONS.farmers, id, { verificationStatus: 'SUSPENDED', ...data });
+    return ok(updated ?? { verificationStatus: 'SUSPENDED' });
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -329,6 +341,11 @@ export const farmsApi = {
       grade: farm.grade, mapped: !!farm.centerLatitude, photoCount: photos.length,
       message: 'Activate your MAYOData membership to unlock the full farm analytics report.',
     });
+  },
+  async reviewBoundary(id: string) {
+    const farm = await db.update(COLLECTIONS.farms, id, { isVerified: true });
+    if (!farm) return fail('Farm not found', 404);
+    return ok(farm);
   },
 };
 
@@ -636,6 +653,8 @@ export const leasesApi = {
   async forFarm(_farmId: string) { return ok([]); },
   async renterConfirm(_id: string) { return ok({ success: true }); },
   async renterReject(_id: string) { return ok({ success: true }); },
+  async all(_status?: string) { return ok([]); },
+  async officerVerify(_id: string, _data: any) { return ok({ success: true }); },
 };
 
 export const correctionsApi = {
@@ -674,6 +693,29 @@ export const registryApi = {
   async mine() { return ok([]); },
   async claim(_id: string) { return ok({ record: { status: 'CLAIMED' } }); },
   async reject(_id: string) { return ok({ status: 'DISPUTED' }); },
+};
+
+/** Local-mode approximation of the server workspace context. */
+export const workspaceApi = {
+  async context() {
+    return {
+      data: {
+        workspace: 'RENTER',
+        role: 'FARMER',
+        navigation: ['home', 'my-farm', 'activities', 'alerts', 'profile'],
+        activeAssignments: [],
+        pendingAssignments: [],
+        metrics: { activeFarmCount: 0, pendingVerificationCount: 0, unreadAlerts: 0 },
+      },
+    };
+  },
+};
+
+export const officerVisitsApi = {
+  async create(data: any) { return ok({ id: uid(), photoUrls: [], ...data, visitedAt: nowIso(), createdAt: nowIso() }); },
+  async mine(_params?: any) { return ok({ total: 0, page: 1, pageSize: 20, data: [] }); },
+  async forFarmer(_farmerId: string) { return ok([]); },
+  async calendar(_params?: any) { return ok([]); },
 };
 
 /** No-op locally; token is only meaningful for the remote backend. */

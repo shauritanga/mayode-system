@@ -50,18 +50,31 @@ export class WorkspaceService {
   }
 
   private async officerContext(userId: string) {
-    const officer = await this.prisma.fieldOfficer.findUnique({ where: { userId }, select: { id: true, assignedArea: true } });
-    if (!officer) throw new ForbiddenException('Field officer profile is missing');
-    const pendingLeases = await this.prisma.farmLease.findMany({
-      where: { renterConfirmationStatus: VerificationStatus.VERIFIED, officerConfirmationStatus: VerificationStatus.PENDING, status: LeaseStatus.PENDING_VERIFICATION },
-      take: 25, orderBy: { updatedAt: 'asc' },
-      include: { farm: { select: { id: true, farmCode: true, name: true, mamcos: { select: { id: true, name: true } } } }, renterFarmer: { select: { id: true, firstName: true, lastName: true } }, farmingSeason: { select: { id: true, name: true } } },
+    const officer = await this.prisma.fieldOfficer.findUnique({
+      where: { userId },
+      select: { id: true, assignedArea: true, mamcosId: true, mamcos: { select: { id: true, name: true } } },
     });
+    if (!officer) throw new ForbiddenException('Field officer profile is missing');
+
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const [pendingLeases, myFarmersCount, visitsThisWeek] = await Promise.all([
+      this.prisma.farmLease.findMany({
+        where: { renterConfirmationStatus: VerificationStatus.VERIFIED, officerConfirmationStatus: VerificationStatus.PENDING, status: LeaseStatus.PENDING_VERIFICATION },
+        take: 25, orderBy: { updatedAt: 'asc' },
+        include: { farm: { select: { id: true, farmCode: true, name: true, mamcos: { select: { id: true, name: true } } } }, renterFarmer: { select: { id: true, firstName: true, lastName: true } }, farmingSeason: { select: { id: true, name: true } } },
+      }),
+      officer.mamcosId ? this.prisma.farmer.count({ where: { mamcosId: officer.mamcosId } }) : 0,
+      this.prisma.fieldOfficerVisit.count({ where: { fieldOfficerId: officer.id, visitedAt: { gte: startOfWeek } } }),
+    ]);
+
     return {
-      workspace: 'FIELD_OFFICER', role: UserRole.FIELD_OFFICER, assignedArea: officer.assignedArea,
-      navigation: ['home', 'work-queue', 'field-surveys', 'farms', 'profile'],
+      workspace: 'FIELD_OFFICER', role: UserRole.FIELD_OFFICER, assignedArea: officer.assignedArea, mamcos: officer.mamcos,
+      navigation: ['home', 'farmers', 'calendar', 'reports', 'profile'],
       workQueue: pendingLeases,
-      metrics: { pendingVerifications: pendingLeases.length },
+      metrics: { pendingVerifications: pendingLeases.length, myFarmersCount, visitsThisWeek },
     };
   }
 

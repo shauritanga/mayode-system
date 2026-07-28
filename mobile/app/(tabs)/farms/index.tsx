@@ -4,8 +4,8 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Add01Icon, Location01Icon, Tree02Icon } from '@hugeicons/core-free-icons';
-import { farmsApi } from '../../../src/lib/data';
+import { Location01Icon, Tree02Icon } from '@hugeicons/core-free-icons';
+import { farmsApi, workspaceApi } from '../../../src/lib/data';
 import { useAuthStore } from '../../../src/store/auth.store';
 import { StatusBar } from 'expo-status-bar';
 import { useI18n } from '../../../src/i18n';
@@ -28,7 +28,7 @@ interface Farm {
 
 export default function FarmsIndex() {
   const router = useRouter();
-  const { farmerId } = useAuthStore();
+  const role = useAuthStore((state) => state.user?.role);
   const { t } = useI18n();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,8 +36,20 @@ export default function FarmsIndex() {
   const fetchFarms = async () => {
     setLoading(true);
     try {
-      const res = farmerId ? await farmsApi.getByFarmerId(farmerId) : await farmsApi.getAll();
-      setFarms(res.data?.data || res.data || []);
+      if (role && role !== 'FARMER') {
+        const res = await farmsApi.getAll();
+        setFarms(res.data?.data || res.data || []);
+      } else {
+        // A renter sees only AMCOS farms with an active, field-verified
+        // seasonal assignment; Farm.farmerId is not used as an access rule.
+        const res = await workspaceApi.context();
+        const assignments = res.data?.activeAssignments ?? [];
+        setFarms(assignments.map((assignment: any) => ({
+          ...assignment.farm,
+          grade: assignment.farm?.grade || 'C', socialHectares: assignment.farm?.socialHectares || 0,
+          hasIrrigation: !!assignment.farm?.hasIrrigation, isLeased: true, isVerified: true,
+        })));
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -45,7 +57,7 @@ export default function FarmsIndex() {
     }
   };
 
-  useFocusEffect(useCallback(() => { fetchFarms(); }, [farmerId]));
+  useFocusEffect(useCallback(() => { fetchFarms(); }, [role]));
 
   const gradeColors: Record<string, { bg: string; text: string }> = {
     A: { bg: 'rgba(16, 185, 129, 0.15)', text: '#10B981' },
@@ -64,10 +76,7 @@ export default function FarmsIndex() {
           <View style={styles.emptyContainer}>
             <HugeiconsIcon icon={Tree02Icon} size={56} color="#D1FAE5" strokeWidth={1.5} />
             <Text style={styles.emptyTitle}>{t('noFarmsYetTitle')}</Text>
-            <Text style={styles.emptySubtitle}>{t('tapPlusRegisterFarm')}</Text>
-            <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/farm-register')}>
-              <Text style={styles.emptyBtnText}>{t('registerFirstFarm')}</Text>
-            </TouchableOpacity>
+            <Text style={styles.emptySubtitle}>Your AMCOS will assign a farm to you. Accept the assignment and complete Field Officer verification before farming records become available.</Text>
           </View>
         ) : (
           farms.map((farm) => {
@@ -140,14 +149,6 @@ export default function FarmsIndex() {
         )}
       </ScrollView>
 
-      {/* Floating action button — register a farm */}
-      <TouchableOpacity
-        style={styles.fab}
-        activeOpacity={0.85}
-        onPress={() => router.push('/farm-register')}
-      >
-        <HugeiconsIcon icon={Add01Icon} size={28} color="#fff" strokeWidth={2.2} />
-      </TouchableOpacity>
     </View>
   );
 }

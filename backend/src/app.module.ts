@@ -14,6 +14,7 @@ import { MamcosModule } from './mamcos/mamcos.module';
 import { FarmsModule } from './farms/farms.module';
 import { PlotsModule } from './plots/plots.module';
 import { FarmVerificationsModule } from './farm-verifications/farm-verifications.module';
+import { FieldOfficerVisitsModule } from './field-officer-visits/field-officer-visits.module';
 import { CropCyclesModule } from './crop-cycles/crop-cycles.module';
 import { FinanceModule } from './finance/finance.module';
 import { InventoryModule } from './inventory/inventory.module';
@@ -74,6 +75,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     FarmsModule,
     PlotsModule,
     FarmVerificationsModule,
+    FieldOfficerVisitsModule,
 
     // Production & Traceability (Agronomy & Fairtrade) — Phase 3
     CropCyclesModule,

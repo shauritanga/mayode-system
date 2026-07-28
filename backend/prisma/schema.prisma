@@ -121,6 +121,7 @@ model Farmer {
   seasonalAssignments SeasonalFarmAssignment[] @relation("ActiveFarmer")
   rewardWins          RewardWinner[]
   activities          Activity[]
+  officerVisits       FieldOfficerVisit[]
 
   @@map("farmers")
 }
@@ -136,15 +137,21 @@ model FieldOfficer {
   firstName    String   @map("first_name")
   lastName     String   @map("last_name")
   assignedArea String?  @map("assigned_area")
+  // Nullable: existing officers predate AMCOS scoping. Not unique — many
+  // officers can belong to the same AMCOS (unlike MamcosSecretary.mamcosId).
+  mamcosId     String?  @map("mamcos_id")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Relations
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mamcos              Mamcos?              @relation(fields: [mamcosId], references: [id])
   farmVerifications   FarmVerification[]
   farmerVerifications FarmerVerification[]
   activityLogs        ActivityLog[]
+  visits              FieldOfficerVisit[]
 
+  @@index([mamcosId])
   @@map("field_officers")
 }
 
@@ -166,6 +173,7 @@ model Mamcos {
 
   // Relations
   secretary       MamcosSecretary?
+  fieldOfficers   FieldOfficer[]
   farmers         Farmer[]
   farms           Farm[]
   farmingSeasons  FarmingSeason[]
@@ -262,6 +270,7 @@ model Farm {
   suggestedUpdates     SuggestedFarmUpdate[]
   dataValues           FarmDataValue[]
   confirmationRequests OwnerConfirmationRequest[]
+  officerVisits        FieldOfficerVisit[]
 
   @@map("farms")
 }
@@ -313,6 +322,7 @@ model CropCycle {
   activities ActivityLog[]
   costs      InputCost[]
   revenues   Revenue[]
+  officerVisits FieldOfficerVisit[]
 
   @@map("crop_cycles")
 }
@@ -817,6 +827,44 @@ model Activity {
 
   @@index([farmerId, createdAt])
   @@map("activities")
+}
+
+// A field officer's timestamped record of visiting a farmer (routine check,
+// helping with a farming activity, in-person verification, etc.). visitedAt
+// is always server-set at submission time — never client-supplied — so it
+// stays a trustworthy audit trail even though the officer's own draft may be
+// composed earlier (e.g. offline in the field).
+enum FieldOfficerVisitPurpose {
+  ROUTINE_CHECK
+  FARMING_ASSISTANCE
+  VERIFICATION
+  DISPUTE_FOLLOWUP
+  TRAINING
+  OTHER
+}
+
+model FieldOfficerVisit {
+  id             String                   @id @default(uuid())
+  fieldOfficerId String                   @map("field_officer_id")
+  farmerId       String                   @map("farmer_id")
+  farmId         String?                  @map("farm_id")
+  cropCycleId    String?                  @map("crop_cycle_id")
+  purpose        FieldOfficerVisitPurpose @default(ROUTINE_CHECK)
+  notes          String?
+  photoUrls      String[]                 @map("photo_urls")
+  gpsLatitude    Float?                   @map("gps_latitude")
+  gpsLongitude   Float?                   @map("gps_longitude")
+  visitedAt      DateTime                 @map("visited_at")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+
+  fieldOfficer FieldOfficer @relation(fields: [fieldOfficerId], references: [id], onDelete: Cascade)
+  farmer       Farmer       @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  farm         Farm?        @relation(fields: [farmId], references: [id])
+  cropCycle    CropCycle?   @relation(fields: [cropCycleId], references: [id])
+
+  @@index([fieldOfficerId, visitedAt])
+  @@index([farmerId, visitedAt])
+  @@map("field_officer_visits")
 }
 
 // ============================================================

@@ -4,9 +4,10 @@ import { Tabs, useRouter, usePathname, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Home01Icon, Plant01Icon, ShoppingCart02Icon, UserCircleIcon, Notification03Icon, BellIcon, TaskDaily01Icon } from '@hugeicons/core-free-icons';
+import { Home01Icon, Plant01Icon, ShoppingCart02Icon, UserCircleIcon, Notification03Icon, BellIcon, TaskDaily01Icon, UserGroupIcon, Calendar01Icon } from '@hugeicons/core-free-icons';
 import { notificationsApi } from '../../src/lib/data';
 import { useI18n } from '../../src/i18n';
+import { useAuthStore } from '../../src/store/auth.store';
 
 /** Bell button with live unread badge; opens the notification center. */
 export function NotificationBell({ light = false }: { light?: boolean }) {
@@ -63,6 +64,35 @@ function CustomBottomNav() {
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useI18n();
+  const role = useAuthStore((state) => state.user?.role);
+
+  if (role === 'FIELD_OFFICER') {
+    return (
+      <SafeAreaView edges={['bottom']} style={styles.bottomNavContainer}>
+        <View style={styles.bottomNav}>
+          <NavButton icon={Home01Icon} label="Workspace" active={pathname === '/' || pathname === '/(tabs)'} onPress={() => router.push('/')} />
+          <NavButton icon={UserGroupIcon} label={t('myFarmers')} active={pathname.startsWith('/officer/farmer')} onPress={() => router.push('/officer/farmers')} />
+          <NavButton icon={Calendar01Icon} label={t('calendar')} active={pathname === '/officer/calendar'} onPress={() => router.push('/officer/calendar')} />
+          <NavButton icon={TaskDaily01Icon} label={t('reports')} active={pathname === '/officer/reports'} onPress={() => router.push('/officer/reports')} />
+          <NavButton icon={UserCircleIcon} label={t('profile')} active={pathname === '/profile' || pathname === '/(tabs)/profile'} onPress={() => router.push('/profile')} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (role && role !== 'FARMER') {
+    const workRoute = '/farms';
+    const workLabel = 'AMCOS farms';
+    return (
+      <SafeAreaView edges={['bottom']} style={styles.bottomNavContainer}>
+        <View style={styles.bottomNav}>
+          <NavButton icon={Home01Icon} label="Workspace" active={pathname === '/' || pathname === '/(tabs)'} onPress={() => router.push('/')} />
+          <NavButton icon={Plant01Icon} label={workLabel} active={pathname === workRoute} onPress={() => router.push(workRoute as any)} />
+          <NavButton icon={UserCircleIcon} label={t('profile')} active={pathname === '/profile' || pathname === '/(tabs)/profile'} onPress={() => router.push('/profile')} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const isDashboard = pathname === '/' || pathname === '/(tabs)';
   const isFarms = pathname === '/farms' || pathname === '/(tabs)/farms';
@@ -150,6 +180,13 @@ function CustomBottomNav() {
       </View>
     </SafeAreaView>
   );
+}
+
+function NavButton({ icon, label, active, onPress }: { icon: any; label: string; active: boolean; onPress: () => void }) {
+  return <TouchableOpacity style={styles.navTab} onPress={onPress}>
+    <HugeiconsIcon icon={icon} size={24} color={active ? '#10B981' : '#6B7280'} strokeWidth={active ? 2 : 1.5} />
+    <Text style={[styles.navText, active && styles.navTextActive]}>{label}</Text>
+  </TouchableOpacity>;
 }
 
 export default function TabsLayout() {

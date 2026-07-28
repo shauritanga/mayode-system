@@ -19,7 +19,19 @@ interface Campaign {
   winners?: Winner[];
 }
 
+interface FeedbackDialog {
+  title: string;
+  message: string;
+}
+
+type ApiError = { response?: { data?: { message?: string | string[] } } };
+
 const REWARD_TYPES = ['FERTILIZER', 'SEEDS', 'MACHINE_SERVICE', 'IRRIGATION_SUPPORT', 'TRAINING', 'INPUT_VOUCHER', 'CERTIFICATE', 'OTHER'];
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  const message = (error as ApiError)?.response?.data?.message;
+  return Array.isArray(message) ? message.join(', ') : message || fallback;
+};
 
 const statusBadge = (s: string) => {
   const map: Record<string, string> = {
@@ -40,6 +52,8 @@ export default function RewardsPage() {
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [selectionTarget, setSelectionTarget] = useState<Campaign | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackDialog | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -49,7 +63,10 @@ export default function RewardsPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(load, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
@@ -72,9 +89,8 @@ export default function RewardsPage() {
       setForm({ ...emptyForm });
       setShowForm(false);
       load();
-    } catch (e: any) {
-      const msg = e?.response?.data?.message;
-      setError(Array.isArray(msg) ? msg.join(', ') : msg || 'Failed to create campaign.');
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, 'Failed to create campaign.'));
     } finally {
       setSubmitting(false);
     }
@@ -93,11 +109,16 @@ export default function RewardsPage() {
     setBusy(id);
     try {
       await rewardsApi.select(id);
+      setSelectionTarget(null);
       load();
       const res = await rewardsApi.getCampaign(id);
       setCampaigns(cs => cs.map(c => c.id === id ? res.data : c));
-    } catch (e: any) {
-      alert(e?.response?.data?.message || 'Selection failed');
+    } catch (e: unknown) {
+      setSelectionTarget(null);
+      setFeedback({
+        title: 'Winner selection failed',
+        message: getErrorMessage(e, 'The winner selection could not be completed. Please try again.'),
+      });
     } finally { setBusy(null); }
   };
 
@@ -106,8 +127,11 @@ export default function RewardsPage() {
     try {
       await rewardsApi.approve(id);
       load();
-    } catch (e: any) {
-      alert(e?.response?.data?.message || 'Approval failed');
+    } catch (e: unknown) {
+      setFeedback({
+        title: 'Approval failed',
+        message: getErrorMessage(e, 'The winners could not be approved. Please try again.'),
+      });
     } finally { setBusy(null); }
   };
 
@@ -158,6 +182,38 @@ export default function RewardsPage() {
         </Modal>
       )}
 
+      {selectionTarget && (
+        <Modal
+          title="Run winner selection"
+          subtitle="This will record an auditable, reproducible selection for this campaign."
+          onClose={() => { if (busy !== selectionTarget.id) setSelectionTarget(null); }}
+          width="480px"
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => setSelectionTarget(null)} disabled={busy === selectionTarget.id}>Cancel</button>
+              <button className="btn-primary" onClick={() => runSelect(selectionTarget.id)} disabled={busy === selectionTarget.id}>
+                {busy === selectionTarget.id ? 'Selecting…' : 'Run selection'}
+              </button>
+            </>
+          }
+        >
+          <p style={{ color: 'var(--neutral-400)', fontSize: '14px', lineHeight: 1.6 }}>
+            Are you sure you want to select {selectionTarget.numberOfWinners} winner{selectionTarget.numberOfWinners === 1 ? '' : 's'} for <strong style={{ color: 'var(--text-primary)' }}>{selectionTarget.name}</strong>?
+          </p>
+        </Modal>
+      )}
+
+      {feedback && (
+        <Modal
+          title={feedback.title}
+          onClose={() => setFeedback(null)}
+          width="480px"
+          footer={<button className="btn-primary" onClick={() => setFeedback(null)}>Close</button>}
+        >
+          <p style={{ color: 'var(--neutral-400)', fontSize: '14px', lineHeight: 1.6 }}>{feedback.message}</p>
+        </Modal>
+      )}
+
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading campaigns…</div>
@@ -182,7 +238,7 @@ export default function RewardsPage() {
                           {expanded === c.id ? 'Hide' : 'Winners'}
                         </button>
                         {(c.status === 'DRAFT' || c.status === 'ACTIVE' || c.status === 'SELECTION_PENDING') && (
-                          <button className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px' }} disabled={busy === c.id} onClick={() => runSelect(c.id)}>
+                          <button className="btn-secondary" style={{ fontSize: '11px', padding: '5px 10px' }} disabled={busy === c.id} onClick={() => setSelectionTarget(c)}>
                             {busy === c.id ? 'Selecting…' : 'Run selection'}
                           </button>
                         )}

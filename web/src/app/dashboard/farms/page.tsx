@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { farmsApi } from '@/lib/api';
 
 interface Farm {
@@ -98,9 +99,9 @@ export default function FarmsPage() {
                 {filtered.map(farm => (
                   <tr key={farm.id}>
                     <td>
-                      <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--accent)', fontWeight: 600, background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>
+                      <Link href={`/dashboard/farms/${farm.id}`} style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--accent)', fontWeight: 600, background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '6px', textDecoration: 'none' }}>
                         {farm.farmCode}
-                      </span>
+                      </Link>
                     </td>
                     <td>
                       <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>

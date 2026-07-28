@@ -33,9 +33,31 @@ export const api = axios.create({
 });
 
 let inMemoryToken: string | null = null;
+let inMemoryRefreshToken: string | null = null;
 
 export const setApiToken = (token: string | null) => {
   inMemoryToken = token;
+};
+
+export const setApiRefreshToken = (token: string | null) => {
+  inMemoryRefreshToken = token;
+};
+
+/**
+ * Wired up by the auth store so the 401 handler below can persist a
+ * refreshed token pair and force a logout when the refresh token itself
+ * is no longer valid, without api.ts importing the store directly
+ * (which would create a circular import).
+ */
+let onTokensRefreshed: ((accessToken: string, refreshToken: string) => void) | null = null;
+let onRefreshFailed: (() => void) | null = null;
+
+export const registerAuthHandlers = (handlers: {
+  onTokensRefreshed: (accessToken: string, refreshToken: string) => void;
+  onRefreshFailed: () => void;
+}) => {
+  onTokensRefreshed = handlers.onTokensRefreshed;
+  onRefreshFailed = handlers.onRefreshFailed;
 };
 
 api.interceptors.request.use((config) => {
@@ -44,6 +66,56 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Access tokens are short-lived (15m). On a 401, use the refresh token to
+// get a new pair and retry the original request once. Concurrent 401s share
+// a single in-flight refresh call instead of each firing their own.
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (!inMemoryRefreshToken) return null;
+  try {
+    const res = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+      refreshToken: inMemoryRefreshToken,
+    });
+    const { accessToken, refreshToken } = res.data;
+    inMemoryToken = accessToken;
+    inMemoryRefreshToken = refreshToken;
+    onTokensRefreshed?.(accessToken, refreshToken);
+    return accessToken;
+  } catch {
+    inMemoryToken = null;
+    inMemoryRefreshToken = null;
+    onRefreshFailed?.();
+    return null;
+  }
+}
+
+api.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const originalConfig = error.config;
+    const isRefreshCall = originalConfig?.url?.includes('/auth/refresh');
+
+    if (error.response?.status === 401 && originalConfig && !originalConfig._retry && !isRefreshCall) {
+      originalConfig._retry = true;
+
+      if (!refreshPromise) {
+        refreshPromise = refreshAccessToken().finally(() => {
+          refreshPromise = null;
+        });
+      }
+
+      const newToken = await refreshPromise;
+      if (newToken) {
+        originalConfig.headers.Authorization = `Bearer ${newToken}`;
+        return api(originalConfig);
+      }
+    }
+
+    return Promise.reject(error);
+  },
+);
 
 // ── Auth ──
 export const authApi = {
@@ -99,6 +171,7 @@ export const farmsApi = {
   update: (id: string, data: object) => api.patch(`/farms/${id}`, data),
   updateBoundary: (id: string, data: { boundaryCoordinates: object; centerLat: number; centerLng: number }) =>
     api.patch(`/farms/${id}/boundary`, data),
+  reviewBoundary: (id: string) => api.post(`/farms/${id}/review-boundary`),
   overview: () => api.get('/farms/overview'),
   productivity: (id: string) => api.get(`/farms/${id}/productivity`),
   addDocument: (id: string, data: object) => api.post(`/farms/${id}/documents`, data),
@@ -243,6 +316,16 @@ export const leasesApi = {
   forFarm: (farmId: string) => api.get(`/farm-leases/farm/${farmId}`),
   renterConfirm: (id: string) => api.patch(`/farm-leases/${id}/renter-confirm`),
   renterReject: (id: string) => api.patch(`/farm-leases/${id}/renter-reject`),
+  // Staff (Field Officer / AMCOS Leader) queue and decision
+  all: (status?: string) => api.get('/farm-leases', { params: status ? { status } : undefined }),
+  officerVerify: (id: string, data: {
+    decision: 'VERIFIED' | 'REJECTED' | 'NEEDS_MORE_INFO' | 'DISPUTED';
+    method: string;
+    contactedName?: string;
+    contactedPhone?: string;
+    evidenceUrls?: string[];
+    notes?: string;
+  }) => api.patch(`/farm-leases/${id}/officer-verify`, data),
 };
 
 // ── Suggested farm corrections ("Add More Details" / "Suggest Correction") ──
@@ -291,6 +374,30 @@ export const registryApi = {
   mine: () => api.get('/farm-registry/mine'),
   claim: (id: string) => api.post(`/farm-registry/${id}/claim`),
   reject: (id: string) => api.post(`/farm-registry/${id}/reject`),
+};
+
+/** Role-scoped dashboard data. Do not infer workspace permissions in the app. */
+export const workspaceApi = {
+  context: () => api.get('/workspace/context'),
+};
+
+// ── Field officer visits (timestamped farmer visits, own-AMCOS scoped) ──
+export const officerVisitsApi = {
+  create: (data: {
+    farmerId: string;
+    farmId?: string;
+    cropCycleId?: string;
+    purpose: 'ROUTINE_CHECK' | 'FARMING_ASSISTANCE' | 'VERIFICATION' | 'DISPUTE_FOLLOWUP' | 'TRAINING' | 'OTHER';
+    notes?: string;
+    photoUrls?: string[];
+    gpsLatitude?: number;
+    gpsLongitude?: number;
+  }) => api.post('/field-officer-visits', data),
+  mine: (params?: { farmerId?: string; from?: string; to?: string; page?: number; pageSize?: number }) =>
+    api.get('/field-officer-visits/mine', { params }),
+  forFarmer: (farmerId: string) => api.get(`/field-officer-visits/farmer/${farmerId}`),
+  calendar: (params?: { from?: string; to?: string }) =>
+    api.get('/field-officer-visits/calendar', { params }),
 };
 
 // ── Marketplace ──

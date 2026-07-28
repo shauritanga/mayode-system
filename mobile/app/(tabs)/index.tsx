@@ -4,13 +4,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Location01Icon, Notification03Icon, ArrowRight01Icon, Add01Icon,BellIcon, Alert02Icon, SquareLock02Icon, Plant01Icon } from '@hugeicons/core-free-icons';
+import { Location01Icon, Notification03Icon, ArrowRight01Icon, BellIcon, Alert02Icon, SquareLock02Icon, Plant01Icon } from '@hugeicons/core-free-icons';
 import { useAuthStore } from '../../src/store/auth.store';
 import { farmsApi, activitiesApi, alertsApi, registryApi } from '../../src/lib/data';
 import { fetchWeatherHere, WeatherData } from '../../src/services/weather.service';
 import { timeAgo, useI18n } from '../../src/i18n';
+import RoleWorkspaceDashboard from '../role-workspace';
 
 export default function DashboardTab() {
+  const { user } = useAuthStore();
+  if (user?.role && user.role !== 'FARMER') {
+    return <RoleWorkspaceDashboard role={user.role} />;
+  }
+  return <FarmerDashboardTab />;
+}
+
+function FarmerDashboardTab() {
   const { user, farmerId } = useAuthStore();
   const { language, t } = useI18n();
   const router = useRouter();
@@ -201,12 +210,8 @@ export default function DashboardTab() {
             <View style={[styles.emptyFarmCard, { width: cardW }]}>
               <Text style={styles.emptyFarmTitle}>{t('noFarmsYet')}</Text>
               <Text style={styles.emptyFarmDesc}>
-                {t('registerFirstFarmHint')}
+                Your AMCOS will assign a farm for the active season. Once you accept and a Field Officer verifies it, it will appear here.
               </Text>
-              <TouchableOpacity style={styles.registerBtn} onPress={() => router.push('/farm-register')}>
-                <HugeiconsIcon icon={Add01Icon} size={16} color="#fff" strokeWidth={2} />
-                <Text style={styles.registerBtnText}>{t('registerFarm')}</Text>
-              </TouchableOpacity>
             </View>
           ) : (
             <ScrollView

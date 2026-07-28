@@ -278,6 +278,9 @@ export class AuthService {
           },
         });
       } else if (dto.role === UserRole.FIELD_OFFICER) {
+        if (!dto.mamcosId) throw new BadRequestException('mamcosId is required for a Field Officer');
+        const mamcos = await prisma.mamcos.findUnique({ where: { id: dto.mamcosId }, select: { id: true } });
+        if (!mamcos) throw new NotFoundException('AMCOS not found');
         const employeeCode = await this.generateEmployeeCode();
         await prisma.fieldOfficer.create({
           data: {
@@ -286,6 +289,7 @@ export class AuthService {
             firstName: dto.firstName,
             lastName: dto.lastName,
             assignedArea: dto.assignedArea,
+            mamcosId: dto.mamcosId,
           },
         });
       } else if (dto.role === UserRole.MAMCOS_SECRETARY) {

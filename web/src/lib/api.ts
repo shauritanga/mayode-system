@@ -69,6 +69,8 @@ export const farmsApi = {
   getOne: (id: string) => api.get(`/farms/${id}`),
   create: (data: object) => api.post('/farms', data),
   updateBoundary: (id: string, data: object) => api.patch(`/farms/${id}/boundary`, data),
+  reviewBoundary: (id: string) => api.post(`/farms/${id}/review-boundary`),
+  listPhotos: (id: string) => api.get(`/farms/${id}/photos`),
 };
 
 // ── Crop Cycles ──
@@ -128,6 +130,7 @@ export const farmingSeasonsApi = {
 // ── Farm leases, seasonal assignments & ownerships ──
 export const farmLeasesApi = {
   getAll: (params?: object) => api.get('/farm-leases', { params }),
+  create: (data: object) => api.post('/farm-leases', data),
   officerVerify: (id: string, data: object) => api.patch(`/farm-leases/${id}/officer-verify`, data),
 };
 export const seasonalAssignmentsApi = {

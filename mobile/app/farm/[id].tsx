@@ -217,12 +217,32 @@ export default function FarmDetail() {
 
         {/* Field survey — staff only (screen itself gates by role) */}
         {STAFF_ROLES.includes(user?.role ?? '') && (
-          <TouchableOpacity
-            style={styles.correctionBtn}
-            onPress={() => router.push({ pathname: '/field-survey', params: { farmId: farm.id, farmCode: farm.farmCode } })}
-          >
-            <HugeiconsIcon icon={Location01Icon} size={16} color="#065F46" strokeWidth={2} />
-            <Text style={styles.correctionBtnText}>{t('recordFieldSurvey')}</Text>
+          <>
+            <TouchableOpacity style={styles.correctionBtn} onPress={() => router.push({ pathname: '/boundary', params: { id: farm.id, label: `Map ${farm.farmCode}` } })}>
+              <HugeiconsIcon icon={Location01Icon} size={16} color="#065F46" strokeWidth={2} />
+              <Text style={styles.correctionBtnText}>Map official boundary</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.correctionBtn} onPress={() => router.push({ pathname: '/field-survey', params: { farmId: farm.id, farmCode: farm.farmCode } })}>
+              <HugeiconsIcon icon={Location01Icon} size={16} color="#065F46" strokeWidth={2} />
+              <Text style={styles.correctionBtnText}>{t('recordFieldSurvey')}</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {user?.role === 'MAMCOS_SECRETARY' && !farm.isVerified && (
+          <TouchableOpacity style={styles.correctionBtn} onPress={async () => {
+            try { await farmsApi.reviewBoundary(farm.id); Alert.alert('Boundary approved', 'This is now the official AMCOS farm boundary.'); load(); }
+            catch (e: any) { Alert.alert('Cannot approve boundary', e?.response?.data?.message || e?.message || 'Map the boundary first.'); }
+          }}>
+            <HugeiconsIcon icon={CheckmarkCircle02Icon} size={16} color="#065F46" strokeWidth={2} />
+            <Text style={styles.correctionBtnText}>Approve official boundary</Text>
+          </TouchableOpacity>
+        )}
+
+        {user?.role === 'MAMCOS_SECRETARY' && farm.isVerified && (
+          <TouchableOpacity style={styles.correctionBtn} onPress={() => router.push({ pathname: '/lease-new', params: { farmId: farm.id, farmCode: farm.farmCode } })}>
+            <HugeiconsIcon icon={UserMultiple02Icon} size={16} color="#065F46" strokeWidth={2} />
+            <Text style={styles.correctionBtnText}>Assign renter for this season</Text>
           </TouchableOpacity>
         )}
 
