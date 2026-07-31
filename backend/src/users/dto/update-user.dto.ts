@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEmail, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsEmail, IsBoolean, IsIn } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateUserDto {
@@ -26,7 +26,7 @@ export class UpdateUserDto {
     example: 'en',
     description: 'Language preference: sw or en',
   })
-  @IsString()
+  @IsIn(['sw', 'en'])
   @IsOptional()
   language?: string;
 

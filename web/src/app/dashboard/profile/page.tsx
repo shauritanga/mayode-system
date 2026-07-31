@@ -3,6 +3,8 @@ import { useRouter } from 'next/navigation';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Logout01Icon, UserIcon, CallIcon, IdIcon } from '@hugeicons/core-free-icons';
 import { useAuthStore } from '@/store/auth.store';
+import { usersApi } from '@/lib/api';
+import { useState } from 'react';
 
 function initials(firstName?: string, lastName?: string, phone?: string): string {
   if (firstName || lastName) {
@@ -12,8 +14,10 @@ function initials(firstName?: string, lastName?: string, phone?: string): string
 }
 
 export default function ProfilePage() {
-  const { user, clearAuth } = useAuthStore();
+  const { user, clearAuth, updateUser } = useAuthStore();
   const router = useRouter();
+  const [savingLanguage, setSavingLanguage] = useState(false);
+  const [message, setMessage] = useState('');
 
   const handleLogout = () => {
     clearAuth();
@@ -21,6 +25,18 @@ export default function ProfilePage() {
   };
 
   const displayName = user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : (user?.phone ?? 'Account');
+  const setLanguage = async (language: 'sw' | 'en') => {
+    if (!user) return;
+    setSavingLanguage(true);
+    setMessage('');
+    try {
+      await usersApi.update(user.id, { language });
+      updateUser({ language });
+      setMessage(language === 'sw' ? 'Lugha imehifadhiwa.' : 'Language preference saved.');
+    } finally {
+      setSavingLanguage(false);
+    }
+  };
 
   return (
     <div>
@@ -48,6 +64,14 @@ export default function ProfilePage() {
           <ProfileRow icon={UserIcon} label="First name" value={user?.firstName ?? '—'} />
           <ProfileRow icon={UserIcon} label="Last name" value={user?.lastName ?? '—'} />
           <ProfileRow icon={IdIcon} label="Role" value={user?.role ?? '—'} />
+          <div style={{ padding: '12px', background: 'var(--surface-2)', borderRadius: '10px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--neutral-500)', marginBottom: 8 }}>Language / Lugha</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className={user?.language === 'sw' || !user?.language ? 'btn-primary' : 'btn-secondary'} disabled={savingLanguage} onClick={() => setLanguage('sw')}>Swahili</button>
+              <button className={user?.language === 'en' ? 'btn-primary' : 'btn-secondary'} disabled={savingLanguage} onClick={() => setLanguage('en')}>English</button>
+            </div>
+            {message && <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 8 }}>{message}</div>}
+          </div>
         </div>
 
         <button

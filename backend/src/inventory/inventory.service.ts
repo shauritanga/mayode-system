@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInventoryRecordDto, UpdateInventoryStatusDto, CreateLotDto } from './dto/inventory.dto';
+import { RiceProtocolsService } from '../rice-protocols/rice-protocols.service';
 
 @Injectable()
 export class InventoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly riceProtocols: RiceProtocolsService) {}
 
   /**
    * Helper to generate unique Inventory Tracking Code (INV-YYYY-XXXX)
@@ -29,9 +30,9 @@ export class InventoryService {
   }
 
   async receiveInventory(createInventoryRecordDto: CreateInventoryRecordDto) {
-    const { farmId, farmerId, weightKg, qualityGrade, warehouseLocation, receivedDate } = createInventoryRecordDto;
+    const { farmId, farmerId, cropCycleId, weightKg, qualityGrade, warehouseLocation, receivedDate } = createInventoryRecordDto;
 
-    const farm = await this.prisma.farm.findUnique({ where: { id: farmId } });
+    const farm = await this.prisma.farm.findUnique({ where: { id: farmId }, select: { id: true, mamcosId: true } });
     if (!farm) {
       throw new NotFoundException(`Farm with ID ${farmId} not found`);
     }
@@ -40,6 +41,15 @@ export class InventoryService {
     if (!farmer) {
       throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
     }
+    const protocolEnabled = farm.mamcosId && await this.prisma.riceProtocol.findFirst({ where: { mamcosId: farm.mamcosId, isActive: true }, select: { id: true } });
+    if (protocolEnabled && !cropCycleId) {
+      throw new BadRequestException({ code: 'MBALARI_QUALITY_GATE', missing: ['crop_cycle'] });
+    }
+    if (cropCycleId) {
+      const cycle = await this.prisma.cropCycle.findFirst({ where: { id: cropCycleId, farmId, farmerId }, select: { id: true } });
+      if (!cycle) throw new BadRequestException('The crop cycle must belong to the supplied farm and farmer');
+      await this.riceProtocols.recordWarehouseReceipt(cropCycleId, warehouseLocation ?? 'Mbalari cooperative warehouse', new Date(receivedDate));
+    }
 
     const trackingCode = await this.generateTrackingCode();
 
@@ -47,6 +57,7 @@ export class InventoryService {
       data: {
         farmId,
         farmerId,
+        cropCycleId,
         weightKg,
         qualityGrade,
         trackingCode,

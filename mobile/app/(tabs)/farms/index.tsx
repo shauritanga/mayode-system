@@ -29,6 +29,7 @@ interface Farm {
 export default function FarmsIndex() {
   const router = useRouter();
   const role = useAuthStore((state) => state.user?.role);
+  const farmerId = useAuthStore((state) => state.farmerId);
   const { t } = useI18n();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,15 +41,22 @@ export default function FarmsIndex() {
         const res = await farmsApi.getAll();
         setFarms(res.data?.data || res.data || []);
       } else {
-        // A renter sees only AMCOS farms with an active, field-verified
-        // seasonal assignment; Farm.farmerId is not used as an access rule.
-        const res = await workspaceApi.context();
-        const assignments = res.data?.activeAssignments ?? [];
-        setFarms(assignments.map((assignment: any) => ({
+        // A farmer sees both farms they own/self-registered (Farm.farmerId)
+        // and AMCOS farms with an active, field-verified seasonal assignment.
+        const [ownedRes, assignmentsRes] = await Promise.all([
+          farmerId ? farmsApi.getByFarmerId(farmerId) : Promise.resolve({ data: [] }),
+          workspaceApi.context(),
+        ]);
+        const owned = ownedRes.data?.data || ownedRes.data || [];
+        const assignments = assignmentsRes.data?.activeAssignments ?? [];
+        const assignedFarms = assignments.map((assignment: any) => ({
           ...assignment.farm,
           grade: assignment.farm?.grade || 'C', socialHectares: assignment.farm?.socialHectares || 0,
           hasIrrigation: !!assignment.farm?.hasIrrigation, isLeased: true, isVerified: true,
-        })));
+        }));
+        const byId = new Map<string, Farm>();
+        [...owned, ...assignedFarms].forEach((f: Farm) => byId.set(f.id, f));
+        setFarms(Array.from(byId.values()));
       }
     } catch (e) {
       console.error(e);
@@ -57,7 +65,7 @@ export default function FarmsIndex() {
     }
   };
 
-  useFocusEffect(useCallback(() => { fetchFarms(); }, [role]));
+  useFocusEffect(useCallback(() => { fetchFarms(); }, [role, farmerId]));
 
   const gradeColors: Record<string, { bg: string; text: string }> = {
     A: { bg: 'rgba(16, 185, 129, 0.15)', text: '#10B981' },
@@ -76,7 +84,12 @@ export default function FarmsIndex() {
           <View style={styles.emptyContainer}>
             <HugeiconsIcon icon={Tree02Icon} size={56} color="#D1FAE5" strokeWidth={1.5} />
             <Text style={styles.emptyTitle}>{t('noFarmsYetTitle')}</Text>
-            <Text style={styles.emptySubtitle}>Your AMCOS will assign a farm to you. Accept the assignment and complete Field Officer verification before farming records become available.</Text>
+            <Text style={styles.emptySubtitle}>Your AMCOS will assign a farm for the active season. Once you accept, it will be verified by the field officer and it will be displayed here. Or register your own farm below.</Text>
+            {role === 'FARMER' && (
+              <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/farm-register')} activeOpacity={0.85}>
+                <Text style={styles.emptyBtnText}>{t('registerFarm')}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           farms.map((farm) => {
@@ -149,6 +162,11 @@ export default function FarmsIndex() {
         )}
       </ScrollView>
 
+      {role === 'FARMER' && farms.length > 0 && (
+        <TouchableOpacity style={styles.fab} onPress={() => router.push('/farm-register')} activeOpacity={0.85}>
+          <Text style={styles.fabIcon}>+</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -160,6 +178,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center',
     shadowColor: '#10B981', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8,
   },
+  fabIcon: { color: '#FFFFFF', fontSize: 30, fontWeight: '700', lineHeight: 32 },
   scrollContent: { padding: 16, paddingBottom: 100 },
   emptyContainer: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginTop: 16, marginBottom: 8 },

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useI18n } from '../src/i18n';
@@ -21,7 +21,7 @@ export default function SplashRoute() {
       <StatusBar style="light" />
       <View style={styles.content}>
         <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>M</Text>
+          <Image source={require('../assets/mayode.png')} style={styles.logoImage} resizeMode="contain" />
         </View>
         <Text style={styles.appTitle}>MAYODE GROUP</Text>
         <Text style={styles.appSubtitle}>{t('splashSubtitle')}</Text>
@@ -60,10 +60,9 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     elevation: 10,
   },
-  logoText: {
-    fontSize: 44,
-    fontWeight: '900',
-    color: '#10B981',
+  logoImage: {
+    width: 64,
+    height: 64,
   },
   appTitle: {
     fontSize: 32,

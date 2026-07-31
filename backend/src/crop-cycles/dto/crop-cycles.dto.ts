@@ -174,6 +174,21 @@ export class CreateActivityLogDto {
   @IsOptional()
   laborHours?: number;
 
+  @ApiPropertyOptional({ example: 2, description: 'Family members who contributed labour' })
+  @IsInt()
+  @IsOptional()
+  familyLaborCount?: number;
+
+  @ApiPropertyOptional({ example: 3, description: 'Paid workers who contributed labour' })
+  @IsInt()
+  @IsOptional()
+  hiredLaborCount?: number;
+
+  @ApiPropertyOptional({ example: 90000, description: 'Total paid labour wage in TZS' })
+  @IsNumber()
+  @IsOptional()
+  laborWageTotal?: number;
+
   @ApiPropertyOptional({
     example: ['https://example.com/activity1.jpg'],
     description: 'Activity photo proof URLs',

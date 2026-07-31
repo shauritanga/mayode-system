@@ -167,7 +167,7 @@ export default function OfficerVisitNewScreen() {
         {!!cropCycleId && (
           <TouchableOpacity
             style={styles.assistBtn}
-            onPress={() => router.push({ pathname: '/activity-new', params: { cropCycleId } })}
+            onPress={() => router.push({ pathname: '/activity-new', params: { cropCycleId, farmId } })}
           >
             <HugeiconsIcon icon={TaskDaily01Icon} size={18} color="#065F46" strokeWidth={2} />
             <Text style={styles.assistBtnText}>{t('helpWithActivity')}</Text>

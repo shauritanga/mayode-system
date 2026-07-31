@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ClickPesaService } from './clickpesa.service';
 import { PaymentsController } from './payments.controller';
+import { SalesModule } from '../sales/sales.module';
 
 /**
  * ClickPesa payment integration. Exports ClickPesaService so MembershipsModule
@@ -8,6 +9,7 @@ import { PaymentsController } from './payments.controller';
  * MembershipsService is resolved via the global MembershipsModule.
  */
 @Module({
+  imports: [forwardRef(() => SalesModule)],
   controllers: [PaymentsController],
   providers: [ClickPesaService],
   exports: [ClickPesaService],

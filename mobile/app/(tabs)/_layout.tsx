@@ -4,7 +4,7 @@ import { Tabs, useRouter, usePathname, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Home01Icon, Plant01Icon, UserCircleIcon, Notification03Icon, BellIcon, TaskDaily01Icon, UserGroupIcon, Calendar01Icon } from '@hugeicons/core-free-icons';
+import { Home01Icon, Plant01Icon, ShoppingCart02Icon, UserCircleIcon, Notification03Icon, BellIcon, TaskDaily01Icon, UserGroupIcon, Calendar01Icon } from '@hugeicons/core-free-icons';
 import { notificationsApi } from '../../src/lib/data';
 import { useI18n } from '../../src/i18n';
 import { useAuthStore } from '../../src/store/auth.store';
@@ -45,15 +45,10 @@ function CustomTopAppBar({ options }: any) {
   const { t } = useI18n();
   return (
     <SafeAreaView edges={['top']} style={styles.appBarContainer}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <View style={styles.appBar}>
-        <View style={styles.appBarLeft}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoBadgeText}>M</Text>
-          </View>
-          <Text style={styles.appBarTitle}>{options.title || t('dashboard')}</Text>
-        </View>
-        <NotificationBell />
+        <Text style={styles.appBarTitle}>{options.title || t('dashboard')}</Text>
+        <NotificationBell light />
       </View>
     </SafeAreaView>
   );
@@ -97,7 +92,7 @@ function CustomBottomNav() {
   const isDashboard = pathname === '/' || pathname === '/(tabs)';
   const isFarms = pathname === '/farms' || pathname === '/(tabs)/farms';
   const isActivities = pathname === '/activities';
-  const isCalendar = pathname === '/calendar';
+  const isMarketplace = pathname === '/marketplace' || pathname === '/(tabs)/marketplace';
   const isProfile = pathname === '/profile' || pathname === '/(tabs)/profile';
 
   return (
@@ -150,16 +145,16 @@ function CustomBottomNav() {
 
         <TouchableOpacity
           style={styles.navTab}
-          onPress={() => router.push('/calendar')}
+          onPress={() => router.push('/marketplace')}
         >
           <HugeiconsIcon
-            icon={Calendar01Icon}
+            icon={ShoppingCart02Icon}
             size={24}
-            color={isCalendar ? '#10B981' : '#6B7280'}
-            strokeWidth={isCalendar ? 2 : 1.5}
+            color={isMarketplace ? '#10B981' : '#6B7280'}
+            strokeWidth={isMarketplace ? 2 : 1.5}
           />
-          <Text style={[styles.navText, isCalendar && styles.navTextActive]}>
-            {t('calendar')}
+          <Text style={[styles.navText, isMarketplace && styles.navTextActive]}>
+            M-LAX
           </Text>
         </TouchableOpacity>
 
@@ -203,6 +198,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: t('dashboard'), headerShown: false }} />
       {/* Farms tab has its own Stack (farms/_layout) that renders headers per screen */}
       <Tabs.Screen name="farms" options={{ title: t('manageFarms'), headerShown: false }} />
+      <Tabs.Screen name="activities" options={{ title: t('recentActivities') }} />
       <Tabs.Screen name="marketplace" options={{ title: t('marketplace') }} />
       <Tabs.Screen name="profile" options={{ title: t('myProfile') }} />
     </Tabs>
@@ -211,7 +207,7 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   appBarContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#065F46',
     borderBottomWidth: 0,
     borderBottomColor: '#E5E7EB',
   },
@@ -221,30 +217,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-  },
-  appBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logoBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#10B981',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  logoBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
+    backgroundColor: '#065F46',
   },
   appBarTitle: {
     fontSize: 19,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   notificationBtn: {
     padding: 8,

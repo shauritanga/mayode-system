@@ -92,6 +92,10 @@ export class SmsService {
     }
   }
 
+  async sendPaymentBreakdown(input: { phone: string; grossAmount: number; loanDeduction: number; netAmount: number; invoiceNumber: string }) {
+    return this.send(input.phone, `MAYODE: Sale ${input.invoiceNumber}. Gross TZS ${input.grossAmount.toLocaleString()}, loan repayment TZS ${input.loanDeduction.toLocaleString()}, net payment TZS ${input.netAmount.toLocaleString()}.`, 'payment_breakdown');
+  }
+
   private async log(
     phone: string,
     message: string,

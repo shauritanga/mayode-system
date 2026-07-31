@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { MamcosStaffRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { ActivitiesService } from '../activities/activities.service';
+import { RiceProtocolsService } from '../rice-protocols/rice-protocols.service';
 import {
   CreateCropCycleDto,
   UpdateCropCycleDto,
@@ -28,6 +33,7 @@ export class CropCyclesService {
     private readonly prisma: PrismaService,
     private readonly ownership: OwnershipService,
     private readonly activities: ActivitiesService,
+    private readonly riceProtocols: RiceProtocolsService,
   ) {}
 
   /**
@@ -36,6 +42,15 @@ export class CropCyclesService {
    * under someone else's name by tampering with the request body.
    */
   async create(dto: CreateCropCycleDto, user: RequestUser) {
+    if (
+      dto.plantingDate &&
+      dto.expectedHarvest &&
+      new Date(dto.expectedHarvest) < new Date(dto.plantingDate)
+    ) {
+      throw new BadRequestException(
+        'Expected harvest date cannot be earlier than planting date',
+      );
+    }
     await this.ownership.assertFarmAccess(user, dto.farmId);
 
     const farm = await this.prisma.farm.findUnique({
@@ -44,11 +59,17 @@ export class CropCyclesService {
     if (!farm) {
       throw new NotFoundException(`Farm with ID ${dto.farmId} not found`);
     }
-    const requester = await this.prisma.farmer.findUnique({ where: { userId: user.id }, select: { id: true } });
+    const requester = await this.prisma.farmer.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
     const farmerId = dto.farmerId
       ? await this.assertKnownFarmer(dto.farmerId)
       : requester?.id;
-    if (!farmerId) throw new NotFoundException('A renter farmer profile is required to start a crop cycle');
+    if (!farmerId)
+      throw new NotFoundException(
+        'A renter farmer profile is required to start a crop cycle',
+      );
 
     const cropCycle = await this.prisma.cropCycle.create({
       data: {
@@ -80,6 +101,7 @@ export class CropCyclesService {
       `${farm.farmCode}${dto.riceVariety ? ` · ${dto.riceVariety}` : ''}`,
       '🌾',
     );
+    await this.riceProtocols.scheduleForCycle(cropCycle.id, farm.mamcosId);
     return cropCycle;
   }
 
@@ -96,9 +118,9 @@ export class CropCyclesService {
     return this.prisma.cropCycle.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        farm: { select: { farmCode: true, socialHectares: true } },
+        farm: { select: { id: true, farmCode: true, socialHectares: true } },
         farmer: {
-          select: { controlNumber: true, firstName: true, lastName: true },
+          select: { id: true, controlNumber: true, firstName: true, lastName: true },
         },
         _count: { select: { activities: true, costs: true, revenues: true } },
       },
@@ -121,6 +143,8 @@ export class CropCyclesService {
         },
         costs: { orderBy: { dateIncurred: 'desc' } },
         revenues: { orderBy: { saleDate: 'desc' } },
+        calendarTasks: { orderBy: { dueDate: 'asc' } },
+        harvestQuality: true,
       },
     });
 
@@ -168,8 +192,12 @@ export class CropCyclesService {
     if (!farmer) throw new NotFoundException('Farmer profile not found');
 
     const now = new Date();
-    const from = fromStr ? new Date(fromStr) : new Date(now.getFullYear(), now.getMonth(), 1);
-    const to = toStr ? new Date(toStr) : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const from = fromStr
+      ? new Date(fromStr)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = toStr
+      ? new Date(toStr)
+      : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
     const [cycles, activityLogs] = await Promise.all([
       this.prisma.cropCycle.findMany({
@@ -184,9 +212,17 @@ export class CropCyclesService {
         include: { farm: { select: { id: true, farmCode: true, name: true } } },
       }),
       this.prisma.activityLog.findMany({
-        where: { cropCycle: { farmerId: farmer.id }, activityDate: { gte: from, lte: to } },
+        where: {
+          cropCycle: { farmerId: farmer.id },
+          activityDate: { gte: from, lte: to },
+        },
         include: {
-          cropCycle: { select: { id: true, farm: { select: { id: true, farmCode: true, name: true } } } },
+          cropCycle: {
+            select: {
+              id: true,
+              farm: { select: { id: true, farmCode: true, name: true } },
+            },
+          },
         },
       }),
     ]);
@@ -201,11 +237,31 @@ export class CropCyclesService {
         farm: a.cropCycle.farm,
       })),
       ...cycles
-        .filter((c) => c.plantingDate && c.plantingDate >= from && c.plantingDate <= to)
-        .map((c) => ({ type: 'PLANTING' as const, date: c.plantingDate as Date, id: c.id, cropCycleId: c.id, farm: c.farm })),
+        .filter(
+          (c) =>
+            c.plantingDate && c.plantingDate >= from && c.plantingDate <= to,
+        )
+        .map((c) => ({
+          type: 'PLANTING' as const,
+          date: c.plantingDate as Date,
+          id: c.id,
+          cropCycleId: c.id,
+          farm: c.farm,
+        })),
       ...cycles
-        .filter((c) => c.expectedHarvest && c.expectedHarvest >= from && c.expectedHarvest <= to)
-        .map((c) => ({ type: 'HARVEST' as const, date: c.expectedHarvest as Date, id: c.id, cropCycleId: c.id, farm: c.farm })),
+        .filter(
+          (c) =>
+            c.expectedHarvest &&
+            c.expectedHarvest >= from &&
+            c.expectedHarvest <= to,
+        )
+        .map((c) => ({
+          type: 'HARVEST' as const,
+          date: c.expectedHarvest as Date,
+          id: c.id,
+          cropCycleId: c.id,
+          farm: c.farm,
+        })),
     ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
     return entries;
@@ -213,6 +269,17 @@ export class CropCyclesService {
 
   async update(id: string, dto: UpdateCropCycleDto, user: RequestUser) {
     const existing = await this.findOne(id, user); // also verifies existence + ownership
+    const plantingDate = dto.plantingDate
+      ? new Date(dto.plantingDate)
+      : existing.plantingDate;
+    const harvestDate = dto.harvestDate
+      ? new Date(dto.harvestDate)
+      : existing.harvestDate;
+    if (plantingDate && harvestDate && harvestDate < plantingDate) {
+      throw new BadRequestException(
+        'Harvest date cannot be earlier than planting date',
+      );
+    }
 
     const cropCycle = await this.prisma.cropCycle.update({
       where: { id },
@@ -228,9 +295,13 @@ export class CropCyclesService {
         status: dto.status,
       },
       include: {
-        farm: { select: { farmCode: true } },
+        farm: { select: { farmCode: true, mamcosId: true } },
       },
     });
+
+    if (dto.plantingDate || dto.expectedHarvest) {
+      await this.riceProtocols.scheduleForCycle(cropCycle.id, cropCycle.farm?.mamcosId);
+    }
 
     if (dto.status && dto.status !== existing.status) {
       await this.activities.log(
@@ -266,6 +337,9 @@ export class CropCyclesService {
         inputsUsed: dto.inputsUsed ?? Prisma.JsonNull,
         laborWorkers: dto.laborWorkers,
         laborHours: dto.laborHours,
+        familyLaborCount: dto.familyLaborCount,
+        hiredLaborCount: dto.hiredLaborCount,
+        laborWageTotal: dto.laborWageTotal,
         photoUrls: dto.photoUrls || [],
         gpsLatitude: dto.gpsLatitude,
         gpsLongitude: dto.gpsLongitude,

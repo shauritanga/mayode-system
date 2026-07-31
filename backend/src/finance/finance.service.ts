@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { ActivitiesService } from '../activities/activities.service';
 import { CreateInputCostDto, CreateRevenueDto } from './dto/finance.dto';
+import { AccountingService } from '../accounting/accounting.service';
 
 const CATEGORY_ICONS: Record<string, string> = {
   SEEDS: '🌱',
@@ -23,6 +24,7 @@ export class FinanceService {
     private readonly prisma: PrismaService,
     private readonly ownership: OwnershipService,
     private readonly activities: ActivitiesService,
+    private readonly accounting: AccountingService,
   ) {}
 
   private async findCropCycleOrFail(cropCycleId: string) {
@@ -68,6 +70,7 @@ export class FinanceService {
       `TZS ${dto.totalCost.toLocaleString()} · ${cropCycle.farm.farmCode}`,
       CATEGORY_ICONS[dto.category] ?? '💵',
     );
+    await this.accounting.postToLedger('InputCost', cost.id, cost.dateIncurred, `Input cost: ${cost.itemName}`, [{ code: '5000', debit: cost.totalCost }, { code: '1000', credit: cost.totalCost }]);
     return cost;
   }
 
@@ -109,6 +112,7 @@ export class FinanceService {
       `TZS ${dto.totalRevenue.toLocaleString()} · ${cropCycle.farm.farmCode}`,
       '💰',
     );
+    await this.accounting.postToLedger('Revenue', revenue.id, revenue.saleDate, 'Recorded crop revenue', [{ code: '1000', debit: revenue.totalRevenue }, { code: '4000', credit: revenue.totalRevenue }]);
     return revenue;
   }
 

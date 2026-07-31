@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -113,6 +113,10 @@ export default function ProfileTab() {
             <Text style={styles.detailLabel}>{t('verificationStatus')}</Text>
             <Text style={[styles.verifiedText, { color: verify.color }]}>{verify.label}</Text>
           </View>
+          <View style={styles.consentRow}>
+            <View style={{ flex: 1 }}><Text style={styles.detailLabel}>Credit-data consent</Text><Text style={styles.consentHint}>Share credit readiness with approved lenders.</Text></View>
+            <Switch value={Boolean(farmer?.dataShareConsent)} onValueChange={async (value) => { if (!farmerId) return; try { await farmersApi.update(farmerId, { dataShareConsent: value }); setFarmer({ ...farmer, dataShareConsent: value }); } catch { Alert.alert('Consent', 'Unable to update consent.'); } }} trackColor={{ true: '#10B981' }} />
+          </View>
           {/* Identity verification CTA — hidden once verified */}
           {status !== 'VERIFIED' && (
             <TouchableOpacity style={styles.verifyCta} onPress={() => router.push('/identity')}>
@@ -169,6 +173,9 @@ export default function ProfileTab() {
               <Text style={styles.menuItemText}>{t('myRewards')}</Text>
             </View>
             <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#9CA3AF" />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 0 }]} onPress={() => router.push('/votes')}>
+            <View style={styles.menuItemLeft}><HugeiconsIcon icon={Agreement01Icon} size={22} color="#3B82F6" /><Text style={styles.menuItemText}>Member voting</Text></View><HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
 
@@ -352,6 +359,8 @@ const styles = StyleSheet.create({
     color: '#10B981',
     fontWeight: '700',
   },
+  consentRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderColor: '#F3F4F6', paddingTop: 14, marginTop: 4 },
+  consentHint: { fontSize: 11, color: '#6B7280', marginTop: 3 },
   verifyCta: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: '#065F46', paddingVertical: 12, borderRadius: 12, marginTop: 14,

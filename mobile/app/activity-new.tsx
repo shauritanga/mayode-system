@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform, Image,
 } from 'react-native';
@@ -7,10 +7,16 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Calendar01Icon, Camera01Icon, Location01Icon, CheckmarkCircle02Icon } from '@hugeicons/core-free-icons';
-import { cropCyclesApi, uploadsApi } from '../src/lib/data';
-import { getCurrentPoint } from '../src/services/location.service';
+import { Calendar01Icon, Camera01Icon, Location01Icon, CheckmarkCircle02Icon, Alert02Icon } from '@hugeicons/core-free-icons';
+import { cropCyclesApi, farmsApi, uploadsApi } from '../src/lib/data';
+import { checkWithinFarm, getCurrentPoint, FarmGeofenceResult } from '../src/services/location.service';
 import { useI18n } from '../src/i18n';
+
+interface FarmGeo {
+  boundaryCoordinates?: { type: 'Polygon'; coordinates: number[][][] } | null;
+  centerLatitude?: number | null;
+  centerLongitude?: number | null;
+}
 
 const ACTIVITY_TYPES = [
   { key: 'LAND_PREPARATION', labelKey: 'activityLandPreparation', icon: '🚜' },
@@ -31,7 +37,7 @@ function toDateInput(d: Date): string {
 
 /** Log a farming activity (owner comment: "record farm activities" — a free feature). */
 export default function ActivityNew() {
-  const { cropCycleId, farmCode, season } = useLocalSearchParams<{ cropCycleId: string; farmCode?: string; season?: string }>();
+  const { cropCycleId, farmId, farmCode, season } = useLocalSearchParams<{ cropCycleId: string; farmId?: string; farmCode?: string; season?: string }>();
   const router = useRouter();
   const { t } = useI18n();
 
@@ -46,6 +52,20 @@ export default function ActivityNew() {
   const [gps, setGps] = useState<{ latitude: number; longitude: number } | null>(null);
   const [capturingGps, setCapturingGps] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const [farm, setFarm] = useState<FarmGeo | null>(null);
+  const [farmLoading, setFarmLoading] = useState(!!farmId);
+  const [geofence, setGeofence] = useState<FarmGeofenceResult | null>(null);
+
+  useEffect(() => {
+    if (!farmId) return;
+    setFarmLoading(true);
+    farmsApi.getOne(farmId).then((res) => setFarm(res.data)).catch(() => setFarm(null)).finally(() => setFarmLoading(false));
+  }, [farmId]);
+
+  const geofenceEnforced = !!farmId && !!farm && (!!farm.boundaryCoordinates || (farm.centerLatitude != null && farm.centerLongitude != null));
+  // Location is "ok to submit" unless we have a farm to check against and the check hasn't cleared yet.
+  const locationOk = farmLoading ? false : !geofenceEnforced || geofence?.status === 'inside';
 
   const onPickDate = (event: any, selected?: Date) => {
     setShowPicker(Platform.OS === 'ios');
@@ -77,6 +97,7 @@ export default function ActivityNew() {
     try {
       const p = await getCurrentPoint();
       setGps(p);
+      if (farm) setGeofence(checkWithinFarm(p, farm));
     } catch (e: any) {
       Alert.alert(t('captureLocation'), String(e?.message ?? e));
     } finally {
@@ -87,6 +108,10 @@ export default function ActivityNew() {
   const submit = async () => {
     if (!activityType || !date) {
       Alert.alert(t('logActivity'), t('fillActivityFields'));
+      return;
+    }
+    if (!locationOk) {
+      Alert.alert(t('logActivity'), t('mustVerifyLocationFirst'));
       return;
     }
     setSubmitting(true);
@@ -174,15 +199,60 @@ export default function ActivityNew() {
           )}
 
           <Text style={[styles.fieldLabel, { marginTop: 12 }]}>{t('captureLocation')}</Text>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={captureGps} disabled={capturingGps}>
-            {capturingGps ? <ActivityIndicator size="small" color="#10B981" /> : (
-              <><HugeiconsIcon icon={gps ? CheckmarkCircle02Icon : Location01Icon} size={16} color="#10B981" strokeWidth={2} />
-              <Text style={styles.secondaryBtnText}>{gps ? `${gps.latitude.toFixed(5)}, ${gps.longitude.toFixed(5)}` : t('captureLocation')}</Text></>
+          <TouchableOpacity
+            style={[
+              styles.secondaryBtn,
+              geofence?.status === 'inside' && styles.locationBtnOk,
+              geofence?.status === 'outside' && styles.locationBtnBad,
+            ]}
+            onPress={captureGps}
+            disabled={capturingGps || farmLoading}
+          >
+            {capturingGps || farmLoading ? (
+              <>
+                <ActivityIndicator size="small" color="#10B981" />
+                <Text style={styles.secondaryBtnText}>{t('verifyingLocation')}</Text>
+              </>
+            ) : (
+              <>
+                <HugeiconsIcon
+                  icon={geofence?.status === 'outside' ? Alert02Icon : gps ? CheckmarkCircle02Icon : Location01Icon}
+                  size={16}
+                  color={geofence?.status === 'outside' ? '#DC2626' : geofence?.status === 'inside' ? '#10B981' : '#10B981'}
+                  strokeWidth={2}
+                />
+                <Text style={[styles.secondaryBtnText, geofence?.status === 'outside' && { color: '#DC2626' }]}>
+                  {gps ? `${gps.latitude.toFixed(5)}, ${gps.longitude.toFixed(5)}` : t('captureLocation')}
+                </Text>
+              </>
             )}
           </TouchableOpacity>
+
+          {geofenceEnforced && geofence?.status === 'inside' && (
+            <Text style={styles.locationOk}>{t('withinFarmBoundary')}</Text>
+          )}
+          {geofenceEnforced && geofence?.status === 'outside' && (
+            <>
+              <Text style={styles.locationBad}>
+                {geofence.distanceM != null
+                  ? t('outsideFarmBoundaryDistance', { distance: Math.round(geofence.distanceM) })
+                  : t('outsideFarmBoundary')}
+              </Text>
+              <TouchableOpacity onPress={captureGps} style={styles.retryBtn}>
+                <Text style={styles.retryBtnText}>{t('retryLocation')}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+          {!!farmId && !farmLoading && farm && !geofenceEnforced && (
+            <Text style={styles.locationHint}>{t('farmBoundaryUnmapped')}</Text>
+          )}
         </View>
 
-        <TouchableOpacity style={[styles.submitBtn, submitting && { opacity: 0.6 }]} onPress={submit} disabled={submitting}>
+        <TouchableOpacity
+          style={[styles.submitBtn, (submitting || !locationOk) && { opacity: 0.6 }]}
+          onPress={submit}
+          disabled={submitting || !locationOk}
+        >
           <Text style={styles.submitText}>{t('logActivity')}</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -194,6 +264,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E5E7EB' },
   contextLabel: { fontSize: 13, color: '#6B7280', marginBottom: 12, fontWeight: '600' },
+  locationBtnOk: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
+  locationBtnBad: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
+  locationOk: { fontSize: 12, color: '#10B981', fontWeight: '700', marginTop: 8 },
+  locationBad: { fontSize: 12, color: '#DC2626', fontWeight: '600', marginTop: 8, lineHeight: 17 },
+  locationHint: { fontSize: 12, color: '#9CA3AF', marginTop: 8, lineHeight: 17 },
+  retryBtn: { alignSelf: 'flex-start', marginTop: 8 },
+  retryBtnText: { fontSize: 13, color: '#10B981', fontWeight: '700' },
   fieldLabel: { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 8 },
   input: { backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111827', marginBottom: 12 },
   inputMultiline: { minHeight: 70, textAlignVertical: 'top' },

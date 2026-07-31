@@ -6,12 +6,17 @@ import {
   IsEmail,
   IsNumber,
   IsDateString,
+  IsBoolean,
   Min,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Gender, EducationLevel } from '@prisma/client';
 
 export class UpdateFarmerDto {
+  @ApiPropertyOptional({ example: true, description: 'Consent to share credit-readiness data with financial partners' })
+  @IsBoolean()
+  @IsOptional()
+  dataShareConsent?: boolean;
   @ApiPropertyOptional({ example: 'John' })
   @IsString()
   @IsOptional()

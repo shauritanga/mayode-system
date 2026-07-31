@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { farmersApi, farmsApi, mamcosApi, marketplaceApi, financeApi } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { farmersApi, farmsApi, mamcosApi, marketplaceApi, reportsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 
 // A Secretary can manage their own AMCOS's staff/inventory/marketplace
@@ -65,6 +66,7 @@ function StatCard({ label, value, sub, icon, color }: StatCard) {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const role = useAuthStore((state) => state.user?.role);
   const isSecretary = role === 'MAMCOS_SECRETARY';
   const quickActions = role === 'ADMIN' ? ADMIN_ACTIONS : isSecretary ? SECRETARY_ACTIONS : SUPER_ADMIN_OPS_ACTIONS;
@@ -74,6 +76,18 @@ export default function DashboardPage() {
   const [mamcosName, setMamcosName] = useState('');
   const [prices, setPrices] = useState<{ commodity: string; price: number; market: string; recordedAt: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [kpis, setKpis] = useState({ totalHectares: 0, averageYieldPerHectare: 0, totalRevenue: 0 });
+
+  useEffect(() => {
+    const roleLanding: Record<string, string> = {
+      FARMER: '/dashboard/farmer',
+      FIELD_OFFICER: '/dashboard/field-officer',
+      AUDITOR: '/dashboard/auditor',
+      FINANCIAL_PROVIDER: '/dashboard/financial-provider',
+      BUYER: '/dashboard/buyer',
+    };
+    if (role && roleLanding[role]) router.replace(roleLanding[role]);
+  }, [role, router]);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -124,6 +138,10 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSecretary]);
 
+  useEffect(() => {
+    reportsApi.kpis().then((result) => setKpis(result.data)).catch(console.error);
+  }, []);
+
   return (
     <div>
       {/* Header */}
@@ -149,6 +167,9 @@ export default function DashboardPage() {
           <StatCard label="AMCOS Schemes" value={loading ? '—' : stats.mamcos} sub="Active cooperatives" icon="🏛" color="var(--gold-400)" />
         )}
         <StatCard label="M-LAX Listings" value={loading ? '—' : stats.listings} sub="Land & tractor ads" icon="🏪" color="var(--blue-500)" />
+        <StatCard label="Cooperative Hectares" value={kpis.totalHectares.toLocaleString()} sub="Registered farm area" icon="🗺️" color="var(--purple-500)" />
+        <StatCard label="Average Yield / ha" value={`${Math.round(kpis.averageYieldPerHectare).toLocaleString()} kg`} sub="Harvested crop cycles" icon="🌾" color="var(--green-400)" />
+        <StatCard label="Cooperative Revenue" value={`TZS ${Math.round(kpis.totalRevenue).toLocaleString()}`} sub="Recorded sales revenue" icon="💰" color="var(--gold-400)" />
       </div>
 
       {/* Content Panels */}

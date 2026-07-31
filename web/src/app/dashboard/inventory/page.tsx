@@ -1,6 +1,7 @@
 'use client';
+import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
-import { inventoryApi } from '@/lib/api';
+import { cropCyclesApi, inventoryApi, riceProtocolsApi } from '@/lib/api';
 
 interface InventoryRecord {
   id: string;
@@ -14,6 +15,15 @@ interface InventoryRecord {
   farmer?: { firstName: string; lastName: string };
 }
 
+interface CropCycleOption {
+  id: string;
+  season: string;
+  riceVariety?: string;
+  status: string;
+  farm?: { id: string; farmCode: string };
+  farmer?: { id: string; firstName: string; lastName: string; controlNumber: string };
+}
+
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
     RECEIVED: 'badge-blue',
@@ -25,33 +35,106 @@ const statusBadge = (status: string) => {
   return <span className={`badge ${map[status] || 'badge-gray'}`}>{status.replace('_', ' ')}</span>;
 };
 
+const gateLabels: Record<string, string> = {
+  crop_cycle: 'Select source crop cycle',
+  harvest: 'Harvest task completed',
+  drying: 'Drying task completed',
+  bagging: 'Bagging task completed',
+  warehouse_receipt: 'Warehouse receipt recorded',
+  drying_moisture: 'Drying moisture at or below 14%',
+};
+
+const formatMissing = (missing: string[] = []) => missing.map((key) => gateLabels[key] || key.replace(/_/g, ' ')).join(', ');
+
 export default function InventoryPage() {
   const [records, setRecords] = useState<InventoryRecord[]>([]);
+  const [cycles, setCycles] = useState<CropCycleOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [form, setForm] = useState({ cropCycleId: '', weightKg: '', qualityGrade: '', warehouseLocation: '', receivedDate: new Date().toISOString().slice(0, 10) });
+  const [readiness, setReadiness] = useState<{ ready: boolean; missing: string[] } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
-    inventoryApi.getAll()
-      .then(res => setRecords(res.data || []))
+    Promise.all([
+      inventoryApi.getAll(),
+      cropCyclesApi.getAll(),
+    ])
+      .then(([inventoryRes, cycleRes]) => {
+        setRecords(inventoryRes.data || []);
+        setCycles(cycleRes.data?.data || cycleRes.data || []);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!form.cropCycleId) { setReadiness(null); return; }
+    riceProtocolsApi.readiness(form.cropCycleId)
+      .then((res) => setReadiness(res.data))
+      .catch(() => setReadiness(null));
+  }, [form.cropCycleId]);
 
   const filtered = records.filter(r =>
     `${r.trackingCode} ${r.farmer?.firstName} ${r.farmer?.lastName} ${r.farm?.farmCode}`.toLowerCase().includes(search.toLowerCase())
   );
 
   const totalKg = records.reduce((a, r) => a + r.weightKg, 0);
+  const selectedCycle = cycles.find((cycle) => cycle.id === form.cropCycleId);
+  const gateText = readiness
+    ? readiness.ready
+      ? 'Ready for warehouse receipt'
+      : `Missing before receipt: ${formatMissing(readiness.missing)}`
+    : form.cropCycleId
+      ? 'Readiness unavailable'
+      : 'Select a crop cycle to check Mbalari readiness';
+
+  const errorText = (exception: any) => {
+    const data = exception?.response?.data;
+    const body = data?.message && typeof data.message === 'object' ? data.message : data;
+    if (body?.code === 'MBALARI_QUALITY_GATE') return `Mbalari quality gate incomplete: ${formatMissing(body.missing || [])}`;
+    const message = data?.message;
+    if (Array.isArray(message)) return message.join(', ');
+    return message || 'Unable to receive inventory.';
+  };
+
+  const receive = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!selectedCycle?.farm?.id || !selectedCycle?.farmer?.id) {
+      setMessage('Selected crop cycle is missing farm or farmer details.');
+      return;
+    }
+    setSaving(true);
+    setMessage('');
+    try {
+      await inventoryApi.receive({
+        cropCycleId: selectedCycle.id,
+        farmId: selectedCycle.farm.id,
+        farmerId: selectedCycle.farmer.id,
+        weightKg: Number(form.weightKg),
+        qualityGrade: form.qualityGrade || undefined,
+        warehouseLocation: form.warehouseLocation || undefined,
+        receivedDate: new Date(form.receivedDate).toISOString(),
+      });
+      const res = await inventoryApi.getAll();
+      setRecords(res.data || []);
+      setForm({ cropCycleId: '', weightKg: '', qualityGrade: '', warehouseLocation: '', receivedDate: new Date().toISOString().slice(0, 10) });
+      setMessage('Inventory received and linked to the Mbalari crop cycle.');
+    } catch (exception: any) {
+      setMessage(errorText(exception));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div>
-      <div style={{ marginBottom: '28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+    <div className="page-shell">
+      <div className="page-heading">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--blue-500), var(--blue-400))', borderRadius: '9999px' }} />
-            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Inventory</h1>
-          </div>
-          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Warehouse receipts & Fairtrade batch tracking</p>
+          <div className="page-kicker">Warehouse</div>
+          <h1 className="page-title">Inventory</h1>
+          <p className="page-subtitle">Receive verified Mbalari harvests, keep warehouse records linked to crop cycles, and prepare Fairtrade lots from traceable stock.</p>
         </div>
         <input
           id="inventory-search"
@@ -60,12 +143,33 @@ export default function InventoryPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="input-field"
-          style={{ width: '280px' }}
+          style={{ maxWidth: '320px' }}
         />
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+      <form onSubmit={receive} className="action-panel">
+        <div className="panel-header">
+          <div>
+            <h2 className="panel-title">Receive Mbalari Inventory</h2>
+            <p className="panel-copy">Choose the source crop cycle first. The system checks harvest, drying moisture, bagging, and warehouse readiness before inventory can enter cooperative stock.</p>
+          </div>
+          <span className={`badge ${readiness?.ready ? 'badge-green' : 'badge-gold'}`}>{gateText}</span>
+        </div>
+        {message && <div className={`alert-box ${message.includes('incomplete') || message.includes('Missing') || message.includes('Unable') ? 'alert-danger' : 'alert-success'}`}>{message}</div>}
+        <div className="form-grid-wide">
+          <label className="form-label">Source crop cycle<select className="input-field" value={form.cropCycleId} onChange={(event) => setForm((current) => ({ ...current, cropCycleId: event.target.value }))} required>
+            <option value="">Select crop cycle</option>
+            {cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.farm?.farmCode || 'Farm'} · {cycle.farmer ? `${cycle.farmer.firstName} ${cycle.farmer.lastName}` : 'Farmer'} · {cycle.season} · {cycle.riceVariety || 'Rice'}</option>)}
+          </select></label>
+          <label className="form-label">Weight<input className="input-field" type="number" min="0.01" step="0.01" placeholder="kg" value={form.weightKg} onChange={(event) => setForm((current) => ({ ...current, weightKg: event.target.value }))} required /></label>
+          <label className="form-label">Quality grade<input className="input-field" placeholder="Grade 1" value={form.qualityGrade} onChange={(event) => setForm((current) => ({ ...current, qualityGrade: event.target.value }))} /></label>
+          <label className="form-label">Warehouse bay<input className="input-field" placeholder="Bay A" value={form.warehouseLocation} onChange={(event) => setForm((current) => ({ ...current, warehouseLocation: event.target.value }))} /></label>
+          <label className="form-label">Received date<input className="input-field" type="date" value={form.receivedDate} onChange={(event) => setForm((current) => ({ ...current, receivedDate: event.target.value }))} required /></label>
+        </div>
+        <button className="btn-primary" disabled={saving || !readiness?.ready} style={{ marginTop: 12 }}>{saving ? 'Receiving...' : 'Receive inventory'}</button>
+      </form>
+
+      <div className="metric-grid">
         {[
           { label: 'Total Receipts', value: records.length, color: 'var(--blue-500)' },
           { label: 'Total Weight', value: `${totalKg.toFixed(0)} kg`, color: 'var(--accent)' },
@@ -79,7 +183,8 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      <div className="glass-card" style={{ overflow: 'hidden' }}>
+      <div className="table-panel">
+        <div className="section-toolbar"><strong>Warehouse Receipts</strong><span className="muted">{filtered.length} shown</span></div>
         {loading ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading inventory…</div>
         ) : filtered.length === 0 ? (

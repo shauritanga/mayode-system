@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Add01Icon, WheatIcon, Wallet01Icon, CoinsDollarIcon } from '@hugeicons/core-free-icons';
-import { cropCyclesApi } from '../../src/lib/data';
+import { cropCyclesApi, riceProtocolsApi } from '../../src/lib/data';
 import { timeAgo, useI18n } from '../../src/i18n';
 
 interface Activity {
@@ -23,9 +23,11 @@ interface Revenue {
 interface CropCycle {
   id: string; season: string; riceVariety?: string; status: string;
   estimatedYieldKg?: number; actualYieldKg?: number;
-  farm?: { farmCode: string };
+  farm?: { id: string; farmCode: string };
   activities: Activity[]; costs: Cost[]; revenues: Revenue[];
+  calendarTasks?: CalendarTask[];
 }
+interface CalendarTask { id: string; title: string; guidance: string; dueDate: string; status: string; evidenceRequired: boolean; }
 
 type Tab = 'activities' | 'expenses' | 'sales';
 
@@ -39,6 +41,7 @@ export default function CropCycleDetail() {
   const [harvestOpen, setHarvestOpen] = useState(false);
   const [actualYield, setActualYield] = useState('');
   const [saving, setSaving] = useState(false);
+  const [readiness, setReadiness] = useState<{ ready: boolean; missing: string[] } | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -46,6 +49,7 @@ export default function CropCycleDetail() {
     try {
       const res = await cropCyclesApi.getOne(id);
       setCycle(res.data);
+      try { const quality = await riceProtocolsApi.readiness(id); setReadiness(quality.data); } catch { setReadiness(null); }
     } finally {
       setLoading(false);
     }
@@ -115,6 +119,20 @@ export default function CropCycleDetail() {
           )}
         </View>
 
+        {!!cycle.calendarTasks?.length && (
+          <View style={styles.calendarCard}>
+            <Text style={styles.calendarTitle}>Kalenda ya Mpunga — Mbalari</Text>
+            {readiness && <Text style={[styles.readiness, readiness.ready ? styles.readinessOk : styles.readinessPending]}>{readiness.ready ? 'Tayari kwa uuzaji wa ushirika' : `Kabla ya ghala: ${readiness.missing.join(', ')}`}</Text>}
+            {cycle.calendarTasks.map((task) => (
+              <TouchableOpacity key={task.id} style={styles.taskRow} onPress={() => router.push({ pathname: '/calendar-task/[id]', params: { id: task.id, cropCycleId: cycle.id } })}>
+                <View style={[styles.taskDot, task.status === 'COMPLETED' && styles.taskDotDone]} />
+                <View style={{ flex: 1 }}><Text style={styles.taskTitle}>{task.title}</Text><Text style={styles.taskDue}>{new Date(task.dueDate).toLocaleDateString('sw-TZ')}</Text></View>
+                <Text style={task.status === 'COMPLETED' ? styles.taskDone : styles.taskOpen}>{task.status === 'COMPLETED' ? 'Imekamilika' : 'Fungua'}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         <View style={styles.tabRow}>
           <TouchableOpacity style={[styles.tabBtn, tab === 'activities' && styles.tabBtnActive]} onPress={() => setTab('activities')}>
             <Text style={[styles.tabText, tab === 'activities' && styles.tabTextActive]}>{t('activitiesTab')} ({cycle.activities.length})</Text>
@@ -131,7 +149,7 @@ export default function CropCycleDetail() {
           <>
             <TouchableOpacity
               style={styles.addBtn}
-              onPress={() => router.push({ pathname: '/activity-new', params: { cropCycleId: cycle.id, farmCode: cycle.farm?.farmCode, season: cycle.season } })}
+              onPress={() => router.push({ pathname: '/activity-new', params: { cropCycleId: cycle.id, farmId: cycle.farm?.id, farmCode: cycle.farm?.farmCode, season: cycle.season } })}
             >
               <HugeiconsIcon icon={Add01Icon} size={16} color="#10B981" strokeWidth={2} />
               <Text style={styles.addBtnText}>{t('logActivity')}</Text>
@@ -241,6 +259,12 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111827', marginBottom: 10 },
   saveBtn: { backgroundColor: '#065F46', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
   saveBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  calendarCard: { backgroundColor: '#ECFDF5', borderRadius: 16, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#A7F3D0' },
+  calendarTitle: { fontSize: 15, fontWeight: '900', color: '#065F46', marginBottom: 6 },
+  readiness: { fontSize: 11, marginBottom: 8, fontWeight: '700' }, readinessOk: { color: '#047857' }, readinessPending: { color: '#B45309' },
+  taskRow: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 9, borderTopWidth: 1, borderTopColor: '#D1FAE5' },
+  taskDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#F59E0B' }, taskDotDone: { backgroundColor: '#10B981' },
+  taskTitle: { fontWeight: '700', color: '#064E3B', fontSize: 13 }, taskDue: { fontSize: 11, color: '#6B7280', marginTop: 1 }, taskOpen: { color: '#047857', fontSize: 11, fontWeight: '800' }, taskDone: { color: '#059669', fontSize: 11, fontWeight: '800' },
   tabRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   tabBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center' },
   tabBtnActive: { backgroundColor: '#065F46', borderColor: '#065F46' },

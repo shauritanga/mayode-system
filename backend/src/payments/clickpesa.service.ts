@@ -30,6 +30,29 @@ export interface ActiveMethod {
   fee?: number;
 }
 
+export interface PayoutResult {
+  id: string;
+  status: string; // PENDING | PROCESSING | SUCCESS | FAILED
+  orderReference: string;
+  amount?: string | number;
+  currency?: string;
+  createdAt?: string;
+}
+
+export interface PayoutStatusResult {
+  id: string;
+  status: string;
+  orderReference: string;
+  amount?: string | number;
+  currency?: string;
+  message?: string;
+}
+
+export interface AccountBalance {
+  currency: string;
+  available: string | number;
+}
+
 /**
  * ClickPesa mobile-money collection client (Tanzania).
  *
@@ -213,6 +236,95 @@ export class ClickPesaService {
     }
     // The query endpoint may return a single object or a list; normalize.
     const body = (await res.json()) as PaymentStatusResult | PaymentStatusResult[];
+    const record = Array.isArray(body) ? body[0] : body;
+    return record ?? null;
+  }
+
+  // ----------------------------------------------------------------- payout
+  //
+  // NOTE: ClickPesa's Payout API (docs.clickpesa.com/payout-api) is confirmed
+  // to support mobile-money payout preview/create/query plus a balance check,
+  // using the same auth-token/checksum pattern as collection above. The exact
+  // path strings below follow ClickPesa's collection-endpoint naming
+  // convention ("mno" = mobile network operator, matching their own payout
+  // docs index) but were not directly visible in the fetched documentation
+  // excerpt — confirm them against the live API reference (or ask ClickPesa
+  // support) before relying on this in production, and update here if they
+  // differ. All calls fail loudly (thrown error), so a wrong path surfaces
+  // immediately rather than silently misrouting money.
+
+  /** Check available payout balance before disbursing (recommended pre-flight). */
+  async getAccountBalance(): Promise<AccountBalance> {
+    const res = await this.authedFetch('/third-parties/accounts/balance', { method: 'GET' });
+    if (!res.ok) {
+      throw new Error(`ClickPesa balance check failed: ${res.status} ${await res.text()}`);
+    }
+    return (await res.json()) as AccountBalance;
+  }
+
+  /** Preview a mobile-money payout (fee/method check) before disbursing. */
+  async previewMobilePayout(input: {
+    amount: string;
+    orderReference: string;
+    phoneNumber: string;
+  }): Promise<{ activeMethods: ActiveMethod[] }> {
+    const payload: Record<string, unknown> = {
+      amount: input.amount,
+      currency: 'TZS',
+      orderReference: input.orderReference,
+      phoneNumber: ClickPesaService.normalizePhone(input.phoneNumber),
+    };
+    const checksum = this.generateChecksum(payload);
+    if (checksum) payload.checksum = checksum;
+
+    const res = await this.authedFetch('/third-parties/payouts/preview-mno-payout-request', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      throw new Error(`ClickPesa payout preview failed: ${res.status} ${await res.text()}`);
+    }
+    return (await res.json()) as { activeMethods: ActiveMethod[] };
+  }
+
+  /** Disburse money out to a farmer's mobile-money wallet. */
+  async initiateMobilePayout(input: {
+    amount: string;
+    orderReference: string;
+    phoneNumber: string;
+    recipientName?: string;
+  }): Promise<PayoutResult> {
+    const payload: Record<string, unknown> = {
+      amount: input.amount,
+      currency: 'TZS',
+      orderReference: input.orderReference,
+      phoneNumber: ClickPesaService.normalizePhone(input.phoneNumber),
+    };
+    if (input.recipientName) payload.recipientName = input.recipientName;
+    const checksum = this.generateChecksum(payload);
+    if (checksum) payload.checksum = checksum;
+
+    const res = await this.authedFetch('/third-parties/payouts/initiate-mno-payout-request', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      throw new Error(`ClickPesa payout initiate failed: ${res.status} ${await res.text()}`);
+    }
+    return (await res.json()) as PayoutResult;
+  }
+
+  /** Authoritative server-to-server payout status check. */
+  async queryPayoutStatus(orderReference: string): Promise<PayoutStatusResult | null> {
+    const res = await this.authedFetch(
+      `/third-parties/payouts/${encodeURIComponent(orderReference)}`,
+      { method: 'GET' },
+    );
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      throw new Error(`ClickPesa payout query failed: ${res.status} ${await res.text()}`);
+    }
+    const body = (await res.json()) as PayoutStatusResult | PayoutStatusResult[];
     const record = Array.isArray(body) ? body[0] : body;
     return record ?? null;
   }

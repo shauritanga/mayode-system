@@ -58,6 +58,31 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+model PartnerApiKey {
+  id          String   @id @default(uuid())
+  partnerName String   @map("partner_name")
+  keyPrefix   String   @unique @map("key_prefix")
+  keyHash     String   @map("key_hash")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+  requests    PartnerApiRequest[]
+  @@map("partner_api_keys")
+}
+
+model PartnerApiRequest {
+  id            String   @id @default(uuid())
+  apiKeyId      String   @map("api_key_id")
+  farmerId      String?  @map("farmer_id")
+  endpoint      String
+  ipAddress     String?  @map("ip_address")
+  responseCode  Int      @map("response_code")
+  createdAt     DateTime @default(now()) @map("created_at")
+  apiKey        PartnerApiKey @relation(fields: [apiKeyId], references: [id])
+  @@index([farmerId, createdAt])
+  @@map("partner_api_requests")
+}
+
 // ============================================================
 // CORE: Farmer Profile
 // ============================================================
@@ -93,6 +118,8 @@ model Farmer {
 
   membershipDate  DateTime @default(now()) @map("membership_date")
   creditScore     Float    @default(0) @map("credit_score")
+  dataShareConsent Boolean @default(false) @map("data_share_consent")
+  consentedAt      DateTime? @map("consented_at")
   isBlacklisted   Boolean  @default(false) @map("is_blacklisted")
   blacklistReason String?  @map("blacklist_reason")
   createdAt       DateTime @default(now()) @map("created_at")
@@ -107,6 +134,14 @@ model Farmer {
   payments            Payment[]                @relation("FarmerPayments")
   landListings        LandListing[]            @relation("LandOwner")
   rentals             LandListing[]            @relation("LandRenter")
+  previousRentals     LandListing[]            @relation("LandPreviousRenter")
+  subLeasesAsOriginalRenter LandListingSubLease[] @relation("SubLeaseOriginalRenter")
+  subLeasesAsNewRenter      LandListingSubLease[] @relation("SubLeaseNewRenter")
+  ownershipTransfersFrom    LandListingOwnershipTransfer[] @relation("TransferFromOwner")
+  ownershipTransfersTo      LandListingOwnershipTransfer[] @relation("TransferToOwner")
+  escrowPayouts       EscrowPayment[]
+  landListingOffers   LandListingOffer[]
+  landListingImprovements LandListingImprovement[]
   tractorBookings     TractorBooking[]
   inventoryRecords    InventoryRecord[]
   loanRecords         LoanRecord[]
@@ -121,6 +156,10 @@ model Farmer {
   rewardWins          RewardWinner[]
   activities          Activity[]
   officerVisits       FieldOfficerVisit[]
+  saleApportionments  SaleApportionment[]
+  voteResponses       VoteResponse[]
+  consentRecords      ConsentRecord[]
+  questionnaires      FarmerQuestionnaire[]
 
   @@map("farmers")
 }
@@ -163,6 +202,7 @@ model MamcosStaff {
   farmerVerifications FarmerVerification[]
   activityLogs        ActivityLog[]
   visits              FieldOfficerVisit[]
+  facilitatedListings LandListing[]
 
   @@index([mamcosId])
   @@map("mamcos_staff")
@@ -190,6 +230,7 @@ model Mamcos {
   farms           Farm[]
   farmingSeasons  FarmingSeason[]
   registryRecords FarmRegistryRecord[]
+  riceProtocols   RiceProtocol[]
 
   @@map("mamcos")
 }
@@ -266,6 +307,8 @@ model Farm {
   dataValues           FarmDataValue[]
   confirmationRequests OwnerConfirmationRequest[]
   officerVisits        FieldOfficerVisit[]
+  questionnaires       FarmerQuestionnaire[]
+  aiIntegrationRecords AiIntegrationRecord[]
 
   @@map("farms")
 }
@@ -318,6 +361,10 @@ model CropCycle {
   costs      InputCost[]
   revenues   Revenue[]
   officerVisits FieldOfficerVisit[]
+  calendarTasks RiceCalendarTask[]
+  harvestQuality HarvestQualityCheck?
+  inventoryRecords InventoryRecord[]
+  aiIntegrationRecords AiIntegrationRecord[]
 
   @@map("crop_cycles")
 }
@@ -332,6 +379,9 @@ model ActivityLog {
   inputsUsed     Json?        @map("inputs_used") // { name, quantity, unit }
   laborWorkers   Int?         @map("labor_workers")
   laborHours     Float?       @map("labor_hours")
+  familyLaborCount Int?       @map("family_labor_count")
+  hiredLaborCount  Int?       @map("hired_labor_count")
+  laborWageTotal   Float?     @map("labor_wage_total")
   photoUrls      String[]     @map("photo_urls")
   gpsLatitude    Float?       @map("gps_latitude")
   gpsLongitude   Float?       @map("gps_longitude")
@@ -342,6 +392,70 @@ model ActivityLog {
   fieldOfficer MamcosStaff? @relation(fields: [fieldOfficerId], references: [id])
 
   @@map("activity_logs")
+}
+
+// Cooperative-owned, versioned rice calendar. Each task is copied onto the
+// crop cycle so later protocol edits never rewrite a farmer's historic plan.
+model RiceProtocol {
+  id          String   @id @default(uuid())
+  mamcosId    String   @map("mamcos_id")
+  name        String
+  version     Int      @default(1)
+  isActive    Boolean  @default(true) @map("is_active")
+  taskDefinitions Json @map("task_definitions")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  mamcos Mamcos @relation(fields: [mamcosId], references: [id], onDelete: Cascade)
+
+  @@unique([mamcosId, version])
+  @@index([mamcosId, isActive])
+  @@map("rice_protocols")
+}
+
+model RiceCalendarTask {
+  id                   String             @id @default(uuid())
+  cropCycleId          String             @map("crop_cycle_id")
+  protocolVersion      Int                @map("protocol_version")
+  taskKey              String             @map("task_key")
+  title                String
+  guidance             String
+  activityType         ActivityType?      @map("activity_type")
+  dueDate              DateTime           @map("due_date")
+  requiredMeasurements Json?              @map("required_measurements")
+  evidenceRequired     Boolean            @default(false) @map("evidence_required")
+  status               CalendarTaskStatus @default(PENDING)
+  measurements         Json?
+  photoUrls            String[]           @map("photo_urls")
+  completedAt          DateTime?          @map("completed_at")
+  completedByUserId    String?            @map("completed_by_user_id")
+  activityLogId        String?            @map("activity_log_id")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  cropCycle CropCycle @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
+
+  @@unique([cropCycleId, taskKey])
+  @@index([cropCycleId, status, dueDate])
+  @@map("rice_calendar_tasks")
+}
+
+model HarvestQualityCheck {
+  id                  String   @id @default(uuid())
+  cropCycleId         String   @unique @map("crop_cycle_id")
+  harvestMaturityPct  Float?   @map("harvest_maturity_pct")
+  panicleMoisturePct  Float?   @map("panicle_moisture_pct")
+  dryingMoisturePct   Float?   @map("drying_moisture_pct")
+  bagCount            Int?     @map("bag_count")
+  bagWeightKg         Float?   @map("bag_weight_kg")
+  warehouseLocation   String?  @map("warehouse_location")
+  warehouseReceivedAt DateTime? @map("warehouse_received_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  cropCycle CropCycle @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
+
+  @@map("harvest_quality_checks")
 }
 
 // ============================================================
@@ -376,11 +490,14 @@ model Revenue {
   totalRevenue     Float       @map("total_revenue") // In TZS
   fairtradePremium Float?      @map("fairtrade_premium")
   buyerId          String?     @map("buyer_id")
+  saleId           String?     @map("sale_id")
   saleDate         DateTime    @map("sale_date")
   createdAt        DateTime    @default(now()) @map("created_at")
 
   cropCycle CropCycle @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
   buyer     Buyer?    @relation(fields: [buyerId], references: [id])
+  sale      Sale?     @relation(fields: [saleId], references: [id])
+  saleApportionment SaleApportionment?
 
   @@map("revenues")
 }
@@ -393,11 +510,14 @@ model Payment {
   id             String        @id @default(uuid())
   farmerId       String        @map("farmer_id")
   membershipId   String?       @map("membership_id")
+  saleId         String?       @map("sale_id")
   amount         Float // In TZS
   paymentType    PaymentType   @map("payment_type")
   status         PaymentStatus
   mpesaRef       String?       @map("mpesa_ref")
   orderReference String?       @map("order_reference") // ClickPesa order reference
+  payoutApprovedByUserId String? @map("payout_approved_by_user_id")
+  payoutApprovedAt DateTime? @map("payout_approved_at")
   loanDeduction  Float?        @map("loan_deduction")
   netAmount      Float?        @map("net_amount")
   description    String?
@@ -407,6 +527,8 @@ model Payment {
 
   farmer     Farmer      @relation("FarmerPayments", fields: [farmerId], references: [id])
   membership Membership? @relation(fields: [membershipId], references: [id])
+  sale       Sale?       @relation(fields: [saleId], references: [id])
+  loanDeductions LoanDeduction[]
 
   @@map("payments")
 }
@@ -419,13 +541,36 @@ model LoanRecord {
   amountOwed        Float    @map("amount_owed")
   repaymentSchedule String?  @map("repayment_schedule")
   autoDeductPercent Float?   @map("auto_deduct_percent")
+  lenderPayoutPhone String?  @map("lender_payout_phone")
+  lenderPayoutName  String?  @map("lender_payout_name")
   isActive          Boolean  @default(true) @map("is_active")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   farmer Farmer @relation(fields: [farmerId], references: [id])
+  deductions LoanDeduction[]
 
   @@map("loan_records")
+}
+
+model LoanDeduction {
+  id              String       @id @default(uuid())
+  loanRecordId    String       @map("loan_record_id")
+  sourcePaymentId String       @map("source_payment_id")
+  amount          Float
+  orderReference  String?      @unique @map("order_reference")
+  payoutStatus    PayoutStatus @default(PENDING) @map("payout_status")
+  payoutApprovedByUserId String? @map("payout_approved_by_user_id")
+  payoutApprovedAt DateTime? @map("payout_approved_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  loanRecord    LoanRecord @relation(fields: [loanRecordId], references: [id])
+  sourcePayment Payment    @relation(fields: [sourcePaymentId], references: [id])
+
+  @@unique([loanRecordId, sourcePaymentId])
+  @@index([sourcePaymentId])
+  @@map("loan_deductions")
 }
 
 // ============================================================
@@ -436,6 +581,7 @@ model InventoryRecord {
   id                String          @id @default(uuid())
   farmId            String          @map("farm_id")
   farmerId          String          @map("farmer_id")
+  cropCycleId       String?         @map("crop_cycle_id")
   lotNumber         String?         @map("lot_number")
   weightKg          Float           @map("weight_kg")
   qualityGrade      String?         @map("quality_grade")
@@ -448,6 +594,7 @@ model InventoryRecord {
 
   farm   Farm   @relation(fields: [farmId], references: [id])
   farmer Farmer @relation(fields: [farmerId], references: [id])
+  cropCycle CropCycle? @relation(fields: [cropCycleId], references: [id])
   lot    Lot?   @relation(fields: [lotNumber], references: [lotNumber])
 
   @@map("inventory_records")
@@ -462,6 +609,7 @@ model Lot {
 
   inventoryRecords InventoryRecord[]
   sales            Sale[]
+  aiIntegrationRecords AiIntegrationRecord[]
 
   @@map("lots")
 }
@@ -483,6 +631,7 @@ model Buyer {
 
   sales    Sale[]
   revenues Revenue[]
+  invoices Invoice[]
 
   @@map("buyers")
 }
@@ -500,13 +649,207 @@ model Sale {
   totalRevenue     Float     @map("total_revenue")
   paymentReceived  Boolean   @default(false) @map("payment_received")
   paymentDate      DateTime? @map("payment_date")
+  buyerOrderReference String? @unique @map("buyer_order_reference")
+  buyerPaymentReference String? @map("buyer_payment_reference")
   saleDate         DateTime  @map("sale_date")
   createdAt        DateTime  @default(now()) @map("created_at")
 
   buyer Buyer @relation(fields: [buyerId], references: [id])
   lot   Lot   @relation(fields: [lotId], references: [id])
+  revenues Revenue[]
+  payments Payment[]
+  apportionments SaleApportionment[]
+  premiumFundEntries PremiumFundEntry[]
+  invoice Invoice?
 
   @@map("sales")
+}
+
+// Immutable audit trail of how a cooperative sale was allocated to source farmers.
+// Revenue rows are created from these allocations, while this table preserves the
+// original inventory-weight calculation for traceability and dispute resolution.
+model SaleApportionment {
+  id                String   @id @default(uuid())
+  saleId            String   @map("sale_id")
+  farmerId          String   @map("farmer_id")
+  inventoryWeightKg Float    @map("inventory_weight_kg")
+  weightShare       Float    @map("weight_share")
+  quantityKg        Float    @map("quantity_kg")
+  grossAmount       Float    @map("gross_amount")
+  fairtradePremium  Float    @default(0) @map("fairtrade_premium")
+  revenueId         String?  @unique @map("revenue_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  sale     Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  farmer   Farmer  @relation(fields: [farmerId], references: [id])
+  revenue  Revenue? @relation(fields: [revenueId], references: [id])
+
+  @@unique([saleId, farmerId])
+  @@index([farmerId])
+  @@map("sale_apportionments")
+}
+
+// Fairtrade premium is deliberately tracked outside ordinary crop revenue so
+// members can audit fund income, expenditure and the resulting balance.
+model PremiumFundEntry {
+  id          String               @id @default(uuid())
+  entryType   PremiumFundEntryType @map("entry_type")
+  amount      Float
+  description String
+  saleId      String?              @map("sale_id")
+  entryDate   DateTime             @map("entry_date")
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  sale Sale? @relation(fields: [saleId], references: [id])
+
+  @@index([entryDate])
+  @@map("premium_fund_entries")
+}
+
+model Account {
+  id        String      @id @default(uuid())
+  code      String      @unique
+  name      String
+  type      AccountType
+  isActive  Boolean     @default(true) @map("is_active")
+  createdAt DateTime    @default(now()) @map("created_at")
+  entries   LedgerEntry[]
+  budgetLines BudgetLine[]
+
+  @@map("accounts")
+}
+
+model LedgerEntry {
+  id          String   @id @default(uuid())
+  entryNumber String   @map("entry_number")
+  accountId   String   @map("account_id")
+  debit       Float    @default(0)
+  credit      Float    @default(0)
+  entryDate   DateTime @map("entry_date")
+  sourceType  String   @map("source_type")
+  sourceId    String   @map("source_id")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@unique([sourceType, sourceId, accountId])
+  @@index([entryDate])
+  @@map("ledger_entries")
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique @map("invoice_number")
+  saleId        String?       @unique @map("sale_id")
+  buyerId       String?       @map("buyer_id")
+  amount        Float
+  dueDate       DateTime      @map("due_date")
+  status        InvoiceStatus @default(OPEN)
+  paidAt        DateTime?     @map("paid_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  sale          Sale?         @relation(fields: [saleId], references: [id])
+  buyer         Buyer?        @relation(fields: [buyerId], references: [id])
+  @@index([dueDate, status])
+  @@map("invoices")
+}
+
+model Bill {
+  id          String        @id @default(uuid())
+  billNumber  String        @unique @map("bill_number")
+  supplier    String
+  amount      Float
+  dueDate     DateTime      @map("due_date")
+  status      InvoiceStatus @default(OPEN)
+  paidAt      DateTime?     @map("paid_at")
+  description String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  @@index([dueDate, status])
+  @@map("bills")
+}
+
+model Budget {
+  id        String       @id @default(uuid())
+  name      String
+  fiscalYear Int?        @map("fiscal_year")
+  seasonLabel String?    @map("season_label")
+  startDate DateTime     @map("start_date")
+  endDate   DateTime     @map("end_date")
+  createdAt DateTime     @default(now()) @map("created_at")
+  lines     BudgetLine[]
+  @@map("budgets")
+}
+
+model BudgetLine {
+  id        String   @id @default(uuid())
+  budgetId  String   @map("budget_id")
+  accountId String   @map("account_id")
+  amount    Float
+  budget    Budget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  account   Account @relation(fields: [accountId], references: [id])
+  @@unique([budgetId, accountId])
+  @@map("budget_lines")
+}
+
+model CommunityProject {
+  id            String        @id @default(uuid())
+  name          String
+  fundingSource String        @map("funding_source")
+  budget        Float
+  spentAmount   Float         @default(0) @map("spent_amount")
+  status        ProjectStatus @default(OPEN)
+  milestones    Json?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  @@map("community_projects")
+}
+
+model MeetingRecord {
+  id            String   @id @default(uuid())
+  meetingDate   DateTime @map("meeting_date")
+  agenda        String
+  decisions     String
+  attendeeCount Int      @map("attendee_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+  votes         Vote[]
+  @@map("meeting_records")
+}
+
+model Vote {
+  id        String     @id @default(uuid())
+  title     String
+  description String?
+  opensAt   DateTime   @map("opens_at")
+  closesAt  DateTime   @map("closes_at")
+  status    VoteStatus @default(DRAFT)
+  meetingId String?    @map("meeting_id")
+  createdAt DateTime   @default(now()) @map("created_at")
+  options   VoteOption[]
+  responses VoteResponse[]
+  meeting   MeetingRecord? @relation(fields: [meetingId], references: [id])
+  @@map("votes")
+}
+
+model VoteOption {
+  id      String @id @default(uuid())
+  voteId  String @map("vote_id")
+  label   String
+  vote    Vote @relation(fields: [voteId], references: [id], onDelete: Cascade)
+  responses VoteResponse[]
+  @@map("vote_options")
+}
+
+model VoteResponse {
+  id       String   @id @default(uuid())
+  voteId   String   @map("vote_id")
+  optionId String   @map("option_id")
+  farmerId String   @map("farmer_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  vote     Vote     @relation(fields: [voteId], references: [id], onDelete: Cascade)
+  option   VoteOption @relation(fields: [optionId], references: [id])
+  farmer   Farmer   @relation(fields: [farmerId], references: [id])
+  @@unique([voteId, farmerId])
+  @@map("vote_responses")
 }
 
 // ============================================================
@@ -534,16 +877,102 @@ model LandListing {
   pricingModel        String?     @map("pricing_model") // "fixed", "step_up", "rice_linked"
   autoDropPrice       Float?      @map("auto_drop_price") // Flexible pricing auto-drop
   autoDropDays        Int?        @map("auto_drop_days")
+  lastPriceDropAt     DateTime?   @map("last_price_drop_at") // Flash-deal cron dedup
+  previousRenterId    String?     @map("previous_renter_id") // Last completed renter on this farm, for loyalty pricing
+  facilitatedByStaffId String?    @map("facilitated_by_staff_id") // Desk officer who gets the agent fee
+  agreementPdfUrl      String?    @map("agreement_pdf_url")
+  agreementGeneratedAt DateTime?  @map("agreement_generated_at")
+  // Multi-year leases (Step-Up / Rice-Linked pricing)
+  paymentPlan          String?    @default("PREPAID") @map("payment_plan") // "PREPAID" | "ANNUAL"
+  rentScheduleJson      Json?      @map("rent_schedule_json")
+  lastInstallmentYear  Int        @default(0) @map("last_installment_year")
+  // Reward for Honesty: every M-LAX in-app deal is MAYODE-protected once escrow is secured
+  mayodeProtected      Boolean    @default(false) @map("mayode_protected")
   createdAt           DateTime    @default(now()) @map("created_at")
   updatedAt           DateTime    @updatedAt @map("updated_at")
 
   // Relations
-  farm           Farm            @relation(fields: [farmId], references: [id])
-  owner          Farmer          @relation("LandOwner", fields: [ownerId], references: [id])
-  renter         Farmer?         @relation("LandRenter", fields: [renterId], references: [id])
-  escrowPayments EscrowPayment[]
+  farm             Farm                          @relation(fields: [farmId], references: [id])
+  owner            Farmer                        @relation("LandOwner", fields: [ownerId], references: [id])
+  renter           Farmer?                       @relation("LandRenter", fields: [renterId], references: [id])
+  previousRenter   Farmer?                       @relation("LandPreviousRenter", fields: [previousRenterId], references: [id])
+  facilitatedByStaff MamcosStaff?                @relation(fields: [facilitatedByStaffId], references: [id])
+  escrowPayments   EscrowPayment[]
+  subLeases        LandListingSubLease[]
+  ownershipTransfers LandListingOwnershipTransfer[]
+  offers           LandListingOffer[]
+  improvements     LandListingImprovement[]
 
   @@map("land_listings")
+}
+
+model LandListingOffer {
+  id            String      @id @default(uuid())
+  listingId     String      @map("listing_id")
+  farmerId      String      @map("farmer_id") // the farmer making the offer
+  offerAmount   Float       @map("offer_amount")
+  status        OfferStatus @default(PENDING)
+  counterAmount Float?      @map("counter_amount")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  listing LandListing @relation(fields: [listingId], references: [id])
+  farmer  Farmer      @relation(fields: [farmerId], references: [id])
+
+  @@map("land_listing_offers")
+}
+
+model LandListingImprovement {
+  id            String    @id @default(uuid())
+  listingId     String    @map("listing_id")
+  renterId      String    @map("renter_id")
+  description   String
+  amountTzs     Float     @map("amount_tzs")
+  appliedToYear Int?      @map("applied_to_year") // which installment year this credit was deducted from, if any
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  listing LandListing @relation(fields: [listingId], references: [id])
+  renter  Farmer      @relation(fields: [renterId], references: [id])
+
+  @@map("land_listing_improvements")
+}
+
+model LandListingSubLease {
+  id                 String          @id @default(uuid())
+  originalListingId  String          @map("original_listing_id")
+  originalRenterId   String          @map("original_renter_id")
+  status             SubLeaseStatus  @default(PENDING)
+  newRenterId        String?         @map("new_renter_id")
+  newAskingPrice     Float?          @map("new_asking_price")
+  approvedByOwnerAt  DateTime?       @map("approved_by_owner_at")
+  settledAt          DateTime?       @map("settled_at") // Re-listing fee payout to original renter processed
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  originalListing LandListing @relation(fields: [originalListingId], references: [id])
+  originalRenter  Farmer      @relation("SubLeaseOriginalRenter", fields: [originalRenterId], references: [id])
+  newRenter       Farmer?     @relation("SubLeaseNewRenter", fields: [newRenterId], references: [id])
+
+  @@map("land_listing_sub_leases")
+}
+
+model LandListingOwnershipTransfer {
+  id             String    @id @default(uuid())
+  listingId      String    @map("listing_id")
+  fromOwnerId    String    @map("from_owner_id")
+  toOwnerPhone   String    @map("to_owner_phone")
+  toOwnerId      String?   @map("to_owner_id")
+  reason         String?
+  transferFeeTzs Float     @default(10000) @map("transfer_fee_tzs")
+  feeChargedAt   DateTime? @map("fee_charged_at") // Fixed transfer fee deducted from the next payout
+  transferredAt  DateTime  @default(now()) @map("transferred_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  listing  LandListing @relation(fields: [listingId], references: [id])
+  fromOwner Farmer     @relation("TransferFromOwner", fields: [fromOwnerId], references: [id])
+  toOwner   Farmer?    @relation("TransferToOwner", fields: [toOwnerId], references: [id])
+
+  @@map("land_listing_ownership_transfers")
 }
 
 // ============================================================
@@ -615,12 +1044,24 @@ model EscrowPayment {
   amount      Float
   status      PaymentStatus
   mpesaRef    String?       @map("mpesa_ref")
+  // Collection (money in, via ClickPesa USSD push)
+  orderReference String?   @unique @map("order_reference")
+  phoneNumber     String?   @map("phone_number")
+  // Payout (money out, via ClickPesa Payout API)
+  payoutOrderReference String?      @unique @map("payout_order_reference")
+  payoutStatus         PayoutStatus? @map("payout_status")
+  payoutRecipientId    String?      @map("payout_recipient_id")
+  payoutFailureReason  String?      @map("payout_failure_reason")
   depositedAt DateTime?     @map("deposited_at")
   releasedAt  DateTime?     @map("released_at")
+  // Set only for a multi-year ANNUAL-plan installment (year 2, 3, ...) —
+  // null means this is the original deposit that activates the lease.
+  installmentYear Int?      @map("installment_year")
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
-  listing LandListing @relation(fields: [listingId], references: [id])
+  listing         LandListing @relation(fields: [listingId], references: [id])
+  payoutRecipient Farmer?     @relation(fields: [payoutRecipientId], references: [id])
 
   @@map("escrow_payments")
 }
@@ -672,6 +1113,80 @@ model SmsLog {
   createdAt DateTime  @default(now()) @map("created_at")
 
   @@map("sms_logs")
+}
+
+model ConsentRecord {
+  id                      String    @id @default(uuid())
+  farmerId                String    @map("farmer_id")
+  scope                   String
+  granted                 Boolean   @default(true)
+  formVersion             String    @default("MAYODATA_CONSENT_2026_07") @map("form_version")
+  language                String    @default("sw")
+  explanationReadByUserId String?   @map("explanation_read_by_user_id")
+  signatureUrl            String?   @map("signature_url")
+  thumbprintUrl           String?   @map("thumbprint_url")
+  witnessName             String?   @map("witness_name")
+  notes                   String?
+  capturedAt              DateTime  @default(now()) @map("captured_at")
+  revokedAt               DateTime? @map("revoked_at")
+
+  farmer Farmer @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+
+  @@index([farmerId, scope, capturedAt])
+  @@map("consent_records")
+}
+
+model FarmerQuestionnaire {
+  id                  String   @id @default(uuid())
+  farmerId            String   @map("farmer_id")
+  farmId              String?  @map("farm_id")
+  fieldOfficerUserId  String?  @map("field_officer_user_id")
+  formVersion         String   @default("MAYODATA_FIELD_QUESTIONNAIRE_2026_07") @map("form_version")
+  language            String   @default("sw")
+  officialUse         Json     @default("{}") @map("official_use")
+  farmerSnapshot      Json     @default("{}") @map("farmer_snapshot")
+  farmRegistration    Json     @default("{}") @map("farm_registration")
+  plantingInputs      Json     @default("{}") @map("planting_inputs")
+  midSeasonCosts      Json     @default("{}") @map("mid_season_costs")
+  harvestSales        Json     @default("{}") @map("harvest_sales")
+  consentAcknowledged Boolean  @default(false) @map("consent_acknowledged")
+  signatureUrl        String?  @map("signature_url")
+  photoUrls           String[] @map("photo_urls")
+  gpsLatitude         Float?   @map("gps_latitude")
+  gpsLongitude        Float?   @map("gps_longitude")
+  capturedAt          DateTime @default(now()) @map("captured_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  farmer Farmer @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  farm   Farm?  @relation(fields: [farmId], references: [id], onDelete: SetNull)
+
+  @@index([farmerId, capturedAt])
+  @@index([farmId])
+  @@map("farmer_questionnaires")
+}
+
+model AiIntegrationRecord {
+  id                String   @id @default(uuid())
+  sourceType        String   @map("source_type")
+  farmId            String?  @map("farm_id")
+  cropCycleId       String?  @map("crop_cycle_id")
+  lotId             String?  @map("lot_id")
+  externalReference String?  @map("external_reference")
+  payload           Json     @default("{}")
+  recommendation    Json?
+  capturedByUserId  String?  @map("captured_by_user_id")
+  capturedAt        DateTime @default(now()) @map("captured_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  farm      Farm?      @relation(fields: [farmId], references: [id], onDelete: SetNull)
+  cropCycle CropCycle? @relation(fields: [cropCycleId], references: [id], onDelete: SetNull)
+  lot       Lot?       @relation(fields: [lotId], references: [id], onDelete: SetNull)
+
+  @@index([sourceType, capturedAt])
+  @@index([farmId])
+  @@index([cropCycleId])
+  @@index([lotId])
+  @@map("ai_integration_records")
 }
 
 // ============================================================
@@ -1350,6 +1865,26 @@ enum DealType {
   RELATIONSHIP
 }
 
+enum SubLeaseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COUNTERED
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+}
+
 enum CropCycleStatus {
   PLANNED
   ACTIVE
@@ -1370,6 +1905,12 @@ enum ActivityType {
   TRANSPORT
 }
 
+enum CalendarTaskStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
 enum CostCategory {
   SEEDS
   FERTILIZER
@@ -1385,6 +1926,40 @@ enum CostCategory {
 enum RevenueType {
   FAIRTRADE_SALE
   CONVENTIONAL_SALE
+}
+
+enum PremiumFundEntryType {
+  INCOME
+  EXPENSE
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum InvoiceStatus {
+  OPEN
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum ProjectStatus {
+  OPEN
+  PLANNED
+  IN_PROGRESS
+  COMPLETE
+  CANCELLED
+}
+
+enum VoteStatus {
+  DRAFT
+  OPEN
+  CLOSED
 }
 
 enum PaymentType {
@@ -1647,6 +2222,7 @@ enum DisputeType {
   NEIGHBOR_CONFLICT
   PREVIOUS_RENTER_CLAIM
   OWNERSHIP_TRANSFER_DISPUTE
+  UNREPORTED_MLAX_ACTIVITY
   OTHER
 }
 

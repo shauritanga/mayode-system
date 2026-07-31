@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsDateString,
   IsNotEmpty,
+  IsBoolean,
   MinLength,
   Min,
 } from 'class-validator';
@@ -18,12 +19,18 @@ import { Gender, EducationLevel } from '@prisma/client';
  * Provisions the login User + Farmer profile in one transaction.
  */
 export class CreateFarmerDto {
-  @ApiProperty({ example: '+255700000001', description: 'Login phone number (unique)' })
+  @ApiProperty({
+    example: '+255700000001',
+    description: 'Login phone number (unique)',
+  })
   @IsString()
   @IsNotEmpty()
   phone: string;
 
-  @ApiProperty({ example: 'ChangeMe123', description: 'Initial password (min 6 chars)' })
+  @ApiProperty({
+    example: 'ChangeMe123',
+    description: 'Initial password (min 6 chars)',
+  })
   @IsString()
   @MinLength(6)
   password: string;
@@ -37,6 +44,15 @@ export class CreateFarmerDto {
   @IsString()
   @IsNotEmpty()
   lastName: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Recorded farmer consent for approved financial-provider data sharing',
+  })
+  @IsBoolean()
+  @IsOptional()
+  dataShareConsent?: boolean;
 
   @ApiPropertyOptional({ example: 'john@example.com' })
   @IsEmail()
@@ -58,7 +74,10 @@ export class CreateFarmerDto {
   @IsOptional()
   nationalId?: string;
 
-  @ApiPropertyOptional({ example: 'mamcos-uuid', description: 'Cooperative (AMCOS) ID' })
+  @ApiPropertyOptional({
+    example: 'mamcos-uuid',
+    description: 'Cooperative (AMCOS) ID',
+  })
   @IsString()
   @IsOptional()
   mamcosId?: string;
@@ -98,7 +117,10 @@ export class CreateFarmerDto {
   @IsOptional()
   educationLevel?: EducationLevel;
 
-  @ApiPropertyOptional({ example: 12, description: 'Years of farming experience' })
+  @ApiPropertyOptional({
+    example: 12,
+    description: 'Years of farming experience',
+  })
   @IsInt()
   @Min(0)
   @IsOptional()

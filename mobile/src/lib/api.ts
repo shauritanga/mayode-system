@@ -1,5 +1,7 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
+import { syncQueue } from '../services/sync-queue';
+import { cachedRead, discardOfflineMutation, reconcileOfflineMutation, resolveReplayData, stageOfflineMutation } from '../services/offline-cache';
 
 /**
  * Base URL resolution order:
@@ -30,6 +32,21 @@ export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   timeout: 15000,
+});
+
+syncQueue.configure(async (mutation) => {
+  if (mutation.method.toUpperCase() === 'PATCH') {
+    // Server records expose updatedAt. If another device has a newer version,
+    // discard this stale local write; otherwise the queued mutation wins.
+    const current = await api.get(mutation.url);
+    const serverUpdatedAt = current.data?.updatedAt;
+    if (serverUpdatedAt && new Date(serverUpdatedAt).getTime() > new Date(mutation.createdAt).getTime()) {
+      await discardOfflineMutation(mutation);
+      return;
+    }
+  }
+  const response = await api.request({ method: mutation.method, url: mutation.url, data: await resolveReplayData(mutation.data), params: mutation.params, headers: { 'X-MAYODE-SYNC-REPLAY': '1' } });
+  await reconcileOfflineMutation(mutation, response.data);
 });
 
 let inMemoryToken: string | null = null;
@@ -113,6 +130,23 @@ api.interceptors.response.use(
       }
     }
 
+    // Network errors for normal data mutations are persisted locally and replayed
+    // on reconnect. Authentication, uploads and payment actions are excluded.
+    const method = String(originalConfig?.method ?? '').toUpperCase();
+    const replayable = ['POST', 'PATCH', 'PUT'].includes(method) && !originalConfig?.headers?.['X-MAYODE-SYNC-REPLAY'] && !String(originalConfig?.url ?? '').startsWith('/auth/') && !String(originalConfig?.url ?? '').startsWith('/uploads') && !String(originalConfig?.url ?? '').includes('payout');
+    if (!error.response && replayable) {
+      const queued = await syncQueue.enqueue({ method, url: originalConfig.url, data: originalConfig.data, params: originalConfig.params });
+      const optimistic = await stageOfflineMutation(queued);
+      return { data: { ...(optimistic ?? {}), queued: true, syncId: queued.id }, status: 202, statusText: 'Queued for sync', headers: {}, config: originalConfig };
+    }
+
+    // Offline reads for the three field workflows are served from the same
+    // persistent optimistic cache that backs queued mutations.
+    if (!error.response && method === 'GET') {
+      const cached = await cachedRead(String(originalConfig?.url ?? ''), originalConfig?.params as Record<string, unknown> | undefined);
+      if (cached !== undefined) return { data: cached, status: 200, statusText: 'Offline cache', headers: {}, config: originalConfig };
+    }
+
     return Promise.reject(error);
   },
 );
@@ -121,7 +155,7 @@ api.interceptors.response.use(
 export const authApi = {
   login: (phone: string, password: string) =>
     api.post('/auth/login', { phone, password }),
-  register: (data: { phone: string; password: string; firstName: string; lastName: string; role: string }) =>
+  register: (data: { phone: string; password: string; firstName: string; lastName: string; role: string; dataShareConsent: boolean }) =>
     api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
   // AMCOS Secretary self-service: mamcosId is resolved server-side from the
@@ -157,7 +191,12 @@ export const farmersApi = {
   }) => api.post(`/farmers/${id}/identity`, data),
   productionSummary: (id: string) => api.get(`/farmers/${id}/production-summary`),
   financialSummary: (id: string) => api.get(`/farmers/${id}/financial-summary`),
+  financialProfile: (id: string) => api.get(`/farmers/${id}/financial-profile`),
   creditReadiness: (id: string) => api.get(`/farmers/${id}/credit-readiness`),
+  listConsents: (id: string) => api.get(`/farmers/${id}/consents`),
+  captureConsent: (id: string, data: object) => api.post(`/farmers/${id}/consents`, data),
+  listQuestionnaires: (id: string) => api.get(`/farmers/${id}/questionnaires`),
+  createQuestionnaire: (id: string, data: object) => api.post(`/farmers/${id}/questionnaires`, data),
 };
 
 // ── AMCOS cooperatives (API route remains /mamcos) ──
@@ -233,6 +272,13 @@ export const cropCyclesApi = {
     gpsLongitude?: number;
   }) => api.post('/crop-cycles/activity', data),
   calendar: (params?: { from?: string; to?: string }) => api.get('/crop-cycles/calendar', { params }),
+};
+
+export const riceProtocolsApi = {
+  tasks: (cropCycleId: string) => api.get(`/rice-protocols/crop-cycles/${cropCycleId}/tasks`),
+  readiness: (cropCycleId: string) => api.get(`/rice-protocols/crop-cycles/${cropCycleId}/readiness`),
+  rescheduleTask: (id: string, data: { dueDate: string; reason?: string }) => api.patch(`/rice-protocols/tasks/${id}/schedule`, data),
+  completeTask: (id: string, data: { measurements?: Record<string, string | number>; photoUrls?: string[]; description?: string }) => api.post(`/rice-protocols/tasks/${id}/complete`, data),
 };
 
 // ── Finance (expenses & revenue per crop cycle) ──
@@ -405,10 +451,91 @@ export const officerVisitsApi = {
     api.get('/field-officer-visits/calendar', { params }),
 };
 
-// ── Marketplace ──
+// ── Marketplace (M-LAX) ──
 export const marketplaceApi = {
+  // Land listings
   getLandListings: (params?: object) => api.get('/marketplace/land', { params }),
+  getLandListing: (id: string) => api.get(`/marketplace/land/${id}`),
+  createLandListing: (data: object) => api.post('/marketplace/land', data),
+  updateLandListing: (id: string, data: object) => api.patch(`/marketplace/land/${id}`, data),
+  cancelLandListing: (id: string) => api.patch(`/marketplace/land/${id}/cancel`),
+  getSuggestedPrice: (farmId: string, askingPrice?: number) =>
+    api.get(`/marketplace/land/farm/${farmId}/suggested-price`, { params: askingPrice ? { askingPrice } : undefined }),
+
+  // Escrow
+  depositEscrow: (listingId: string, data: { renterId: string; amount: number; mpesaRef?: string; phoneNumber?: string }) =>
+    api.post(`/marketplace/land/${listingId}/escrow-deposit`, data),
+  reconcileEscrow: (listingId: string) => api.post(`/marketplace/land/${listingId}/escrow-reconcile`),
+  releaseEscrow: (listingId: string) => api.post(`/marketplace/land/${listingId}/escrow-release`),
+
+  // Digital lease agreement
+  regenerateAgreement: (listingId: string) => api.post(`/marketplace/land/${listingId}/agreement/regenerate`),
+
+  // Sub-leasing & ownership transfer
+  requestSubLease: (listingId: string, data: { renterId: string; newAskingPrice?: number }) =>
+    api.post(`/marketplace/land/${listingId}/sub-lease/request`, data),
+  approveSubLease: (listingId: string, subLeaseId: string, data: { ownerId: string; approve: boolean }) =>
+    api.patch(`/marketplace/land/${listingId}/sub-lease/${subLeaseId}/approve`, data),
+  transferOwnership: (listingId: string, data: { currentOwnerId: string; newOwnerPhone: string; reason?: string }) =>
+    api.post(`/marketplace/land/${listingId}/transfer-ownership`, data),
+
+  // Bargaining — "Make an Offer"
+  submitOffer: (listingId: string, data: { farmerId: string; offerAmount: number }) =>
+    api.post(`/marketplace/land/${listingId}/offers`, data),
+  getOffers: (listingId: string) => api.get(`/marketplace/land/${listingId}/offers`),
+  respondToOffer: (listingId: string, offerId: string, data: { ownerId: string; action: 'accept' | 'reject' | 'counter'; counterAmount?: number }) =>
+    api.patch(`/marketplace/land/${listingId}/offers/${offerId}/respond`, data),
+  respondToCounter: (listingId: string, offerId: string, data: { farmerId: string; accept: boolean }) =>
+    api.patch(`/marketplace/land/${listingId}/offers/${offerId}/counter-response`, data),
+
+  // Multi-year rent schedule & installments
+  getRentSchedule: (listingId: string) => api.get(`/marketplace/land/${listingId}/rent-schedule`),
+  payInstallment: (listingId: string, data: { renterId: string; phoneNumber?: string; mpesaRef?: string }) =>
+    api.post(`/marketplace/land/${listingId}/installments/pay`, data),
+  logImprovement: (listingId: string, data: { renterId: string; description: string; amountTzs: number }) =>
+    api.post(`/marketplace/land/${listingId}/improvements`, data),
+
+  // Reward for Honesty (internal MAYODE protection status, not third-party insurance)
+  getProtectionStatus: (listingId: string) => api.get(`/marketplace/land/${listingId}/protection`),
+
+  // Input credit / harvest buy-back eligibility (gated on M-LAX activity)
+  checkInputCreditEligibility: (farmerId: string) => api.get(`/marketplace/farmers/${farmerId}/input-credit-eligibility`),
+  issueInputCredit: (farmerId: string, data: { amountTzs: number; repaymentSchedule?: string; autoDeductPercent?: number }) =>
+    api.post(`/marketplace/farmers/${farmerId}/input-credit`, data),
+  checkBuyBackEligibility: (farmerId: string) => api.get(`/marketplace/farmers/${farmerId}/buy-back-eligibility`),
+
+  // MAMCOS stability + unreported-activity flagging
+  getMamcosStability: (mamcosId: string) => api.get(`/marketplace/mamcos/${mamcosId}/stability`),
+  flagUnreportedActivity: (farmId: string, data: { officerUserId: string; description: string }) =>
+    api.post(`/marketplace/farms/${farmId}/flag-unreported-activity`, data),
+
+  // Tractors
+  createTractorOwner: (data: { name: string; phone: string; location?: string }) =>
+    api.post('/marketplace/tractors/owners', data),
+  createTractor: (data: object) => api.post('/marketplace/tractors', data),
   getTractors: (params?: object) => api.get('/marketplace/tractors', { params }),
+  getMyTractors: (ownerId: string) => api.get(`/marketplace/tractors/owners/${ownerId}/tractors`),
   bookTractor: (data: object) => api.post('/marketplace/tractors/book', data),
+  confirmTractorBooking: (id: string) => api.patch(`/marketplace/tractors/bookings/${id}/confirm`),
+  completeTractorBooking: (id: string) => api.patch(`/marketplace/tractors/bookings/${id}/complete`),
+  cancelTractorBooking: (id: string) => api.patch(`/marketplace/tractors/bookings/${id}/cancel`),
+
+  // Market prices
   getMarketPrices: (params?: object) => api.get('/marketplace/prices', { params }),
+  createMarketPrice: (data: { commodity: string; price: number; market?: string; source?: string; recordedAt: string }) =>
+    api.post('/marketplace/prices', data),
+};
+
+export const governanceApi = {
+  votes: () => api.get('/governance/votes'),
+  respond: (voteId: string, optionId: string) => api.post(`/governance/votes/${voteId}/respond/${optionId}`),
+};
+
+export const reportsApi = {
+  flocertAuditPack: (params?: object) => api.get('/reports/flocert-audit-pack', { params }),
+};
+
+export const integrationsApi = {
+  createAiRecord: (data: object) => api.post('/integrations/ai-records', data),
+  aiRecords: (params?: object) => api.get('/integrations/ai-records', { params }),
 };

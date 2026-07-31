@@ -111,10 +111,11 @@ export default function RegisterFarmScreen() {
         soilCondition: soilCondition || undefined,
       });
       const farm = res.data;
-      Alert.alert(t('farmRegistered'), t('farmCreated', { code: farm.farmCode }), [
+      const queued = Boolean(farm.queued);
+      Alert.alert(t('farmRegistered'), queued ? 'Farm saved on this device and will sync automatically when you reconnect.' : t('farmCreated', { code: farm.farmCode }), [
         {
           text: t('walkGpsBoundary'),
-          onPress: () => router.replace({ pathname: '/boundary', params: { id: farm.id, label: t('farmContext', { code: farm.farmCode }) } }),
+          onPress: () => queued ? Alert.alert('Pending sync', 'Connect to the internet before mapping this farm boundary.') : router.replace({ pathname: '/boundary', params: { id: farm.id, label: t('farmContext', { code: farm.farmCode }) } }),
         },
         { text: t('done'), style: 'cancel', onPress: () => router.replace('/(tabs)/farms') },
       ]);

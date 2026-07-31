@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Keyboard, Platform } from 'react-native';
+import { View, Text, Image, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Keyboard, Platform, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
@@ -13,6 +13,7 @@ export default function RegisterRoute() {
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [dataShareConsent, setDataShareConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const { setAuth, setFarmerId } = useAuthStore();
   const { t } = useI18n();
@@ -34,6 +35,10 @@ export default function RegisterRoute() {
       Alert.alert(t('validationError'), t('allFieldsRequired'));
       return;
     }
+    if (!dataShareConsent) {
+      Alert.alert('Data sharing consent', 'Please confirm your consent before creating your account. You can withdraw it later from your profile.');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -43,6 +48,7 @@ export default function RegisterRoute() {
         firstName,
         lastName,
         role: 'FARMER',
+        dataShareConsent,
       });
       const { accessToken, refreshToken, user } = res.data;
       setAuth(user, accessToken, refreshToken);
@@ -77,9 +83,7 @@ export default function RegisterRoute() {
         >
           {/* Logo Section */}
           <View style={styles.headerContainer}>
-            <View style={styles.logoBox}>
-              <Text style={styles.logoText}>M</Text>
-            </View>
+            <Image source={require('../assets/mayode.png')} style={styles.logoImage} resizeMode="contain" />
             <Text style={styles.appTitle}>MAYODE GROUP</Text>
             <Text style={styles.appSubtitle}>{t('farmerRegistrationPortal')}</Text>
           </View>
@@ -123,6 +127,14 @@ export default function RegisterRoute() {
                 onChangeText={setPhone}
                 autoCapitalize="none"
               />
+            </View>
+
+            <View style={styles.consentRow}>
+              <Switch value={dataShareConsent} onValueChange={setDataShareConsent} trackColor={{ true: '#10B981' }} />
+              <TouchableOpacity style={styles.consentCopy} onPress={() => setDataShareConsent((value) => !value)} activeOpacity={0.8}>
+                <Text style={styles.consentTitle}>Data-sharing consent</Text>
+                <Text style={styles.consentText}>I agree that MAYODE may share my credit-readiness data with approved financial providers. You can withdraw this in your profile at any time.</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.inputGroup}>
@@ -175,24 +187,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
-  logoBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: '#10B981',
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoImage: {
+    width: 72,
+    height: 72,
     marginBottom: 16,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
   },
   appTitle: {
     fontSize: 24,
@@ -252,6 +250,10 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontSize: 15,
   },
+  consentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 12, borderRadius: 12, backgroundColor: '#F0FDF9', borderWidth: 1, borderColor: '#A7F3D0', marginBottom: 4 },
+  consentCopy: { flex: 1 },
+  consentTitle: { fontSize: 13, fontWeight: '700', color: '#065F46', marginBottom: 3 },
+  consentText: { fontSize: 12, color: '#374151', lineHeight: 17 },
   button: {
     backgroundColor: '#10B981',
     borderRadius: 12,

@@ -13,6 +13,11 @@ export class CreateInventoryRecordDto {
   @IsNotEmpty()
   farmerId: string;
 
+  @ApiPropertyOptional({ example: 'crop-cycle-uuid', description: 'Source crop cycle. Required when the Mbalari calendar is active for the farm.' })
+  @IsString()
+  @IsOptional()
+  cropCycleId?: string;
+
   @ApiProperty({ example: 450.5, description: 'Net weight of the received harvest in kilograms' })
   @IsNumber()
   weightKg: number;

@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Location01Icon, Notification03Icon, ArrowRight01Icon, BellIcon, Alert02Icon, SquareLock02Icon, Plant01Icon, Wallet01Icon, ShoppingCart02Icon } from '@hugeicons/core-free-icons';
+import { Location01Icon, Notification03Icon, ArrowRight01Icon, BellIcon, Alert02Icon, SquareLock02Icon, Plant01Icon, Wallet01Icon, Calendar01Icon, Agreement01Icon } from '@hugeicons/core-free-icons';
 import { useAuthStore } from '../../src/store/auth.store';
 import { farmsApi, activitiesApi, alertsApi, registryApi } from '../../src/lib/data';
 import { fetchWeatherHere, WeatherData } from '../../src/services/weather.service';
@@ -154,9 +154,13 @@ function FarmerDashboardTab() {
               <HugeiconsIcon icon={Wallet01Icon} size={20} color="#065F46" strokeWidth={2} />
               <Text style={styles.quickLinkText}>{t('finances')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickLink} onPress={() => router.push('/marketplace')}>
-              <HugeiconsIcon icon={ShoppingCart02Icon} size={20} color="#065F46" strokeWidth={2} />
-              <Text style={styles.quickLinkText}>{t('marketplace')}</Text>
+            <TouchableOpacity style={styles.quickLink} onPress={() => router.push('/calendar')}>
+              <HugeiconsIcon icon={Calendar01Icon} size={20} color="#065F46" strokeWidth={2} />
+              <Text style={styles.quickLinkText}>{t('calendar')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickLink} onPress={() => router.push('/votes')}>
+              <HugeiconsIcon icon={Agreement01Icon} size={20} color="#065F46" strokeWidth={2} />
+              <Text style={styles.quickLinkText}>Voting</Text>
             </TouchableOpacity>
           </View>
 
@@ -222,7 +226,7 @@ function FarmerDashboardTab() {
             <View style={[styles.emptyFarmCard, { width: cardW }]}>
               <Text style={styles.emptyFarmTitle}>{t('noFarmsYet')}</Text>
               <Text style={styles.emptyFarmDesc}>
-                Your AMCOS will assign a farm for the active season. Once you accept and a Field Officer verifies it, it will appear here.
+                Your AMCOS will assign a farm for the active season. Once you accept, it will be verified by the field officer and it will be displayed here
               </Text>
             </View>
           ) : (

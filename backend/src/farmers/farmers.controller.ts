@@ -9,7 +9,9 @@ import {
   Delete,
   Query,
   UseGuards,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FarmersService } from './farmers.service';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
@@ -23,49 +25,118 @@ import {
   LinkDocumentDto,
   SubmitIdentityDto,
 } from './dto/farmer-actions.dto';
+import {
+  CaptureConsentDto,
+  CreateQuestionnaireDto,
+} from './dto/trust-layer.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 import type { RequestUser } from '../common/ownership.service';
+import { ExportService } from '../common/export.service';
 
 @ApiTags('farmers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('farmers')
 export class FarmersController {
-  constructor(private readonly farmersService: FarmersService) {}
+  constructor(
+    private readonly farmersService: FarmersService,
+    private readonly exporter: ExportService,
+  ) {}
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER)
-  @ApiOperation({ summary: 'Register a new farmer (provisions login + profile)' })
+  @ApiOperation({
+    summary: 'Register a new farmer (provisions login + profile)',
+  })
   create(@Body() dto: CreateFarmerDto) {
     return this.farmersService.create(dto);
   }
 
   @Get()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY, UserRole.AUDITOR)
-  @ApiOperation({ summary: 'List farmers (search, filter by location/cooperative/status, paginated) — Admin read-only for reporting/Finance farmer lookup' })
-  findAll(@Query() query: QueryFarmersDto) {
-    return this.farmersService.findAll(query);
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
+  @ApiOperation({
+    summary:
+      'List farmers (search, filter by location/cooperative/status, paginated) — Admin read-only for reporting/Finance farmer lookup',
+  })
+  async findAll(
+    @Query() query: QueryFarmersDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.farmersService.findAll(query);
+    if (!query.format || query.format === 'json') return result;
+    const rows = result.data.map((farmer: any) => ({
+      controlNumber: farmer.controlNumber,
+      firstName: farmer.firstName,
+      lastName: farmer.lastName,
+      phone: farmer.user?.phone ?? '',
+      village: farmer.village ?? '',
+      district: farmer.district ?? '',
+      region: farmer.region ?? '',
+      verificationStatus: farmer.verificationStatus,
+    }));
+    if (query.format === 'csv') {
+      response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      response.setHeader(
+        'Content-Disposition',
+        'attachment; filename="farmers.csv"',
+      );
+      return response.send(this.exporter.csv(rows));
+    }
+    response.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    response.setHeader(
+      'Content-Disposition',
+      'attachment; filename="farmers.xlsx"',
+    );
+    return response.send(this.exporter.xlsx(rows, 'farmers'));
   }
 
   @Get('overview')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY, UserRole.AUDITOR)
-  @ApiOperation({ summary: 'Farmer dashboard aggregates (counts by status and region)' })
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
+  @ApiOperation({
+    summary: 'Farmer dashboard aggregates (counts by status and region)',
+  })
   overview() {
     return this.farmersService.getOverview();
   }
 
   @Get('control-number/:controlNumber')
-  @ApiOperation({ summary: 'Get farmer by unique Control Number (e.g., MYD-00001)' })
+  @ApiOperation({
+    summary: 'Get farmer by unique Control Number (e.g., MYD-00001)',
+  })
   findByControlNumber(@Param('controlNumber') controlNumber: string) {
     return this.farmersService.findByControlNumber(controlNumber);
   }
 
+  @Get('me')
+  @Roles(UserRole.FARMER)
+  @ApiOperation({ summary: 'Get the farmer profile linked to the current user' })
+  findMe(@CurrentUser() user: RequestUser) {
+    return this.farmersService.findMe(user.id);
+  }
+
   @Get(':id')
-  @ApiOperation({ summary: 'Get farmer profile by ID (household, documents, verifications, farms)' })
+  @ApiOperation({
+    summary:
+      'Get farmer profile by ID (household, documents, verifications, farms)',
+  })
   findOne(@Param('id') id: string) {
     return this.farmersService.findOne(id);
   }
@@ -77,15 +148,31 @@ export class FarmersController {
   }
 
   @Get(':id/credit-readiness')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FINANCIAL_PROVIDER, UserRole.MAMCOS_SECRETARY, UserRole.FARMER)
-  @ApiOperation({ summary: 'Compute & persist credit-readiness score with factor breakdown' })
-  getCreditReadiness(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.FINANCIAL_PROVIDER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.FARMER,
+  )
+  @ApiOperation({
+    summary: 'Compute & persist credit-readiness score with factor breakdown',
+  })
+  getCreditReadiness(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+  ) {
     return this.farmersService.getCreditReadiness(id, user);
   }
 
   @Get(':id/production-summary')
-  @ApiOperation({ summary: 'Farmer production history summary (yields per cycle)' })
-  getProductionSummary(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+  @ApiOperation({
+    summary: 'Farmer production history summary (yields per cycle)',
+  })
+  getProductionSummary(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+  ) {
     return this.farmersService.getProductionSummary(id, user);
   }
 
@@ -94,8 +181,99 @@ export class FarmersController {
     summary:
       'Farmer financial summary (costs, revenues, net profit). Premium: free users receive a locked preview.',
   })
-  getFinancialSummary(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+  getFinancialSummary(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+  ) {
     return this.farmersService.getFinancialSummary(id, user);
+  }
+
+  @Get(':id/financial-profile')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.FINANCIAL_PROVIDER,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
+  @ApiOperation({
+    summary:
+      'Formal farmer financial profile for staff/auditors and consented financial-provider sharing',
+  })
+  getFinancialProfile(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.farmersService.getFormalFinancialProfile(id, user);
+  }
+
+  @Post(':id/consents')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.FARMER,
+  )
+  @ApiOperation({
+    summary:
+      'Capture a formal farmer consent/revocation record, including financial-provider sharing consent',
+  })
+  captureConsent(
+    @Param('id') id: string,
+    @Body() dto: CaptureConsentDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.farmersService.captureConsent(id, dto, user);
+  }
+
+  @Get(':id/consents')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
+  @ApiOperation({ summary: 'List formal consent records for a farmer' })
+  listConsents(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.farmersService.listConsents(id, user);
+  }
+
+  @Post(':id/questionnaires')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY)
+  @ApiOperation({
+    summary:
+      'Capture official MAYOData farmer/farm questionnaire sections as an auditable record',
+  })
+  createQuestionnaire(
+    @Param('id') id: string,
+    @Body() dto: CreateQuestionnaireDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.farmersService.createQuestionnaire(id, dto, user);
+  }
+
+  @Get(':id/questionnaires')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
+  @ApiOperation({ summary: 'List official questionnaire records for a farmer' })
+  listQuestionnaires(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.farmersService.listQuestionnaires(id, user);
   }
 
   @Get(':id/documents')
@@ -105,7 +283,9 @@ export class FarmersController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update farmer profile (own profile for farmers, any for staff)' })
+  @ApiOperation({
+    summary: 'Update farmer profile (own profile for farmers, any for staff)',
+  })
   update(
     @Param('id') id: string,
     @Body() dto: UpdateFarmerDto,
@@ -158,7 +338,9 @@ export class FarmersController {
   }
 
   @Post(':id/documents')
-  @ApiOperation({ summary: 'Link an uploaded file as a typed document on the farmer' })
+  @ApiOperation({
+    summary: 'Link an uploaded file as a typed document on the farmer',
+  })
   addDocument(
     @Param('id') id: string,
     @Body() dto: LinkDocumentDto,

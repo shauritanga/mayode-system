@@ -491,7 +491,7 @@ Collect only:
 
 - Phone number
 - Name
-- Role
+- RoleB
 - Farm confirmation
 - Farming season
 - Consent
@@ -1071,3 +1071,7 @@ After reviewing the existing system, provide:
 Implement the solution in the existing application.
 
 Do not only produce mockups, recommendations, or documentation. Make the necessary database, backend, mobile, web, USSD, notification, authorization, and testing changes while preserving the existing project architecture.
+
+
+
+

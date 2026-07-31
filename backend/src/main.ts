@@ -6,12 +6,34 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+    );
+    next();
+  });
+
   // Global prefix for all API routes
   app.setGlobalPrefix('api/v1');
 
-  // Enable CORS for web and mobile clients across all local Wi-Fi IP addresses
+  const configuredOrigins = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  // Enable CORS for configured clients. Local development remains permissive.
   app.enableCors({
-    origin: true,
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? configuredOrigins
+        : configuredOrigins.length
+          ? configuredOrigins
+          : true,
     credentials: true,
   });
 

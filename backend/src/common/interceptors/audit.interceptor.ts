@@ -60,9 +60,31 @@ export class AuditInterceptor implements NestInterceptor {
   /** Strip obviously-sensitive fields before persisting the request body. */
   private safeBody(body: unknown): object | undefined {
     if (!body || typeof body !== 'object') return undefined;
-    const clone: Record<string, unknown> = { ...(body as Record<string, unknown>) };
-    for (const key of ['password', 'passwordHash', 'refreshToken', 'accessToken']) {
-      if (key in clone) clone[key] = '***';
+    return this.redact(body) as object;
+  }
+
+  private redact(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map((item) => this.redact(item));
+    if (!value || typeof value !== 'object') return value;
+    const sensitive = [
+      'password',
+      'passwordHash',
+      'refreshToken',
+      'accessToken',
+      'token',
+      'apiKey',
+      'keyHash',
+      'secret',
+      'authorization',
+      'signature',
+      'thumbprint',
+      'nationalId',
+    ];
+    const clone: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      clone[key] = sensitive.some((needle) => key.toLowerCase().includes(needle.toLowerCase()))
+        ? '***'
+        : this.redact(item);
     }
     return clone;
   }

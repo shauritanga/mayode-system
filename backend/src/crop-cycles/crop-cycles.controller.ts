@@ -7,7 +7,9 @@ import {
   Param,
   Query,
   UseGuards,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CropCyclesService } from './crop-cycles.service';
 import {
@@ -22,6 +24,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { UserRole } from '@prisma/client';
+import { ExportService } from '../common/export.service';
+import { ReportFormatDto } from '../reports/dto/reports.dto';
 
 const STAFF_ROLES = [
   UserRole.SUPER_ADMIN,
@@ -35,14 +39,13 @@ const STAFF_ROLES = [
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('crop-cycles')
 export class CropCyclesController {
-  constructor(private readonly cropCyclesService: CropCyclesService) {}
+  constructor(
+    private readonly cropCyclesService: CropCyclesService,
+    private readonly exporter: ExportService,
+  ) {}
 
   @Post()
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.FIELD_OFFICER,
-    UserRole.FARMER,
-  )
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({ summary: 'Initiate a new seasonal crop cycle for a farm' })
   create(@Body() dto: CreateCropCycleDto, @CurrentUser() user: RequestUser) {
     return this.cropCyclesService.create(dto, user);
@@ -53,15 +56,54 @@ export class CropCyclesController {
   @ApiOperation({
     summary: 'Get all crop cycles across the system (staff only)',
   })
-  findAll() {
-    return this.cropCyclesService.findAll();
+  async findAll(
+    @Query() query: ReportFormatDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const rows = await this.cropCyclesService.findAll();
+    if (!query.format || query.format === 'json') return rows;
+    const exportRows = rows.map((cycle: any) => ({
+      farmCode: cycle.farm?.farmCode ?? '',
+      farmer:
+        `${cycle.farmer?.firstName ?? ''} ${cycle.farmer?.lastName ?? ''}`.trim(),
+      season: cycle.season,
+      riceVariety: cycle.riceVariety ?? '',
+      plantingDate: cycle.plantingDate?.toISOString?.() ?? '',
+      harvestDate: cycle.harvestDate?.toISOString?.() ?? '',
+      actualYieldKg: cycle.actualYieldKg ?? 0,
+      status: cycle.status,
+    }));
+    if (query.format === 'csv') {
+      response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      response.setHeader(
+        'Content-Disposition',
+        'attachment; filename="crop-cycles.csv"',
+      );
+      return response.send(this.exporter.csv(exportRows));
+    }
+    response.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    response.setHeader(
+      'Content-Disposition',
+      'attachment; filename="crop-cycles.xlsx"',
+    );
+    return response.send(this.exporter.xlsx(exportRows, 'crop-cycles'));
   }
 
   @Get('calendar')
   @Roles(UserRole.FARMER)
-  @ApiOperation({ summary: "Combined calendar: own activity log entries + upcoming planting/harvest milestones across all the farmer's farms" })
+  @ApiOperation({
+    summary:
+      "Combined calendar: own activity log entries + upcoming planting/harvest milestones across all the farmer's farms",
+  })
   calendar(@CurrentUser() user: RequestUser, @Query() query: CalendarQueryDto) {
-    return this.cropCyclesService.calendarForSelf(user.id, query.from, query.to);
+    return this.cropCyclesService.calendarForSelf(
+      user.id,
+      query.from,
+      query.to,
+    );
   }
 
   @Get(':id')
@@ -92,11 +134,7 @@ export class CropCyclesController {
   }
 
   @Patch(':id')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.FIELD_OFFICER,
-    UserRole.FARMER,
-  )
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({
     summary: 'Update crop cycle status, harvest dates, or actual yields',
   })
@@ -109,11 +147,7 @@ export class CropCyclesController {
   }
 
   @Post('activity')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.FIELD_OFFICER,
-    UserRole.FARMER,
-  )
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({
     summary:
       'Log a farming activity (land prep, weeding, harvest, etc.) with inputs & labor',

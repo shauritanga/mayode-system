@@ -1,16 +1,4 @@
 /**
- * Data-source switch.
- *
- * true  → all data is stored locally on the device (AsyncStorage). The app is
- *         fully functional offline; nothing talks to the backend.
- * false → the app uses the remote NestJS backend over HTTP (src/lib/api.ts).
- *
- * Flip this to false (and run the backend) when you're ready to link the real
- * backend. Screens import from src/lib/data.ts, so no screen code changes.
- */
-export const USE_LOCAL_DATA = false;
-
-/**
  * Push notifications require Firebase/FCM credentials (googleServicesFile) and a
  * real EAS projectId — both are configured (see app.json). Push tokens only
  * resolve on a physical device with a native build that includes google-services.json,

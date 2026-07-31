@@ -1,12 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { marketplaceApi } from '../../src/lib/data';
 import { useAuthStore } from '../../src/store/auth.store';
 import { useI18n } from '../../src/i18n';
+import { LandListingCard } from '../../src/components/marketplace/LandListingCard';
+import { TractorCard } from '../../src/components/marketplace/TractorCard';
 
 export default function MarketplaceTab() {
-  const { user } = useAuthStore();
+  const { user, farmerId } = useAuthStore();
+  const router = useRouter();
   const { t } = useI18n();
   const [tab, setTab] = useState<'land' | 'tractors'>('land');
   const [listings, setListings] = useState<any[]>([]);
@@ -30,12 +34,10 @@ export default function MarketplaceTab() {
     }
   };
 
-  useEffect(() => {
-    fetchMarketplace();
-  }, []);
+  useFocusEffect(useCallback(() => { fetchMarketplace(); }, []));
 
   const handleBookTractor = async (tractorId: string) => {
-    if (!user) {
+    if (!user || !farmerId) {
       Alert.alert(t('authRequired'), t('tractorAuthRequired'));
       return;
     }
@@ -43,10 +45,10 @@ export default function MarketplaceTab() {
     try {
       await marketplaceApi.bookTractor({
         tractorId,
-        farmerId: user.id,
+        farmerId,
         hectares: 2.0,
         terrainGrade: 'B',
-        commissionRate: 0.05,
+        commissionRate: 0.1,
         scheduledDate: new Date(Date.now() + 86400000 * 3).toISOString(), // 3 days from now
       });
       Alert.alert(t('bookingConfirmed'), t('tractorBooked'));
@@ -83,27 +85,7 @@ export default function MarketplaceTab() {
             <Text style={styles.emptyText}>{t('noLandListings')}</Text>
           ) : (
             listings.map((l) => (
-              <View key={l.id} style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View>
-                    <Text style={styles.farmCode}>{l.farm?.farmCode || t('farm')}</Text>
-                    <Text style={styles.subText}>{l.farm?.socialHectares || '—'} ha · {t('gradeValue', { grade: l.farm?.grade || 'A' })}</Text>
-                  </View>
-                  <View style={[styles.badge, styles.badgeGold]}>
-                    <Text style={styles.badgeTextGold}>{l.dealType}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.priceBox}>
-                  <Text style={styles.priceLabel}>{t('askingPrice')}</Text>
-                  <Text style={styles.priceValue}>{Number(l.askingPrice).toLocaleString()} TZS</Text>
-                </View>
-
-                <View style={styles.cardFooter}>
-                  <Text style={styles.ownerText}>👤 {l.owner?.firstName} {l.owner?.lastName}</Text>
-                  <Text style={styles.statusText}>{l.leaseStatus}</Text>
-                </View>
-              </View>
+              <LandListingCard key={l.id} listing={l} onPress={() => router.push(`/land-listing/${l.id}` as any)} />
             ))
           )
         ) : (
@@ -111,33 +93,25 @@ export default function MarketplaceTab() {
             <Text style={styles.emptyText}>{t('noTractors')}</Text>
           ) : (
             tractors.map((tractor) => (
-              <View key={tractor.id} style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View>
-                    <Text style={styles.tractorModel}>{tractor.model || t('tractors')}</Text>
-                    <Text style={styles.regNo}>{tractor.registrationNo}</Text>
-                  </View>
-                  <View style={[styles.badge, tractor.isAvailable ? styles.badgeGreen : styles.badgeRed]}>
-                    <Text style={[styles.badgeText, tractor.isAvailable ? styles.badgeTextGreen : styles.badgeTextRed]}>
-                      {tractor.isAvailable ? t('available') : t('booked')}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.tractorDetails}>
-                  <Text style={styles.tractorDetailText}>📍 {tractor.location || t('locationUnknown')}</Text>
-                  <Text style={styles.tractorDetailText}>⚡ {tractor.horsePower || '—'} HP</Text>
-                  <Text style={styles.tractorPriceText}>{tractor.pricePerHectare ? `${Number(tractor.pricePerHectare).toLocaleString()} TZS/ha` : '—'}</Text>
-                </View>
-
-                {tractor.isAvailable && (
-                  <TouchableOpacity style={styles.bookBtn} onPress={() => handleBookTractor(tractor.id)}>
-                    <Text style={styles.bookBtnText}>{t('bookTractorService')}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+              <TractorCard key={tractor.id} tractor={tractor} onBook={() => handleBookTractor(tractor.id)} />
             ))
           )
+        )}
+
+        {tab === 'land' && farmerId && (
+          <TouchableOpacity style={styles.fabBtn} onPress={() => router.push('/land-listing-new' as any)}>
+            <Text style={styles.fabBtnText}>{t('mlaxCreateListing')}</Text>
+          </TouchableOpacity>
+        )}
+        {tab === 'land' && user?.role && ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'].includes(user.role) && (
+          <TouchableOpacity style={[styles.fabBtn, styles.fabBtnSecondary]} onPress={() => router.push('/agent-list-farm' as any)}>
+            <Text style={styles.fabBtnText}>{t('mlaxAgentListFarm')}</Text>
+          </TouchableOpacity>
+        )}
+        {tab === 'tractors' && (
+          <TouchableOpacity style={styles.fabBtn} onPress={() => router.push('/my-tractors' as any)}>
+            <Text style={styles.fabBtnText}>{t('mlaxMyTractors')}</Text>
+          </TouchableOpacity>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -186,124 +160,19 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     fontSize: 15,
   },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  farmCode: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  subText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  tractorModel: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  regNo: {
-    fontSize: 13,
-    color: '#10B981',
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  badge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  badgeGreen: { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)' },
-  badgeGold: { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: 'rgba(245, 158, 11, 0.3)' },
-  badgeRed: { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)' },
-  badgeText: { fontSize: 12, fontWeight: '700' },
-  badgeTextGreen: { color: '#10B981' },
-  badgeTextGold: { color: '#F59E0B' },
-  badgeTextRed: { color: '#F87171' },
-  priceBox: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  priceLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  priceValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#10B981',
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  fabBtn: {
+    backgroundColor: '#065F46',
+    borderRadius: 14,
+    paddingVertical: 15,
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 14,
+    marginTop: 4,
   },
-  ownerText: {
-    fontSize: 13,
-    color: '#374151',
-    fontWeight: '500',
+  fabBtnSecondary: {
+    backgroundColor: '#374151',
   },
-  statusText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  tractorDetails: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  tractorDetailText: {
-    fontSize: 13,
-    color: '#374151',
-    marginBottom: 4,
-  },
-  tractorPriceText: {
-    fontSize: 16,
+  fabBtnText: {
+    color: '#fff',
     fontWeight: '800',
-    color: '#10B981',
-    marginTop: 6,
-  },
-  bookBtn: {
-    backgroundColor: '#10B981',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  bookBtnText: {
-    color: '#ffffff',
     fontSize: 15,
-    fontWeight: '700',
   },
 });

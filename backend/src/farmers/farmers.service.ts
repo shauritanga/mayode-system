@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -29,6 +30,10 @@ import {
   LinkDocumentDto,
   SubmitIdentityDto,
 } from './dto/farmer-actions.dto';
+import {
+  CaptureConsentDto,
+  CreateQuestionnaireDto,
+} from './dto/trust-layer.dto';
 
 @Injectable()
 export class FarmersService {
@@ -104,6 +109,8 @@ export class FarmersService {
           farmingExperienceYears: dto.farmingExperienceYears,
           familySize: dto.familySize,
           dependents: dto.dependents,
+          dataShareConsent: dto.dataShareConsent ?? false,
+          consentedAt: dto.dataShareConsent ? new Date() : null,
         },
         include: { user: { select: { phone: true, email: true } } },
       });
@@ -200,6 +207,17 @@ export class FarmersService {
     return farmer;
   }
 
+  async findMe(userId: string) {
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!farmer) {
+      throw new NotFoundException('No farmer profile is linked to this user');
+    }
+    return this.findOne(farmer.id);
+  }
+
   async findByControlNumber(controlNumber: string) {
     const farmer = await this.prisma.farmer.findUnique({
       where: { controlNumber },
@@ -224,12 +242,18 @@ export class FarmersService {
   async update(id: string, dto: UpdateFarmerDto, user: RequestUser) {
     await this.ownership.assertFarmerAccess(user, id);
     await this.findOne(id);
-    const { dateOfBirth, ...rest } = dto;
+    const { dateOfBirth, dataShareConsent, ...rest } = dto;
     return this.prisma.farmer.update({
       where: { id },
       data: {
         ...rest,
         ...(dateOfBirth ? { dateOfBirth: new Date(dateOfBirth) } : {}),
+        ...(dataShareConsent !== undefined
+          ? {
+              dataShareConsent,
+              consentedAt: dataShareConsent ? new Date() : null,
+            }
+          : {}),
       },
       include: { user: { select: { phone: true, email: true } } },
     });
@@ -543,13 +567,287 @@ export class FarmersService {
     return this.finance.getFarmerFinancialSummary(farmerId, user);
   }
 
+  async captureConsent(
+    farmerId: string,
+    dto: CaptureConsentDto,
+    user: RequestUser,
+  ) {
+    await this.ownership.assertFarmerAccess(user, farmerId);
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { id: farmerId },
+      select: { id: true },
+    });
+    if (!farmer)
+      throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
+
+    const granted = dto.granted ?? true;
+    const capturedAt = dto.capturedAt ? new Date(dto.capturedAt) : new Date();
+    const consent = await this.prisma.consentRecord.create({
+      data: {
+        farmerId,
+        scope: dto.scope,
+        granted,
+        formVersion: dto.formVersion ?? 'MAYODATA_CONSENT_2026_07',
+        language: dto.language ?? 'sw',
+        explanationReadByUserId: user.id,
+        signatureUrl: dto.signatureUrl,
+        thumbprintUrl: dto.thumbprintUrl,
+        witnessName: dto.witnessName,
+        notes: dto.notes,
+        capturedAt,
+        revokedAt: granted ? undefined : capturedAt,
+      },
+    });
+
+    const financialScopes = new Set([
+      'FINANCIAL_PROVIDERS',
+      'FINANCIAL_PROVIDER',
+      'FINANCIAL_DATA_SHARING',
+      'CREDIT_PROFILE',
+    ]);
+    if (financialScopes.has(dto.scope)) {
+      await this.prisma.farmer.update({
+        where: { id: farmerId },
+        data: {
+          dataShareConsent: granted,
+          consentedAt: granted ? capturedAt : null,
+        },
+      });
+    }
+
+    return consent;
+  }
+
+  async listConsents(farmerId: string, user: RequestUser) {
+    await this.ownership.assertFarmerAccess(user, farmerId);
+    return this.prisma.consentRecord.findMany({
+      where: { farmerId },
+      orderBy: { capturedAt: 'desc' },
+    });
+  }
+
+  async createQuestionnaire(
+    farmerId: string,
+    dto: CreateQuestionnaireDto,
+    user: RequestUser,
+  ) {
+    await this.ownership.assertFarmerAccess(user, farmerId);
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { id: farmerId },
+      select: { id: true },
+    });
+    if (!farmer)
+      throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
+    if (dto.farmId) {
+      const farm = await this.prisma.farm.findUnique({
+        where: { id: dto.farmId },
+        select: { id: true },
+      });
+      if (!farm)
+        throw new NotFoundException(`Farm with ID ${dto.farmId} not found`);
+    }
+
+    return this.prisma.farmerQuestionnaire.create({
+      data: {
+        farmerId,
+        farmId: dto.farmId,
+        fieldOfficerUserId: user.id,
+        formVersion: dto.formVersion ?? 'MAYODATA_FIELD_QUESTIONNAIRE_2026_07',
+        language: dto.language ?? 'sw',
+        officialUse: (dto.officialUse ?? {}) as Prisma.InputJsonValue,
+        farmerSnapshot: (dto.farmerSnapshot ?? {}) as Prisma.InputJsonValue,
+        farmRegistration: (dto.farmRegistration ?? {}) as Prisma.InputJsonValue,
+        plantingInputs: (dto.plantingInputs ?? {}) as Prisma.InputJsonValue,
+        midSeasonCosts: (dto.midSeasonCosts ?? {}) as Prisma.InputJsonValue,
+        harvestSales: (dto.harvestSales ?? {}) as Prisma.InputJsonValue,
+        consentAcknowledged: dto.consentAcknowledged ?? false,
+        signatureUrl: dto.signatureUrl,
+        photoUrls: dto.photoUrls ?? [],
+        gpsLatitude: dto.gpsLatitude,
+        gpsLongitude: dto.gpsLongitude,
+        capturedAt: dto.capturedAt ? new Date(dto.capturedAt) : new Date(),
+      },
+      include: { farm: { select: { id: true, farmCode: true, name: true } } },
+    });
+  }
+
+  async listQuestionnaires(farmerId: string, user: RequestUser) {
+    await this.ownership.assertFarmerAccess(user, farmerId);
+    return this.prisma.farmerQuestionnaire.findMany({
+      where: { farmerId },
+      include: { farm: { select: { id: true, farmCode: true, name: true } } },
+      orderBy: { capturedAt: 'desc' },
+    });
+  }
+
+  async getFormalFinancialProfile(farmerId: string, user: RequestUser) {
+    if (user.role !== UserRole.FINANCIAL_PROVIDER) {
+      await this.ownership.assertFarmerAccess(user, farmerId);
+    }
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { id: farmerId },
+      include: {
+        user: { select: { phone: true, email: true } },
+        mamcos: { select: { id: true, name: true } },
+        consentRecords: {
+          orderBy: { capturedAt: 'desc' },
+          take: 10,
+        },
+        farms: {
+          select: {
+            id: true,
+            farmCode: true,
+            name: true,
+            socialHectares: true,
+            actualAcres: true,
+            isVerified: true,
+          },
+        },
+        cropCycles: {
+          include: {
+            costs: true,
+            revenues: true,
+            farm: { select: { farmCode: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        loanRecords: { include: { deductions: true } },
+        payments: { orderBy: { createdAt: 'desc' }, take: 20 },
+        memberships: { orderBy: { createdAt: 'desc' }, take: 5 },
+      },
+    });
+    if (!farmer)
+      throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
+    if (user.role === UserRole.FINANCIAL_PROVIDER && !farmer.dataShareConsent) {
+      throw new ForbiddenException(
+        'This farmer has not consented to financial-provider data sharing',
+      );
+    }
+
+    const totalCosts = farmer.cropCycles.reduce(
+      (sum, cycle) => sum + cycle.costs.reduce((s, c) => s + c.totalCost, 0),
+      0,
+    );
+    const totalRevenue = farmer.cropCycles.reduce(
+      (sum, cycle) =>
+        sum +
+        cycle.revenues.reduce(
+          (s, r) => s + r.totalRevenue + (r.fairtradePremium ?? 0),
+          0,
+        ),
+      0,
+    );
+    const harvestedCycles = farmer.cropCycles.filter(
+      (cycle) => (cycle.actualYieldKg ?? 0) > 0,
+    );
+    const totalLoanOriginal = farmer.loanRecords.reduce(
+      (sum, loan) => sum + loan.originalAmount,
+      0,
+    );
+    const totalLoanOutstanding = farmer.loanRecords.reduce(
+      (sum, loan) => sum + loan.amountOwed,
+      0,
+    );
+    const activeLoanCount = farmer.loanRecords.filter((loan) => loan.isActive)
+      .length;
+
+    const readiness = await this.getCreditReadiness(farmerId, user);
+    const latestFinancialConsent = farmer.consentRecords.find((record) =>
+      [
+        'FINANCIAL_PROVIDERS',
+        'FINANCIAL_PROVIDER',
+        'FINANCIAL_DATA_SHARING',
+        'CREDIT_PROFILE',
+      ].includes(record.scope),
+    );
+
+    return {
+      farmer: {
+        id: farmer.id,
+        controlNumber: farmer.controlNumber,
+        name: `${farmer.firstName} ${farmer.lastName}`,
+        phone: farmer.user.phone,
+        email: farmer.user.email,
+        village: farmer.village,
+        ward: farmer.ward,
+        district: farmer.district,
+        region: farmer.region,
+        cooperative: farmer.mamcos,
+        verificationStatus: farmer.verificationStatus,
+        farmingExperienceYears: farmer.farmingExperienceYears,
+      },
+      consent: {
+        financialProviderSharing: farmer.dataShareConsent,
+        consentedAt: farmer.consentedAt,
+        latestRecord: latestFinancialConsent ?? null,
+      },
+      credit: readiness,
+      production: {
+        totalCropCycles: farmer.cropCycles.length,
+        harvestedCycles: harvestedCycles.length,
+        totalYieldKg: harvestedCycles.reduce(
+          (sum, cycle) => sum + (cycle.actualYieldKg ?? 0),
+          0,
+        ),
+        cycles: farmer.cropCycles.map((cycle) => ({
+          id: cycle.id,
+          season: cycle.season,
+          farmCode: cycle.farm.farmCode,
+          status: cycle.status,
+          riceVariety: cycle.riceVariety,
+          actualYieldKg: cycle.actualYieldKg,
+          estimatedYieldKg: cycle.estimatedYieldKg,
+          harvestDate: cycle.harvestDate,
+        })),
+      },
+      finance: {
+        totalCosts,
+        totalRevenue,
+        netProfit: totalRevenue - totalCosts,
+        activeLoanCount,
+        totalLoanOriginal,
+        totalLoanOutstanding,
+        repaymentRatio: totalLoanOriginal
+          ? Number(
+              (
+                (totalLoanOriginal - totalLoanOutstanding) /
+                totalLoanOriginal
+              ).toFixed(2),
+            )
+          : null,
+      },
+      farms: farmer.farms,
+      recentPayments: farmer.payments.map((payment) => ({
+        id: payment.id,
+        amount: payment.amount,
+        netAmount: payment.netAmount,
+        loanDeduction: payment.loanDeduction,
+        status: payment.status,
+        paidAt: payment.paidAt,
+        createdAt: payment.createdAt,
+        description: payment.description,
+      })),
+      conditions: {
+        canShareWithFinancialProvider:
+          farmer.dataShareConsent && !farmer.isBlacklisted,
+        hasVerifiedIdentity:
+          farmer.verificationStatus === VerificationStatus.VERIFIED,
+        hasProductionHistory: harvestedCycles.length > 0,
+        hasPositiveNetFarmIncome: totalRevenue - totalCosts > 0,
+        isBlacklisted: farmer.isBlacklisted,
+      },
+    };
+  }
+
   /**
    * Compute a real credit-readiness score (0-100) from verification, production,
    * profitability, loan repayment, cooperative membership and experience. The
    * resulting score is persisted onto Farmer.creditScore.
    */
   async getCreditReadiness(farmerId: string, user: RequestUser) {
-    await this.ownership.assertFarmerAccess(user, farmerId);
+    if (user.role !== UserRole.FINANCIAL_PROVIDER) {
+      await this.ownership.assertFarmerAccess(user, farmerId);
+    }
     const farmer = await this.prisma.farmer.findUnique({
       where: { id: farmerId },
       include: {
@@ -559,6 +857,11 @@ export class FarmersService {
     });
     if (!farmer)
       throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
+    if (user.role === UserRole.FINANCIAL_PROVIDER && !farmer.dataShareConsent) {
+      throw new ForbiddenException(
+        'This farmer has not consented to sharing credit-readiness data',
+      );
+    }
 
     // 1. Verification (max 25)
     const verificationScore =

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Keyboard, Platform } from 'react-native';
+import { View, Text, Image, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Keyboard, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
@@ -66,9 +66,7 @@ export default function LoginRoute() {
         >
           {/* Logo Section */}
           <View style={styles.headerContainer}>
-            <View style={styles.logoBox}>
-              <Text style={styles.logoText}>M</Text>
-            </View>
+            <Image source={require('../assets/mayode.png')} style={styles.logoImage} resizeMode="contain" />
             <Text style={styles.appTitle}>MAYODE GROUP</Text>
             <Text style={styles.appSubtitle}>MAYOData Platform & M-LAX Mobile</Text>
           </View>
@@ -141,24 +139,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
-  logoBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: '#10B981',
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoImage: {
+    width: 72,
+    height: 72,
     marginBottom: 16,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
   },
   appTitle: {
     fontSize: 24,

@@ -160,8 +160,15 @@ export class AuthService {
    * request bodies (whitelist validation would otherwise reject it).
    */
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    const { phone, email, password, firstName, lastName, language } =
-      registerDto;
+    const {
+      phone,
+      email,
+      password,
+      firstName,
+      lastName,
+      language,
+      dataShareConsent,
+    } = registerDto;
 
     const existingUser = await this.prisma.user.findFirst({
       where: {
@@ -202,6 +209,8 @@ export class AuthService {
             controlNumber,
             firstName,
             lastName,
+            dataShareConsent: dataShareConsent ?? false,
+            consentedAt: dataShareConsent ? new Date() : null,
           },
         });
 
@@ -303,8 +312,14 @@ export class AuthService {
           },
         });
       } else if (dto.role === UserRole.FIELD_OFFICER) {
-        if (!dto.mamcosId) throw new BadRequestException('mamcosId is required for a Field Officer');
-        const mamcos = await prisma.mamcos.findUnique({ where: { id: dto.mamcosId }, select: { id: true } });
+        if (!dto.mamcosId)
+          throw new BadRequestException(
+            'mamcosId is required for a Field Officer',
+          );
+        const mamcos = await prisma.mamcos.findUnique({
+          where: { id: dto.mamcosId },
+          select: { id: true },
+        });
         if (!mamcos) throw new NotFoundException('AMCOS not found');
         const employeeCode = await this.generateEmployeeCode();
         await prisma.mamcosStaff.create({
@@ -319,12 +334,31 @@ export class AuthService {
           },
         });
       } else if (dto.role === UserRole.MAMCOS_SECRETARY) {
-        if (!dto.mamcosId) throw new BadRequestException('mamcosId is required for an AMCOS Leader');
-        const mamcos = await prisma.mamcos.findUnique({ where: { id: dto.mamcosId }, select: { id: true } });
+        if (!dto.mamcosId)
+          throw new BadRequestException(
+            'mamcosId is required for an AMCOS Leader',
+          );
+        const mamcos = await prisma.mamcos.findUnique({
+          where: { id: dto.mamcosId },
+          select: { id: true },
+        });
         if (!mamcos) throw new NotFoundException('AMCOS not found');
-        const existing = await prisma.mamcosStaff.findFirst({ where: { mamcosId: dto.mamcosId, role: MamcosStaffRole.SECRETARY } });
-        if (existing) throw new ConflictException('This AMCOS already has a Leader; reassign the current Leader instead');
-        await prisma.mamcosStaff.create({ data: { userId: user.id, role: MamcosStaffRole.SECRETARY, mamcosId: dto.mamcosId, firstName: dto.firstName, lastName: dto.lastName } });
+        const existing = await prisma.mamcosStaff.findFirst({
+          where: { mamcosId: dto.mamcosId, role: MamcosStaffRole.SECRETARY },
+        });
+        if (existing)
+          throw new ConflictException(
+            'This AMCOS already has a Leader; reassign the current Leader instead',
+          );
+        await prisma.mamcosStaff.create({
+          data: {
+            userId: user.id,
+            role: MamcosStaffRole.SECRETARY,
+            mamcosId: dto.mamcosId,
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+          },
+        });
       }
 
       return user;

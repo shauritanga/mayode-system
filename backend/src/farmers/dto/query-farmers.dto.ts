@@ -4,7 +4,9 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { VerificationStatus } from '@prisma/client';
 
 export class QueryFarmersDto {
-  @ApiPropertyOptional({ description: 'Free-text search: name, control number, or phone' })
+  @ApiPropertyOptional({
+    description: 'Free-text search: name, control number, or phone',
+  })
   @IsString()
   @IsOptional()
   search?: string;
@@ -53,4 +55,8 @@ export class QueryFarmersDto {
   @Max(100)
   @IsOptional()
   pageSize?: number = 20;
+
+  @IsOptional()
+  @IsEnum(['json', 'csv', 'xlsx'] as const)
+  format?: 'json' | 'csv' | 'xlsx';
 }

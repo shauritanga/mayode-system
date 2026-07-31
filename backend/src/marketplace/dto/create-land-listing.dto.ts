@@ -27,10 +27,14 @@ export class CreateLandListingDto {
   @IsEnum(DealType)
   dealType: DealType;
 
-  @ApiProperty({ example: 0.05, description: 'M-LAX platform commission rate (e.g., 0.05 for 5%)' })
+  @ApiPropertyOptional({
+    example: 0.1,
+    description: 'Ignored — the server always derives the commission rate from dealType (STANDARD=10%, FLASH_DEAL=14%, RELATIONSHIP=5%). Kept only for backward compatibility with older clients that still send it.',
+    deprecated: true,
+  })
   @IsNumber()
-  @Min(0)
-  commissionRate: number;
+  @IsOptional()
+  commissionRate?: number;
 
   @ApiProperty({ example: 12, description: 'Lease duration in months' })
   @IsNumber()
@@ -66,4 +70,14 @@ export class CreateLandListingDto {
   @IsNumber()
   @IsOptional()
   autoDropDays?: number;
+
+  @ApiPropertyOptional({ example: 'mamcos-staff-uuid', description: 'Desk officer who facilitated this listing (earns the fixed 5,000/- agent fee)' })
+  @IsString()
+  @IsOptional()
+  facilitatedByStaffId?: string;
+
+  @ApiPropertyOptional({ example: 'ANNUAL', enum: ['PREPAID', 'ANNUAL'], description: 'For multi-year leases: pay the full term upfront, or one year at a time' })
+  @IsString()
+  @IsOptional()
+  paymentPlan?: string;
 }

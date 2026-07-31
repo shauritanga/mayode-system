@@ -15,6 +15,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SmsService } from '../messaging/sms.service';
 import { ClickPesaService } from '../payments/clickpesa.service';
+import { AccountingService } from '../accounting/accounting.service';
 import {
   ApproveMembershipDto,
   CreateMembershipPlanDto,
@@ -47,6 +48,7 @@ export class MembershipsService {
     private readonly notifications: NotificationsService,
     private readonly clickPesa: ClickPesaService,
     private readonly sms: SmsService,
+    private readonly accounting: AccountingService,
   ) {}
 
   // ---------------------------------------------------------------- plans
@@ -341,6 +343,9 @@ export class MembershipsService {
       });
       return m;
     });
+
+    const payments = await this.prisma.payment.findMany({ where: { membershipId: id, status: PaymentStatus.CLEARED } });
+    await Promise.all(payments.map((payment) => this.accounting.postToLedger('MembershipPayment', payment.id, payment.paidAt ?? now, `Membership payment ${membership.plan.name}`, [{ code: '1000', debit: payment.amount }, { code: '4200', credit: payment.amount }])));
 
     await this.notifications.create({
       userId: membership.userId,

@@ -36,6 +36,16 @@ import { DisputesModule } from './disputes/disputes.module';
 import { FarmCorrectionsModule } from './farm-corrections/farm-corrections.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { WorkspaceModule } from './workspace/workspace.module';
+import { BuyersModule } from './buyers/buyers.module';
+import { SalesModule } from './sales/sales.module';
+import { ReportsModule } from './reports/reports.module';
+import { LoansModule } from './loans/loans.module';
+import { AccountingModule } from './accounting/accounting.module';
+import { GovernanceModule } from './governance/governance.module';
+import { BuyerPortalModule } from './buyer-portal/buyer-portal.module';
+import { PartnerApiModule } from './partner-api/partner-api.module';
+import { RiceProtocolsModule } from './rice-protocols/rice-protocols.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 import { LoggerMiddleware } from './middleware/logger.middleware';
 
 @Module({
@@ -81,6 +91,16 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     CropCyclesModule,
     FinanceModule,
     InventoryModule,
+    BuyersModule,
+    SalesModule,
+    ReportsModule,
+    LoansModule,
+    AccountingModule,
+    GovernanceModule,
+    BuyerPortalModule,
+    PartnerApiModule,
+    RiceProtocolsModule,
+    IntegrationsModule,
 
     // Geographic Hierarchy & Locations
     LocationsModule,

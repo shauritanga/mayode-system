@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { financeApi, farmersApi } from '@/lib/api';
+import { accountingApi, financeApi, farmersApi } from '@/lib/api';
 
 interface FinanceSummary {
   totalRevenue: number;
@@ -15,11 +15,15 @@ export default function FinancePage() {
   const [farmerId, setFarmerId] = useState('');
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [farmers, setFarmers] = useState<{ id: string; firstName: string; lastName: string; controlNumber: string }[]>([]);
+  const [statements, setStatements] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     farmersApi.getAll()
       .then(res => setFarmers(res.data?.data || res.data || []))
+      .catch(console.error);
+    accountingApi.statements()
+      .then(res => setStatements(res.data))
       .catch(console.error);
   }, []);
 
@@ -78,6 +82,55 @@ export default function FinancePage() {
           </button>
         </div>
       </div>
+
+      {statements && (
+        <div className="animate-fade-in" style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+            <div>
+              <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 18, margin: 0 }}>Cooperative Financial Statements</h2>
+              <p className="muted" style={{ margin: '4px 0 0' }}>Formal accounting view from the general ledger.</p>
+            </div>
+            <span className={`badge ${statements.trialBalance?.balanced ? 'badge-green' : 'badge-gold'}`}>
+              Trial balance {statements.trialBalance?.balanced ? 'balanced' : 'needs review'}
+            </span>
+          </div>
+          <div className="metric-grid">
+            {[
+              ['Income', statements.profitAndLoss?.income, 'Ledger income accounts'],
+              ['Expenses', statements.profitAndLoss?.expenses, 'Ledger expense accounts'],
+              ['Net surplus', statements.profitAndLoss?.netProfit, 'Income less expenses'],
+              ['Assets', statements.balanceSheet?.assets, 'Cash, receivables and assets'],
+              ['Liabilities', statements.balanceSheet?.liabilities, 'Payables and obligations'],
+              ['Working capital', statements.workingCapital, 'Assets less liabilities'],
+              ['Net cash flow', statements.cashFlow?.netCashFlow, 'Cash/mobile-money movement'],
+              ['Receivables', statements.receivablesTotal, 'Open buyer invoices'],
+              ['Payables', statements.payablesTotal, 'Open supplier bills'],
+            ].map(([label, value, sub]) => (
+              <div key={String(label)} className="stat-card" style={{ padding: 18 }}>
+                <div className="muted" style={{ fontSize: 12 }}>{label}</div>
+                <strong style={{ display: 'block', fontSize: 20, marginTop: 6 }}>TZS {Math.round(Number(value || 0)).toLocaleString()}</strong>
+                <small className="muted">{sub}</small>
+              </div>
+            ))}
+          </div>
+          <div className="table-panel" style={{ marginTop: 16 }}>
+            <div className="section-toolbar"><strong>Financial Ratios</strong><span className="muted">Liquidity · Profitability · Solvency</span></div>
+            <div className="metric-grid" style={{ padding: 16 }}>
+              {[
+                ['Liquidity', statements.ratios?.liquidity, 'Assets / liabilities'],
+                ['Profitability', statements.ratios?.profitability, 'Net surplus / income'],
+                ['Solvency', statements.ratios?.solvency, '(Assets - liabilities) / assets'],
+              ].map(([label, value, sub]) => (
+                <div key={String(label)} className="stat-card" style={{ padding: 16 }}>
+                  <div className="muted" style={{ fontSize: 12 }}>{label}</div>
+                  <strong style={{ display: 'block', fontSize: 22, marginTop: 6 }}>{value == null ? '—' : Number(value).toFixed(2)}</strong>
+                  <small className="muted">{sub}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       {summary && (

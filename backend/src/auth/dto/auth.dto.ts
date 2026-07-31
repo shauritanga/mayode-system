@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsEmail,
   IsEnum,
+  IsBoolean,
   MinLength,
   Matches,
 } from 'class-validator';
@@ -64,6 +65,15 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   language?: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Whether the farmer has consented to sharing data with approved financial providers',
+  })
+  @IsBoolean()
+  @IsOptional()
+  dataShareConsent?: boolean;
 }
 
 // ---- Login DTO ----

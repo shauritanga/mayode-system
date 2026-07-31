@@ -1,16 +1,12 @@
 /**
  * Single data-access entry point for the whole app.
  *
- * Screens import their API objects from here (not from ./api or ../local
- * directly). Flip USE_LOCAL_DATA in ./config to switch the entire app between
- * on-device local storage and the remote backend — no screen changes needed.
+ * Screens import their API objects from here rather than importing the HTTP
+ * client directly. Offline writes are handled by the sync queue in api.ts;
+ * there is no separate all-local application mode.
  */
-import { USE_LOCAL_DATA } from './config';
-
 import * as remote from './api';
-import * as local from '../local/repositories';
-
-const impl = USE_LOCAL_DATA ? local : remote;
+const impl = remote;
 
 export const authApi = impl.authApi;
 export const usersApi = impl.usersApi;
@@ -19,6 +15,7 @@ export const mamcosApi = impl.mamcosApi;
 export const farmsApi = impl.farmsApi;
 export const plotsApi = impl.plotsApi;
 export const cropCyclesApi = impl.cropCyclesApi;
+export const riceProtocolsApi = impl.riceProtocolsApi;
 export const activitiesApi = impl.activitiesApi;
 export const locationsApi = impl.locationsApi;
 export const uploadsApi = impl.uploadsApi;

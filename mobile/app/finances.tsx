@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { SquareLock02Icon, CheckmarkCircle02Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
+import { SquareLock02Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { farmersApi } from '../src/lib/data';
 import { useAuthStore } from '../src/store/auth.store';
 import { useI18n } from '../src/i18n';
@@ -28,6 +28,7 @@ export default function FinancesScreen() {
   const [credit, setCredit] = useState<any>(null);
   const [production, setProduction] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [creditVisible, setCreditVisible] = useState(true);
 
   const load = useCallback(async () => {
     if (!farmerId) { setLoading(false); return; }
@@ -46,7 +47,7 @@ export default function FinancesScreen() {
     }
   }, [farmerId]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { setCreditVisible(true); load(); }, [load]));
 
   if (loading) {
     return (
@@ -89,19 +90,16 @@ export default function FinancesScreen() {
           </View>
         )}
 
-        {!!credit && (
+        {!!credit && creditVisible && (
           <View style={styles.card}>
             <View style={styles.creditHeader}>
               <View>
                 <Text style={styles.sectionTitle}>{t('creditScore')}</Text>
                 <Text style={styles.creditScore}>{credit.creditScore}</Text>
               </View>
-              <HugeiconsIcon
-                icon={credit.creditReady ? CheckmarkCircle02Icon : Cancel01Icon}
-                size={22}
-                color={credit.creditReady ? '#10B981' : '#DC2626'}
-                strokeWidth={2}
-              />
+              <TouchableOpacity onPress={() => setCreditVisible(false)} hitSlop={8}>
+                <HugeiconsIcon icon={Cancel01Icon} size={18} color="#9CA3AF" strokeWidth={2} />
+              </TouchableOpacity>
             </View>
             <Text style={[styles.creditReadyText, { color: credit.creditReady ? '#10B981' : '#DC2626' }]}>
               {credit.creditReady ? t('creditReady') : t('notCreditReady')}

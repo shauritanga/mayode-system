@@ -74,3 +74,66 @@ export function toGeoJsonPolygon(points: LatLng[]): {
   }
   return { type: 'Polygon', coordinates: [ring] };
 }
+
+export interface GeoJsonPolygon {
+  type: 'Polygon';
+  coordinates: number[][][];
+}
+
+/** Great-circle distance between two points, in meters (haversine). */
+export function distanceMeters(a: LatLng, b: LatLng): number {
+  const R = 6371000;
+  const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
+  const dLng = ((b.longitude - a.longitude) * Math.PI) / 180;
+  const lat1 = (a.latitude * Math.PI) / 180;
+  const lat2 = (b.latitude * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
+ * Ray-casting point-in-polygon test against a GeoJSON Polygon's outer ring
+ * (holes, if any, are ignored — farm boundaries are simple polygons).
+ */
+export function isPointInPolygon(point: LatLng, polygon: GeoJsonPolygon): boolean {
+  const ring = polygon?.coordinates?.[0];
+  if (!ring || ring.length < 3) return false;
+  const x = point.longitude;
+  const y = point.latitude;
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const intersects = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+/** A farm hasn't had its boundary walked yet — fall back to a radius around its center point. */
+export const FARM_CENTER_FALLBACK_RADIUS_M = 500;
+
+export type FarmGeofenceResult =
+  | { status: 'inside' }
+  | { status: 'outside'; distanceM?: number }
+  | { status: 'unmapped' };
+
+/**
+ * Check whether a device position is on a given farm: precise polygon test
+ * if the boundary has been walked, otherwise a generous radius around the
+ * farm's center point, otherwise unverifiable (farm has no GPS data yet).
+ */
+export function checkWithinFarm(
+  point: LatLng,
+  farm: { boundaryCoordinates?: GeoJsonPolygon | null; centerLatitude?: number | null; centerLongitude?: number | null },
+): FarmGeofenceResult {
+  const boundary = farm.boundaryCoordinates;
+  if (boundary && (boundary.coordinates?.[0]?.length ?? 0) >= 3) {
+    return isPointInPolygon(point, boundary) ? { status: 'inside' } : { status: 'outside' };
+  }
+  if (farm.centerLatitude != null && farm.centerLongitude != null) {
+    const d = distanceMeters(point, { latitude: farm.centerLatitude, longitude: farm.centerLongitude });
+    return d <= FARM_CENTER_FALLBACK_RADIUS_M ? { status: 'inside' } : { status: 'outside', distanceM: d };
+  }
+  return { status: 'unmapped' };
+}

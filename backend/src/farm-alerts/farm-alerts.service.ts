@@ -8,6 +8,7 @@ import {
   AlertCategory,
   AlertStatus,
   AlertUrgency,
+  CalendarTaskStatus,
   CropCycleStatus,
   FarmAlert,
   Prisma,
@@ -252,7 +253,10 @@ export class FarmAlertsService {
         farmerId: true,
         cropCycles: {
           where: { status: { in: [CropCycleStatus.PLANNED, CropCycleStatus.ACTIVE] } },
-          include: { activities: { select: { activityType: true } } },
+          include: {
+            activities: { select: { activityType: true } },
+            calendarTasks: { where: { status: CalendarTaskStatus.PENDING }, select: { id: true, taskKey: true, title: true, guidance: true, dueDate: true } },
+          },
         },
       },
     });
@@ -334,6 +338,26 @@ export class FarmAlertsService {
           cropCycleId: cycle.id,
           dedupeKey: `fertilizer:${cycle.id}`,
         });
+      }
+
+      // Mbalari protocol work is date-driven. A dedicated alert turns the
+      // current pending task into a farmer-facing action, while the task itself
+      // remains the source of truth for evidence and completion.
+      for (const task of cycle.calendarTasks) {
+        if (task.dueDate.getTime() <= now) {
+          await add({
+            farmId,
+            category: AlertCategory.ACTIVITY_OVERDUE,
+            urgency: task.dueDate.getTime() < now - 7 * DAY ? AlertUrgency.HIGH : AlertUrgency.MEDIUM,
+            title: task.title,
+            previewMessage: 'Kazi ya kalenda ya Mbalari inahitaji kufanywa kwenye shamba hili.',
+            recommendation: task.guidance,
+            actionDetails: 'Fungua kalenda ya zao, kamilisha kazi hii na uweke vipimo pamoja na picha inayohitajika.',
+            expectedActionDate: task.dueDate.toISOString(),
+            cropCycleId: cycle.id,
+            dedupeKey: `mbalari-task:${task.id}`,
+          });
+        }
       }
     }
     return created;

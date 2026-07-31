@@ -8,6 +8,7 @@ interface User {
   role: string;
   firstName?: string;
   lastName?: string;
+  language?: string;
 }
 
 interface AuthState {
@@ -21,6 +22,7 @@ interface AuthState {
   _hasHydrated: boolean;
   setHasHydrated: (hydrated: boolean) => void;
   setAuth: (user: User, token: string) => void;
+  updateUser: (user: Partial<User>) => void;
   clearAuth: () => void;
 }
 
@@ -38,6 +40,7 @@ export const useAuthStore = create<AuthState>()(
         }
         set({ user, accessToken, isAuthenticated: true });
       },
+      updateUser: (patch) => set((state) => ({ user: state.user ? { ...state.user, ...patch } : state.user })),
       clearAuth: () => {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('accessToken');

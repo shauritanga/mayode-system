@@ -4,12 +4,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { useAuthStore } from '../src/store/auth.store';
 import { usersApi } from '../src/lib/data';
-import { seedIfNeeded } from '../src/local/seed';
 import { useI18n } from '../src/i18n';
 import {
   setNotificationHandler,
   registerForPushNotifications,
 } from '../src/services/notifications.service';
+import { syncQueue } from '../src/services/sync-queue';
 
 // Configure foreground notification presentation globally
 setNotificationHandler();
@@ -21,10 +21,9 @@ export default function RootLayout() {
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
 
-  // Seed the local database on first launch (local-data mode).
-  useEffect(() => {
-    seedIfNeeded().catch((e) => console.warn('[Local seed] failed:', e));
-  }, []);
+  // Queue is replayed automatically on reconnect. Updates to the same resource
+  // use last-write-wins; the backend's updatedAt timestamp remains authoritative.
+  useEffect(() => syncQueue.start(), []);
 
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
@@ -109,10 +108,6 @@ export default function RootLayout() {
           options={{ headerShown: true, title: t('editProfile'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff' }}
         />
         <Stack.Screen
-          name="activities"
-          options={{ headerShown: true, title: t('recentActivities'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff' }}
-        />
-        <Stack.Screen
           name="boundary"
           options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }}
         />
@@ -160,6 +155,7 @@ export default function RootLayout() {
           name="rewards"
           options={{ headerShown: true, title: t('myRewards'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '800' } }}
         />
+        <Stack.Screen name="votes" options={{ headerShown: true, title: 'Member voting', headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff' }} />
         <Stack.Screen
           name="farm-report/[id]"
           options={{ headerShown: true, title: t('farmReport'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '800' } }}
