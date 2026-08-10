@@ -42,6 +42,22 @@ export class MamcosService {
     }));
   }
 
+  /** Platform-wide field officer directory, for admin assignment pickers. */
+  findAllFieldOfficers() {
+    return this.prisma.mamcosStaff.findMany({
+      where: { role: MamcosStaffRole.FIELD_OFFICER },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        employeeCode: true,
+        assignedArea: true,
+        mamcos: { select: { name: true } },
+      },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+  }
+
   async findOne(id: string) {
     const mamcos = await this.prisma.mamcos.findUnique({
       where: { id },
@@ -63,6 +79,33 @@ export class MamcosService {
     if (!mamcos) {
       throw new NotFoundException(`MAMCOS with ID ${id} not found`);
     }
+
+    // Rolled-up production/aggregation figures the docx asks for on the AMCOS
+    // detail page. "Storage/aggregation capacity" is deliberately omitted —
+    // there's no capacity field anywhere in the schema (InventoryRecord only
+    // tracks quantities received, not a designed max), so reporting one would
+    // be fabricated. "Total rice aggregated" (actual, to date) is reported
+    // instead as the honest equivalent.
+    const farmerIds = mamcos.farmers.map((f) => f.id);
+    const totalRegisteredHectares = mamcos.farms.reduce((sum, f) => sum + (f.socialHectares || 0), 0);
+    const [yieldAgg, inventoryAgg] = farmerIds.length
+      ? await Promise.all([
+          this.prisma.cropCycle.aggregate({
+            where: { farmerId: { in: farmerIds } },
+            _sum: { actualYieldKg: true, estimatedYieldKg: true },
+          }),
+          this.prisma.inventoryRecord.aggregate({
+            where: { farmerId: { in: farmerIds } },
+            _sum: { weightKg: true },
+          }),
+        ])
+      : [{ _sum: { actualYieldKg: 0, estimatedYieldKg: 0 } }, { _sum: { weightKg: 0 } }];
+    const productionSummary = {
+      totalRegisteredHectares,
+      totalActualYieldKg: yieldAgg._sum.actualYieldKg ?? 0,
+      totalEstimatedYieldKg: yieldAgg._sum.estimatedYieldKg ?? 0,
+      totalRiceAggregatedKg: inventoryAgg._sum.weightKg ?? 0,
+    };
 
     const { staff, ...rest } = mamcos;
     const secretaryRow = staff.find((s) => s.role === MamcosStaffRole.SECRETARY);
@@ -90,7 +133,7 @@ export class MamcosService {
         user: s.user,
       }));
 
-    return { ...rest, secretary, fieldOfficers };
+    return { ...rest, secretary, fieldOfficers, productionSummary };
   }
 
   async update(id: string, updateMamcosDto: UpdateMamcosDto) {

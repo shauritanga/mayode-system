@@ -21,6 +21,12 @@ interface OfficerRow {
 }
 interface FarmerRow { id: string; controlNumber: string; firstName: string; lastName: string; creditScore: number }
 interface FarmRow { id: string; farmCode: string; socialHectares: number; grade?: string; isVerified: boolean }
+interface ProductionSummary {
+  totalRegisteredHectares: number;
+  totalActualYieldKg: number;
+  totalEstimatedYieldKg: number;
+  totalRiceAggregatedKg: number;
+}
 interface MamcosDetail {
   id: string;
   name: string;
@@ -31,6 +37,7 @@ interface MamcosDetail {
   totalHectares?: number;
   isActive: boolean;
   secretary?: Secretary | null;
+  productionSummary?: ProductionSummary;
   fieldOfficers: OfficerRow[];
   farmers: FarmerRow[];
   farms: FarmRow[];
@@ -152,8 +159,16 @@ export default function MamcosDetailPage() {
         {[
           { label: 'Farmers', value: mamcos.farmers.length, color: 'var(--accent)' },
           { label: 'Farms', value: mamcos.farms.length, color: 'var(--blue-500)' },
-          { label: 'Hectares', value: mamcos.totalHectares ? `${mamcos.totalHectares} ha` : '—', color: 'var(--gold-400)' },
-          { label: 'District', value: mamcos.district || '—', color: 'var(--green-400)' },
+          { label: 'Registered farm area', value: mamcos.productionSummary ? `${mamcos.productionSummary.totalRegisteredHectares.toLocaleString()} ha` : '—', color: 'var(--gold-400)' },
+          {
+            label: 'Total yield',
+            value: mamcos.productionSummary
+              ? `${(mamcos.productionSummary.totalActualYieldKg || mamcos.productionSummary.totalEstimatedYieldKg).toLocaleString()} kg${mamcos.productionSummary.totalActualYieldKg ? '' : ' (est.)'}`
+              : '—',
+            color: 'var(--green-400)',
+          },
+          { label: 'Rice aggregated to date', value: mamcos.productionSummary ? `${mamcos.productionSummary.totalRiceAggregatedKg.toLocaleString()} kg` : '—', color: 'var(--purple-500)' },
+          { label: 'District', value: mamcos.district || '—', color: 'var(--neutral-400)' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>

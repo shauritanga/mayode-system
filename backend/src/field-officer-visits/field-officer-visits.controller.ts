@@ -24,6 +24,13 @@ export class FieldOfficerVisitsController {
     return this.visits.create(user.id, dto);
   }
 
+  @Get()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get all field officer visits across the system (staff only)' })
+  findAll() {
+    return this.visits.findAll();
+  }
+
   @Get('mine')
   @Roles(UserRole.FIELD_OFFICER)
   @ApiOperation({ summary: "The calling officer's own visit history" })

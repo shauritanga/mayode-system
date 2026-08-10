@@ -81,6 +81,14 @@ export class CropCyclesController {
       );
       return response.send(this.exporter.csv(exportRows));
     }
+    if (query.format === 'pdf') {
+      response.setHeader('Content-Type', 'application/pdf');
+      response.setHeader(
+        'Content-Disposition',
+        'attachment; filename="crop-cycles.pdf"',
+      );
+      return response.send(await this.exporter.pdf(exportRows, 'crop-cycles'));
+    }
     response.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -104,6 +112,15 @@ export class CropCyclesController {
       query.from,
       query.to,
     );
+  }
+
+  @Get('activity-logs')
+  @Roles(...STAFF_ROLES)
+  @ApiOperation({
+    summary: 'Get all activity log entries across the system (staff only)',
+  })
+  findAllActivityLogs() {
+    return this.cropCyclesService.findAllActivityLogs();
   }
 
   @Get(':id')

@@ -23,6 +23,7 @@ import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
 import { QueryFarmersDto } from './dto/query-farmers.dto';
 import {
+  AssignOfficerDto,
   VerifyFarmerDto,
   RejectFarmerDto,
   SuspendFarmerDto,
@@ -179,6 +180,28 @@ export class FarmersService {
     };
   }
 
+  /**
+   * Unpaginated, minimal-field farmer list for admin dashboard aggregation
+   * (gender/age/district/officer-attribution charts). `findAll()` above is
+   * paginated (max 100/page) for the searchable UI table — dashboards that
+   * need every farmer must use this instead, not loop pages against `findAll`.
+   */
+  findAllUnpaginated() {
+    return this.prisma.farmer.findMany({
+      select: {
+        id: true,
+        gender: true,
+        dateOfBirth: true,
+        district: true,
+        region: true,
+        verificationStatus: true,
+        verifiedById: true,
+        assignedOfficerId: true,
+        mamcosId: true,
+      },
+    });
+  }
+
   async findOne(id: string) {
     const farmer = await this.prisma.farmer.findUnique({
       where: { id },
@@ -273,6 +296,25 @@ export class FarmersService {
       );
     }
     return officer;
+  }
+
+  /** Staff assigns a field officer as responsible for a farmer's follow-up (pending-tasks tracking). */
+  async assignOfficer(farmerId: string, dto: AssignOfficerDto) {
+    await this.findOne(farmerId);
+    const officer = await this.prisma.mamcosStaff.findUnique({
+      where: { id: dto.officerId },
+      select: { id: true, role: true },
+    });
+    if (!officer) {
+      throw new NotFoundException(`Field officer with ID ${dto.officerId} not found`);
+    }
+    if (officer.role !== MamcosStaffRole.FIELD_OFFICER) {
+      throw new ConflictException('Assignee must be a field officer');
+    }
+    return this.prisma.farmer.update({
+      where: { id: farmerId },
+      data: { assignedOfficerId: dto.officerId },
+    });
   }
 
   async verifyFarmer(

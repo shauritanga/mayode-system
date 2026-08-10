@@ -662,6 +662,27 @@ body {
   gap: 18px;
 }
 
+.role-two-col-even {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.role-three-col {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.role-section-label {
+  margin: 6px 2px -6px;
+  color: var(--neutral-500);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .metric-tile {
   position: relative;
   overflow: hidden;
@@ -801,6 +822,73 @@ body {
   text-align: center;
 }
 
+.chart-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  color: var(--neutral-500);
+  font-size: 13px;
+  text-align: center;
+}
+
+.donut-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.85fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.donut-legend {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.donut-legend li {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.donut-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-top: 3px;
+}
+
+.donut-legend-label {
+  grid-column: 2;
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.donut-legend-value {
+  grid-column: 2;
+  display: block;
+  color: var(--neutral-500);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+@media (max-width: 720px) {
+  .donut-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .farmer-tabbar {
   display: flex;
   gap: 8px;
@@ -848,7 +936,9 @@ body {
 
 @media (max-width: 980px) {
   .role-hero,
-  .role-two-col {
+  .role-two-col,
+  .role-two-col-even,
+  .role-three-col {
     grid-template-columns: 1fr;
   }
   .role-hero {

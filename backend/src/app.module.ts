@@ -46,6 +46,8 @@ import { BuyerPortalModule } from './buyer-portal/buyer-portal.module';
 import { PartnerApiModule } from './partner-api/partner-api.module';
 import { RiceProtocolsModule } from './rice-protocols/rice-protocols.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { InsuranceModule } from './insurance/insurance.module';
+import { WeatherModule } from './weather/weather.module';
 import { LoggerMiddleware } from './middleware/logger.middleware';
 
 @Module({
@@ -101,6 +103,8 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     PartnerApiModule,
     RiceProtocolsModule,
     IntegrationsModule,
+    InsuranceModule,
+    WeatherModule,
 
     // Geographic Hierarchy & Locations
     LocationsModule,

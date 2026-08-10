@@ -70,6 +70,16 @@ export class FieldOfficerVisitsService {
     return visit;
   }
 
+  /** Platform-wide visit list for admin reporting (field officer activity ranking). */
+  findAll() {
+    return this.prisma.fieldOfficerVisit.findMany({
+      orderBy: { visitedAt: 'desc' },
+      include: {
+        fieldOfficer: { select: { firstName: true, lastName: true, employeeCode: true } },
+      },
+    });
+  }
+
   async findMine(userId: string, query: QueryVisitsDto) {
     const officer = await this.requireOfficerWithMamcos(userId);
     const page = query.page && query.page > 0 ? query.page : 1;

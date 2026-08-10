@@ -42,6 +42,16 @@ export class LoansService {
     });
   }
 
+  /** Platform-wide loan list for admin reporting (repayment performance, finance-access counts). */
+  findAll() {
+    return this.prisma.loanRecord.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        farmer: { select: { firstName: true, lastName: true, controlNumber: true } },
+      },
+    });
+  }
+
   async applyDeductionsForSale(saleId: string) {
     const payments = await this.prisma.payment.findMany({
       where: {

@@ -48,10 +48,13 @@ export const usersApi = {
 // ── Farmers ──
 export const farmersApi = {
   getAll: (params?: object) => api.get('/farmers', { params }),
+  /** Unpaginated, minimal-field list for dashboard aggregation — use this, not getAll(), when you need every farmer. */
+  getAllUnpaginated: () => api.get('/farmers/all'),
   getOne: (id: string) => api.get(`/farmers/${id}`),
   getMe: () => api.get('/farmers/me'),
   getByControlNumber: (controlNumber: string) => api.get(`/farmers/control-number/${encodeURIComponent(controlNumber)}`),
   update: (id: string, data: object) => api.patch(`/farmers/${id}`, data),
+  assignOfficer: (id: string, officerId: string) => api.patch(`/farmers/${id}/assign-officer`, { officerId }),
   financialProfile: (id: string) => api.get(`/farmers/${id}/financial-profile`),
   listConsents: (id: string) => api.get(`/farmers/${id}/consents`),
   captureConsent: (id: string, data: object) => api.post(`/farmers/${id}/consents`, data),
@@ -68,6 +71,7 @@ export const mamcosApi = {
   assignSecretary: (id: string, data: object) => api.post(`/mamcos/${id}/secretary`, data),
   assignFarmer: (id: string, data: object) => api.post(`/mamcos/${id}/assign-farmer`, data),
   dashboard: () => api.get('/mamcos/secretary-dashboard'),
+  fieldOfficers: () => api.get('/mamcos/staff/field-officers'),
 };
 
 // ── Farms ──
@@ -87,6 +91,12 @@ export const farmsApi = {
   addDocument: (id: string, data: object) => api.post(`/farms/${id}/documents`, data),
   listDocuments: (id: string) => api.get(`/farms/${id}/documents`),
 };
+export const farmVerificationsApi = {
+  getAll: () => api.get('/farm-verifications'),
+  getOne: (id: string) => api.get(`/farm-verifications/${id}`),
+  getForFarm: (farmId: string) => api.get(`/farm-verifications/farm/${farmId}`),
+  verify: (data: object) => api.post('/farm-verifications', data),
+};
 
 // ── Crop Cycles ──
 export const cropCyclesApi = {
@@ -97,6 +107,7 @@ export const cropCyclesApi = {
   update: (id: string, data: object) => api.patch(`/crop-cycles/${id}`, data),
   logActivity: (data: object) => api.post('/crop-cycles/activity', data),
   calendar: (params?: object) => api.get('/crop-cycles/calendar', { params }),
+  activityLogs: () => api.get('/crop-cycles/activity-logs'),
 };
 export const riceProtocolsApi = {
   bootstrap: (mamcosId: string) => api.post(`/rice-protocols/mamcos/${mamcosId}/bootstrap`),
@@ -119,6 +130,13 @@ export const financeApi = {
   getFarmerSummary: (id: string) => api.get(`/finance/farmer/${id}/summary`),
   addCost: (data: object) => api.post('/finance/cost', data),
   addRevenue: (data: object) => api.post('/finance/revenue', data),
+  getAllCosts: () => api.get('/finance/costs'),
+};
+// ── Loans ──
+export const loansApi = {
+  getForFarmer: (farmerId: string) => api.get(`/loans/farmer/${farmerId}`),
+  getAll: () => api.get('/loans'),
+  create: (data: object) => api.post('/loans', data),
 };
 export const accountingApi = {
   statements: (params?: object) => api.get('/accounting/statements', { params }),
@@ -129,6 +147,25 @@ export const accountingApi = {
   ratios: (params?: object) => api.get('/accounting/ratios', { params }),
 };
 
+export const insuranceApi = {
+  getProviders: () => api.get('/insurance/providers'),
+  createProvider: (data: object) => api.post('/insurance/providers', data),
+  updateProvider: (id: string, data: object) => api.patch(`/insurance/providers/${id}`, data),
+  getPolicies: () => api.get('/insurance/policies'),
+  getPoliciesForFarmer: (farmerId: string) => api.get(`/insurance/policies/farmer/${farmerId}`),
+  createPolicy: (data: object) => api.post('/insurance/policies', data),
+  updatePolicyStatus: (id: string, status: string) => api.patch(`/insurance/policies/${id}/status`, { status }),
+  getClaims: () => api.get('/insurance/claims'),
+  createClaim: (data: object) => api.post('/insurance/claims', data),
+  inspectClaim: (id: string, data: object) => api.patch(`/insurance/claims/${id}/inspect`, data),
+  updateClaimPayment: (id: string, data: object) => api.patch(`/insurance/claims/${id}/payment`, data),
+  coverageSummary: () => api.get('/insurance/coverage-summary'),
+};
+export const weatherApi = {
+  forecast: (lat: number, lon: number) => api.get('/weather/forecast', { params: { lat, lon } }),
+  getAlerts: () => api.get('/weather/alerts'),
+  createAlert: (data: object) => api.post('/weather/alerts', data),
+};
 export const reportsApi = {
   kpis: () => api.get('/reports/kpis'),
   impact: () => api.get('/reports/impact'),
@@ -283,6 +320,15 @@ export const farmCorrectionsApi = {
 export const fieldSurveysApi = {
   listForFarm: (farmId: string) => api.get(`/farms/${farmId}/field-surveys`),
   create: (farmId: string, data: object) => api.post(`/farms/${farmId}/field-surveys`, data),
+};
+
+// ── Field officer visits ──
+export const fieldOfficerVisitsApi = {
+  getAll: () => api.get('/field-officer-visits'),
+  mine: (params?: object) => api.get('/field-officer-visits/mine', { params }),
+  forFarmer: (farmerId: string) => api.get(`/field-officer-visits/farmer/${farmerId}`),
+  calendar: (params?: object) => api.get('/field-officer-visits/calendar', { params }),
+  create: (data: object) => api.post('/field-officer-visits', data),
 };
 
 // ── Owner-confirmation requests (AMCOS-first registry) ──

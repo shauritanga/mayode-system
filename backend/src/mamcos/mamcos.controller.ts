@@ -43,6 +43,13 @@ export class MamcosController {
     return this.mamcosService.getSecretaryDashboard(user.id);
   }
 
+  @Get('staff/field-officers')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @ApiOperation({ summary: 'Platform-wide field officer directory (for admin assignment pickers)' })
+  findAllFieldOfficers() {
+    return this.mamcosService.findAllFieldOfficers();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get MAMCOS details by ID' })
   findOne(@Param('id') id: string) {

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { farmersApi } from '@/lib/api';
+import { farmersApi, mamcosApi } from '@/lib/api';
 
 interface Farmer {
   id: string;
@@ -12,7 +12,16 @@ interface Farmer {
   ward?: string;
   creditScore: number;
   isBlacklisted: boolean;
+  assignedOfficerId?: string | null;
   mamcos?: { name: string };
+}
+
+interface FieldOfficer {
+  id: string;
+  firstName: string;
+  lastName: string;
+  employeeCode?: string | null;
+  mamcos?: { name: string } | null;
 }
 
 const statusBadge = (blacklisted: boolean) => (
@@ -23,15 +32,32 @@ const statusBadge = (blacklisted: boolean) => (
 
 export default function FarmersPage() {
   const [farmers, setFarmers] = useState<Farmer[]>([]);
+  const [officers, setOfficers] = useState<FieldOfficer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [assigningId, setAssigningId] = useState<string | null>(null);
 
   useEffect(() => {
-    farmersApi.getAll()
-      .then(res => setFarmers(res.data?.data || res.data || []))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    Promise.allSettled([farmersApi.getAll(), mamcosApi.fieldOfficers()]).then(([farmerResult, officerResult]) => {
+      if (farmerResult.status === 'fulfilled') setFarmers(farmerResult.value.data?.data || farmerResult.value.data || []);
+      else console.error(farmerResult.reason);
+      if (officerResult.status === 'fulfilled') setOfficers(officerResult.value.data || []);
+      setLoading(false);
+    });
   }, []);
+
+  const handleAssign = async (farmerId: string, officerId: string) => {
+    if (!officerId) return;
+    setAssigningId(farmerId);
+    try {
+      await farmersApi.assignOfficer(farmerId, officerId);
+      setFarmers((prev) => prev.map((f) => (f.id === farmerId ? { ...f, assignedOfficerId: officerId || null } : f)));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAssigningId(null);
+    }
+  };
 
   const filtered = farmers.filter(f =>
     `${f.firstName} ${f.lastName} ${f.controlNumber}`.toLowerCase().includes(search.toLowerCase())
@@ -78,6 +104,7 @@ export default function FarmersPage() {
                   <th>AMCOS</th>
                   <th>Credit Score</th>
                   <th>Status</th>
+                  <th>Assigned Officer</th>
                 </tr>
               </thead>
               <tbody>
@@ -100,6 +127,25 @@ export default function FarmersPage() {
                       </span>
                     </td>
                     <td>{statusBadge(farmer.isBlacklisted)}</td>
+                    <td>
+                      <select
+                        className="input-field"
+                        style={{ fontSize: '12px', padding: '4px 8px', minWidth: '160px' }}
+                        value={farmer.assignedOfficerId || ''}
+                        disabled={assigningId === farmer.id}
+                        onChange={(e) => handleAssign(farmer.id, e.target.value)}
+                      >
+                        <option value="">
+                          {farmer.assignedOfficerId ? 'Change officer…' : 'Unassigned'}
+                        </option>
+                        {officers.map((officer) => (
+                          <option key={officer.id} value={officer.id}>
+                            {officer.firstName} {officer.lastName}
+                            {officer.mamcos?.name ? ` — ${officer.mamcos.name}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                   </tr>
                 ))}
               </tbody>

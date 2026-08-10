@@ -27,7 +27,7 @@ export class ReportsController {
     private readonly exporter: ExportService,
   ) {}
 
-  private send(
+  private async send(
     rows: Record<string, unknown>[],
     name: string,
     format: ReportFormatDto['format'],
@@ -41,6 +41,14 @@ export class ReportsController {
         `attachment; filename="${name}.csv"`,
       );
       return response.send(this.exporter.csv(rows));
+    }
+    if (format === 'pdf') {
+      response.setHeader('Content-Type', 'application/pdf');
+      response.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${name}.pdf"`,
+      );
+      return response.send(await this.exporter.pdf(rows, name));
     }
     response.setHeader(
       'Content-Type',
@@ -173,8 +181,8 @@ export class ReportsController {
   @Get('export-info')
   exportInfo() {
     return {
-      supportedFormats: ['json', 'csv', 'xlsx'],
-      usage: 'Add ?format=csv or ?format=xlsx to a report endpoint.',
+      supportedFormats: ['json', 'csv', 'xlsx', 'pdf'],
+      usage: 'Add ?format=csv, ?format=xlsx or ?format=pdf to a report endpoint.',
     };
   }
 

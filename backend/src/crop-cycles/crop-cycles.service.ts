@@ -127,6 +127,16 @@ export class CropCyclesService {
     });
   }
 
+  /** Platform-wide activity log list for admin reporting (field officer "crop records updated" ranking). */
+  findAllActivityLogs() {
+    return this.prisma.activityLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        fieldOfficer: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
+      },
+    });
+  }
+
   async findOne(id: string, user?: RequestUser) {
     const cropCycle = await this.prisma.cropCycle.findUnique({
       where: { id },

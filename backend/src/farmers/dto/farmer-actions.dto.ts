@@ -39,6 +39,14 @@ export class VerifyFarmerDto {
   notes?: string;
 }
 
+/** Staff assigns a field officer as responsible for this farmer's follow-up. */
+export class AssignOfficerDto {
+  @ApiProperty({ example: 'a1b2c3d4-...', description: 'MamcosStaff id of the field officer' })
+  @IsString()
+  @IsNotEmpty()
+  officerId: string;
+}
+
 /** Field-officer rejects a farmer application. */
 export class RejectFarmerDto {
   @ApiProperty({ example: 'National ID could not be verified against NIDA records.' })

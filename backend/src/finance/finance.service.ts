@@ -27,6 +27,20 @@ export class FinanceService {
     private readonly accounting: AccountingService,
   ) {}
 
+  /** Platform-wide input cost list for admin reporting (distribution status by category). */
+  findAllInputCosts() {
+    return this.prisma.inputCost.findMany({
+      orderBy: { dateIncurred: 'desc' },
+      include: {
+        cropCycle: {
+          select: {
+            farmer: { select: { firstName: true, lastName: true, controlNumber: true } },
+          },
+        },
+      },
+    });
+  }
+
   private async findCropCycleOrFail(cropCycleId: string) {
     const cropCycle = await this.prisma.cropCycle.findUnique({
       where: { id: cropCycleId },

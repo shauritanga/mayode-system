@@ -50,6 +50,13 @@ export class FinanceController {
     return this.financeService.addRevenue(dto, user);
   }
 
+  @Get('costs')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR)
+  @ApiOperation({ summary: 'Get all input costs across the system (staff only)' })
+  findAllInputCosts() {
+    return this.financeService.findAllInputCosts();
+  }
+
   @Get('crop-cycle/:cropCycleId/summary')
   @ApiOperation({
     summary:

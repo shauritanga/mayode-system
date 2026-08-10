@@ -25,6 +25,8 @@ import {
   FileEditIcon,
   MapsSearchIcon,
   UserAdd01Icon,
+  Shield01Icon,
+  CloudSunRainIcon,
 } from '@hugeicons/core-free-icons';
 import UserMenu from './UserMenu';
 import { useAuthStore } from '@/store/auth.store';
@@ -55,6 +57,8 @@ const navItems = [
   { href: '/dashboard/inventory', label: 'Inventory', icon: Package01Icon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
   { href: '/dashboard/sales', label: 'Cooperative Sales', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
   { href: '/dashboard/finance', label: 'Finance', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { href: '/dashboard/insurance', label: 'Insurance', icon: Shield01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'AUDITOR'] },
+  { href: '/dashboard/weather', label: 'Weather', icon: CloudSunRainIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER'] },
   { href: '/dashboard/compliance', label: 'Compliance', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'AUDITOR'] },
   { href: '/dashboard/governance', label: 'Governance', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
   { href: '/dashboard/projects', label: 'Community Projects', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },

@@ -22,6 +22,11 @@ export class LoansController {
   @Get('farmer/:farmerId') list(@Param('farmerId') farmerId: string) {
     return this.loans.listForFarmer(farmerId);
   }
+  @Get()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR, UserRole.FINANCIAL_PROVIDER)
+  findAll() {
+    return this.loans.findAll();
+  }
   @Post('sales/:saleId/approve-payouts')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   approve(@Param('saleId') saleId: string, @CurrentUser() user: RequestUser) {

@@ -8,7 +8,7 @@ export class DateRangeDto {
 }
 
 export class ReportFormatDto extends DateRangeDto {
-  @IsOptional() @IsEnum(['json', 'csv', 'xlsx'] as const) format?: 'json' | 'csv' | 'xlsx';
+  @IsOptional() @IsEnum(['json', 'csv', 'xlsx', 'pdf'] as const) format?: 'json' | 'csv' | 'xlsx' | 'pdf';
 }
 
 export class CreatePremiumFundEntryDto {

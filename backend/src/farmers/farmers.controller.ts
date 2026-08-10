@@ -18,6 +18,7 @@ import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
 import { QueryFarmersDto } from './dto/query-farmers.dto';
 import {
+  AssignOfficerDto,
   VerifyFarmerDto,
   RejectFarmerDto,
   SuspendFarmerDto,
@@ -92,6 +93,14 @@ export class FarmersController {
       );
       return response.send(this.exporter.csv(rows));
     }
+    if (query.format === 'pdf') {
+      response.setHeader('Content-Type', 'application/pdf');
+      response.setHeader(
+        'Content-Disposition',
+        'attachment; filename="farmers.pdf"',
+      );
+      return response.send(await this.exporter.pdf(rows, 'farmers'));
+    }
     response.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -115,6 +124,22 @@ export class FarmersController {
   })
   overview() {
     return this.farmersService.getOverview();
+  }
+
+  @Get('all')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
+  @ApiOperation({
+    summary:
+      'Unpaginated farmer list for admin dashboard reporting/aggregation (minimal fields — not for UI tables, use GET /farmers for that)',
+  })
+  findAllUnpaginated() {
+    return this.farmersService.findAllUnpaginated();
   }
 
   @Get('control-number/:controlNumber')
@@ -292,6 +317,13 @@ export class FarmersController {
     @CurrentUser() user: RequestUser,
   ) {
     return this.farmersService.update(id, dto, user);
+  }
+
+  @Patch(':id/assign-officer')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @ApiOperation({ summary: 'Assign a field officer as responsible for a farmer\'s follow-up' })
+  assignOfficer(@Param('id') id: string, @Body() dto: AssignOfficerDto) {
+    return this.farmersService.assignOfficer(id, dto);
   }
 
   @Post(':id/verify')

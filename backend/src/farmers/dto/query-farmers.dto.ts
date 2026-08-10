@@ -57,6 +57,6 @@ export class QueryFarmersDto {
   pageSize?: number = 20;
 
   @IsOptional()
-  @IsEnum(['json', 'csv', 'xlsx'] as const)
-  format?: 'json' | 'csv' | 'xlsx';
+  @IsEnum(['json', 'csv', 'xlsx', 'pdf'] as const)
+  format?: 'json' | 'csv' | 'xlsx' | 'pdf';
 }
