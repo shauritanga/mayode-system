@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Patch,
+  Delete,
   Param,
   Query,
   UseGuards,
@@ -16,6 +17,7 @@ import {
   CreateCropCycleDto,
   UpdateCropCycleDto,
   CreateActivityLogDto,
+  UpdateActivityLogDto,
   CalendarQueryDto,
 } from './dto/crop-cycles.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -121,6 +123,27 @@ export class CropCyclesController {
   })
   findAllActivityLogs() {
     return this.cropCyclesService.findAllActivityLogs();
+  }
+
+  @Get('activity/:id')
+  @Roles(...STAFF_ROLES)
+  @ApiOperation({ summary: 'Get a single activity log entry by ID (staff only)' })
+  findActivityLog(@Param('id') id: string) {
+    return this.cropCyclesService.findActivityLogById(id);
+  }
+
+  @Patch('activity/:id')
+  @Roles(...STAFF_ROLES)
+  @ApiOperation({ summary: 'Edit an activity log entry (staff only)' })
+  updateActivityLog(@Param('id') id: string, @Body() dto: UpdateActivityLogDto) {
+    return this.cropCyclesService.updateActivityLog(id, dto);
+  }
+
+  @Delete('activity/:id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.MAMCOS_SECRETARY)
+  @ApiOperation({ summary: 'Delete an activity log entry (staff only)' })
+  deleteActivityLog(@Param('id') id: string) {
+    return this.cropCyclesService.deleteActivityLog(id);
   }
 
   @Get(':id')

@@ -73,6 +73,8 @@ export class MamcosService {
         farms: {
           select: { id: true, farmCode: true, socialHectares: true, grade: true, isVerified: true },
         },
+        irrigationSchemes: true,
+        aggregationCentres: true,
       },
     });
 
@@ -81,13 +83,16 @@ export class MamcosService {
     }
 
     // Rolled-up production/aggregation figures the docx asks for on the AMCOS
-    // detail page. "Storage/aggregation capacity" is deliberately omitted —
-    // there's no capacity field anywhere in the schema (InventoryRecord only
-    // tracks quantities received, not a designed max), so reporting one would
-    // be fabricated. "Total rice aggregated" (actual, to date) is reported
-    // instead as the honest equivalent.
+    // detail page. "Total rice aggregated" (actual, to date) is reported as
+    // the honest equivalent of a storage balance. "Aggregation capacity" is
+    // now a real derived figure (sum of this AMCOS's AggregationCentre rows'
+    // capacityKg) since that field was added in this pass — no longer
+    // fabricated. Cooperative-level "storage capacity" as a distinct figure
+    // still has no backing field anywhere in the schema, so it stays omitted
+    // rather than reporting a made-up number.
     const farmerIds = mamcos.farmers.map((f) => f.id);
     const totalRegisteredHectares = mamcos.farms.reduce((sum, f) => sum + (f.socialHectares || 0), 0);
+    const totalAggregationCapacityKg = mamcos.aggregationCentres.reduce((sum, c) => sum + (c.capacityKg || 0), 0);
     const [yieldAgg, inventoryAgg] = farmerIds.length
       ? await Promise.all([
           this.prisma.cropCycle.aggregate({
@@ -105,6 +110,7 @@ export class MamcosService {
       totalActualYieldKg: yieldAgg._sum.actualYieldKg ?? 0,
       totalEstimatedYieldKg: yieldAgg._sum.estimatedYieldKg ?? 0,
       totalRiceAggregatedKg: inventoryAgg._sum.weightKg ?? 0,
+      totalAggregationCapacityKg,
     };
 
     const { staff, ...rest } = mamcos;

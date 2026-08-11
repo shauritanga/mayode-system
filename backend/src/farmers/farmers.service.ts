@@ -883,8 +883,8 @@ export class FarmersService {
 
   /**
    * Compute a real credit-readiness score (0-100) from verification, production,
-   * profitability, loan repayment, cooperative membership and experience. The
-   * resulting score is persisted onto Farmer.creditScore.
+   * profitability, loan repayment, cooperative membership, experience, farm size and
+   * insurance status. The resulting score is persisted onto Farmer.creditScore.
    */
   async getCreditReadiness(farmerId: string, user: RequestUser) {
     if (user.role !== UserRole.FINANCIAL_PROVIDER) {
@@ -895,6 +895,8 @@ export class FarmersService {
       include: {
         cropCycles: { include: { costs: true, revenues: true } },
         loanRecords: true,
+        farms: { select: { socialHectares: true } },
+        insurancePolicies: { select: { status: true } },
       },
     });
     if (!farmer)
@@ -905,15 +907,15 @@ export class FarmersService {
       );
     }
 
-    // 1. Verification (max 25)
+    // 1. Verification (max 20)
     const verificationScore =
-      farmer.verificationStatus === VerificationStatus.VERIFIED ? 25 : 0;
+      farmer.verificationStatus === VerificationStatus.VERIFIED ? 20 : 0;
 
-    // 2. Production history (max 20) — reward harvested cycles
+    // 2. Production history (max 15) — reward harvested cycles
     const harvestedCycles = farmer.cropCycles.filter(
       (c) => (c.actualYieldKg ?? 0) > 0,
     ).length;
-    const productionScore = Math.min(20, harvestedCycles * 7);
+    const productionScore = Math.min(15, harvestedCycles * 5);
 
     // 3. Profitability (max 20)
     let overallCosts = 0;
@@ -930,11 +932,11 @@ export class FarmersService {
     const netProfit = overallRevenues + overallPremium - overallCosts;
     let profitabilityScore = 0;
     if (farmer.cropCycles.length > 0) {
-      profitabilityScore = netProfit > 0 ? 20 : 5;
+      profitabilityScore = netProfit > 0 ? 15 : 4;
     }
 
-    // 4. Loan repayment history (max 20)
-    let loanScore = 12; // neutral: no debt, but no track record
+    // 4. Loan repayment history (max 15)
+    let loanScore = 9; // neutral: no debt, but no track record
     if (farmer.loanRecords.length > 0) {
       const ratios = farmer.loanRecords.map((l) => {
         if (!l.originalAmount || l.originalAmount <= 0) return 1;
@@ -942,7 +944,7 @@ export class FarmersService {
         return Math.max(0, Math.min(1, repaid));
       });
       const avgRepaid = ratios.reduce((s, r) => s + r, 0) / ratios.length;
-      loanScore = Math.round(20 * avgRepaid);
+      loanScore = Math.round(15 * avgRepaid);
     }
 
     // 5. Cooperative membership (max 10)
@@ -952,13 +954,29 @@ export class FarmersService {
     const years = farmer.farmingExperienceYears ?? 0;
     const experienceScore = years >= 5 ? 5 : years >= 2 ? 3 : 0;
 
+    // 7. Farm size (max 10) — total registered hectares across this farmer's farms
+    const totalHectares = farmer.farms.reduce(
+      (sum, farm) => sum + (farm.socialHectares ?? 0),
+      0,
+    );
+    const farmSizeScore =
+      totalHectares >= 2 ? 10 : totalHectares >= 1 ? 6 : totalHectares > 0 ? 3 : 0;
+
+    // 8. Insurance status (max 10) — an active policy demonstrates managed production risk
+    const hasActiveInsurance = farmer.insurancePolicies.some(
+      (policy) => policy.status === 'ACTIVE',
+    );
+    const insuranceScore = hasActiveInsurance ? 10 : 0;
+
     let score =
       verificationScore +
       productionScore +
       profitabilityScore +
       loanScore +
       cooperativeScore +
-      experienceScore;
+      experienceScore +
+      farmSizeScore +
+      insuranceScore;
     if (farmer.isBlacklisted) score = Math.min(score, 20);
 
     const creditReady =
@@ -982,14 +1000,14 @@ export class FarmersService {
       factors: {
         verification: {
           score: verificationScore,
-          max: 25,
+          max: 20,
           status: farmer.verificationStatus,
         },
-        production: { score: productionScore, max: 20, harvestedCycles },
-        profitability: { score: profitabilityScore, max: 20, netProfit },
+        production: { score: productionScore, max: 15, harvestedCycles },
+        profitability: { score: profitabilityScore, max: 15, netProfit },
         loanRepayment: {
           score: loanScore,
-          max: 20,
+          max: 15,
           activeLoans: farmer.loanRecords.length,
         },
         cooperativeMembership: {
@@ -998,6 +1016,12 @@ export class FarmersService {
           isMember: !!farmer.mamcosId,
         },
         experience: { score: experienceScore, max: 5, years },
+        farmSize: { score: farmSizeScore, max: 10, totalHectares },
+        insurance: {
+          score: insuranceScore,
+          max: 10,
+          hasActiveInsurance,
+        },
       },
     };
   }

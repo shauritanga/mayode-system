@@ -21,7 +21,7 @@ interface AuthState {
    *  default `isAuthenticated: false` and bounces the user out. */
   _hasHydrated: boolean;
   setHasHydrated: (hydrated: boolean) => void;
-  setAuth: (user: User, token: string) => void;
+  setAuth: (user: User, token: string, refreshToken?: string) => void;
   updateUser: (user: Partial<User>) => void;
   clearAuth: () => void;
 }
@@ -34,9 +34,10 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       _hasHydrated: false,
       setHasHydrated: (hydrated) => set({ _hasHydrated: hydrated }),
-      setAuth: (user, accessToken) => {
+      setAuth: (user, accessToken, refreshToken) => {
         if (typeof window !== 'undefined') {
           localStorage.setItem('accessToken', accessToken);
+          if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
         }
         set({ user, accessToken, isAuthenticated: true });
       },
@@ -44,6 +45,7 @@ export const useAuthStore = create<AuthState>()(
       clearAuth: () => {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
         }
         set({ user: null, accessToken: null, isAuthenticated: false });
       },

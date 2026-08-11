@@ -35,6 +35,12 @@ export class InventoryController {
     return this.inventoryService.findAllRecords();
   }
 
+  @Get('dashboard-summary')
+  @ApiOperation({ summary: 'Warehouse dashboard aggregates: totals by grade, warehouse, status and variety' })
+  dashboardSummary() {
+    return this.inventoryService.dashboardSummary();
+  }
+
   @Get('records/:id')
   @ApiOperation({ summary: 'Get inventory record details by ID' })
   findRecordById(@Param('id') id: string) {

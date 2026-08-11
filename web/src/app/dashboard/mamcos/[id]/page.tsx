@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { authApi, mamcosApi } from '@/lib/api';
+import { authApi, mamcosApi, facilitiesApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 
 interface Secretary {
@@ -21,11 +21,14 @@ interface OfficerRow {
 }
 interface FarmerRow { id: string; controlNumber: string; firstName: string; lastName: string; creditScore: number }
 interface FarmRow { id: string; farmCode: string; socialHectares: number; grade?: string; isVerified: boolean }
+interface IrrigationSchemeRow { id: string; name: string; schemeType?: string; coverageHectares?: number; waterSource?: string; isActive: boolean }
+interface AggregationCentreRow { id: string; name: string; location?: string; capacityKg?: number; contactPerson?: string; isActive: boolean }
 interface ProductionSummary {
   totalRegisteredHectares: number;
   totalActualYieldKg: number;
   totalEstimatedYieldKg: number;
   totalRiceAggregatedKg: number;
+  totalAggregationCapacityKg: number;
 }
 interface MamcosDetail {
   id: string;
@@ -41,6 +44,8 @@ interface MamcosDetail {
   fieldOfficers: OfficerRow[];
   farmers: FarmerRow[];
   farms: FarmRow[];
+  irrigationSchemes?: IrrigationSchemeRow[];
+  aggregationCentres?: AggregationCentreRow[];
 }
 
 const EMPTY_LEADER_FORM = { firstName: '', lastName: '', phone: '', password: '' };
@@ -62,6 +67,9 @@ export default function MamcosDetailPage() {
   const [officerForm, setOfficerForm] = useState<any>({ ...EMPTY_OFFICER_FORM });
   const [staffMessage, setStaffMessage] = useState('');
   const [staffSaving, setStaffSaving] = useState(false);
+  const [schemeForm, setSchemeForm] = useState({ name: '', schemeType: '', coverageHectares: '', waterSource: '' });
+  const [centreForm, setCentreForm] = useState({ name: '', location: '', capacityKg: '', contactPerson: '' });
+  const [facilityMessage, setFacilityMessage] = useState('');
 
   const load = () => {
     setLoading(true);
@@ -97,6 +105,30 @@ export default function MamcosDetailPage() {
     } catch (e: any) {
       setStaffMessage(e?.response?.data?.message || 'Could not add Field Officer.');
     } finally { setStaffSaving(false); }
+  };
+
+  const addScheme = async (e: React.FormEvent) => {
+    e.preventDefault(); setFacilityMessage('');
+    try {
+      await facilitiesApi.createIrrigationScheme({ mamcosId: id, name: schemeForm.name, schemeType: schemeForm.schemeType || undefined, coverageHectares: schemeForm.coverageHectares ? Number(schemeForm.coverageHectares) : undefined, waterSource: schemeForm.waterSource || undefined });
+      setSchemeForm({ name: '', schemeType: '', coverageHectares: '', waterSource: '' });
+      setFacilityMessage('Irrigation scheme added.');
+      load();
+    } catch (err: any) {
+      setFacilityMessage(err?.response?.data?.message || 'Unable to add irrigation scheme.');
+    }
+  };
+
+  const addCentre = async (e: React.FormEvent) => {
+    e.preventDefault(); setFacilityMessage('');
+    try {
+      await facilitiesApi.createAggregationCentre({ mamcosId: id, name: centreForm.name, location: centreForm.location || undefined, capacityKg: centreForm.capacityKg ? Number(centreForm.capacityKg) : undefined, contactPerson: centreForm.contactPerson || undefined });
+      setCentreForm({ name: '', location: '', capacityKg: '', contactPerson: '' });
+      setFacilityMessage('Aggregation centre added.');
+      load();
+    } catch (err: any) {
+      setFacilityMessage(err?.response?.data?.message || 'Unable to add aggregation centre.');
+    }
   };
 
   const openEdit = () => {
@@ -168,6 +200,7 @@ export default function MamcosDetailPage() {
             color: 'var(--green-400)',
           },
           { label: 'Rice aggregated to date', value: mamcos.productionSummary ? `${mamcos.productionSummary.totalRiceAggregatedKg.toLocaleString()} kg` : '—', color: 'var(--purple-500)' },
+          { label: 'Aggregation capacity', value: mamcos.productionSummary?.totalAggregationCapacityKg ? `${mamcos.productionSummary.totalAggregationCapacityKg.toLocaleString()} kg` : '—', color: 'var(--gold-400)' },
           { label: 'District', value: mamcos.district || '—', color: 'var(--neutral-400)' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
@@ -283,6 +316,60 @@ export default function MamcosDetailPage() {
             </table>
           </div>
         )}
+      </div>
+
+      {facilityMessage && <div className="glass-card" style={{ padding: '12px 16px', marginBottom: '16px', color: 'var(--accent)' }}>{facilityMessage}</div>}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px', marginTop: '24px' }}>
+        <div className="glass-card" style={{ overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--hover-tint-3)', fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Irrigation Schemes</div>
+          <form onSubmit={addScheme} style={{ padding: '14px 18px', display: 'grid', gap: '8px', borderBottom: '1px solid var(--hover-tint-3)' }}>
+            <input className="input-field" placeholder="Scheme name" required value={schemeForm.name} onChange={(e) => setSchemeForm({ ...schemeForm, name: e.target.value })} />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input className="input-field" placeholder="Type (gravity, pump...)" value={schemeForm.schemeType} onChange={(e) => setSchemeForm({ ...schemeForm, schemeType: e.target.value })} />
+              <input className="input-field" type="number" placeholder="Hectares covered" value={schemeForm.coverageHectares} onChange={(e) => setSchemeForm({ ...schemeForm, coverageHectares: e.target.value })} />
+            </div>
+            <input className="input-field" placeholder="Water source" value={schemeForm.waterSource} onChange={(e) => setSchemeForm({ ...schemeForm, waterSource: e.target.value })} />
+            <button className="btn-secondary" type="submit" style={{ fontSize: '12px', padding: '7px 10px' }}>+ Add scheme</button>
+          </form>
+          {!mamcos.irrigationSchemes?.length ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>No irrigation schemes recorded yet.</div>
+          ) : (
+            <div style={{ padding: '10px 18px', display: 'grid', gap: '8px' }}>
+              {mamcos.irrigationSchemes.map((s) => (
+                <div key={s.id} style={{ fontSize: '13px', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{s.name}{s.schemeType ? ` · ${s.schemeType}` : ''}{s.coverageHectares ? ` · ${s.coverageHectares} ha` : ''}</span>
+                  <span className={`badge ${s.isActive ? 'badge-green' : 'badge-gray'}`}>{s.isActive ? 'Active' : 'Inactive'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="glass-card" style={{ overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--hover-tint-3)', fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Aggregation Centres</div>
+          <form onSubmit={addCentre} style={{ padding: '14px 18px', display: 'grid', gap: '8px', borderBottom: '1px solid var(--hover-tint-3)' }}>
+            <input className="input-field" placeholder="Centre name" required value={centreForm.name} onChange={(e) => setCentreForm({ ...centreForm, name: e.target.value })} />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input className="input-field" placeholder="Location" value={centreForm.location} onChange={(e) => setCentreForm({ ...centreForm, location: e.target.value })} />
+              <input className="input-field" type="number" placeholder="Capacity (kg)" value={centreForm.capacityKg} onChange={(e) => setCentreForm({ ...centreForm, capacityKg: e.target.value })} />
+            </div>
+            <input className="input-field" placeholder="Contact person" value={centreForm.contactPerson} onChange={(e) => setCentreForm({ ...centreForm, contactPerson: e.target.value })} />
+            <button className="btn-secondary" type="submit" style={{ fontSize: '12px', padding: '7px 10px' }}>+ Add centre</button>
+          </form>
+          {!mamcos.aggregationCentres?.length ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>No aggregation centres recorded yet.</div>
+          ) : (
+            <div style={{ padding: '10px 18px', display: 'grid', gap: '8px' }}>
+              {mamcos.aggregationCentres.map((c) => (
+                <div key={c.id} style={{ fontSize: '13px', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{c.name}{c.location ? ` · ${c.location}` : ''}{c.capacityKg ? ` · ${c.capacityKg.toLocaleString()} kg capacity` : ''}</span>
+                  <span className={`badge ${c.isActive ? 'badge-green' : 'badge-gray'}`}>{c.isActive ? 'Active' : 'Inactive'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {showEditForm && form && (

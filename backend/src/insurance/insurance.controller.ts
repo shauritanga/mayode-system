@@ -8,9 +8,11 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { InsuranceService } from './insurance.service';
 import {
+  AmendPolicyDto,
   CreateInsuranceClaimDto,
   CreateInsurancePolicyDto,
   InspectClaimDto,
+  RenewPolicyDto,
   UpdateClaimPaymentDto,
   UpdatePolicyStatusDto,
   UpsertInsuranceProviderDto,
@@ -68,6 +70,20 @@ export class InsuranceController {
     return this.insurance.updatePolicyStatus(id, dto);
   }
 
+  @Patch('policies/:id/amend')
+  @Roles(...STAFF_ROLES)
+  @ApiOperation({ summary: 'Amend a policy\'s coverage/financial terms (sum insured, premium, area, dates)' })
+  amendPolicy(@Param('id') id: string, @Body() dto: AmendPolicyDto) {
+    return this.insurance.amendPolicy(id, dto);
+  }
+
+  @Post('policies/:id/renew')
+  @Roles(...STAFF_ROLES)
+  @ApiOperation({ summary: 'Renew an expiring policy into a new PENDING policy chained via renewedFromPolicyId' })
+  renewPolicy(@Param('id') id: string, @Body() dto: RenewPolicyDto) {
+    return this.insurance.renewPolicy(id, dto);
+  }
+
   @Post('claims')
   @Roles(...STAFF_ROLES, UserRole.FIELD_OFFICER, UserRole.FARMER)
   createClaim(@Body() dto: CreateInsuranceClaimDto) {
@@ -91,6 +107,13 @@ export class InsuranceController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   updateClaimPayment(@Param('id') id: string, @Body() dto: UpdateClaimPaymentDto) {
     return this.insurance.updateClaimPayment(id, dto);
+  }
+
+  @Get('claims/:id/weather-context')
+  @Roles(...STAFF_ROLES)
+  @ApiOperation({ summary: 'Weather alerts issued near this claim\'s incident date/location — supporting evidence, not a decision rule' })
+  getWeatherContextForClaim(@Param('id') id: string) {
+    return this.insurance.getWeatherContextForClaim(id);
   }
 
   @Get('coverage-summary')

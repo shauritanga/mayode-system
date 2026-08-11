@@ -2,9 +2,11 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { ClaimStatus, PolicyStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  AmendPolicyDto,
   CreateInsuranceClaimDto,
   CreateInsurancePolicyDto,
   InspectClaimDto,
+  RenewPolicyDto,
   UpdateClaimPaymentDto,
   UpdatePolicyStatusDto,
   UpsertInsuranceProviderDto,
@@ -93,6 +95,43 @@ export class InsuranceService {
     return this.prisma.insurancePolicy.update({ where: { id }, data: { status: dto.status } });
   }
 
+  /** Amend a policy's coverage/financial terms post-creation (not a status transition). */
+  async amendPolicy(id: string, dto: AmendPolicyDto) {
+    await this.findPolicyOrFail(id);
+    return this.prisma.insurancePolicy.update({
+      where: { id },
+      data: {
+        riceVariety: dto.riceVariety,
+        insuredAreaHectares: dto.insuredAreaHectares,
+        sumInsured: dto.sumInsured,
+        premiumAmount: dto.premiumAmount,
+        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+      },
+    });
+  }
+
+  /** Renew an expiring/expired policy: clones its coverage into a new PENDING policy, chained via renewedFromPolicyId. */
+  async renewPolicy(id: string, dto: RenewPolicyDto) {
+    const policy = await this.findPolicyOrFail(id);
+    return this.prisma.insurancePolicy.create({
+      data: {
+        farmerId: policy.farmerId,
+        farmId: policy.farmId,
+        cropCycleId: policy.cropCycleId,
+        providerId: policy.providerId,
+        productType: policy.productType,
+        riceVariety: policy.riceVariety,
+        insuredAreaHectares: policy.insuredAreaHectares,
+        sumInsured: dto.sumInsured ?? policy.sumInsured,
+        premiumAmount: dto.premiumAmount ?? policy.premiumAmount,
+        startDate: new Date(dto.startDate),
+        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+        renewedFromPolicyId: policy.id,
+      },
+    });
+  }
+
   // ── Claims ──
   async createClaim(dto: CreateInsuranceClaimDto) {
     const policy = await this.findPolicyOrFail(dto.policyId);
@@ -155,6 +194,45 @@ export class InsuranceService {
         paidAt: dto.status === ClaimStatus.PAID ? new Date() : undefined,
       },
     });
+  }
+
+  /**
+   * Cross-references a claim's incident with WeatherAlerts issued around the same time for the
+   * farmer's region/district — the explicit policy↔weather link the docx asks for. This is a
+   * read-side correlation (no FK), matching the WeatherAlert model's loose-reference convention;
+   * it surfaces existing alerts as supporting evidence, it doesn't drive claim approval.
+   */
+  async getWeatherContextForClaim(claimId: string) {
+    const claim = await this.prisma.insuranceClaim.findUnique({
+      where: { id: claimId },
+      include: { policy: { include: { farmer: { select: { region: true, district: true } } } } },
+    });
+    if (!claim) throw new NotFoundException(`Insurance claim with ID ${claimId} not found`);
+
+    const windowStart = new Date(claim.incidentDate);
+    windowStart.setDate(windowStart.getDate() - 14);
+    const windowEnd = new Date(claim.incidentDate);
+    windowEnd.setDate(windowEnd.getDate() + 14);
+
+    const { region, district } = claim.policy.farmer;
+    const alerts = await this.prisma.weatherAlert.findMany({
+      where: {
+        validFrom: { gte: windowStart, lte: windowEnd },
+        OR: [
+          region ? { region } : undefined,
+          district ? { district } : undefined,
+        ].filter(Boolean) as object[],
+      },
+      orderBy: { validFrom: 'desc' },
+    });
+
+    return {
+      claimId,
+      incidentDate: claim.incidentDate,
+      farmerLocation: { region, district },
+      windowDays: 14,
+      matchingAlerts: alerts,
+    };
   }
 
   // ── Dashboard aggregate ──

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { insuranceApi, farmersApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 
@@ -43,6 +43,8 @@ export default function InsurancePage() {
   const [claimForm, setClaimForm] = useState<any>({ ...EMPTY_CLAIM });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [weatherContext, setWeatherContext] = useState<Record<string, any>>({});
+  const [weatherLoadingId, setWeatherLoadingId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -103,6 +105,38 @@ export default function InsurancePage() {
       await insuranceApi.updatePolicyStatus(id, status);
       setPolicies((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
     } catch (e) { console.error(e); } finally { setStatusSavingId(null); }
+  };
+
+  const handleRenewPolicy = async (policy: Policy) => {
+    const startDate = window.prompt('New policy start date (YYYY-MM-DD):', new Date().toISOString().slice(0, 10));
+    if (!startDate) return;
+    try {
+      await insuranceApi.renewPolicy(policy.id, { startDate: new Date(startDate).toISOString() });
+      load();
+    } catch (e: any) { setError(e?.response?.data?.message || 'Could not renew policy.'); }
+  };
+
+  const handleAmendPolicy = async (policy: Policy) => {
+    const sumInsured = window.prompt('New sum insured (TZS):', String(policy.sumInsured));
+    if (sumInsured == null) return;
+    const premiumAmount = window.prompt('New premium amount (TZS):', String(policy.premiumAmount));
+    if (premiumAmount == null) return;
+    try {
+      await insuranceApi.amendPolicy(policy.id, { sumInsured: Number(sumInsured), premiumAmount: Number(premiumAmount) });
+      load();
+    } catch (e: any) { setError(e?.response?.data?.message || 'Could not amend policy.'); }
+  };
+
+  const toggleWeatherContext = async (claimId: string) => {
+    if (weatherContext[claimId]) {
+      setWeatherContext((prev) => { const next = { ...prev }; delete next[claimId]; return next; });
+      return;
+    }
+    setWeatherLoadingId(claimId);
+    try {
+      const res = await insuranceApi.getWeatherContextForClaim(claimId);
+      setWeatherContext((prev) => ({ ...prev, [claimId]: res.data }));
+    } catch (e) { console.error(e); } finally { setWeatherLoadingId(null); }
   };
 
   const handleClaimStatus = async (claim: Claim, status: string) => {
@@ -192,7 +226,7 @@ export default function InsurancePage() {
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
-              <thead><tr><th>Farmer</th><th>Provider</th><th>Product</th><th>Area (ha)</th><th>Sum Insured</th><th>Premium</th><th>Status</th></tr></thead>
+              <thead><tr><th>Farmer</th><th>Provider</th><th>Product</th><th>Area (ha)</th><th>Sum Insured</th><th>Premium</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
                 {policies.map((p) => (
                   <tr key={p.id}>
@@ -212,6 +246,10 @@ export default function InsurancePage() {
                       >
                         {['PENDING', 'ACTIVE', 'EXPIRED', 'CANCELLED', 'REJECTED'].map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
+                    </td>
+                    <td style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn-secondary" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => handleAmendPolicy(p)}>Amend</button>
+                      <button className="btn-secondary" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => handleRenewPolicy(p)}>Renew</button>
                     </td>
                   </tr>
                 ))}
@@ -233,27 +271,50 @@ export default function InsurancePage() {
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
-              <thead><tr><th>Farmer</th><th>Provider</th><th>Incident</th><th>Claimed</th><th>Paid</th><th>Status</th></tr></thead>
+              <thead><tr><th>Farmer</th><th>Provider</th><th>Incident</th><th>Claimed</th><th>Paid</th><th>Status</th><th>Weather</th></tr></thead>
               <tbody>
                 {claims.map((c) => (
-                  <tr key={c.id}>
-                    <td style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{c.policy?.farmer ? `${c.policy.farmer.firstName} ${c.policy.farmer.lastName}` : '—'}</td>
-                    <td style={{ fontSize: '13px', color: 'var(--neutral-400)' }}>{c.policy?.provider?.name || '—'}</td>
-                    <td style={{ fontSize: '13px', color: 'var(--neutral-400)' }}>{c.incidentType}</td>
-                    <td>TZS {c.claimedAmount.toLocaleString()}</td>
-                    <td>{c.paidAmount ? `TZS ${c.paidAmount.toLocaleString()}` : '—'}</td>
-                    <td>
-                      <select
-                        className="input-field"
-                        style={{ fontSize: '12px', padding: '4px 6px' }}
-                        value={c.status}
-                        disabled={statusSavingId === c.id}
-                        onChange={(e) => handleClaimStatus(c, e.target.value)}
-                      >
-                        {['SUBMITTED', 'INSPECTING', 'APPROVED', 'REJECTED', 'PAID'].map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </td>
-                  </tr>
+                  <Fragment key={c.id}>
+                    <tr>
+                      <td style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{c.policy?.farmer ? `${c.policy.farmer.firstName} ${c.policy.farmer.lastName}` : '—'}</td>
+                      <td style={{ fontSize: '13px', color: 'var(--neutral-400)' }}>{c.policy?.provider?.name || '—'}</td>
+                      <td style={{ fontSize: '13px', color: 'var(--neutral-400)' }}>{c.incidentType}</td>
+                      <td>TZS {c.claimedAmount.toLocaleString()}</td>
+                      <td>{c.paidAmount ? `TZS ${c.paidAmount.toLocaleString()}` : '—'}</td>
+                      <td>
+                        <select
+                          className="input-field"
+                          style={{ fontSize: '12px', padding: '4px 6px' }}
+                          value={c.status}
+                          disabled={statusSavingId === c.id}
+                          onChange={(e) => handleClaimStatus(c, e.target.value)}
+                        >
+                          {['SUBMITTED', 'INSPECTING', 'APPROVED', 'REJECTED', 'PAID'].map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <button className="btn-secondary" style={{ fontSize: '11px', padding: '4px 8px' }} disabled={weatherLoadingId === c.id} onClick={() => toggleWeatherContext(c.id)}>
+                          {weatherLoadingId === c.id ? 'Loading…' : weatherContext[c.id] ? 'Hide' : 'Check'}
+                        </button>
+                      </td>
+                    </tr>
+                    {weatherContext[c.id] && (
+                      <tr>
+                        <td colSpan={7} style={{ background: 'var(--surface-tint)', padding: '12px 16px', fontSize: '12px', color: 'var(--neutral-400)' }}>
+                          {weatherContext[c.id].matchingAlerts.length === 0
+                            ? `No weather alerts recorded within 14 days of the incident for ${weatherContext[c.id].farmerLocation.region || weatherContext[c.id].farmerLocation.district || 'this farmer\'s location'}.`
+                            : <div style={{ display: 'grid', gap: 6 }}>
+                                {weatherContext[c.id].matchingAlerts.map((a: any) => (
+                                  <div key={a.id}>
+                                    <span className="badge badge-gold" style={{ marginRight: 8 }}>{a.alertType.replace(/_/g, ' ')}</span>
+                                    {a.title} — {new Date(a.validFrom).toLocaleDateString()} ({a.region || a.district})
+                                  </div>
+                                ))}
+                              </div>}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

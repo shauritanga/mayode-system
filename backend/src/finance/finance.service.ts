@@ -37,6 +37,7 @@ export class FinanceService {
             farmer: { select: { firstName: true, lastName: true, controlNumber: true } },
           },
         },
+        supplierRecord: { select: { id: true, name: true } },
       },
     });
   }
@@ -69,6 +70,9 @@ export class FinanceService {
         unitPrice: dto.unitPrice,
         totalCost: dto.totalCost,
         supplier: dto.supplier,
+        supplierId: dto.supplierId,
+        paymentStatus: dto.paymentStatus,
+        loanRecordId: dto.loanRecordId,
         receiptUrl: dto.receiptUrl,
         dateIncurred: new Date(dto.dateIncurred),
       },

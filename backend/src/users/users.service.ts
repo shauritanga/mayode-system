@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import type { RequestUser } from '../common/ownership.service';
 
 @Injectable()
 export class UsersService {
@@ -49,8 +51,21 @@ export class UsersService {
     return user;
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto) {
+  async update(id: string, updateUserDto: UpdateUserDto, requestUser?: RequestUser) {
     await this.findOne(id); // Ensure user exists
+    const isSelf = requestUser?.id === id;
+    const isStaff =
+      requestUser?.role === UserRole.SUPER_ADMIN ||
+      requestUser?.role === UserRole.ADMIN;
+    if (!isSelf && !isStaff) {
+      throw new ForbiddenException('You may only update your own account');
+    }
+    if (updateUserDto.role && requestUser?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only a Super Admin may change a user’s role');
+    }
+    if (updateUserDto.isActive !== undefined && !isStaff) {
+      throw new ForbiddenException('Only staff may change account active status');
+    }
     return this.prisma.user.update({
       where: { id },
       data: updateUserDto,

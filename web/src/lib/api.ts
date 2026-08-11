@@ -19,16 +19,72 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Auto-refresh token on 401
+// Auto-refresh token on 401: exchange the stored refresh token for a new
+// access token and retry the original request once. Concurrent 401s while a
+// refresh is already in flight queue behind it instead of each firing their
+// own refresh call. Falls back to a hard logout/redirect if there's no
+// refresh token, or the refresh call itself fails/401s.
+let isRefreshing = false;
+let refreshQueue: Array<(token: string | null) => void> = [];
+
+const forceLogout = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  window.location.href = '/login';
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+    const originalRequest = error.config;
+    if (typeof window === 'undefined' || !originalRequest) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    const isAuthEndpoint = originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh');
+
+    if (error.response?.status !== 401 || isAuthEndpoint || originalRequest._retry) {
+      if (error.response?.status === 401) forceLogout();
+      return Promise.reject(error);
+    }
+
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      forceLogout();
+      return Promise.reject(error);
+    }
+
+    originalRequest._retry = true;
+
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        refreshQueue.push((token) => {
+          if (!token) { reject(error); return; }
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          resolve(api(originalRequest));
+        });
+      });
+    }
+
+    isRefreshing = true;
+    try {
+      const res = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
+      const { accessToken, refreshToken: newRefreshToken } = res.data;
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', newRefreshToken);
+      refreshQueue.forEach((resolveQueued) => resolveQueued(accessToken));
+      refreshQueue = [];
+      originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+      return api(originalRequest);
+    } catch (refreshError) {
+      refreshQueue.forEach((resolveQueued) => resolveQueued(null));
+      refreshQueue = [];
+      forceLogout();
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
   }
 );
 
@@ -73,6 +129,16 @@ export const mamcosApi = {
   dashboard: () => api.get('/mamcos/secretary-dashboard'),
   fieldOfficers: () => api.get('/mamcos/staff/field-officers'),
 };
+export const facilitiesApi = {
+  getIrrigationSchemes: (mamcosId?: string) => api.get('/irrigation-schemes', { params: mamcosId ? { mamcosId } : undefined }),
+  createIrrigationScheme: (data: object) => api.post('/irrigation-schemes', data),
+  updateIrrigationScheme: (id: string, data: object) => api.patch(`/irrigation-schemes/${id}`, data),
+  removeIrrigationScheme: (id: string) => api.delete(`/irrigation-schemes/${id}`),
+  getAggregationCentres: (mamcosId?: string) => api.get('/aggregation-centres', { params: mamcosId ? { mamcosId } : undefined }),
+  createAggregationCentre: (data: object) => api.post('/aggregation-centres', data),
+  updateAggregationCentre: (id: string, data: object) => api.patch(`/aggregation-centres/${id}`, data),
+  removeAggregationCentre: (id: string) => api.delete(`/aggregation-centres/${id}`),
+};
 
 // ── Farms ──
 export const farmsApi = {
@@ -108,6 +174,9 @@ export const cropCyclesApi = {
   logActivity: (data: object) => api.post('/crop-cycles/activity', data),
   calendar: (params?: object) => api.get('/crop-cycles/calendar', { params }),
   activityLogs: () => api.get('/crop-cycles/activity-logs'),
+  getActivityLog: (id: string) => api.get(`/crop-cycles/activity/${id}`),
+  updateActivityLog: (id: string, data: object) => api.patch(`/crop-cycles/activity/${id}`, data),
+  deleteActivityLog: (id: string) => api.delete(`/crop-cycles/activity/${id}`),
 };
 export const riceProtocolsApi = {
   bootstrap: (mamcosId: string) => api.post(`/rice-protocols/mamcos/${mamcosId}/bootstrap`),
@@ -132,6 +201,14 @@ export const financeApi = {
   addRevenue: (data: object) => api.post('/finance/revenue', data),
   getAllCosts: () => api.get('/finance/costs'),
 };
+// ── Suppliers ──
+export const suppliersApi = {
+  getAll: () => api.get('/suppliers'),
+  getOne: (id: string) => api.get(`/suppliers/${id}`),
+  create: (data: object) => api.post('/suppliers', data),
+  update: (id: string, data: object) => api.patch(`/suppliers/${id}`, data),
+  remove: (id: string) => api.delete(`/suppliers/${id}`),
+};
 // ── Loans ──
 export const loansApi = {
   getForFarmer: (farmerId: string) => api.get(`/loans/farmer/${farmerId}`),
@@ -155,10 +232,13 @@ export const insuranceApi = {
   getPoliciesForFarmer: (farmerId: string) => api.get(`/insurance/policies/farmer/${farmerId}`),
   createPolicy: (data: object) => api.post('/insurance/policies', data),
   updatePolicyStatus: (id: string, status: string) => api.patch(`/insurance/policies/${id}/status`, { status }),
+  amendPolicy: (id: string, data: object) => api.patch(`/insurance/policies/${id}/amend`, data),
+  renewPolicy: (id: string, data: object) => api.post(`/insurance/policies/${id}/renew`, data),
   getClaims: () => api.get('/insurance/claims'),
   createClaim: (data: object) => api.post('/insurance/claims', data),
   inspectClaim: (id: string, data: object) => api.patch(`/insurance/claims/${id}/inspect`, data),
   updateClaimPayment: (id: string, data: object) => api.patch(`/insurance/claims/${id}/payment`, data),
+  getWeatherContextForClaim: (id: string) => api.get(`/insurance/claims/${id}/weather-context`),
   coverageSummary: () => api.get('/insurance/coverage-summary'),
 };
 export const weatherApi = {
@@ -173,6 +253,12 @@ export const reportsApi = {
   farmerPayments: (params?: object) => api.get('/reports/farmer-payments', { params }),
   premiumFund: (params?: object) => api.get('/reports/premium-fund', { params }),
   flocertAuditPack: (params?: object) => api.get('/reports/flocert-audit-pack', { params }),
+  farmers: (params?: object) => api.get('/reports/farmers', { params }),
+  cropCycles: (params?: object) => api.get('/reports/crop-cycles', { params }),
+  fieldOfficerPerformance: (params?: object) => api.get('/reports/field-officer-performance', { params }),
+  insuranceCoverage: (params?: object) => api.get('/reports/insurance-coverage', { params }),
+  genderYouthInclusion: (params?: object) => api.get('/reports/gender-youth-inclusion', { params }),
+  download: (path: string, params?: object) => api.get(path, { params, responseType: 'blob' }),
 };
 export const integrationsApi = {
   createAiRecord: (data: object) => api.post('/integrations/ai-records', data),
@@ -187,6 +273,13 @@ export const governanceApi = {
 };
 export const salesApi = { create: (data: object) => api.post('/sales', data), list: () => api.get('/sales'), settle: (id: string) => api.post(`/sales/${id}/settle`, {}), collect: (id: string, phoneNumber?: string) => api.post(`/sales/${id}/collect`, { phoneNumber }), approvePayouts: (id: string) => api.post(`/loans/sales/${id}/approve-payouts`), reconcilePayouts: (id: string) => api.post(`/loans/sales/${id}/reconcile-payouts`) };
 export const buyersApi = { list: () => api.get('/buyers') };
+export const buyerOrdersApi = {
+  getAll: () => api.get('/buyer-orders'),
+  getForBuyer: (buyerId: string) => api.get(`/buyer-orders/buyer/${buyerId}`),
+  create: (data: object) => api.post('/buyer-orders', data),
+  updateStatus: (id: string, status: string) => api.patch(`/buyer-orders/${id}/status`, { status }),
+  remove: (id: string) => api.delete(`/buyer-orders/${id}`),
+};
 
 // ── Inventory ──
 export const inventoryApi = {
@@ -194,6 +287,7 @@ export const inventoryApi = {
   receive: (data: object) => api.post('/inventory/records', data),
   createLot: (data: object) => api.post('/inventory/lots', data),
   lots: () => api.get('/inventory/lots'),
+  dashboardSummary: () => api.get('/inventory/dashboard-summary'),
 };
 
 // ── Locations ──
@@ -201,6 +295,23 @@ export const locationsApi = {
   getRegions: () => api.get('/locations/regions'),
   getDistricts: (regionId: string) => api.get(`/locations/regions/${regionId}/districts`),
   getWards: (districtId: string) => api.get(`/locations/districts/${districtId}/wards`),
+  createRegion: (data: object) => api.post('/locations/regions', data),
+  updateRegion: (id: string, data: object) => api.patch(`/locations/regions/${id}`, data),
+  removeRegion: (id: string) => api.delete(`/locations/regions/${id}`),
+  createDistrict: (data: object) => api.post('/locations/districts', data),
+  updateDistrict: (id: string, data: object) => api.patch(`/locations/districts/${id}`, data),
+  removeDistrict: (id: string) => api.delete(`/locations/districts/${id}`),
+  createWard: (data: object) => api.post('/locations/wards', data),
+  updateWard: (id: string, data: object) => api.patch(`/locations/wards/${id}`, data),
+  removeWard: (id: string) => api.delete(`/locations/wards/${id}`),
+};
+export const settingsApi = {
+  getOrg: () => api.get('/settings/org'),
+  updateOrg: (data: object) => api.put('/settings/org', data),
+  getTemplates: () => api.get('/settings/notification-templates'),
+  createTemplate: (data: object) => api.post('/settings/notification-templates', data),
+  updateTemplate: (id: string, data: object) => api.patch(`/settings/notification-templates/${id}`, data),
+  removeTemplate: (id: string) => api.delete(`/settings/notification-templates/${id}`),
 };
 
 // ── Marketplace ──

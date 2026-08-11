@@ -9,7 +9,7 @@ import {
   IsDateString,
   IsNotEmpty,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType, OmitType } from '@nestjs/swagger';
 import { CropCycleStatus, ActivityType } from '@prisma/client';
 
 export class CreateCropCycleDto {
@@ -208,6 +208,10 @@ export class CreateActivityLogDto {
   @IsOptional()
   gpsLongitude?: number;
 }
+
+export class UpdateActivityLogDto extends PartialType(
+  OmitType(CreateActivityLogDto, ['cropCycleId'] as const),
+) {}
 
 export class CalendarQueryDto {
   @ApiPropertyOptional({ description: 'ISO date, inclusive lower bound; defaults to start of current month' })

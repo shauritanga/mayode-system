@@ -33,13 +33,23 @@ import { useAuthStore } from '@/store/auth.store';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-  { href: '/dashboard/farmer', label: 'Farmer Dashboard', icon: Home01Icon, roles: ['FARMER'] },
+  { href: '/dashboard/farmer', label: 'Overview', icon: Home01Icon, roles: ['FARMER'] },
+  { href: '/dashboard/farmer/farms', label: 'My Farms', icon: Plant01Icon, roles: ['FARMER'] },
+  { href: '/dashboard/farmer/crop-cycles', label: 'Crop Cycles', icon: WheatIcon, roles: ['FARMER'] },
+  { href: '/dashboard/farmer/rice-tasks', label: 'Rice Tasks', icon: BookOpen01Icon, roles: ['FARMER'] },
+  { href: '/dashboard/farmer/finance', label: 'Finance', icon: Wallet01Icon, roles: ['FARMER'] },
+  { href: '/dashboard/farmer/insurance', label: 'Insurance', icon: Shield01Icon, roles: ['FARMER'] },
+  { href: '/dashboard/farmer/membership', label: 'Membership', icon: StarIcon, roles: ['FARMER'] },
+  { href: '/dashboard/farmer/votes', label: 'Votes', icon: File01Icon, roles: ['FARMER'] },
+  { href: '/dashboard/farmer/alerts', label: 'Alerts', icon: BellIcon, roles: ['FARMER'] },
+  { href: '/dashboard/farmer/marketplace', label: 'Marketplace', icon: ShoppingCart02Icon, roles: ['FARMER'] },
+  { href: '/dashboard/farmer/consent', label: 'Consent', icon: ClipboardIcon, roles: ['FARMER'] },
   { href: '/dashboard/field-officer', label: 'Field Dashboard', icon: MapsSearchIcon, roles: ['FIELD_OFFICER'] },
   { href: '/dashboard/auditor', label: 'Auditor Dashboard', icon: File01Icon, roles: ['AUDITOR'] },
   { href: '/dashboard/financial-provider', label: 'Credit Dashboard', icon: Wallet01Icon, roles: ['FINANCIAL_PROVIDER'] },
   { href: '/dashboard/leadership', label: 'Leadership', icon: DashboardSquare01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-  { href: '/dashboard/mayodata-admin', label: 'MAYOData Admin', icon: DashboardSquare01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
   { href: '/dashboard/staff', label: 'Staff', icon: UserAdd01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/users', label: 'Users & Roles', icon: UserAdd01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
   { href: '/dashboard/farmers', label: 'Farmers', icon: UserGroupIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER'] },
   { href: '/dashboard/farms', label: 'Farms', icon: Plant01Icon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'] },
   { href: '/dashboard/farm-registry', label: 'Farm Registry', icon: ClipboardIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER'] },
@@ -53,18 +63,23 @@ const navItems = [
   { href: '/dashboard/rewards', label: 'Rewards', icon: GiftIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
   { href: '/dashboard/mamcos', label: 'AMCOS', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
   { href: '/dashboard/crop-cycles', label: 'Crop Cycles', icon: WheatIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'] },
+  { href: '/dashboard/activities', label: 'Crop Activities', icon: ClipboardIcon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'] },
   { href: '/dashboard/rice-calendar', label: 'Rice Calendar', icon: BookOpen01Icon, roles: ['MAMCOS_SECRETARY'] },
   { href: '/dashboard/inventory', label: 'Inventory', icon: Package01Icon, roles: ['SUPER_ADMIN', 'MAMCOS_SECRETARY'] },
+  { href: '/dashboard/suppliers', label: 'Suppliers', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
   { href: '/dashboard/sales', label: 'Cooperative Sales', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
   { href: '/dashboard/finance', label: 'Finance', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
   { href: '/dashboard/insurance', label: 'Insurance', icon: Shield01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'AUDITOR'] },
   { href: '/dashboard/weather', label: 'Weather', icon: CloudSunRainIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER'] },
   { href: '/dashboard/compliance', label: 'Compliance', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'AUDITOR'] },
+  { href: '/dashboard/reports', label: 'Reports', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'AUDITOR'] },
   { href: '/dashboard/governance', label: 'Governance', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
   { href: '/dashboard/projects', label: 'Community Projects', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
   { href: '/dashboard/buyer', label: 'Buyer Portal', icon: DashboardSquare01Icon, roles: ['BUYER'] },
   { href: '/dashboard/marketplace', label: 'M-LAX Marketplace', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { href: '/dashboard/buyer-orders', label: 'Buyer Orders', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
   { href: '/dashboard/locations', label: 'Locations', icon: Location01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { href: '/dashboard/settings', label: 'Settings', icon: DashboardSquare01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
 ];
 
 export default function Sidebar() {
@@ -107,7 +122,12 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav style={{ flex: 1, padding: '16px 12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
         {visibleItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+          // Landing pages that sit at the same path prefix as their own sibling routes
+          // (e.g. "/dashboard/farmer" is the Overview page, but "/dashboard/farmer/farms"
+          // etc. are siblings, not children of it) must match exactly, not by prefix —
+          // otherwise the landing page's nav item stays highlighted on every sub-page too.
+          const isLandingPage = item.href === '/dashboard' || item.href === '/dashboard/farmer';
+          const isActive = pathname === item.href || (!isLandingPage && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}

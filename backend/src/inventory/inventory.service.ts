@@ -30,7 +30,7 @@ export class InventoryService {
   }
 
   async receiveInventory(createInventoryRecordDto: CreateInventoryRecordDto) {
-    const { farmId, farmerId, cropCycleId, weightKg, qualityGrade, warehouseLocation, receivedDate } = createInventoryRecordDto;
+    const { farmId, farmerId, cropCycleId, weightKg, qualityGrade, moistureContentPct, warehouseLocation, receivedDate } = createInventoryRecordDto;
 
     const farm = await this.prisma.farm.findUnique({ where: { id: farmId }, select: { id: true, mamcosId: true } });
     if (!farm) {
@@ -60,6 +60,7 @@ export class InventoryService {
         cropCycleId,
         weightKg,
         qualityGrade,
+        moistureContentPct,
         trackingCode,
         warehouseLocation,
         receivedDate: new Date(receivedDate),
@@ -166,6 +167,36 @@ export class InventoryService {
         },
       });
     });
+  }
+
+  /** Warehouse dashboard: totals by grade, warehouse, status and variety (via Lot). */
+  async dashboardSummary() {
+    const [byGrade, byWarehouse, byStatus, byVariety, totals, soldTotal] = await Promise.all([
+      this.prisma.inventoryRecord.groupBy({ by: ['qualityGrade'], _sum: { weightKg: true }, _count: { _all: true } }),
+      this.prisma.inventoryRecord.groupBy({ by: ['warehouseLocation'], _sum: { weightKg: true }, _count: { _all: true } }),
+      this.prisma.inventoryRecord.groupBy({ by: ['status'], _sum: { weightKg: true }, _count: { _all: true } }),
+      this.prisma.lot.groupBy({ by: ['riceVariety'], _sum: { totalWeightKg: true }, _count: { _all: true } }),
+      this.prisma.inventoryRecord.aggregate({ _sum: { weightKg: true }, _count: { _all: true } }),
+      this.prisma.inventoryRecord.aggregate({ where: { status: 'SOLD' }, _sum: { weightKg: true } }),
+    ]);
+
+    const totalReceivedKg = totals._sum.weightKg ?? 0;
+    const soldKg = soldTotal._sum.weightKg ?? 0;
+    const inStockKg = byStatus
+      .filter((row) => row.status === 'RECEIVED' || row.status === 'IN_STORAGE' || row.status === 'BATCHED')
+      .reduce((sum, row) => sum + (row._sum.weightKg ?? 0), 0);
+
+    return {
+      totalReceivedKg,
+      totalReceivedCount: totals._count._all,
+      inStockKg,
+      soldKg,
+      currentBalanceKg: totalReceivedKg - soldKg,
+      byGrade: byGrade.map((row) => ({ grade: row.qualityGrade ?? 'Ungraded', weightKg: row._sum.weightKg ?? 0, count: row._count._all })),
+      byWarehouse: byWarehouse.map((row) => ({ warehouseLocation: row.warehouseLocation ?? 'Unassigned', weightKg: row._sum.weightKg ?? 0, count: row._count._all })),
+      byStatus: byStatus.map((row) => ({ status: row.status, weightKg: row._sum.weightKg ?? 0, count: row._count._all })),
+      byVariety: byVariety.map((row) => ({ riceVariety: row.riceVariety ?? 'Unspecified', weightKg: row._sum.totalWeightKg ?? 0, count: row._count._all })),
+    };
   }
 
   async findAllLots() {

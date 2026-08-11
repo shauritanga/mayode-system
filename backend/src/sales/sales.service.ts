@@ -141,6 +141,7 @@ export class SalesService {
           invoiceNumber,
           buyerId: dto.buyerId,
           lotId: dto.lotId,
+          buyerOrderId: dto.buyerOrderId,
           riceVariety: dto.riceVariety ?? lot.riceVariety,
           packaging: dto.packaging,
           quantityKg: dto.quantityKg,
@@ -150,6 +151,17 @@ export class SalesService {
           saleDate: new Date(dto.saleDate),
         },
       });
+      if (dto.buyerOrderId) {
+        const order = await tx.buyerOrder.findUnique({ where: { id: dto.buyerOrderId }, select: { quantityRequiredKg: true } });
+        if (order) {
+          const fulfilledKg = await tx.sale.aggregate({ where: { buyerOrderId: dto.buyerOrderId }, _sum: { quantityKg: true } });
+          const totalFulfilled = fulfilledKg._sum.quantityKg ?? 0;
+          await tx.buyerOrder.update({
+            where: { id: dto.buyerOrderId },
+            data: { status: totalFulfilled >= order.quantityRequiredKg ? 'FULFILLED' : 'PARTIALLY_FULFILLED' },
+          });
+        }
+      }
       await tx.invoice.create({
         data: {
           invoiceNumber: `AR-${invoiceNumber}`,

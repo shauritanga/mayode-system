@@ -1,7 +1,10 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService, normalizeMsisdn } from '../messaging/sms.service';
+import { SettingsService } from '../settings/settings.service';
 import { CreateWeatherAlertDto } from './dto/weather.dto';
+
+const WEATHER_ALERT_TEMPLATE_KEY = 'weather_alert';
 
 interface OpenMeteoResponse {
   daily: {
@@ -22,6 +25,7 @@ export class WeatherService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sms: SmsService,
+    private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -98,7 +102,19 @@ export class WeatherService {
 
     // Broadcast via SMS to farmers in the affected area (reuses the same
     // best-effort SmsService every other feature uses — never throws, logs
-    // to SmsLog even in simulated/no-credentials mode).
+    // to SmsLog even in simulated/no-credentials mode). Message body comes
+    // from a configurable NotificationTemplate (Settings > Notification
+    // Templates) when one exists for the "weather_alert" key, falling back
+    // to the original hardcoded format otherwise — proof-of-integration
+    // without rewiring every other SMS call site in the codebase.
+    const template = await this.settings.findTemplateByKey(WEATHER_ALERT_TEMPLATE_KEY);
+    const messageBody = template
+      ? template.body
+          .replace('{alertType}', dto.alertType)
+          .replace('{title}', dto.title)
+          .replace('{message}', dto.message)
+      : `MAYODE ALERT (${dto.alertType}): ${dto.title} — ${dto.message}`;
+
     const farmers = await this.prisma.farmer.findMany({
       where: {
         ...(dto.region ? { region: dto.region } : {}),
@@ -111,7 +127,7 @@ export class WeatherService {
     let sent = 0;
     for (const farmer of farmers) {
       if (!farmer.user?.phone) continue;
-      await this.sms.send(normalizeMsisdn(farmer.user.phone), `MAYODE ALERT (${dto.alertType}): ${dto.title} — ${dto.message}`, 'weather_alert');
+      await this.sms.send(normalizeMsisdn(farmer.user.phone), messageBody, 'weather_alert');
       sent += 1;
     }
 

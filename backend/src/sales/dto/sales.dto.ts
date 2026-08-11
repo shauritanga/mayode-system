@@ -4,6 +4,7 @@ import { IsDateString, IsNumber, IsOptional, IsPositive, IsString, Min } from 'c
 export class CreateSaleDto {
   @IsString() lotId: string;
   @IsString() buyerId: string;
+  @IsOptional() @IsString() buyerOrderId?: string;
   @IsNumber() @IsPositive() quantityKg: number;
   @IsNumber() @Min(0) pricePerKg: number;
   @IsOptional() @IsNumber() @Min(0) fairtradePremium?: number;

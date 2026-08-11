@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, PremiumFundEntryType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePremiumFundEntryDto, DateRangeDto } from './dto/reports.dto';
+import { CreatePremiumFundEntryDto, DateRangeDto, ReportFilterDto } from './dto/reports.dto';
+
+const YOUTH_MAX_AGE = 35; // Tanzania's national youth-age cap, matches the dashboard's youth breakdown
 
 @Injectable()
 export class ReportsService {
@@ -24,12 +26,45 @@ export class ReportsService {
     ];
   }
 
-  async farmerPayments(range: DateRangeDto) {
+  /** Builds a Farmer where-clause from the shared docx filter set (region/district/ward/village/cooperative/officer/gender/youth). */
+  private farmerFilterWhere(filter: ReportFilterDto): Prisma.FarmerWhereInput {
+    const where: Prisma.FarmerWhereInput = {};
+    if (filter.region) where.region = filter.region;
+    if (filter.district) where.district = filter.district;
+    if (filter.ward) where.ward = filter.ward;
+    if (filter.village) where.village = filter.village;
+    if (filter.mamcosId) where.mamcosId = filter.mamcosId;
+    if (filter.fieldOfficerId) where.assignedOfficerId = filter.fieldOfficerId;
+    if (filter.gender) where.gender = filter.gender;
+    if (filter.youthOnly) {
+      const cutoff = new Date();
+      cutoff.setFullYear(cutoff.getFullYear() - YOUTH_MAX_AGE);
+      where.dateOfBirth = { gte: cutoff };
+    }
+    return where;
+  }
+
+  private hasFarmerFilters(filter: ReportFilterDto): boolean {
+    return !!(
+      filter.region ||
+      filter.district ||
+      filter.ward ||
+      filter.village ||
+      filter.mamcosId ||
+      filter.fieldOfficerId ||
+      filter.gender ||
+      filter.youthOnly
+    );
+  }
+
+  async farmerPayments(range: ReportFilterDto) {
+    const farmerFilter = this.hasFarmerFilters(range) ? this.farmerFilterWhere(range) : undefined;
     const [payments, revenues] = await Promise.all([
       this.prisma.payment.findMany({
-        where: this.dateRange(range, 'createdAt')
-          ? { AND: this.dateRange(range, 'createdAt') }
-          : undefined,
+        where: {
+          ...(this.dateRange(range, 'createdAt') ? { AND: this.dateRange(range, 'createdAt') } : {}),
+          ...(farmerFilter ? { farmer: farmerFilter } : {}),
+        },
         include: {
           farmer: {
             select: {
@@ -44,15 +79,25 @@ export class ReportsService {
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.revenue.findMany({
-        where:
-          range.from || range.to
+        where: {
+          ...(range.from || range.to
             ? {
                 saleDate: {
                   ...(range.from ? { gte: new Date(range.from) } : {}),
                   ...(range.to ? { lte: new Date(range.to) } : {}),
                 },
               }
-            : undefined,
+            : {}),
+          ...(range.season || range.riceVariety || farmerFilter
+            ? {
+                cropCycle: {
+                  ...(range.season ? { season: range.season } : {}),
+                  ...(range.riceVariety ? { riceVariety: range.riceVariety } : {}),
+                  ...(farmerFilter ? { farmer: farmerFilter } : {}),
+                },
+              }
+            : {}),
+        },
         include: {
           cropCycle: {
             select: {
@@ -494,8 +539,20 @@ export class ReportsService {
     };
   }
 
-  async farmersExport() {
+  async farmersExport(filter: ReportFilterDto = {}) {
+    const where: Prisma.FarmerWhereInput = {
+      ...this.farmerFilterWhere(filter),
+      ...(filter.from || filter.to
+        ? {
+            membershipDate: {
+              ...(filter.from ? { gte: new Date(filter.from) } : {}),
+              ...(filter.to ? { lte: new Date(filter.to) } : {}),
+            },
+          }
+        : {}),
+    };
     const farmers = await this.prisma.farmer.findMany({
+      where,
       include: {
         user: { select: { phone: true } },
         mamcos: { select: { name: true } },
@@ -515,8 +572,23 @@ export class ReportsService {
       membershipDate: f.membershipDate.toISOString(),
     }));
   }
-  async cropCyclesExport() {
+  async cropCyclesExport(filter: ReportFilterDto = {}) {
+    const farmerFilter = this.hasFarmerFilters(filter) ? this.farmerFilterWhere(filter) : undefined;
+    const where: Prisma.CropCycleWhereInput = {
+      ...(filter.season ? { season: filter.season } : {}),
+      ...(filter.riceVariety ? { riceVariety: filter.riceVariety } : {}),
+      ...(farmerFilter ? { farmer: farmerFilter } : {}),
+      ...(filter.from || filter.to
+        ? {
+            createdAt: {
+              ...(filter.from ? { gte: new Date(filter.from) } : {}),
+              ...(filter.to ? { lte: new Date(filter.to) } : {}),
+            },
+          }
+        : {}),
+    };
     const cycles = await this.prisma.cropCycle.findMany({
+      where,
       include: {
         farm: { select: { farmCode: true } },
         farmer: {
@@ -536,5 +608,110 @@ export class ReportsService {
       actualYieldKg: c.actualYieldKg ?? 0,
       status: c.status,
     }));
+  }
+
+  /** Named report: field-officer performance (visits, farms mapped, farmers verified, activities logged). */
+  async fieldOfficerPerformance() {
+    const [officers, visits, verifications, activityLogs, farmers] = await Promise.all([
+      this.prisma.mamcosStaff.findMany({
+        where: { role: 'FIELD_OFFICER' },
+        select: { id: true, firstName: true, lastName: true, employeeCode: true, mamcos: { select: { name: true } } },
+      }),
+      this.prisma.fieldOfficerVisit.findMany({ select: { fieldOfficerId: true } }),
+      this.prisma.farmVerification.findMany({ select: { fieldOfficerId: true, gpsVerified: true } }),
+      this.prisma.activityLog.findMany({ select: { fieldOfficerId: true } }),
+      this.prisma.farmer.findMany({ select: { verifiedById: true, assignedOfficerId: true, verificationStatus: true } }),
+    ]);
+    const count = (rows: { key: string | null | undefined }[]) => {
+      const map = new Map<string, number>();
+      for (const row of rows) {
+        if (!row.key) continue;
+        map.set(row.key, (map.get(row.key) ?? 0) + 1);
+      }
+      return map;
+    };
+    const visitCounts = count(visits.map((v) => ({ key: v.fieldOfficerId })));
+    const farmsMapped = count(verifications.map((v) => ({ key: v.fieldOfficerId })));
+    const gpsVerifiedCounts = count(
+      verifications.filter((v) => v.gpsVerified).map((v) => ({ key: v.fieldOfficerId })),
+    );
+    const activityCounts = count(activityLogs.map((a) => ({ key: a.fieldOfficerId })));
+    const farmersVerifiedCounts = count(farmers.map((f) => ({ key: f.verifiedById })));
+    const pendingTaskCounts = count(
+      farmers
+        .filter((f) => f.assignedOfficerId && f.verificationStatus === 'PENDING')
+        .map((f) => ({ key: f.assignedOfficerId })),
+    );
+    return officers.map((officer) => {
+      const mapped = farmsMapped.get(officer.id) ?? 0;
+      const gpsVerified = gpsVerifiedCounts.get(officer.id) ?? 0;
+      return {
+        officerId: officer.id,
+        employeeCode: officer.employeeCode ?? '',
+        officer: `${officer.firstName} ${officer.lastName}`,
+        cooperative: officer.mamcos?.name ?? '',
+        visitsCompleted: visitCounts.get(officer.id) ?? 0,
+        farmsMapped: mapped,
+        gpsVerifiedPct: mapped ? Math.round((gpsVerified / mapped) * 100) : 0,
+        farmersVerified: farmersVerifiedCounts.get(officer.id) ?? 0,
+        activitiesLogged: activityCounts.get(officer.id) ?? 0,
+        pendingTasks: pendingTaskCounts.get(officer.id) ?? 0,
+      };
+    });
+  }
+
+  /** Named report: insurance coverage, wraps InsuranceService.coverageSummary() to make it exportable. */
+  async insuranceCoverage() {
+    const [policies, claims] = await Promise.all([
+      this.prisma.insurancePolicy.groupBy({
+        by: ['status', 'productType'],
+        _count: { _all: true },
+        _sum: { sumInsured: true, premiumAmount: true },
+      }),
+      this.prisma.insuranceClaim.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+        _sum: { claimedAmount: true, paidAmount: true },
+      }),
+    ]);
+    return [
+      ...policies.map((row) => ({
+        recordType: 'POLICY',
+        status: row.status,
+        productType: row.productType,
+        count: row._count._all,
+        totalSumInsured: row._sum.sumInsured ?? 0,
+        totalPremium: row._sum.premiumAmount ?? 0,
+      })),
+      ...claims.map((row) => ({
+        recordType: 'CLAIM',
+        status: row.status,
+        productType: '',
+        count: row._count._all,
+        totalClaimed: row._sum.claimedAmount ?? 0,
+        totalPaid: row._sum.paidAmount ?? 0,
+      })),
+    ];
+  }
+
+  /** Named report: gender / youth inclusion breakdown. */
+  async genderYouthInclusion(filter: ReportFilterDto = {}) {
+    const where = this.farmerFilterWhere({ ...filter, gender: undefined, youthOnly: undefined });
+    const farmers = await this.prisma.farmer.findMany({
+      where,
+      select: { gender: true, dateOfBirth: true, region: true, district: true },
+    });
+    const cutoff = new Date();
+    cutoff.setFullYear(cutoff.getFullYear() - YOUTH_MAX_AGE);
+    const rows = new Map<string, { gender: string; ageGroup: string; count: number }>();
+    for (const farmer of farmers) {
+      const gender = farmer.gender ?? 'UNKNOWN';
+      const ageGroup = farmer.dateOfBirth && farmer.dateOfBirth >= cutoff ? 'YOUTH (<=35)' : 'ADULT (36+)';
+      const key = `${gender}::${ageGroup}`;
+      const row = rows.get(key) ?? { gender, ageGroup, count: 0 };
+      row.count += 1;
+      rows.set(key, row);
+    }
+    return [...rows.values()].sort((a, b) => a.gender.localeCompare(b.gender) || a.ageGroup.localeCompare(b.ageGroup));
   }
 }

@@ -17,21 +17,21 @@ Users & Roles, Settings.
 | # | Module | Status | Est. % |
 |---|---|---|---|
 | 1 | Dashboard | ✅ | 100% |
-| 2 | Farmer Management | ✅ | 90% |
-| 3 | Farms & Plot Management | ✅ | 85% |
-| 4 | Rice Crop Seasons | ✅ | 85% |
-| 5 | Crop Activities & Farm Records | ✅ | 80% |
-| 6 | Input Management | 🟡 | 60% |
+| 2 | Farmer Management | ✅ | 100% |
+| 3 | Farms & Plot Management | ✅ | 100% |
+| 4 | Rice Crop Seasons | ✅ | 100% |
+| 5 | Crop Activities & Farm Records | ✅ | 100% |
+| 6 | Input Management | ✅ | 100% |
 | 7 | Field Officer Management | ✅ | 100% |
-| 8 | Cooperative & Farmer Group Management | ✅ | 92% |
-| 9 | Rice Aggregation & Warehouse Management | 🟡 | 65% |
-| 10 | Market and Buyer Management | 🟡 | 60% |
-| 11 | Finance and Credit | 🟡 | 65% |
-| 12 | Agricultural Insurance | ✅ | 90% |
+| 8 | Cooperative & Farmer Group Management | ✅ | 100% |
+| 9 | Rice Aggregation & Warehouse Management | ✅ | 100% |
+| 10 | Market and Buyer Management | ✅ | 100% |
+| 11 | Finance and Credit | ✅ | 100% |
+| 12 | Agricultural Insurance | ✅ | 100% |
 | 13 | Weather and Early Warning | ✅ | 88% |
-| 14 | Reports and Analytics | 🟡 | 65% |
-| 15 | Users & Roles | 🟡 | 50% |
-| 16 | Settings | ❌ | 0% |
+| 14 | Reports and Analytics | ✅ | 100% |
+| 15 | Users & Roles | ✅ | 100% |
+| 16 | Settings | ✅ | 100% |
 
 ---
 
@@ -101,10 +101,15 @@ attempting further live QA against the real backend with a fabricated token corr
 
 ---
 
-## 2. Farmer Management — ✅ 90%
+## 2. Farmer Management — ✅ 100%
 
 **Evidence:** [`backend/src/farmers`](backend/src/farmers), [`web/src/app/dashboard/farmers/page.tsx`](web/src/app/dashboard/farmers/page.tsx),
-`Farmer`/`FarmerVerification`/`Household`/`Document` models.
+`Farmer`/`FarmerVerification`/`Household`/`Document` models. **Insurance history closed this pass**: new
+"Insurance" tab on the farmer self-service portal
+([`web/src/app/dashboard/farmer/page.tsx`](web/src/app/dashboard/farmer/page.tsx)) calling the
+already-existing `insuranceApi.getPoliciesForFarmer()` → `GET /insurance/policies/farmer/:farmerId`
+(`InsuranceService.findPoliciesForFarmer`, already included `provider`/`claims` — zero backend change
+needed, this was pure UI wiring).
 
 - [x] List with Farmer ID, Full Name, Gender, District, Ward, Village, Group/AMCOS, Farm Size, Status (matches `image3.png` wireframe)
 - [x] Personal info, contact, national ID, gender/age, location
@@ -115,56 +120,115 @@ attempting further live QA against the real backend with a fabricated token corr
 - [x] Financing history (`LoanRecord`)
 - [x] Digital documents (`Document`)
 - [x] Field-officer visits (`FieldOfficerVisit`)
-- [ ] Insurance history — blocked on Module 12
+- [x] Insurance history — Insurance tab added to the farmer portal, policies + nested claims rendered
+
+**100% reached.**
 
 ---
 
-## 3. Farms and Plot Management — ✅ 85%
+## 3. Farms and Plot Management — ✅ 100%
 
 **Evidence:** [`backend/src/farms`](backend/src/farms), [`backend/src/plots`](backend/src/plots),
 [`web/src/app/dashboard/farms/page.tsx`](web/src/app/dashboard/farms/page.tsx).
 
+**Closed this pass:** added `leaflet` + `react-leaflet` (no API key, OpenStreetMap tiles — same
+"no API key needed" ethos as the Weather module's Open-Meteo choice). New
+[`web/src/components/FarmsMap.tsx`](web/src/components/FarmsMap.tsx) client component plots every
+farm with `centerLatitude`/`centerLongitude` (already returned by the existing `GET /farms` list —
+no backend change needed) with popups (farm code, name, farmer, hectares, verification status).
+Wired into [`/dashboard/farms`](web/src/app/dashboard/farms/page.tsx) via a List/Map toggle, loaded
+with `next/dynamic({ ssr: false })` (Leaflet needs `window`, so it can't be server-rendered — this
+is the standard Next.js App Router pattern for that). Added a "GPS-located" count stat tile.
+Verified with a full production build (`next build`) — compiled cleanly, `/dashboard/farms`
+statically prerendered without errors.
+
 - [x] Farm ID, farmer name, location hierarchy, GPS, size, tenure, water source, variety
 - [x] Farm verification workflow (`FarmVerification`, `farm-verifications` module)
 - [x] Farm photos (`FarmPhoto`)
-- [ ] Admin map view showing all registered farms — not confirmed present; verify before marking done
-- [ ] Soil information field — not confirmed in `Farm` model, check schema
+- [x] Admin map view showing all registered farms — Leaflet + OpenStreetMap, built this pass
+- [x] Soil information field — `Farm.soilType`/`soilFertility` already existed on the schema (tracker
+  was stale); `soilType` was already rendered, `soilFertility` now added next to it in
+  [`web/src/app/dashboard/farms/[id]/page.tsx`](web/src/app/dashboard/farms/%5Bid%5D/page.tsx)
+
+**100% reached.**
 
 ---
 
-## 4. Rice Crop Seasons — ✅ 85%
+## 4. Rice Crop Seasons — ✅ 100%
 
 **Evidence:** [`backend/src/farming-seasons`](backend/src/farming-seasons), [`backend/src/crop-cycles`](backend/src/crop-cycles),
 [`backend/src/rice-protocols`](backend/src/rice-protocols) (`RiceCalendarTask`),
 [`web/src/app/dashboard/seasons/page.tsx`](web/src/app/dashboard/seasons/page.tsx),
 [`web/src/app/dashboard/rice-calendar/page.tsx`](web/src/app/dashboard/rice-calendar/page.tsx).
 
+**Confirmed this pass:** there is no discrete `CropStage` enum in the schema — the calendar is
+modeled as 18 `taskKey` checklist items scheduled by planting/harvest day-offsets (see
+`MBALARI_TASKS` in [`rice-protocols.service.ts`](backend/src/rice-protocols/rice-protocols.service.ts)),
+not named phenological stages. Rather than introduce a parallel stage enum (which would fight the
+existing offset-based scheduling model), added a `STAGE_NAME_BY_TASK_KEY` mapping in the same file
+and a derived `stageName` field on `GET` calendar-task responses (`tasksForCycle()`), so the UI can
+show docx-aligned stage labels (Nursery Preparation, Tillering, Grain Filling/Maturation, etc.)
+without any schema change. Wired into the farmer portal's Rice Tasks tab.
+
 - [x] Season name, planting/harvest dates, variety, area planted, expected/actual yield
 - [x] Crop stage tracking via `RiceCalendarTask` (land prep → post-harvest)
-- [ ] Confirm every docx stage name (Nursery Prep, Tillering, Grain Filling etc.) maps 1:1 to current stage enum — verify before marking 100%
+- [x] Docx stage names (Nursery Prep, Tillering, Grain Filling etc.) now surfaced via a documented
+  `taskKey → stageName` mapping, exposed on the task API response and rendered in the UI
+
+**100% reached.**
 
 ---
 
-## 5. Crop Activities and Farm Records — ✅ 80%
+## 5. Crop Activities and Farm Records — ✅ 100%
 
 **Evidence:** `ActivityLog` model, mobile activity-logging screens (per `REMAINING_WORK_PLAN.md`),
-[`backend/src/activities`](backend/src/activities).
+[`backend/src/activities`](backend/src/activities) (a separate, unrelated farmer-notification-feed
+model — not to be confused with `ActivityLog`).
+
+**Closed this pass:** the backend had create (`POST /crop-cycles/activity`) and list-all
+(`GET /crop-cycles/activity-logs`) but no single-record read/edit/delete. Added
+`GET/PATCH/DELETE /crop-cycles/activity/:id` (`UpdateActivityLogDto`, `PartialType` of the create
+DTO) in [`crop-cycles.controller.ts`](backend/src/crop-cycles/crop-cycles.controller.ts) /
+[`crop-cycles.service.ts`](backend/src/crop-cycles/crop-cycles.service.ts). New web page
+[`/dashboard/activities`](web/src/app/dashboard/activities/page.tsx) — staff-only list with
+type/search filters, inline edit, and delete (delete restricted to SUPER_ADMIN/MAMCOS_SECRETARY).
+Verified end-to-end against the real local DB with a standalone script: read, edited, and reverted
+a real `ActivityLog` row, confirmed no residue left afterward.
 
 - [x] Activity date, farmer, farm/plot, activity type, inputs used, quantity, cost, field officer, photos, remarks — all fields exist on `ActivityLog`
-- [ ] Web-side view/edit of activity records (currently mobile-first per `REMAINING_WORK_PLAN.md`) — confirm a web list exists, not just mobile capture
+- [x] Web-side view/edit of activity records — new `/dashboard/activities` admin page plus the
+  edit/delete endpoints backing it
+
+**100% reached.**
 
 ---
 
-## 6. Input Management — 🟡 60%
+## 6. Input Management — ✅ 100%
 
 **Evidence:** [`backend/src/inventory`](backend/src/inventory), `InputCost` model,
 [`web/src/app/dashboard/inventory/page.tsx`](web/src/app/dashboard/inventory/page.tsx).
 
+**Closed this pass:** new `Supplier` model + full CRUD module
+([`backend/src/suppliers`](backend/src/suppliers), ADMIN-gated) plus a new
+[`/dashboard/suppliers`](web/src/app/dashboard/suppliers/page.tsx) admin page. `InputCost` gained
+`supplierId` (FK, existing free-text `supplier` field kept for backward compat), `paymentStatus`
+(new `InputPaymentStatus` enum: PENDING/PARTIAL/PAID, the distribution-ledger workflow field), and
+`loanRecordId` (FK → `LoanRecord`, the input-financing link) — migration
+`20260810170312_add_admin_module_gaps`, purely additive. Farmer self-service expense form
+([`farmer/page.tsx`](web/src/app/dashboard/farmer/page.tsx) `CostForm`) now has supplier and
+payment-status fields; the platform-wide input-cost list on
+[`/dashboard/finance`](web/src/app/dashboard/finance/page.tsx) now shows supplier name, payment
+status badge and loan-financing indicator per record. Verified end-to-end against the real local DB
+with a standalone script: full supplier CRUD lifecycle, then created and deleted an `InputCost` row
+with a real `supplierId` FK to confirm the relation resolves — no residue left.
+
 - [x] Input type, quantity, distribution date, receiving farmer
-- [x] Platform-wide input cost list (`GET /finance/costs`, added this pass — was previously only queryable per crop-cycle)
-- [ ] Supplier record / supplier CRUD — not confirmed as a first-class entity
-- [ ] Unit price / total value / payment status as a distinct workflow (currently folded into `InputCost` expense tracking, not a supply-chain distribution ledger)
-- [ ] Input financing status link to `LoanRecord`
+- [x] Platform-wide input cost list (`GET /finance/costs`)
+- [x] Supplier record / supplier CRUD — new `Supplier` model + admin page
+- [x] Unit price / total value / payment status as a distinct workflow — `InputCost.paymentStatus`
+- [x] Input financing status link to `LoanRecord` — `InputCost.loanRecordId`
+
+**100% reached.**
 
 ---
 
@@ -226,7 +290,7 @@ unaddressed or silently skipped).
 
 ---
 
-## 8. Cooperative and Farmer Group Management — ✅ 92%
+## 8. Cooperative and Farmer Group Management — ✅ 100%
 
 **Evidence:** [`backend/src/mamcos`](backend/src/mamcos), [`web/src/app/dashboard/mamcos/page.tsx`](web/src/app/dashboard/mamcos/page.tsx),
 [`web/src/app/dashboard/mamcos/[id]/page.tsx`](web/src/app/dashboard/mamcos/[id]/page.tsx),
@@ -241,48 +305,105 @@ unaddressed or silently skipped).
   AMCOS with no farmers rather than erroring. Deliberately did **not** fabricate a "storage/aggregation capacity"
   figure — no capacity field exists anywhere in the schema (`InventoryRecord` tracks quantities received, not a
   designed max), so "rice aggregated to date" (real, actual) is reported instead, not a made-up capacity number.
-- [ ] Irrigation schemes / aggregation centres as distinct sub-entities (currently likely modeled generically under `Mamcos` or `Locations`)
+- [x] Irrigation schemes / aggregation centres as distinct sub-entities — new `IrrigationScheme` and
+  `AggregationCentre` models (migration `20260810170312_add_admin_module_gaps`, scoped by
+  `mamcosId`), full CRUD via [`backend/src/facilities`](backend/src/facilities), and new sections on
+  the [AMCOS detail page](web/src/app/dashboard/mamcos/%5Bid%5D/page.tsx) with create forms and
+  active/inactive badges. Verified against the real local DB with a standalone script: created a
+  scheme and centre, confirmed `MamcosService.findOne()` returns both via the new relations, updated
+  and removed them — no residue left.
+
+**100% reached.**
 
 ---
 
-## 9. Rice Aggregation and Warehouse Management — 🟡 65%
+## 9. Rice Aggregation and Warehouse Management — ✅ 100%
 
 **Evidence:** [`backend/src/inventory`](backend/src/inventory) (`Lot`, `InventoryRecord`),
 [`backend/src/sales`](backend/src/sales) (`Sale`, `SaleApportionment`).
 
+**Closed this pass:** added `InventoryRecord.moistureContentPct` (migration `20260810170312_add_admin_module_gaps`,
+purely additive) captured on warehouse receipt. Added `InventoryService.dashboardSummary()` →
+`GET /inventory/dashboard-summary` (grouped aggregates: total received/in-stock/sold/current-balance,
+by grade, by warehouse, by status, by variety via `Lot.riceVariety`). Built out the warehouse
+dashboard section on [`/dashboard/inventory`](web/src/app/dashboard/inventory/page.tsx) — 4 new
+stat tiles plus donut/bar charts reusing the same `Charts.tsx` components as the main admin
+dashboard. Verified `dashboardSummary()` against the real local DB with a standalone script,
+including a `received - sold === currentBalance` consistency check.
+
 - [x] Farmer delivering rice, quantity, weight, warehouse/lot tracking, storage batch number (`Lot`)
 - [x] Buyer, purchase price, payment status (`Sale`)
-- [ ] Moisture content / quality grade as captured fields — confirm on `InventoryRecord`/`HarvestQualityCheck`
-- [ ] Warehouse dashboard (total received / in stock / sold / current balance / by grade / by variety / by warehouse) — no dedicated aggregation dashboard page found; this is presentation-layer work on top of existing data
+- [x] Moisture content / quality grade as captured fields — `qualityGrade` already existed;
+  `moistureContentPct` added this pass
+- [x] Warehouse dashboard (total received / in stock / sold / current balance / by grade / by
+  variety / by warehouse) — built this pass
+
+**100% reached.**
 
 ---
 
-## 10. Market and Buyer Management — 🟡 60%
+## 10. Market and Buyer Management — ✅ 100%
 
 **Evidence:** [`backend/src/buyers`](backend/src/buyers), [`backend/src/buyer-portal`](backend/src/buyer-portal),
 [`web/src/app/dashboard/buyer/page.tsx`](web/src/app/dashboard/buyer/page.tsx),
 [`web/src/app/dashboard/marketplace/page.tsx`](web/src/app/dashboard/marketplace/page.tsx), `MarketPrice` model.
 
+**Closed this pass:** new `BuyerOrder` model (migration `20260810170312_add_admin_module_gaps`) —
+quantity required, preferred variety, quality requirements, required-by date, status
+(OPEN/PARTIALLY_FULFILLED/FULFILLED/CANCELLED) — as a genuine first-class record, separate from
+`Sale`. Full CRUD via [`backend/src/buyer-orders`](backend/src/buyer-orders). `Sale` gained an
+optional `buyerOrderId` link; `SalesService.create()` now auto-updates the linked order's status to
+PARTIALLY_FULFILLED/FULFILLED based on cumulative sold quantity. New admin page
+[`/dashboard/buyer-orders`](web/src/app/dashboard/buyer-orders/page.tsx) (create + status control +
+fulfillment tracking), and a self-service "My rice requirements" section on
+[`/dashboard/buyer`](web/src/app/dashboard/buyer/page.tsx) (buyer portal).
+
+**Known limitation, disclosed rather than papered over:** there is no `User`↔`Buyer` link anywhere
+in the schema — the buyer portal has always been identity-less (`profile()` returns a static
+description, not a specific buyer's own data; `traceability()` works by reference lookup, not
+buyer identity). The self-service order form works around this the same way — the buyer selects
+their company from a dropdown rather than it being inferred from their login. Fixing that properly
+would mean adding a `Buyer.userId` relation, a decision bigger than this pass's scope; flagging it
+rather than fabricating an identity link that doesn't exist. Verified the full lifecycle against the
+real local DB with a standalone script: create/read/list-for-buyer/status-update/delete — no
+residue left.
+
 - [x] Buyer directory (name, cert, contact) — per `REMAINING_WORK_PLAN.md` Phase A
 - [x] Market prices (`MarketPrice`)
-- [ ] Buyer orders / purchase agreements as first-class records (vs. ad hoc `Sale` rows)
-- [ ] Rice quantity required / preferred variety / quality requirements captured on buyer requests
+- [x] Buyer orders / purchase agreements as first-class records — new `BuyerOrder` model
+- [x] Rice quantity required / preferred variety / quality requirements captured on buyer requests
+
+**100% reached.**
 
 ---
 
-## 11. Finance and Credit — 🟡 65%
+## 11. Finance and Credit — ✅ 100%
 
 **Evidence:** [`backend/src/loans`](backend/src/loans), [`backend/src/finance`](backend/src/finance),
 `LoanRecord`/`LoanDeduction` models, [`web/src/app/dashboard/finance/page.tsx`](web/src/app/dashboard/finance/page.tsx).
 
+**Correction to the previous entry**: a full credit-readiness composite already existed —
+`FarmersService.getCreditReadiness()` (`GET /farmers/:id/credit-readiness`), a 6-factor, 100pt
+scoring model (verification, production, profitability, loan repayment, cooperative membership,
+experience) already wired into the farmer, financial-provider and farmers-list pages. The tracker's
+"no scoring endpoint found" was stale. **Closed this pass:** added the two missing docx inputs —
+farm size (from `Farm.socialHectares`, max 10pts) and insurance status (`InsurancePolicy.status ===
+ACTIVE`, max 10pts) — rebalancing the other 6 factors down to keep the scale at 100pts total (20/15/15/15/10/5).
+Pure logic change to the existing, already-wired method — no new endpoint, no schema change.
+Verified against the real local DB with a standalone script: confirmed the 8 factor maxes sum to
+exactly 100 and the computed score matches for a real farmer.
+
 - [x] Loan applications, amount, purpose, approval status, disbursement, repayment, outstanding balance
 - [x] Loan deduction automation (`LoanDeduction`, per `M-LAX_IMPLEMENTATION_PLAN.md` Phase 2)
 - [x] Platform-wide loan list (`GET /loans`, added this pass — was previously only queryable per-farmer)
-- [ ] Formal "Rice Farmer Credit Profile" / credit score composite (farm size + production history + repayment history + insurance status) — no scoring endpoint found; insurance-status input blocked on Module 12 anyway
+- [x] Formal "Rice Farmer Credit Profile" / credit score composite (farm size + production history +
+  repayment history + insurance status) — `getCreditReadiness()` now scores all 4 named inputs
+
+**100% reached.**
 
 ---
 
-## 12. Agricultural Insurance — ✅ 90%
+## 12. Agricultural Insurance — ✅ 100%
 
 **Built this pass, net-new module**, with explicit user authorization for schema changes.
 
@@ -313,9 +434,24 @@ cleaned up afterward. Backend test suite still 24/26 (same pre-existing unrelate
 - [x] Claims, claim inspections (inspector, notes, date), claim payment status
 - [x] All 5 product types (area-yield, weather-index, multi-peril, input, credit-linked)
 - [x] Coverage aggregate feeding the admin dashboard
-- [ ] Explicit link between a policy and weather/crop-risk data (the new Weather module exists independently —
-  a policy isn't automatically cross-referenced against a live flood/drought risk flag for its farmer's location)
-- [ ] Policy amendment/renewal flow — only initial registration + status transitions exist, no renewal workflow
+- [x] Explicit link between a policy and weather/crop-risk data — new
+  `InsuranceService.getWeatherContextForClaim()` (`GET /insurance/claims/:id/weather-context`)
+  correlates a claim's incident date/farmer location against `WeatherAlert` records in a ±14-day
+  window (read-side join, no FK — matches the existing `WeatherAlert` loose-reference convention;
+  surfaces alerts as supporting evidence rather than driving claim approval automatically). Surfaced
+  as an expandable "Check" panel per claim row in the insurance page.
+- [x] Policy amendment/renewal flow — `PATCH /insurance/policies/:id/amend` (edit sum
+  insured/premium/area/dates) and `POST /insurance/policies/:id/renew` (clones an expiring policy
+  into a new PENDING one via the new `InsurancePolicy.renewedFromPolicyId` self-relation). Amend/Renew
+  buttons added to each policy row.
+
+**Closed this pass, verified against the real local DB with a standalone script**: created a real
+policy, amended its sum insured, renewed it into a chained new policy, filed a claim, created a real
+`WeatherAlert` in the farmer's region within the correlation window, and confirmed
+`getWeatherContextForClaim()` actually finds it (not just returns an empty array) — then deleted
+every test record, no residue left.
+
+**100% reached.**
 
 ---
 
@@ -356,39 +492,114 @@ season — the risk logic is doing real work, not just always returning true). F
   infrastructure that already existed anywhere in this codebase; USSD/WhatsApp integration would be new
   third-party infrastructure, a materially bigger scope decision than "add a module using what's already here."
 
-## 14. Reports and Analytics — 🟡 65%
+## 14. Reports and Analytics — ✅ 100%
 
 **Evidence:** [`backend/src/reports`](backend/src/reports) — `farmerPayments`, `premiumFund`,
 `kpis`, `impactReport`, `flocertAuditPack`, `membershipGrowth`, `farmersExport`,
 `cropCyclesExport`; export via [`backend/src/common/export.service.ts`](backend/src/common/export.service.ts).
 
+**Closed this pass:** `DateRangeDto`/`ReportFormatDto` extended with a new `ReportFilterDto`
+(region/district/ward/village/mamcosId/fieldOfficerId/season/riceVariety/gender/youthOnly) — a
+`farmerFilterWhere()` helper applies these to `farmerPayments`, and `farmersExport()`/
+`cropCyclesExport()` were fixed to actually accept and apply a filter argument (they previously
+took zero parameters — date-range and every other filter was silently dropped). `premiumFund`
+intentionally stays date-range-only: it's a fund-wide ledger with no per-farmer dimension, so
+farmer-scoped filters wouldn't be analytically meaningful there. Added 3 new named-report
+endpoints, all exportable via the existing CSV/XLSX/PDF pipeline: `GET /reports/field-officer-performance`
+(visits/farms-mapped/farmers-verified/activities-logged per officer, mirrors the logic already used
+by the Module 7 dashboard leaderboard), `GET /reports/insurance-coverage` (wraps policy/claim
+groupBy aggregates the way `InsuranceService.coverageSummary()` does, but exportable), and
+`GET /reports/gender-youth-inclusion` (farmer counts by gender × youth-status). New
+[`/dashboard/reports`](web/src/app/dashboard/reports/page.tsx) page — a filter bar plus a
+CSV/XLSX/PDF download button per report, replacing the previous total absence of a reports UI
+(reports were API-only before this). Verified every new/changed service method against the real
+local DB with a standalone script: unfiltered vs `youthOnly`/`region` filtered counts, and confirmed
+`genderYouthInclusion()`'s counts sum to exactly the total farmer count.
+
 - [x] Farmer registration / farm area / production-adjacent reports exist in some form
 - [x] CSV export (`export.service.ts` `csv()`)
 - [x] Excel export (`export.service.ts` `xlsx()`)
-- [x] PDF export — new `export.service.ts` `pdf()` (pdfkit, already a dependency via `lease-document.service.ts`), a paginated landscape table with repeated headers. Wired into `?format=pdf` on `GET /reports/farmer-payments`, `/reports/premium-fund`, `/reports/farmers`, `/reports/crop-cycles`, `GET /crop-cycles`, and `GET /farmers`. Verified with a standalone script (not just `tsc`) — generated a real 45-row PDF, confirmed valid `%PDF` header, correct page count (2, pagination working), and rendered both pages to JPEG to visually confirm header/column/pagination layout; also confirmed the empty-rows case produces a valid "No records." PDF rather than crashing.
-- [ ] Filter set from the docx (region/district/ward/village/cooperative/officer/season/variety/gender/youth) — confirm each report endpoint actually accepts all of these, not just date range
-- [ ] Field-officer performance report, insurance coverage report (blocked on Module 12), gender/youth inclusion report as named reports
+- [x] PDF export — `export.service.ts` `pdf()` (pdfkit), a paginated landscape table with repeated headers.
+- [x] Filter set from the docx (region/district/ward/village/cooperative/officer/season/variety/gender/youth)
+  — now accepted and applied by `farmerPayments`, `farmersExport`, `cropCyclesExport`
+- [x] Field-officer performance report, insurance coverage report, gender/youth inclusion report as named reports
+
+**100% reached.**
 
 ---
 
-## 15. Users & Roles — 🟡 50%
+## 15. Users & Roles — ✅ 100%
 
 Not in the docx's written text but present in the `image2.png` wireframe sidebar.
 
-**Evidence:** `UserRole` enum + `RolesGuard`, [`web/src/app/dashboard/staff/page.tsx`](web/src/app/dashboard/staff/page.tsx).
+**Evidence:** `UserRole` enum + `RolesGuard`, [`web/src/app/dashboard/staff/page.tsx`](web/src/app/dashboard/staff/page.tsx),
+new [`web/src/app/dashboard/users/page.tsx`](web/src/app/dashboard/users/page.tsx).
+
+**Closed this pass:** confirmed `staff` page is AMCOS-scoped account creation only, not a platform-wide
+account list — built the actual "Users & Roles" page separately rather than overloading `staff`. Added
+`role?: UserRole` to `UpdateUserDto` and `UsersService.update()`.
+
+**Security bug found and fixed in the same pass**: `PATCH /users/:id` had **no `@Roles` guard at
+all** — any authenticated user of any role could edit any *other* user's account (email, phone,
+`isActive`), not just their own. Root cause: the endpoint doubles as farmer/staff self-service
+(`profile/page.tsx` calls it to update the caller's own `language`), so a blanket `@Roles(SUPER_ADMIN,
+ADMIN)` would have broken that self-service path. Fixed with fine-grained authorization in
+`UsersService.update()` instead: self-updates are allowed for any caller, edits to *other* accounts
+require SUPER_ADMIN/ADMIN, role changes require SUPER_ADMIN specifically, and `isActive` changes
+require staff. Verified all four rules against the real local DB with a standalone script — confirmed
+a FARMER-role caller is rejected editing another account, self-service language update still works,
+a non-SUPER_ADMIN is rejected changing a role, and a SUPER_ADMIN role change round-trips correctly —
+then reverted every test mutation so no residue was left in real data.
 
 - [x] Role-based access control exists and is enforced backend-side
 - [x] Staff creation (field officers, cooperative accounts) from `mayodata-admin`
-- [ ] A dedicated "Users & Roles" admin page listing *all* platform accounts with role edit/deactivate — `staff` page creates accounts but confirm it also lists/manages every existing user across all roles
+- [x] A dedicated "Users & Roles" admin page listing *all* platform accounts with role edit/deactivate
+
+**100% reached.**
 
 ---
 
-## 16. Settings — ❌ 0%
+## 16. Settings — ✅ 100%
 
-In the wireframe sidebar, not in the written spec, so scope is undefined.
+In the wireframe sidebar, not in the written spec — scope was undefined until this pass; user chose
+Locations admin + Org Profile + Notification Templates.
 
-- [ ] No dedicated settings page found under `web/src/app/dashboard`
-- [ ] Needs scoping with the user before building: what's configurable (org profile, notification templates, locations/admin hierarchy, integrations)? `locations` module already covers admin-hierarchy maintenance and is linked from `mayodata-admin` — may partially satisfy this once surfaced as "Settings"
+**Built this pass, net-new page**, with explicit user authorization for schema changes.
+
+**Schema** (migration `20260810170312_add_admin_module_gaps`, purely additive): `OrgSettings`
+(singleton row: orgName, logoUrl, contactEmail, contactPhone, address), `NotificationTemplate`
+(key, channel, title, body).
+
+**Backend:**
+- [`backend/src/locations`](backend/src/locations) — was fully read-only with no auth guard at
+  all; added `POST/PATCH/DELETE` for region/district/ward, ADMIN-gated, while leaving the existing
+  reads public (unchanged, since registration flows depend on unauthenticated location lookups).
+- [`backend/src/settings`](backend/src/settings) — singleton get/update for `OrgSettings` (creates
+  the row lazily on first save rather than requiring a migration seed), full CRUD for
+  `NotificationTemplate`.
+- Wired the Weather module's SMS alert broadcast
+  ([`weather.service.ts`](backend/src/weather/weather.service.ts) `createAlert()`) to look up a
+  `NotificationTemplate` by the `weather_alert` key first (with `{alertType}`/`{title}`/`{message}`
+  placeholder substitution), falling back to the original hardcoded message format when no template
+  exists — proof-of-integration without rewiring every other SMS call site in the codebase.
+
+**Web:** new [`/dashboard/settings`](web/src/app/dashboard/settings/page.tsx) page with three tabs
+— Locations (region → district → ward drill-down with inline create/delete), Org Profile (single
+form), Notification Templates (list/edit/delete table with the `weather_alert` key documented in
+the create form's help text). Sidebar entry added.
+
+**Verified against the real local DB with a standalone script**: org-settings lazy-create-on-first-save
+(confirmed the second update reuses the same row rather than creating duplicates), notification
+template CRUD, and the full region→district→ward create/rename lifecycle — all cleaned up
+afterward, no residue left. Full production build (`next build`) also confirms `/dashboard/settings`
+compiles and prerenders cleanly.
+
+- [x] Locations admin hierarchy — region/district/ward now have write endpoints + admin UI
+- [x] Org profile — new `OrgSettings` model + settings form
+- [x] Notification templates — new `NotificationTemplate` model + CRUD UI, wired into the Weather
+  module's SMS broadcast as a real (not decorative) integration
+
+**100% reached.**
 
 ---
 

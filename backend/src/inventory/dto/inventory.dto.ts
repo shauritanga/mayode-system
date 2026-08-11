@@ -27,6 +27,11 @@ export class CreateInventoryRecordDto {
   @IsOptional()
   qualityGrade?: string;
 
+  @ApiPropertyOptional({ example: 13.5, description: 'Moisture content percentage measured at warehouse receipt' })
+  @IsNumber()
+  @IsOptional()
+  moistureContentPct?: number;
+
   @ApiPropertyOptional({ example: 'Mbarali Central Cooperative Warehouse - Bay A' })
   @IsString()
   @IsOptional()

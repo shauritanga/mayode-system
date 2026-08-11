@@ -12,6 +12,7 @@ import {
   CreateCropCycleDto,
   UpdateCropCycleDto,
   CreateActivityLogDto,
+  UpdateActivityLogDto,
 } from './dto/crop-cycles.dto';
 
 const ACTIVITY_ICONS: Record<string, string> = {
@@ -133,8 +134,42 @@ export class CropCyclesService {
       orderBy: { createdAt: 'desc' },
       include: {
         fieldOfficer: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
+        cropCycle: { select: { season: true, riceVariety: true, farm: { select: { farmCode: true } } } },
       },
     });
+  }
+
+  async findActivityLogById(id: string) {
+    const activity = await this.prisma.activityLog.findUnique({
+      where: { id },
+      include: {
+        fieldOfficer: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
+        cropCycle: { select: { season: true, riceVariety: true, farm: { select: { farmCode: true } } } },
+      },
+    });
+    if (!activity) throw new NotFoundException(`Activity log with ID ${id} not found`);
+    return activity;
+  }
+
+  async updateActivityLog(id: string, dto: UpdateActivityLogDto) {
+    await this.findActivityLogById(id);
+    return this.prisma.activityLog.update({
+      where: { id },
+      data: {
+        ...dto,
+        activityDate: dto.activityDate ? new Date(dto.activityDate) : undefined,
+        inputsUsed: dto.inputsUsed ?? undefined,
+      },
+      include: {
+        fieldOfficer: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
+      },
+    });
+  }
+
+  async deleteActivityLog(id: string) {
+    await this.findActivityLogById(id);
+    await this.prisma.activityLog.delete({ where: { id } });
+    return { deleted: true };
   }
 
   async findOne(id: string, user?: RequestUser) {

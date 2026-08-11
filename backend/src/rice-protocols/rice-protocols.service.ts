@@ -30,6 +30,38 @@ const MBALARI_TASKS: ProtocolTask[] = [
   { key: 'warehouse_receipt', title: 'Pokea ghala la ushirika', guidance: 'Peleka mpunga uliokaguliwa kwenye ghala la ushirika kwa hifadhi na uuzaji wa pamoja.', daysFromHarvest: 10, activityType: ActivityType.TRANSPORT },
 ];
 
+// Maps each Mbalari taskKey to one of the docx's exact 10 named growth stages (Land Preparation
+// -> Nursery Preparation -> Transplanting/Direct Seeding -> Vegetative Growth -> Tillering ->
+// Flowering -> Grain Filling -> Maturity -> Harvesting -> Post-Harvest), in day-offset order. The
+// calendar itself is scheduled by planting/harvest day-offsets, not a discrete stage enum — this
+// mapping lets the UI show docx-aligned stage labels without changing that underlying scheduling
+// model. Bucket assignment follows each task's daysFromPlanting/daysFromHarvest above; earlier
+// versions of this mapping invented stage names ("Establishment", "Panicle Initiation") not in
+// the docx and omitted "Flowering"/"Vegetative Growth"/"Maturity" — fixed to use only the docx's
+// own vocabulary.
+const STAGE_NAME_BY_TASK_KEY: Record<string, string> = {
+  market_plan: 'Land Preparation',
+  certified_seed: 'Land Preparation',
+  land_preparation: 'Land Preparation',
+  nursery: 'Nursery Preparation',
+  transplanting: 'Transplanting / Direct Seeding',
+  basal_fertilizer: 'Vegetative Growth',
+  gap_filling: 'Vegetative Growth',
+  fertilizer_1: 'Vegetative Growth',
+  weed_water: 'Tillering',
+  pest_disease_scouting: 'Flowering',
+  pesticide_container_disposal_1: 'Flowering',
+  fertilizer_2: 'Grain Filling',
+  pesticide_container_disposal_2: 'Grain Filling',
+  pesticide_container_disposal_3: 'Maturity',
+  bird_pest_control: 'Maturity',
+  harvest_preparation: 'Maturity',
+  harvest: 'Harvesting',
+  drying: 'Post-Harvest',
+  bagging: 'Post-Harvest',
+  warehouse_receipt: 'Post-Harvest',
+};
+
 @Injectable()
 export class RiceProtocolsService {
   constructor(private readonly prisma: PrismaService, private readonly ownership: OwnershipService) {}
@@ -80,7 +112,8 @@ export class RiceProtocolsService {
     const cycle = await this.prisma.cropCycle.findUnique({ where: { id: cropCycleId }, select: { farmId: true } });
     if (!cycle) throw new NotFoundException('Crop cycle not found');
     await this.ownership.assertFarmAccess(user, cycle.farmId);
-    return this.prisma.riceCalendarTask.findMany({ where: { cropCycleId }, orderBy: { dueDate: 'asc' } });
+    const tasks = await this.prisma.riceCalendarTask.findMany({ where: { cropCycleId }, orderBy: { dueDate: 'asc' } });
+    return tasks.map((task) => ({ ...task, stageName: STAGE_NAME_BY_TASK_KEY[task.taskKey] ?? null }));
   }
 
   async rescheduleTask(id: string, dto: RescheduleRiceCalendarTaskDto, user: RequestUser) {

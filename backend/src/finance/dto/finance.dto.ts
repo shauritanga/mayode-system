@@ -7,7 +7,7 @@ import {
   IsNotEmpty,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CostCategory, RevenueType } from '@prisma/client';
+import { CostCategory, InputPaymentStatus, RevenueType } from '@prisma/client';
 
 export class CreateInputCostDto {
   @ApiProperty({
@@ -53,10 +53,25 @@ export class CreateInputCostDto {
   @IsNumber()
   totalCost: number;
 
-  @ApiPropertyOptional({ example: 'Mbarali Agro-Suppliers Ltd' })
+  @ApiPropertyOptional({ example: 'Mbarali Agro-Suppliers Ltd', description: 'Free-text supplier name (legacy field)' })
   @IsString()
   @IsOptional()
   supplier?: string;
+
+  @ApiPropertyOptional({ example: 'supplier-uuid-1234', description: 'ID of a registered Supplier record' })
+  @IsString()
+  @IsOptional()
+  supplierId?: string;
+
+  @ApiPropertyOptional({ example: 'PENDING', enum: InputPaymentStatus })
+  @IsEnum(InputPaymentStatus)
+  @IsOptional()
+  paymentStatus?: InputPaymentStatus;
+
+  @ApiPropertyOptional({ example: 'loan-record-uuid-1234', description: 'LoanRecord this input purchase is financed against' })
+  @IsString()
+  @IsOptional()
+  loanRecordId?: string;
 
   @ApiPropertyOptional({ example: 'https://example.com/receipt1.jpg' })
   @IsString()

@@ -68,6 +68,40 @@ export class UpdatePolicyStatusDto {
   status: PolicyStatus;
 }
 
+export class AmendPolicyDto {
+  @IsOptional() @IsString()
+  riceVariety?: string;
+
+  @IsOptional() @IsNumber() @Min(0.01)
+  insuredAreaHectares?: number;
+
+  @IsOptional() @IsNumber() @Min(0)
+  sumInsured?: number;
+
+  @IsOptional() @IsNumber() @Min(0)
+  premiumAmount?: number;
+
+  @IsOptional() @IsDateString()
+  startDate?: string;
+
+  @IsOptional() @IsDateString()
+  endDate?: string;
+}
+
+export class RenewPolicyDto {
+  @IsDateString()
+  startDate: string;
+
+  @IsOptional() @IsDateString()
+  endDate?: string;
+
+  @IsOptional() @IsNumber() @Min(0)
+  sumInsured?: number;
+
+  @IsOptional() @IsNumber() @Min(0)
+  premiumAmount?: number;
+}
+
 export class CreateInsuranceClaimDto {
   @IsString()
   policyId: string;

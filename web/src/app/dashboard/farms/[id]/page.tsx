@@ -22,6 +22,7 @@ interface FarmDetail {
   isLeased: boolean;
   hasIrrigation: boolean;
   soilType?: string;
+  soilFertility?: string;
   waterSource?: string;
   centerLatitude?: number;
   centerLongitude?: number;
@@ -115,6 +116,7 @@ export default function FarmDetailPage() {
           <Attr label="Village" value={farm.village} />
           <Attr label="Irrigation" value={farm.hasIrrigation ? 'Yes' : 'No'} />
           <Attr label="Soil type" value={farm.soilType} />
+          <Attr label="Soil fertility" value={farm.soilFertility} />
           <Attr label="Water source" value={farm.waterSource} />
           <Attr label="GPS center" value={farm.centerLatitude != null ? `${farm.centerLatitude.toFixed(5)}, ${farm.centerLongitude?.toFixed(5)}` : undefined} />
         </div>

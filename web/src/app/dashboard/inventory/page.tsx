@@ -2,6 +2,19 @@
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { cropCyclesApi, inventoryApi, riceProtocolsApi } from '@/lib/api';
+import { ChartCard, DonutBreakdown, HorizontalBarChart } from '@/components/role-dashboards/Charts';
+
+interface DashboardSummary {
+  totalReceivedKg: number;
+  totalReceivedCount: number;
+  inStockKg: number;
+  soldKg: number;
+  currentBalanceKg: number;
+  byGrade: { grade: string; weightKg: number; count: number }[];
+  byWarehouse: { warehouseLocation: string; weightKg: number; count: number }[];
+  byStatus: { status: string; weightKg: number; count: number }[];
+  byVariety: { riceVariety: string; weightKg: number; count: number }[];
+}
 
 interface InventoryRecord {
   id: string;
@@ -51,19 +64,22 @@ export default function InventoryPage() {
   const [cycles, setCycles] = useState<CropCycleOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState({ cropCycleId: '', weightKg: '', qualityGrade: '', warehouseLocation: '', receivedDate: new Date().toISOString().slice(0, 10) });
+  const [form, setForm] = useState({ cropCycleId: '', weightKg: '', qualityGrade: '', moistureContentPct: '', warehouseLocation: '', receivedDate: new Date().toISOString().slice(0, 10) });
   const [readiness, setReadiness] = useState<{ ready: boolean; missing: string[] } | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
 
   useEffect(() => {
     Promise.all([
       inventoryApi.getAll(),
       cropCyclesApi.getAll(),
+      inventoryApi.dashboardSummary(),
     ])
-      .then(([inventoryRes, cycleRes]) => {
+      .then(([inventoryRes, cycleRes, summaryRes]) => {
         setRecords(inventoryRes.data || []);
         setCycles(cycleRes.data?.data || cycleRes.data || []);
+        setSummary(summaryRes.data || null);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -114,12 +130,14 @@ export default function InventoryPage() {
         farmerId: selectedCycle.farmer.id,
         weightKg: Number(form.weightKg),
         qualityGrade: form.qualityGrade || undefined,
+        moistureContentPct: form.moistureContentPct ? Number(form.moistureContentPct) : undefined,
         warehouseLocation: form.warehouseLocation || undefined,
         receivedDate: new Date(form.receivedDate).toISOString(),
       });
-      const res = await inventoryApi.getAll();
+      const [res, summaryRes] = await Promise.all([inventoryApi.getAll(), inventoryApi.dashboardSummary()]);
       setRecords(res.data || []);
-      setForm({ cropCycleId: '', weightKg: '', qualityGrade: '', warehouseLocation: '', receivedDate: new Date().toISOString().slice(0, 10) });
+      setSummary(summaryRes.data || null);
+      setForm({ cropCycleId: '', weightKg: '', qualityGrade: '', moistureContentPct: '', warehouseLocation: '', receivedDate: new Date().toISOString().slice(0, 10) });
       setMessage('Inventory received and linked to the Mbalari crop cycle.');
     } catch (exception: any) {
       setMessage(errorText(exception));
@@ -163,6 +181,7 @@ export default function InventoryPage() {
           </select></label>
           <label className="form-label">Weight<input className="input-field" type="number" min="0.01" step="0.01" placeholder="kg" value={form.weightKg} onChange={(event) => setForm((current) => ({ ...current, weightKg: event.target.value }))} required /></label>
           <label className="form-label">Quality grade<input className="input-field" placeholder="Grade 1" value={form.qualityGrade} onChange={(event) => setForm((current) => ({ ...current, qualityGrade: event.target.value }))} /></label>
+          <label className="form-label">Moisture %<input className="input-field" type="number" min="0" max="100" step="0.1" placeholder="13.5" value={form.moistureContentPct} onChange={(event) => setForm((current) => ({ ...current, moistureContentPct: event.target.value }))} /></label>
           <label className="form-label">Warehouse bay<input className="input-field" placeholder="Bay A" value={form.warehouseLocation} onChange={(event) => setForm((current) => ({ ...current, warehouseLocation: event.target.value }))} /></label>
           <label className="form-label">Received date<input className="input-field" type="date" value={form.receivedDate} onChange={(event) => setForm((current) => ({ ...current, receivedDate: event.target.value }))} required /></label>
         </div>
@@ -182,6 +201,37 @@ export default function InventoryPage() {
           </div>
         ))}
       </div>
+
+      {summary && <>
+        <div className="metric-grid">
+          {[
+            { label: 'Total received', value: `${summary.totalReceivedKg.toFixed(0)} kg`, color: 'var(--blue-500)' },
+            { label: 'In stock', value: `${summary.inStockKg.toFixed(0)} kg`, color: 'var(--gold-400)' },
+            { label: 'Sold', value: `${summary.soldKg.toFixed(0)} kg`, color: 'var(--purple-500)' },
+            { label: 'Current balance', value: `${summary.currentBalanceKg.toFixed(0)} kg`, color: 'var(--accent)' },
+          ].map(s => (
+            <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
+              <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>
+              <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="role-two-col">
+          <ChartCard title="Rice by quality grade" subtitle="Weight received per assessed grade.">
+            <DonutBreakdown data={summary.byGrade.map((row) => ({ name: row.grade, value: row.weightKg }))} />
+          </ChartCard>
+          <ChartCard title="Warehouse balance by status" subtitle="Received, in storage, batched, shipped, sold.">
+            <HorizontalBarChart data={summary.byStatus.map((row) => ({ name: row.status.replace('_', ' '), value: row.weightKg }))} color="var(--gold-400)" />
+          </ChartCard>
+          <ChartCard title="Stock by warehouse bay" subtitle="Weight currently attributed to each location.">
+            <HorizontalBarChart data={summary.byWarehouse.map((row) => ({ name: row.warehouseLocation, value: row.weightKg }))} color="var(--blue-500)" />
+          </ChartCard>
+          <ChartCard title="Batched lots by variety" subtitle="Export-lot weight grouped by rice variety.">
+            <DonutBreakdown data={summary.byVariety.map((row) => ({ name: row.riceVariety, value: row.weightKg }))} />
+          </ChartCard>
+        </div>
+      </>}
 
       <div className="table-panel">
         <div className="section-toolbar"><strong>Warehouse Receipts</strong><span className="muted">{filtered.length} shown</span></div>

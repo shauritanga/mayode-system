@@ -2,8 +2,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { farmersApi, farmsApi, mamcosApi, marketplaceApi, reportsApi } from '@/lib/api';
+import { mamcosApi, marketplaceApi, reportsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
+import AdminOverviewDashboard from '@/components/role-dashboards/AdminOverviewDashboard';
 
 // A Secretary can manage their own AMCOS's staff/inventory/marketplace
 // listings and pre-register farms (POST /farm-registry), but backend
@@ -13,26 +14,6 @@ const SECRETARY_ACTIONS = [
   { label: 'Manage Staff', href: '/dashboard/staff', icon: '🧑‍🌾', color: 'var(--gold-400)' },
   { label: 'Register New Farm', href: '/dashboard/farm-registry', icon: '🌾', color: 'var(--green-400)' },
   { label: 'Receive Inventory', href: '/dashboard/inventory', icon: '📦', color: 'var(--blue-500)' },
-  { label: 'Post Land Listing', href: '/dashboard/marketplace', icon: '🏪', color: 'var(--purple-500)' },
-];
-
-// SUPER_ADMIN has blanket backend permission for these, unlike a Secretary.
-// "Register New Farm" goes to Farm Registry (the AMCOS pre-registration
-// workflow), not the plain Farms list — the Farms page is browse-only and
-// has no creation form.
-const SUPER_ADMIN_OPS_ACTIONS = [
-  { label: 'Register New Farmer', href: '/dashboard/farmers', icon: '👤', color: 'var(--accent)' },
-  { label: 'Register New Farm', href: '/dashboard/farm-registry', icon: '🌾', color: 'var(--green-400)' },
-  { label: 'Log Crop Activity', href: '/dashboard/crop-cycles', icon: '🌱', color: 'var(--gold-400)' },
-  { label: 'Receive Inventory', href: '/dashboard/inventory', icon: '📦', color: 'var(--blue-500)' },
-  { label: 'Post Land Listing', href: '/dashboard/marketplace', icon: '🏪', color: 'var(--purple-500)' },
-];
-
-const ADMIN_ACTIONS = [
-  { label: 'Manage Seasons', href: '/dashboard/seasons', icon: '📅', color: 'var(--accent)' },
-  { label: 'Review Disputes', href: '/dashboard/disputes', icon: '⚠️', color: 'var(--red-400)' },
-  { label: 'Manage AMCOS', href: '/dashboard/mamcos', icon: '🏛', color: 'var(--gold-400)' },
-  { label: 'New Reward Campaign', href: '/dashboard/rewards', icon: '🎁', color: 'var(--blue-500)' },
   { label: 'Post Land Listing', href: '/dashboard/marketplace', icon: '🏪', color: 'var(--purple-500)' },
 ];
 
@@ -65,69 +46,34 @@ function StatCard({ label, value, sub, icon, color }: StatCard) {
   );
 }
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const role = useAuthStore((state) => state.user?.role);
-  const isSecretary = role === 'MAMCOS_SECRETARY';
-  const quickActions = role === 'ADMIN' ? ADMIN_ACTIONS : isSecretary ? SECRETARY_ACTIONS : SUPER_ADMIN_OPS_ACTIONS;
-  const [stats, setStats] = useState({
-    farmers: 0, farms: 0, mamcos: 0, listings: 0
-  });
+// AMCOS Secretary landing: a lighter, cooperative-scoped view (own farmers/farms/listings) —
+// deliberately distinct from the platform-wide admin dashboard below, since a secretary manages
+// one cooperative, not the whole system.
+function SecretaryDashboard() {
+  const [stats, setStats] = useState({ farmers: 0, farms: 0, mamcos: 0, listings: 0 });
   const [mamcosName, setMamcosName] = useState('');
   const [prices, setPrices] = useState<{ commodity: string; price: number; market: string; recordedAt: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState({ totalHectares: 0, averageYieldPerHectare: 0, totalRevenue: 0 });
 
   useEffect(() => {
-    const roleLanding: Record<string, string> = {
-      FARMER: '/dashboard/farmer',
-      FIELD_OFFICER: '/dashboard/field-officer',
-      AUDITOR: '/dashboard/auditor',
-      FINANCIAL_PROVIDER: '/dashboard/financial-provider',
-      BUYER: '/dashboard/buyer',
-    };
-    if (role && roleLanding[role]) router.replace(roleLanding[role]);
-  }, [role, router]);
-
-  useEffect(() => {
     const fetchAll = async () => {
       try {
-        if (isSecretary) {
-          const [dashRes, listingsRes, pricesRes] = await Promise.allSettled([
-            mamcosApi.dashboard(),
-            marketplaceApi.getLandListings(),
-            marketplaceApi.getMarketPrices(),
-          ]);
-          const secretary = dashRes.status === 'fulfilled' ? dashRes.value.data : null;
-          const m = secretary?.mamcos;
-          setMamcosName(m?.name || '');
-          setStats({
-            farmers: m?.farmers?.length ?? 0,
-            farms: m?.farms?.length ?? 0,
-            mamcos: m?.farms?.filter((f: any) => f.isVerified)?.length ?? 0,
-            listings: listingsRes.status === 'fulfilled' ? listingsRes.value.data?.length || 0 : 0,
-          });
-          if (pricesRes.status === 'fulfilled') setPrices(pricesRes.value.data?.slice(0, 5) || []);
-          return;
-        }
-
-        const [farmersRes, farmsRes, mamcosRes, listingsRes, pricesRes] = await Promise.allSettled([
-          farmersApi.getAll(),
-          farmsApi.getAll(),
-          mamcosApi.getAll(),
+        const [dashRes, listingsRes, pricesRes] = await Promise.allSettled([
+          mamcosApi.dashboard(),
           marketplaceApi.getLandListings(),
           marketplaceApi.getMarketPrices(),
         ]);
-
+        const secretary = dashRes.status === 'fulfilled' ? dashRes.value.data : null;
+        const m = secretary?.mamcos;
+        setMamcosName(m?.name || '');
         setStats({
-          farmers: farmersRes.status === 'fulfilled' ? farmersRes.value.data?.total || farmersRes.value.data?.length || 0 : 0,
-          farms: farmsRes.status === 'fulfilled' ? farmsRes.value.data?.total || farmsRes.value.data?.length || 0 : 0,
-          mamcos: mamcosRes.status === 'fulfilled' ? mamcosRes.value.data?.length || 0 : 0,
+          farmers: m?.farmers?.length ?? 0,
+          farms: m?.farms?.length ?? 0,
+          mamcos: m?.farms?.filter((f: any) => f.isVerified)?.length ?? 0,
           listings: listingsRes.status === 'fulfilled' ? listingsRes.value.data?.length || 0 : 0,
         });
-        if (pricesRes.status === 'fulfilled') {
-          setPrices(pricesRes.value.data?.slice(0, 5) || []);
-        }
+        if (pricesRes.status === 'fulfilled') setPrices(pricesRes.value.data?.slice(0, 5) || []);
       } catch (err) {
         console.error(err);
       } finally {
@@ -135,8 +81,7 @@ export default function DashboardPage() {
       }
     };
     fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSecretary]);
+  }, []);
 
   useEffect(() => {
     reportsApi.kpis().then((result) => setKpis(result.data)).catch(console.error);
@@ -144,37 +89,29 @@ export default function DashboardPage() {
 
   return (
     <div>
-      {/* Header */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
           <div style={{ width: '4px', height: '28px', background: 'linear-gradient(to bottom, var(--accent), var(--green-400))', borderRadius: '9999px' }} />
           <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '26px', fontWeight: 800, color: 'var(--text-primary)' }}>
-            {isSecretary ? (mamcosName || 'Your AMCOS') : 'System Overview'}
+            {mamcosName || 'Your AMCOS'}
           </h1>
         </div>
         <p style={{ fontSize: '14px', color: 'var(--neutral-500)', marginLeft: '16px' }}>
-          {isSecretary ? 'Your cooperative scheme — MAYODE GROUP' : 'MAYODE GROUP — MAYOData Platform & M-LAX Marketplace'}
+          Your cooperative scheme — MAYODE GROUP
         </p>
       </div>
 
-      {/* Stats Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-        <StatCard label={isSecretary ? 'Your Farmers' : 'Registered Farmers'} value={loading ? '—' : stats.farmers} sub="Active members" icon="👤" color="var(--accent)" />
-        <StatCard label={isSecretary ? 'Your Farms' : 'Registered Farms'} value={loading ? '—' : stats.farms} sub="GPS mapped" icon="🌾" color="var(--green-400)" />
-        {isSecretary ? (
-          <StatCard label="Verified Farms" value={loading ? '—' : stats.mamcos} sub="Boundary confirmed" icon="✅" color="var(--gold-400)" />
-        ) : (
-          <StatCard label="AMCOS Schemes" value={loading ? '—' : stats.mamcos} sub="Active cooperatives" icon="🏛" color="var(--gold-400)" />
-        )}
+        <StatCard label="Your Farmers" value={loading ? '—' : stats.farmers} sub="Active members" icon="👤" color="var(--accent)" />
+        <StatCard label="Your Farms" value={loading ? '—' : stats.farms} sub="GPS mapped" icon="🌾" color="var(--green-400)" />
+        <StatCard label="Verified Farms" value={loading ? '—' : stats.mamcos} sub="Boundary confirmed" icon="✅" color="var(--gold-400)" />
         <StatCard label="M-LAX Listings" value={loading ? '—' : stats.listings} sub="Land & tractor ads" icon="🏪" color="var(--blue-500)" />
         <StatCard label="Cooperative Hectares" value={kpis.totalHectares.toLocaleString()} sub="Registered farm area" icon="🗺️" color="var(--purple-500)" />
         <StatCard label="Average Yield / ha" value={`${Math.round(kpis.averageYieldPerHectare).toLocaleString()} kg`} sub="Harvested crop cycles" icon="🌾" color="var(--green-400)" />
         <StatCard label="Cooperative Revenue" value={`TZS ${Math.round(kpis.totalRevenue).toLocaleString()}`} sub="Recorded sales revenue" icon="💰" color="var(--gold-400)" />
       </div>
 
-      {/* Content Panels */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        {/* Market Prices */}
         <div className="glass-card" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
             <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>📊 Latest Market Prices</h2>
@@ -201,11 +138,10 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Quick Actions */}
         <div className="glass-card" style={{ padding: '24px' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '20px' }}>⚡ Quick Actions</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {quickActions.map((action) => (
+            {SECRETARY_ACTIONS.map((action) => (
               <Link
                 key={action.href}
                 href={action.href}
@@ -233,7 +169,26 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-
     </div>
   );
+}
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const role = useAuthStore((state) => state.user?.role);
+
+  useEffect(() => {
+    const roleLanding: Record<string, string> = {
+      FARMER: '/dashboard/farmer',
+      FIELD_OFFICER: '/dashboard/field-officer',
+      AUDITOR: '/dashboard/auditor',
+      FINANCIAL_PROVIDER: '/dashboard/financial-provider',
+      BUYER: '/dashboard/buyer',
+    };
+    if (role && roleLanding[role]) router.replace(roleLanding[role]);
+  }, [role, router]);
+
+  if (role === 'MAMCOS_SECRETARY') return <SecretaryDashboard />;
+  if (role === 'SUPER_ADMIN' || role === 'ADMIN') return <AdminOverviewDashboard />;
+  return null;
 }

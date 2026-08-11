@@ -37,6 +37,10 @@ import { FarmCorrectionsModule } from './farm-corrections/farm-corrections.modul
 import { ActivitiesModule } from './activities/activities.module';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { BuyersModule } from './buyers/buyers.module';
+import { BuyerOrdersModule } from './buyer-orders/buyer-orders.module';
+import { SuppliersModule } from './suppliers/suppliers.module';
+import { FacilitiesModule } from './facilities/facilities.module';
+import { SettingsModule } from './settings/settings.module';
 import { SalesModule } from './sales/sales.module';
 import { ReportsModule } from './reports/reports.module';
 import { LoansModule } from './loans/loans.module';
@@ -94,6 +98,10 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     FinanceModule,
     InventoryModule,
     BuyersModule,
+    BuyerOrdersModule,
+    SuppliersModule,
+    FacilitiesModule,
+    SettingsModule,
     SalesModule,
     ReportsModule,
     LoansModule,

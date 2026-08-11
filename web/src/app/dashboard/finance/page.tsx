@@ -11,12 +11,31 @@ interface FinanceSummary {
   totalYieldKg?: number;
 }
 
+interface InputCostRow {
+  id: string;
+  category: string;
+  itemName: string;
+  totalCost: number;
+  paymentStatus?: string;
+  supplier?: string;
+  loanRecordId?: string;
+  dateIncurred: string;
+  supplierRecord?: { name: string } | null;
+  cropCycle?: { farmer?: { firstName: string; lastName: string; controlNumber: string } };
+}
+
+const paymentStatusBadge = (status?: string) => {
+  const map: Record<string, string> = { PAID: 'badge-green', PARTIAL: 'badge-gold', PENDING: 'badge-red' };
+  return <span className={`badge ${map[status || 'PENDING'] || 'badge-gray'}`}>{status || 'PENDING'}</span>;
+};
+
 export default function FinancePage() {
   const [farmerId, setFarmerId] = useState('');
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [farmers, setFarmers] = useState<{ id: string; firstName: string; lastName: string; controlNumber: string }[]>([]);
   const [statements, setStatements] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [inputCosts, setInputCosts] = useState<InputCostRow[]>([]);
 
   useEffect(() => {
     farmersApi.getAll()
@@ -24,6 +43,9 @@ export default function FinancePage() {
       .catch(console.error);
     accountingApi.statements()
       .then(res => setStatements(res.data))
+      .catch(console.error);
+    financeApi.getAllCosts()
+      .then(res => setInputCosts(res.data || []))
       .catch(console.error);
   }, []);
 
@@ -182,6 +204,44 @@ export default function FinancePage() {
           <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--neutral-500)' }}>Select a farmer to view their financial profitability summary</div>
         </div>
       )}
+
+      <div className="table-panel" style={{ marginTop: 24 }}>
+        <div className="section-toolbar"><strong>Platform Input Costs</strong><span className="muted">{inputCosts.length} records · supplier, payment status &amp; loan-financing link</span></div>
+        {inputCosts.length === 0 ? (
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No input costs recorded yet.</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Farmer</th>
+                  <th>Category</th>
+                  <th>Item</th>
+                  <th>Total</th>
+                  <th>Supplier</th>
+                  <th>Payment status</th>
+                  <th>Financing</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inputCosts.slice(0, 100).map((cost) => (
+                  <tr key={cost.id}>
+                    <td style={{ fontSize: '12px', color: 'var(--neutral-400)' }}>{new Date(cost.dateIncurred).toLocaleDateString()}</td>
+                    <td style={{ fontSize: '12px', color: 'var(--neutral-400)' }}>{cost.cropCycle?.farmer ? `${cost.cropCycle.farmer.firstName} ${cost.cropCycle.farmer.lastName}` : '—'}</td>
+                    <td style={{ fontSize: '12px' }}>{cost.category}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{cost.itemName}</td>
+                    <td style={{ fontWeight: 700 }}>{Number(cost.totalCost).toLocaleString()} TZS</td>
+                    <td style={{ fontSize: '12px', color: 'var(--neutral-400)' }}>{cost.supplierRecord?.name || cost.supplier || '—'}</td>
+                    <td>{paymentStatusBadge(cost.paymentStatus)}</td>
+                    <td>{cost.loanRecordId ? <span className="badge badge-blue">Loan-linked</span> : <span style={{ color: 'var(--neutral-600)', fontSize: '12px' }}>—</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

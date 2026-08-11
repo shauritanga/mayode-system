@@ -20,8 +20,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await authApi.login(phone, password);
-      const { accessToken, user } = res.data;
-      setAuth(user, accessToken);
+      const { accessToken, refreshToken, user } = res.data;
+      setAuth(user, accessToken, refreshToken);
       router.push('/dashboard');
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };

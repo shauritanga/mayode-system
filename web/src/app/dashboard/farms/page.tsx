@@ -1,7 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { farmsApi } from '@/lib/api';
+
+const FarmsMap = dynamic(() => import('@/components/FarmsMap'), { ssr: false, loading: () => <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading map…</div> });
 
 interface Farm {
   id: string;
@@ -13,6 +16,8 @@ interface Farm {
   isVerified: boolean;
   isLeased: boolean;
   hasIrrigation: boolean;
+  centerLatitude?: number | null;
+  centerLongitude?: number | null;
   farmer?: { firstName: string; lastName: string; controlNumber: string };
   mamcos?: { name: string };
 }
@@ -27,6 +32,7 @@ export default function FarmsPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [view, setView] = useState<'list' | 'map'>('list');
 
   useEffect(() => {
     farmsApi.getAll()
@@ -49,15 +55,21 @@ export default function FarmsPage() {
           </div>
           <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>All registered farm parcels & GPS boundaries</p>
         </div>
-        <input
-          id="farms-search"
-          type="search"
-          placeholder="Search farm code or farmer name…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="input-field"
-          style={{ width: '280px' }}
-        />
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '4px', background: 'var(--surface-tint)', borderRadius: 8, padding: 4 }}>
+            <button className={view === 'list' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => setView('list')}>List</button>
+            <button className={view === 'map' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => setView('map')}>Map</button>
+          </div>
+          <input
+            id="farms-search"
+            type="search"
+            placeholder="Search farm code or farmer name…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="input-field"
+            style={{ width: '280px' }}
+          />
+        </div>
       </div>
 
       {/* Stats row */}
@@ -67,6 +79,7 @@ export default function FarmsPage() {
           { label: 'Verified', value: farms.filter(f => f.isVerified).length, color: 'var(--green-400)' },
           { label: 'Currently Leased', value: farms.filter(f => f.isLeased).length, color: 'var(--gold-400)' },
           { label: 'Total Hectares', value: farms.reduce((a, f) => a + f.socialHectares, 0).toFixed(1), color: 'var(--blue-500)' },
+          { label: 'GPS-located', value: farms.filter(f => f.centerLatitude != null).length, color: 'var(--purple-500)' },
         ].map(stat => (
           <div key={stat.label} className="stat-card" style={{ padding: '16px' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: stat.color, fontFamily: 'Outfit, sans-serif' }}>{stat.value}</div>
@@ -75,7 +88,17 @@ export default function FarmsPage() {
         ))}
       </div>
 
-      <div className="glass-card" style={{ overflow: 'hidden' }}>
+      {view === 'map' && (
+        <div className="glass-card" style={{ overflow: 'hidden', marginBottom: '24px', padding: 12 }}>
+          {loading ? (
+            <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading farms…</div>
+          ) : (
+            <FarmsMap farms={filtered} />
+          )}
+        </div>
+      )}
+
+      {view === 'list' && <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading farms…</div>
         ) : filtered.length === 0 ? (
@@ -133,7 +156,7 @@ export default function FarmsPage() {
             </table>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

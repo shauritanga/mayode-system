@@ -111,7 +111,7 @@ export class ReportsController {
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.send(
-      await this.reports.farmersExport(),
+      await this.reports.farmersExport(query),
       'farmers',
       query.format,
       response,
@@ -130,8 +130,68 @@ export class ReportsController {
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.send(
-      await this.reports.cropCyclesExport(),
+      await this.reports.cropCyclesExport(query),
       'crop-cycles',
+      query.format,
+      response,
+    );
+  }
+
+  @Get('field-officer-performance')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
+  @ApiOperation({ summary: 'Field-officer performance: visits, farms mapped, farmers verified, activities logged' })
+  async fieldOfficerPerformance(
+    @Query() query: ReportFormatDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.send(
+      await this.reports.fieldOfficerPerformance(),
+      'field-officer-performance',
+      query.format,
+      response,
+    );
+  }
+
+  @Get('insurance-coverage')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
+  @ApiOperation({ summary: 'Insurance coverage report: policies and claims by status/product type, exportable' })
+  async insuranceCoverage(
+    @Query() query: ReportFormatDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.send(
+      await this.reports.insuranceCoverage(),
+      'insurance-coverage',
+      query.format,
+      response,
+    );
+  }
+
+  @Get('gender-youth-inclusion')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
+  @ApiOperation({ summary: 'Gender / youth inclusion breakdown across registered farmers' })
+  async genderYouthInclusion(
+    @Query() query: ReportFormatDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.send(
+      await this.reports.genderYouthInclusion(query),
+      'gender-youth-inclusion',
       query.format,
       response,
     );
