@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { MamcosStaffRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { VerifyFarmDto } from './dto/verify-farm.dto';
@@ -8,7 +12,14 @@ export class FarmVerificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async verifyFarm(officerUserId: string, verifyFarmDto: VerifyFarmDto) {
-    const { farmId, neighborLeft, neighborRight, mamcosApprovalStatus, photoProofUrl, notes } = verifyFarmDto;
+    const {
+      farmId,
+      neighborLeft,
+      neighborRight,
+      mamcosApprovalStatus,
+      photoProofUrl,
+      notes,
+    } = verifyFarmDto;
 
     // Find the field officer profile
     const fieldOfficer = await this.prisma.mamcosStaff.findFirst({
@@ -16,7 +27,9 @@ export class FarmVerificationsService {
     });
 
     if (!fieldOfficer) {
-      throw new NotFoundException(`Field Officer profile for user ID ${officerUserId} not found`);
+      throw new NotFoundException(
+        `Field Officer profile for user ID ${officerUserId} not found`,
+      );
     }
 
     // Verify farm exists
@@ -61,7 +74,12 @@ export class FarmVerificationsService {
     return this.prisma.farmVerification.findMany({
       include: {
         farm: {
-          select: { farmCode: true, socialHectares: true, grade: true, isVerified: true },
+          select: {
+            farmCode: true,
+            socialHectares: true,
+            grade: true,
+            isVerified: true,
+          },
         },
         fieldOfficer: {
           select: { employeeCode: true, firstName: true, lastName: true },
@@ -86,7 +104,9 @@ export class FarmVerificationsService {
     });
 
     if (!verification) {
-      throw new NotFoundException(`Farm Verification record with ID ${id} not found`);
+      throw new NotFoundException(
+        `Farm Verification record with ID ${id} not found`,
+      );
     }
 
     return verification;

@@ -27,6 +27,10 @@ export const leasesApi = impl.leasesApi;
 export const correctionsApi = impl.correctionsApi;
 export const fieldSurveysApi = impl.fieldSurveysApi;
 export const financeApi = impl.financeApi;
+export const buyersApi = impl.buyersApi;
+export const suppliersApi = impl.suppliersApi;
+export const inventoryApi = impl.inventoryApi;
+export const insuranceApi = impl.insuranceApi;
 export const assignmentsApi = impl.assignmentsApi;
 export const ownershipApi = impl.ownershipApi;
 export const alertsApi = impl.alertsApi;
@@ -34,6 +38,10 @@ export const rewardsApi = impl.rewardsApi;
 export const registryApi = impl.registryApi;
 export const workspaceApi = impl.workspaceApi;
 export const officerVisitsApi = impl.officerVisitsApi;
+export const integrationsApi = impl.integrationsApi;
 
 // Token setter is only meaningful for the remote backend; local is a no-op.
 export const setApiToken = impl.setApiToken;
+export const resolveMediaUrl = impl.resolveMediaUrl;
+export const API_BASE_URL = impl.API_BASE_URL;
+export const MEDIA_BASE_URL = impl.MEDIA_BASE_URL;

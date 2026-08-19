@@ -13,9 +13,13 @@ export class MultiYearRentSchedulerService {
 
   constructor(private readonly marketplace: MarketplaceService) {}
 
-  @Cron(process.env.MLAX_RENT_REMINDER_CRON || CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT, {
-    name: 'mlax-annual-rent-reminder',
-  })
+  @Cron(
+    process.env.MLAX_RENT_REMINDER_CRON ||
+      CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT,
+    {
+      name: 'mlax-annual-rent-reminder',
+    },
+  )
   async run(): Promise<void> {
     try {
       const sent = await this.marketplace.sendDueAnnualReminders();
@@ -23,7 +27,9 @@ export class MultiYearRentSchedulerService {
         this.logger.log(`M-LAX annual rent reminders: ${sent} sent`);
       }
     } catch (e) {
-      this.logger.error(`M-LAX annual rent reminder job failed: ${e instanceof Error ? e.message : e}`);
+      this.logger.error(
+        `M-LAX annual rent reminder job failed: ${e instanceof Error ? e.message : e}`,
+      );
     }
   }
 }

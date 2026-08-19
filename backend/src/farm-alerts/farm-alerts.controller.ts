@@ -35,7 +35,8 @@ export class FarmAlertsController {
 
   @Get(':id')
   @ApiOperation({
-    summary: 'Alert detail — full recommendation for members, preview + CTA for free users.',
+    summary:
+      'Alert detail — full recommendation for members, preview + CTA for free users.',
   })
   getOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.alerts.getOne(id, user);
@@ -56,7 +57,9 @@ export class FarmAlertsController {
 
   @Post('generate')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Run the rule-based alert generator across all farms (admin)' })
+  @ApiOperation({
+    summary: 'Run the rule-based alert generator across all farms (admin)',
+  })
   generateAll() {
     return this.alerts.generateAll();
   }

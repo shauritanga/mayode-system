@@ -5,12 +5,14 @@ import {
   HttpCode,
   Logger,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FarmLeasesService } from '../farm-leases/farm-leases.service';
 import { FarmRegistryService } from '../farm-registry/farm-registry.service';
 import { SmsService } from './sms.service';
 import { UssdService } from './ussd.service';
+import { WebhookSecretGuard } from './webhook-secret.guard';
 
 interface InboundSmsBody {
   from?: string;
@@ -47,6 +49,7 @@ export class MessagingController {
    * is the more time-sensitive of the two (owner comment §10).
    */
   @Post('sms/inbound')
+  @UseGuards(WebhookSecretGuard)
   @HttpCode(200)
   @ApiOperation({
     summary:
@@ -132,6 +135,7 @@ export class MessagingController {
   }
 
   @Post('ussd')
+  @UseGuards(WebhookSecretGuard)
   @HttpCode(200)
   @Header('Content-Type', 'text/plain')
   @ApiOperation({

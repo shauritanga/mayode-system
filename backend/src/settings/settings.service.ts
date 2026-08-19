@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UpdateOrgSettingsDto, UpsertNotificationTemplateDto } from './dto/settings.dto';
+import {
+  UpdateOrgSettingsDto,
+  UpsertNotificationTemplateDto,
+} from './dto/settings.dto';
 
 @Injectable()
 export class SettingsService {
@@ -12,13 +15,24 @@ export class SettingsService {
     if (existing) return existing;
     // No config yet — return sensible defaults without creating a row, so a read-only
     // caller never triggers a write.
-    return { id: null, orgName: 'MAYODE Youth Development Group', logoUrl: null, contactEmail: null, contactPhone: null, address: null, updatedAt: null };
+    return {
+      id: null,
+      orgName: 'MAYODE Youth Development Group',
+      logoUrl: null,
+      contactEmail: null,
+      contactPhone: null,
+      address: null,
+      updatedAt: null,
+    };
   }
 
   async updateOrgSettings(dto: UpdateOrgSettingsDto) {
     const existing = await this.prisma.orgSettings.findFirst();
     if (existing) {
-      return this.prisma.orgSettings.update({ where: { id: existing.id }, data: dto });
+      return this.prisma.orgSettings.update({
+        where: { id: existing.id },
+        data: dto,
+      });
     }
     return this.prisma.orgSettings.create({ data: dto });
   }
@@ -29,7 +43,9 @@ export class SettingsService {
   }
 
   findAllTemplates() {
-    return this.prisma.notificationTemplate.findMany({ orderBy: { key: 'asc' } });
+    return this.prisma.notificationTemplate.findMany({
+      orderBy: { key: 'asc' },
+    });
   }
 
   async findTemplateByKey(key: string) {
@@ -37,14 +53,27 @@ export class SettingsService {
   }
 
   async updateTemplate(id: string, dto: UpsertNotificationTemplateDto) {
-    const existing = await this.prisma.notificationTemplate.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException(`Notification template with ID ${id} not found`);
-    return this.prisma.notificationTemplate.update({ where: { id }, data: dto });
+    const existing = await this.prisma.notificationTemplate.findUnique({
+      where: { id },
+    });
+    if (!existing)
+      throw new NotFoundException(
+        `Notification template with ID ${id} not found`,
+      );
+    return this.prisma.notificationTemplate.update({
+      where: { id },
+      data: dto,
+    });
   }
 
   async removeTemplate(id: string) {
-    const existing = await this.prisma.notificationTemplate.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException(`Notification template with ID ${id} not found`);
+    const existing = await this.prisma.notificationTemplate.findUnique({
+      where: { id },
+    });
+    if (!existing)
+      throw new NotFoundException(
+        `Notification template with ID ${id} not found`,
+      );
     await this.prisma.notificationTemplate.delete({ where: { id } });
     return { deleted: true };
   }

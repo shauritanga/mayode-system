@@ -1,21 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform, Image,
+  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform, Image, Modal, Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Calendar01Icon, Camera01Icon, Location01Icon, CheckmarkCircle02Icon, Alert02Icon } from '@hugeicons/core-free-icons';
+import { Calendar01Icon, Camera01Icon, Location01Icon, CheckmarkCircle02Icon, Alert02Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { cropCyclesApi, farmsApi, uploadsApi } from '../src/lib/data';
 import { checkWithinFarm, getCurrentPoint, FarmGeofenceResult } from '../src/services/location.service';
+import { SearchableSelect } from '../src/components/SearchableSelect';
 import { useI18n } from '../src/i18n';
 
 interface FarmGeo {
   boundaryCoordinates?: { type: 'Polygon'; coordinates: number[][][] } | null;
   centerLatitude?: number | null;
   centerLongitude?: number | null;
+}
+
+interface ActivityPhoto {
+  id: string;
+  localUri: string;
+  remoteUrl: string | null;
+  uploading: boolean;
 }
 
 const ACTIVITY_TYPES = [
@@ -31,6 +39,8 @@ const ACTIVITY_TYPES = [
   { key: 'TRANSPORT', labelKey: 'activityTransport', icon: '🚚' },
 ] as const;
 
+const MIN_PHOTOS = 2;
+
 function toDateInput(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -41,14 +51,26 @@ export default function ActivityNew() {
   const router = useRouter();
   const { t } = useI18n();
 
+  useEffect(() => {
+    if (!cropCycleId) {
+      router.replace({ pathname: '/activity-select-cycle', params: { purpose: 'activity' } });
+    }
+  }, [cropCycleId, router]);
+
+  const activityKeys = useMemo(() => ACTIVITY_TYPES.map((a) => a.key), []);
+  const formatActivity = (key: string) => {
+    const found = ACTIVITY_TYPES.find((a) => a.key === key);
+    return found ? `${found.icon}  ${t(found.labelKey)}` : key;
+  };
+
   const [activityType, setActivityType] = useState<string | null>(null);
   const [date, setDate] = useState(toDateInput(new Date()));
   const [showPicker, setShowPicker] = useState(false);
   const [description, setDescription] = useState('');
   const [laborWorkers, setLaborWorkers] = useState('');
   const [laborHours, setLaborHours] = useState('');
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photos, setPhotos] = useState<ActivityPhoto[]>([]);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [gps, setGps] = useState<{ latitude: number; longitude: number } | null>(null);
   const [capturingGps, setCapturingGps] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -64,8 +86,9 @@ export default function ActivityNew() {
   }, [farmId]);
 
   const geofenceEnforced = !!farmId && !!farm && (!!farm.boundaryCoordinates || (farm.centerLatitude != null && farm.centerLongitude != null));
-  // Location is "ok to submit" unless we have a farm to check against and the check hasn't cleared yet.
   const locationOk = farmLoading ? false : !geofenceEnforced || geofence?.status === 'inside';
+  const readyPhotos = photos.filter((p) => p.remoteUrl && !p.uploading);
+  const photosOk = readyPhotos.length >= MIN_PHOTOS && !photos.some((p) => p.uploading);
 
   const onPickDate = (event: any, selected?: Date) => {
     setShowPicker(Platform.OS === 'ios');
@@ -73,23 +96,70 @@ export default function ActivityNew() {
     setDate(toDateInput(selected));
   };
 
-  const addPhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) return;
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 });
-    if (result.canceled || !result.assets?.length) return;
-    const asset = result.assets[0];
-    setUploadingPhoto(true);
+  const uploadAsset = async (asset: ImagePicker.ImagePickerAsset) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const draft: ActivityPhoto = { id, localUri: asset.uri, remoteUrl: null, uploading: true };
+    setPhotos((prev) => [...prev, draft]);
     try {
       const up = await uploadsApi.uploadFile({
         uri: asset.uri,
-        name: asset.fileName || `activity-${Date.now()}.jpg`,
+        name: asset.fileName || `activity-${id}.jpg`,
         type: asset.mimeType || 'image/jpeg',
       });
-      setPhotoUrl(up.data.url);
-    } finally {
-      setUploadingPhoto(false);
+      setPhotos((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, remoteUrl: up.data.url, uploading: false } : p)),
+      );
+    } catch (e: any) {
+      setPhotos((prev) => prev.filter((p) => p.id !== id));
+      const msg = e?.response?.data?.message;
+      Alert.alert(t('logActivity'), Array.isArray(msg) ? msg.join('\n') : msg || String(e?.message ?? e));
     }
+  };
+
+  const pickFromCamera = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(t('logActivity'), t('cameraPermissionNeeded'));
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.75,
+      allowsEditing: false,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    await uploadAsset(result.assets[0]);
+  };
+
+  const pickFromLibrary = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(t('logActivity'), t('allowPhotoAccess'));
+      return;
+    }
+    const remaining = Math.max(MIN_PHOTOS - photos.length, 1);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.75,
+      allowsMultipleSelection: true,
+      selectionLimit: Math.min(remaining + 2, 6),
+    });
+    if (result.canceled || !result.assets?.length) return;
+    for (const asset of result.assets) {
+      await uploadAsset(asset);
+    }
+  };
+
+  const addPhoto = () => {
+    Alert.alert(t('addActivityPhoto'), t('activityPhotosHint'), [
+      { text: t('takePhoto'), onPress: () => { void pickFromCamera(); } },
+      { text: t('chooseFromGallery'), onPress: () => { void pickFromLibrary(); } },
+      { text: t('cancel'), style: 'cancel' },
+    ]);
+  };
+
+  const removePhoto = (id: string) => {
+    setPhotos((prev) => prev.filter((p) => p.id !== id));
   };
 
   const captureGps = async () => {
@@ -110,6 +180,10 @@ export default function ActivityNew() {
       Alert.alert(t('logActivity'), t('fillActivityFields'));
       return;
     }
+    if (!photosOk) {
+      Alert.alert(t('logActivity'), t('photosRequiredMin'));
+      return;
+    }
     if (!locationOk) {
       Alert.alert(t('logActivity'), t('mustVerifyLocationFirst'));
       return;
@@ -123,7 +197,7 @@ export default function ActivityNew() {
         description: description.trim() || undefined,
         laborWorkers: laborWorkers ? Number(laborWorkers) : undefined,
         laborHours: laborHours ? Number(laborHours) : undefined,
-        photoUrls: photoUrl ? [photoUrl] : undefined,
+        photoUrls: readyPhotos.map((p) => p.remoteUrl!),
         gpsLatitude: gps?.latitude,
         gpsLongitude: gps?.longitude,
       });
@@ -143,19 +217,15 @@ export default function ActivityNew() {
         {(!!farmCode || !!season) && <Text style={styles.contextLabel}>{[farmCode, season].filter(Boolean).join(' · ')}</Text>}
 
         <View style={styles.card}>
-          <Text style={styles.fieldLabel}>{t('selectActivityType')}</Text>
-          <View style={styles.chipsWrap}>
-            {ACTIVITY_TYPES.map((a) => (
-              <TouchableOpacity
-                key={a.key}
-                style={[styles.chip, activityType === a.key && styles.chipActive]}
-                onPress={() => setActivityType(a.key)}
-              >
-                <Text style={styles.chipEmoji}>{a.icon}</Text>
-                <Text style={[styles.chipText, activityType === a.key && styles.chipTextActive]}>{t(a.labelKey)}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <SearchableSelect
+            label={t('selectActivityType')}
+            value={activityType}
+            placeholder={t('selectActivityType')}
+            options={activityKeys}
+            onSelect={setActivityType}
+            searchable
+            formatLabel={formatActivity}
+          />
 
           <Text style={styles.fieldLabel}>{t('activityDate')}</Text>
           <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker(true)}>
@@ -186,16 +256,47 @@ export default function ActivityNew() {
             </View>
           </View>
 
-          <Text style={[styles.fieldLabel, { marginTop: 12 }]}>{t('addActivityPhoto')}</Text>
-          {photoUrl ? (
-            <Image source={{ uri: photoUrl }} style={styles.photoPreview} />
-          ) : (
-            <TouchableOpacity style={styles.secondaryBtn} onPress={addPhoto} disabled={uploadingPhoto}>
-              {uploadingPhoto ? <ActivityIndicator size="small" color="#10B981" /> : (
-                <><HugeiconsIcon icon={Camera01Icon} size={16} color="#10B981" strokeWidth={2} />
-                <Text style={styles.secondaryBtnText}>{t('addActivityPhoto')}</Text></>
-              )}
-            </TouchableOpacity>
+          <Text style={[styles.fieldLabel, { marginTop: 4 }]}>
+            {t('addActivityPhoto')}
+            <Text style={styles.requiredMark}> *</Text>
+          </Text>
+          <Text style={styles.photosHint}>{t('activityPhotosHint')}</Text>
+          <View style={styles.photoGrid}>
+            {photos.map((photo) => (
+              <View key={photo.id} style={styles.photoCell}>
+                <View style={styles.photoTile}>
+                  <TouchableOpacity activeOpacity={0.9} onPress={() => setPreviewUri(photo.localUri)} style={StyleSheet.absoluteFill}>
+                    <Image source={{ uri: photo.localUri }} style={styles.photoImage} resizeMode="cover" />
+                  </TouchableOpacity>
+                  {photo.uploading && (
+                    <View style={styles.photoOverlay}>
+                      <ActivityIndicator color="#fff" />
+                    </View>
+                  )}
+                  {!photo.uploading && (
+                    <TouchableOpacity style={styles.photoRemove} onPress={() => removePhoto(photo.id)} hitSlop={8}>
+                      <HugeiconsIcon icon={Cancel01Icon} size={14} color="#fff" strokeWidth={2.5} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            ))}
+            <View style={styles.photoCell}>
+              <TouchableOpacity
+                style={styles.addPhotoTile}
+                onPress={addPhoto}
+                activeOpacity={0.85}
+              >
+                <HugeiconsIcon icon={Camera01Icon} size={28} color="#10B981" strokeWidth={1.8} />
+                <Text style={styles.addPhotoText}>{t('addPhoto')}</Text>
+                <Text style={styles.addPhotoCount}>
+                  {readyPhotos.length}/{MIN_PHOTOS}+
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          {photos.length > 0 && photos.length < MIN_PHOTOS && (
+            <Text style={styles.photosWarn}>{t('photosRequiredMin')}</Text>
           )}
 
           <Text style={[styles.fieldLabel, { marginTop: 12 }]}>{t('captureLocation')}</Text>
@@ -218,7 +319,7 @@ export default function ActivityNew() {
                 <HugeiconsIcon
                   icon={geofence?.status === 'outside' ? Alert02Icon : gps ? CheckmarkCircle02Icon : Location01Icon}
                   size={16}
-                  color={geofence?.status === 'outside' ? '#DC2626' : geofence?.status === 'inside' ? '#10B981' : '#10B981'}
+                  color={geofence?.status === 'outside' ? '#DC2626' : '#10B981'}
                   strokeWidth={2}
                 />
                 <Text style={[styles.secondaryBtnText, geofence?.status === 'outside' && { color: '#DC2626' }]}>
@@ -249,13 +350,30 @@ export default function ActivityNew() {
         </View>
 
         <TouchableOpacity
-          style={[styles.submitBtn, (submitting || !locationOk) && { opacity: 0.6 }]}
+          style={[styles.submitBtn, (submitting || !locationOk || !photosOk || !activityType) && { opacity: 0.6 }]}
           onPress={submit}
-          disabled={submitting || !locationOk}
+          disabled={submitting || !locationOk || !photosOk || !activityType}
         >
           <Text style={styles.submitText}>{t('logActivity')}</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal visible={!!previewUri} transparent animationType="fade" onRequestClose={() => setPreviewUri(null)}>
+        <Pressable style={styles.previewBackdrop} onPress={() => setPreviewUri(null)}>
+          <SafeAreaView style={styles.previewSafe} edges={['top', 'bottom']}>
+            <TouchableOpacity style={styles.previewClose} onPress={() => setPreviewUri(null)} hitSlop={12}>
+              <HugeiconsIcon icon={Cancel01Icon} size={22} color="#fff" strokeWidth={2} />
+            </TouchableOpacity>
+            {previewUri ? (
+              <Image source={{ uri: previewUri }} style={styles.previewImage} resizeMode="contain" />
+            ) : null}
+            <View style={styles.previewHintRow}>
+              <HugeiconsIcon icon={Camera01Icon} size={14} color="rgba(255,255,255,0.7)" strokeWidth={2} />
+              <Text style={styles.previewHint}>{t('tapToClosePreview')}</Text>
+            </View>
+          </SafeAreaView>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -272,19 +390,86 @@ const styles = StyleSheet.create({
   retryBtn: { alignSelf: 'flex-start', marginTop: 8 },
   retryBtnText: { fontSize: 13, color: '#10B981', fontWeight: '700' },
   fieldLabel: { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 8 },
+  requiredMark: { color: '#DC2626', fontWeight: '800' },
+  photosHint: { fontSize: 12, color: '#6B7280', marginBottom: 12, lineHeight: 17, marginTop: -4 },
+  photosWarn: { fontSize: 12, color: '#DC2626', fontWeight: '600', marginTop: 8 },
   input: { backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111827', marginBottom: 12 },
   inputMultiline: { minHeight: 70, textAlignVertical: 'top' },
-  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
-  chipActive: { backgroundColor: '#065F46', borderColor: '#065F46' },
-  chipEmoji: { fontSize: 14 },
-  chipText: { fontSize: 12, fontWeight: '600', color: '#374151' },
-  chipTextActive: { color: '#fff' },
   dateBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
   dateBtnText: { fontSize: 14, color: '#111827' },
   secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingVertical: 12 },
   secondaryBtnText: { fontSize: 13, color: '#111827' },
-  photoPreview: { width: 96, height: 96, borderRadius: 12 },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 12,
+  },
+  photoCell: {
+    width: '48%',
+    aspectRatio: 1,
+  },
+  photoTile: {
+    flex: 1,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  photoImage: { width: '100%', height: '100%' },
+  photoOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(17,24,39,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoRemove: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(17,24,39,0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPhotoTile: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    borderStyle: 'dashed',
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 12,
+  },
+  addPhotoText: { fontSize: 13, fontWeight: '700', color: '#065F46' },
+  addPhotoCount: { fontSize: 11, color: '#059669', fontWeight: '600' },
   submitBtn: { backgroundColor: '#065F46', paddingVertical: 15, borderRadius: 14, alignItems: 'center' },
   submitText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  previewBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)' },
+  previewSafe: { flex: 1, justifyContent: 'center' },
+  previewClose: {
+    position: 'absolute',
+    top: 12,
+    right: 16,
+    zIndex: 2,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewImage: { width: '100%', height: '80%' },
+  previewHintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12 },
+  previewHint: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
 });

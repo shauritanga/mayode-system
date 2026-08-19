@@ -1,9 +1,9 @@
 'use client';
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
-import { locationsApi, settingsApi } from '@/lib/api';
+import { locationsApi, partnerApi, settingsApi } from '@/lib/api';
 
-const tabs = ['Locations', 'Org Profile', 'Notification Templates'] as const;
+const tabs = ['Locations', 'Org Profile', 'Notification Templates', 'Partner API'] as const;
 type Tab = (typeof tabs)[number];
 
 export default function SettingsPage() {
@@ -15,17 +15,29 @@ export default function SettingsPage() {
         <div>
           <div className="page-kicker">Platform</div>
           <h1 className="page-title">Settings</h1>
-          <p className="page-subtitle">Admin-hierarchy locations, organization profile, and notification templates.</p>
+          <p className="page-subtitle">
+            Admin-hierarchy locations, organization profile, notification templates, and partner API keys.
+          </p>
         </div>
       </div>
 
       <nav className="farmer-tabbar" aria-label="Settings sections">
-        {tabs.map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab}</button>)}
+        {tabs.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            className={activeTab === tab ? 'active' : ''}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab}
+          </button>
+        ))}
       </nav>
 
       {activeTab === 'Locations' && <LocationsTab />}
       {activeTab === 'Org Profile' && <OrgProfileTab />}
       {activeTab === 'Notification Templates' && <NotificationTemplatesTab />}
+      {activeTab === 'Partner API' && <PartnerApiTab />}
     </div>
   );
 }
@@ -273,4 +285,236 @@ function NotificationTemplatesTab() {
       )}
     </div>
   </div>;
+}
+
+function PartnerApiTab() {
+  const [keys, setKeys] = useState<any[]>([]);
+  const [partnerName, setPartnerName] = useState('');
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
+  const [docs, setDocs] = useState<any>(null);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = () => {
+    setLoading(true);
+    Promise.all([partnerApi.listKeys(), partnerApi.docs()])
+      .then(([keysRes, docsRes]) => {
+        setKeys(keysRes.data || []);
+        setDocs(docsRes.data || null);
+      })
+      .catch((err) => {
+        setMessage(err?.response?.data?.message || 'Unable to load partner API settings.');
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const create = async (event: FormEvent) => {
+    event.preventDefault();
+    setMessage('');
+    setCreatedKey(null);
+    try {
+      const res = await partnerApi.createKey(partnerName.trim());
+      setCreatedKey(res.data.apiKey);
+      setPartnerName('');
+      setMessage(res.data.warning || 'Key created.');
+      load();
+    } catch (err: any) {
+      setMessage(err?.response?.data?.message || 'Unable to create key.');
+    }
+  };
+
+  const revoke = async (id: string) => {
+    try {
+      await partnerApi.revokeKey(id);
+      setMessage('Key revoked.');
+      if (selectedKeyId === id) {
+        setSelectedKeyId(null);
+        setRequests([]);
+      }
+      load();
+    } catch (err: any) {
+      setMessage(err?.response?.data?.message || 'Unable to revoke key.');
+    }
+  };
+
+  const showRequests = async (id: string) => {
+    setSelectedKeyId(id);
+    try {
+      const res = await partnerApi.listRequests(id, 40);
+      setRequests(res.data || []);
+    } catch (err: any) {
+      setMessage(err?.response?.data?.message || 'Unable to load audit requests.');
+    }
+  };
+
+  return (
+    <div>
+      <form onSubmit={create} className="action-panel">
+        <div className="panel-header">
+          <div>
+            <h2 className="panel-title">Partner API keys</h2>
+            <p className="panel-copy">
+              Issue X-API-Key credentials for banks. Credit profile schema{' '}
+              <code>{docs?.schema || 'mayode.credit-profile.v1'}</code>. Docs:{' '}
+              <code>GET /partner/v1/docs</code>.
+            </p>
+          </div>
+        </div>
+        {message && (
+          <div
+            className={`alert-box ${
+              message.includes('Unable') ? 'alert-danger' : 'alert-success'
+            }`}
+          >
+            {message}
+          </div>
+        )}
+        {createdKey && (
+          <div className="alert-box alert-success" style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+            New key (copy now): {createdKey}
+          </div>
+        )}
+        <div className="form-grid">
+          <label className="form-label">
+            Partner name
+            <input
+              className="input-field"
+              required
+              value={partnerName}
+              onChange={(e) => setPartnerName(e.target.value)}
+              placeholder="e.g. CRDB Pilot"
+            />
+          </label>
+        </div>
+        <button className="btn-primary" style={{ marginTop: 12 }}>
+          Create API key
+        </button>
+      </form>
+
+      <div className="table-panel">
+        <div className="section-toolbar">
+          <strong>Issued keys</strong>
+          <span className="muted">{keys.length} total</span>
+        </div>
+        {loading ? (
+          <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>Loading…</div>
+        ) : keys.length === 0 ? (
+          <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>
+            No partner keys yet.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Partner</th>
+                  <th>Prefix</th>
+                  <th>Status</th>
+                  <th>Requests</th>
+                  <th>Last used</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {keys.map((key) => (
+                  <tr key={key.id}>
+                    <td style={{ fontWeight: 600 }}>{key.partnerName}</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{key.keyPrefix}</td>
+                    <td>
+                      <span className={`badge ${key.isActive ? 'badge-green' : 'badge-gray'}`}>
+                        {key.isActive ? 'Active' : 'Revoked'}
+                      </span>
+                    </td>
+                    <td>{key._count?.requests ?? 0}</td>
+                    <td style={{ fontSize: 12, color: 'var(--neutral-500)' }}>
+                      {key.lastUsedAt
+                        ? new Date(key.lastUsedAt).toLocaleString('en-TZ')
+                        : 'Never'}
+                    </td>
+                    <td style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ fontSize: 12, padding: '4px 10px' }}
+                        onClick={() => void showRequests(key.id)}
+                      >
+                        Audit log
+                      </button>
+                      {key.isActive && (
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ fontSize: 12, padding: '4px 10px', color: 'var(--red-500)' }}
+                          onClick={() => void revoke(key.id)}
+                        >
+                          Revoke
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {selectedKeyId && (
+        <div className="table-panel" style={{ marginTop: 16 }}>
+          <div className="section-toolbar">
+            <strong>Recent requests</strong>
+            <span className="muted">{requests.length} shown</span>
+          </div>
+          {requests.length === 0 ? (
+            <div style={{ padding: 24, color: 'var(--neutral-500)', fontSize: 13 }}>
+              No requests recorded for this key yet.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Endpoint</th>
+                    <th>Farmer</th>
+                    <th>IP</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((row) => (
+                    <tr key={row.id}>
+                      <td style={{ fontSize: 12 }}>
+                        {new Date(row.createdAt).toLocaleString('en-TZ')}
+                      </td>
+                      <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{row.endpoint}</td>
+                      <td style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                        {row.farmerId || '—'}
+                      </td>
+                      <td style={{ fontSize: 12 }}>{row.ipAddress || '—'}</td>
+                      <td>
+                        <span
+                          className={`badge ${
+                            row.responseCode < 400 ? 'badge-green' : 'badge-gold'
+                          }`}
+                        >
+                          {row.responseCode}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

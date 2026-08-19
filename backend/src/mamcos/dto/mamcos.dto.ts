@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsBoolean,
+  IsNotEmpty,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateMamcosDto {
@@ -17,7 +23,10 @@ export class CreateMamcosDto {
   @IsOptional()
   district?: string;
 
-  @ApiPropertyOptional({ example: 5000.5, description: 'Total land area in hectares' })
+  @ApiPropertyOptional({
+    example: 5000.5,
+    description: 'Total land area in hectares',
+  })
   @IsNumber()
   @IsOptional()
   totalHectares?: number;
@@ -71,14 +80,20 @@ export class UpdateMamcosDto {
 }
 
 export class AssignFarmerDto {
-  @ApiProperty({ example: 'farmer-uuid-1234', description: 'ID of the farmer to assign to this MAMCOS' })
+  @ApiProperty({
+    example: 'farmer-uuid-1234',
+    description: 'ID of the farmer to assign to this MAMCOS',
+  })
   @IsString()
   @IsNotEmpty()
   farmerId: string;
 }
 
 export class CreateSecretaryDto {
-  @ApiProperty({ example: 'user-uuid-5678', description: 'User ID of the MAMCOS secretary' })
+  @ApiProperty({
+    example: 'user-uuid-5678',
+    description: 'User ID of the MAMCOS secretary',
+  })
   @IsString()
   @IsNotEmpty()
   userId: string;

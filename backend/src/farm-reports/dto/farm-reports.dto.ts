@@ -8,7 +8,10 @@ import {
 } from 'class-validator';
 
 export class AddFarmPhotoDto {
-  @ApiProperty({ example: '/uploads/farm-north.jpg', description: 'Uploaded photo URL' })
+  @ApiProperty({
+    example: '/uploads/farm-north.jpg',
+    description: 'Uploaded photo URL',
+  })
   @IsString()
   @IsNotEmpty()
   url: string;
@@ -50,7 +53,10 @@ export class CreateFieldSurveyDto {
   @IsString()
   soilNotes?: string;
 
-  @ApiPropertyOptional({ example: 350, description: 'Distance to nearest road (m)' })
+  @ApiPropertyOptional({
+    example: 350,
+    description: 'Distance to nearest road (m)',
+  })
   @IsOptional()
   @IsInt()
   roadDistanceMeters?: number;

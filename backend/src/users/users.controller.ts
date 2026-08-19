@@ -10,9 +10,15 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiBody,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateProfileDto, UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -41,7 +47,10 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update user base settings. Self-service for own profile fields; role/active-status changes and editing other accounts require Super Admin / Admin.' })
+  @ApiOperation({
+    summary:
+      'Update user base settings. Self-service for own profile fields; role/active-status changes and editing other accounts require Super Admin / Admin.',
+  })
   update(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
@@ -55,6 +64,23 @@ export class UsersController {
   @ApiOperation({ summary: 'Delete user account (Super Admin only)' })
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
+  }
+
+  @Put('profile')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Update the authenticated user’s own profile (name, email, phone, language). Role and active status can never be changed through this endpoint.',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Phone number or email already in use by another account',
+  })
+  updateProfile(
+    @CurrentUser() user: { id: string },
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.usersService.updateProfile(user.id, dto);
   }
 
   @Put('push-token')

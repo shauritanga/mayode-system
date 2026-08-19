@@ -26,7 +26,9 @@ export class LeaseDocumentService {
   ) {}
 
   private get baseUrl(): string {
-    return this.config.get<string>('PUBLIC_BASE_URL') || 'http://localhost:3001';
+    return (
+      this.config.get<string>('PUBLIC_BASE_URL') || 'http://localhost:3001'
+    );
   }
 
   async generateAgreement(listingId: string): Promise<string | null> {
@@ -42,7 +44,10 @@ export class LeaseDocumentService {
     const renter = listing.renter;
 
     const verificationUrl = `${this.baseUrl}/verify/lease/${listing.id}`;
-    const qrDataUrl = await QRCode.toDataURL(verificationUrl, { margin: 1, width: 200 });
+    const qrDataUrl = await QRCode.toDataURL(verificationUrl, {
+      margin: 1,
+      width: 200,
+    });
     const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
 
     const filename = `lease-agreement-${listing.id}-${randomUUID()}.pdf`;
@@ -53,10 +58,18 @@ export class LeaseDocumentService {
       const stream = fs.createWriteStream(filePath);
       doc.pipe(stream);
 
-      doc.fontSize(18).font('Helvetica-Bold').text('MAYODE M-LAX Digital Lease Agreement', { align: 'center' });
+      doc
+        .fontSize(18)
+        .font('Helvetica-Bold')
+        .text('MAYODE M-LAX Digital Lease Agreement', { align: 'center' });
       doc.moveDown();
-      doc.fontSize(10).font('Helvetica').text(`Agreement ID: ${listing.id}`, { align: 'center' });
-      doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, { align: 'center' });
+      doc
+        .fontSize(10)
+        .font('Helvetica')
+        .text(`Agreement ID: ${listing.id}`, { align: 'center' });
+      doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, {
+        align: 'center',
+      });
       doc.moveDown(2);
 
       doc.fontSize(13).font('Helvetica-Bold').text('Farm');
@@ -66,30 +79,56 @@ export class LeaseDocumentService {
       doc.moveDown();
 
       doc.fontSize(13).font('Helvetica-Bold').text('Owner (Landlord)');
-      doc.fontSize(11).font('Helvetica').text(`${listing.owner.firstName} ${listing.owner.lastName} (${listing.owner.controlNumber})`);
+      doc
+        .fontSize(11)
+        .font('Helvetica')
+        .text(
+          `${listing.owner.firstName} ${listing.owner.lastName} (${listing.owner.controlNumber})`,
+        );
       doc.moveDown();
 
       doc.fontSize(13).font('Helvetica-Bold').text('Renter (Tenant)');
-      doc.fontSize(11).font('Helvetica').text(`${renter.firstName} ${renter.lastName} (${renter.controlNumber})`);
+      doc
+        .fontSize(11)
+        .font('Helvetica')
+        .text(
+          `${renter.firstName} ${renter.lastName} (${renter.controlNumber})`,
+        );
       doc.moveDown();
 
       doc.fontSize(13).font('Helvetica-Bold').text('Terms');
       doc.fontSize(11).font('Helvetica');
       doc.text(`Deal type: ${listing.dealType}`);
-      doc.text(`Agreed price: ${(listing.finalPrice ?? listing.askingPrice).toLocaleString()} TZS`);
-      doc.text(`MAYODE commission: ${(listing.commissionAmount ?? 0).toLocaleString()} TZS`);
+      doc.text(
+        `Agreed price: ${(listing.finalPrice ?? listing.askingPrice).toLocaleString()} TZS`,
+      );
+      doc.text(
+        `MAYODE commission: ${(listing.commissionAmount ?? 0).toLocaleString()} TZS`,
+      );
       doc.text(`Duration: ${listing.leaseDurationMonths} month(s)`);
-      if (listing.leaseStartDate) doc.text(`Start date: ${listing.leaseStartDate.toLocaleDateString('en-GB')}`);
-      if (listing.leaseEndDate) doc.text(`End date: ${listing.leaseEndDate.toLocaleDateString('en-GB')}`);
+      if (listing.leaseStartDate)
+        doc.text(
+          `Start date: ${listing.leaseStartDate.toLocaleDateString('en-GB')}`,
+        );
+      if (listing.leaseEndDate)
+        doc.text(
+          `End date: ${listing.leaseEndDate.toLocaleDateString('en-GB')}`,
+        );
       doc.moveDown();
 
-      doc.fontSize(9).font('Helvetica-Oblique').text(
-        'This lease follows the land, not the person: if the farm changes ownership during the lease term, the new owner must honour these terms until the end date. Disputes are handled through MAYODE and the local MAMCOS office.',
-        { width: 495 },
-      );
+      doc
+        .fontSize(9)
+        .font('Helvetica-Oblique')
+        .text(
+          'This lease follows the land, not the person: if the farm changes ownership during the lease term, the new owner must honour these terms until the end date. Disputes are handled through MAYODE and the local MAMCOS office.',
+          { width: 495 },
+        );
       doc.moveDown(2);
 
-      doc.fontSize(10).font('Helvetica-Bold').text('Scan to verify this agreement:');
+      doc
+        .fontSize(10)
+        .font('Helvetica-Bold')
+        .text('Scan to verify this agreement:');
       doc.image(qrBuffer, { width: 120 });
 
       doc.end();
@@ -103,7 +142,9 @@ export class LeaseDocumentService {
       data: { agreementPdfUrl: url, agreementGeneratedAt: new Date() },
     });
 
-    this.logger.log(`Generated lease agreement for listing ${listing.id} at ${url}`);
+    this.logger.log(
+      `Generated lease agreement for listing ${listing.id} at ${url}`,
+    );
     return url;
   }
 }

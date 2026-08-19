@@ -1,13 +1,17 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff } from 'lucide-react';
+import Image from 'next/image';
+import { motion, useReducedMotion } from 'motion/react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ViewIcon, ViewOffSlashIcon } from '@hugeicons/core-free-icons';
 import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 
 export default function LoginPage() {
   const router = useRouter();
   const { setAuth } = useAuthStore();
+  const reduce = useReducedMotion();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -32,52 +36,65 @@ export default function LoginPage() {
   };
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'radial-gradient(ellipse at 30% 20%, rgba(6, 78, 59, 0.25) 0%, #0A0A0A 60%), radial-gradient(ellipse at 70% 80%, rgba(180, 83, 9, 0.15) 0%, transparent 50%)',
-        padding: '24px',
-      }}
-    >
-      {/* Decorative orbs */}
-      <div style={{ position: 'fixed', top: '-160px', left: '-160px', width: '480px', height: '480px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
-      <div style={{ position: 'fixed', bottom: '-160px', right: '-160px', width: '480px', height: '480px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(245, 158, 11, 0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
-
-      <div className="animate-fade-in" style={{ width: '100%', maxWidth: '420px' }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: '72px', height: '72px', borderRadius: '20px',
-            background: 'linear-gradient(135deg, #065F46, #10B981)',
-            boxShadow: '0 8px 32px rgba(16, 185, 129, 0.3)',
-            marginBottom: '16px',
-          }}>
-            <span style={{ fontSize: '28px', fontWeight: 800, color: 'white', fontFamily: 'Outfit, sans-serif' }}>M</span>
+    <main className="auth-split">
+      {/* Brand panel */}
+      <motion.aside
+        className="auth-brand"
+        initial={reduce ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+      >
+        <Image
+          src="/login-rice-field.png"
+          alt="Rice paddies in Mbarali, Tanzania"
+          fill
+          priority
+          sizes="(max-width: 900px) 100vw, 45vw"
+          style={{ objectFit: 'cover', objectPosition: 'center' }}
+        />
+        <div className="auth-brand-scrim" />
+        <div className="auth-brand-content">
+          <div className="auth-brand-lockup">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/app-icon.png" alt="" className="auth-brand-icon" />
+            <span className="auth-brand-name">MAYODE GROUP</span>
           </div>
-          <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '28px', fontWeight: 800, color: '#F9FAFB', marginBottom: '6px' }}>
-            MAYODE GROUP
-          </h1>
-          <p style={{ fontSize: '14px', color: '#6B7280' }}>MAYOData Platform — Administrator Portal</p>
+          <div className="auth-brand-bottom">
+            <p className="auth-brand-tagline">
+              The integrated platform for cooperative farming in Tanzania.
+            </p>
+            <p className="auth-brand-sub">
+              Farmer records, crop cycles, finance and the M-LAX marketplace, in one place.
+            </p>
+          </div>
         </div>
+      </motion.aside>
 
-        {/* Card */}
-        <div className="glass-card" style={{ padding: '36px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#F9FAFB', marginBottom: '6px' }}>Sign in to your account</h2>
-          <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '28px' }}>Enter your registered phone number and password</p>
+      {/* Form panel */}
+      <section className="auth-panel">
+        <motion.div
+          className="auth-form"
+          initial={reduce ? false : { opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="auth-form-lockup">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/app-icon.png" alt="" className="auth-form-icon" />
+            <span className="auth-form-brand">MAYODE GROUP</span>
+          </div>
+          <h1 className="auth-title">Welcome back</h1>
+          <p className="auth-subtitle">Sign in to your MAYODE GROUP workspace.</p>
 
           {error && (
-            <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '10px', padding: '12px 14px', marginBottom: '20px', fontSize: '13px', color: '#F87171' }}>
+            <div className="alert-box alert-danger" role="alert" style={{ marginBottom: '18px' }}>
               {error}
             </div>
           )}
 
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#D1D5DB', marginBottom: '6px' }}>
+              <label htmlFor="phone-input" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-1)', marginBottom: '6px' }}>
                 Phone Number
               </label>
               <input
@@ -87,11 +104,12 @@ export default function LoginPage() {
                 onChange={e => setPhone(e.target.value)}
                 placeholder="+255755123456"
                 required
+                autoComplete="tel"
                 className="input-field"
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#D1D5DB', marginBottom: '6px' }}>
+              <label htmlFor="password-input" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-1)', marginBottom: '6px' }}>
                 Password
               </label>
               <div style={{ position: 'relative' }}>
@@ -102,6 +120,7 @@ export default function LoginPage() {
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
+                  autoComplete="current-password"
                   className="input-field"
                   style={{ paddingRight: '44px', width: '100%' }}
                 />
@@ -110,12 +129,13 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(v => !v)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   style={{
-                    position: 'absolute', top: '50%', right: '12px', transform: 'translateY(-50%)',
+                    position: 'absolute', top: '50%', right: '8px', transform: 'translateY(-50%)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', padding: '4px',
+                    width: 30, height: 30, borderRadius: 8,
+                    background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 0,
                   }}
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  <HugeiconsIcon icon={showPassword ? ViewOffSlashIcon : ViewIcon} size={17} strokeWidth={1.8} />
                 </button>
               </div>
             </div>
@@ -124,17 +144,17 @@ export default function LoginPage() {
               type="submit"
               disabled={loading}
               className="btn-primary"
-              style={{ marginTop: '8px', width: '100%', padding: '12px', fontSize: '15px', opacity: loading ? 0.7 : 1 }}
+              style={{ marginTop: '6px', width: '100%', padding: '11px', fontSize: '14px', opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
             >
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
-        </div>
 
-        <p style={{ textAlign: 'center', fontSize: '12px', color: '#4B5563', marginTop: '24px' }}>
-          © {new Date().getFullYear()} MAYODE GROUP. All rights reserved.
-        </p>
-      </div>
+          <p style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '28px' }}>
+            © {new Date().getFullYear()} MAYODE GROUP. All rights reserved.
+          </p>
+        </motion.div>
+      </section>
     </main>
   );
 }

@@ -56,7 +56,11 @@ export interface PublicAlert {
 }
 
 type AlertWithFarm = FarmAlert & {
-  farm?: { farmCode: string; name: string | null; farmerId: string | null } | null;
+  farm?: {
+    farmCode: string;
+    name: string | null;
+    farmerId: string | null;
+  } | null;
 };
 
 @Injectable()
@@ -104,7 +108,11 @@ export class FarmAlertsService {
    * farm's farmer with a deep-link. Returns the raw record (internal callers).
    */
   async createAlert(
-    input: CreateFarmAlertDto & { farmerId?: string; farmingSeasonId?: string; dedupeKey?: string },
+    input: CreateFarmAlertDto & {
+      farmerId?: string;
+      farmingSeasonId?: string;
+      dedupeKey?: string;
+    },
   ): Promise<FarmAlert | null> {
     const farm = await this.prisma.farm.findUnique({
       where: { id: input.farmId },
@@ -143,10 +151,12 @@ export class FarmAlertsService {
     // Notify the farm's farmer (deep-links to the alert; the mobile app shows a
     // teaser to free users and the full detail to members).
     const recipientFarmerId = alert.farmerId ?? farm.farmerId;
-    const farmer = recipientFarmerId ? await this.prisma.farmer.findUnique({
-      where: { id: recipientFarmerId },
-      select: { userId: true },
-    }) : null;
+    const farmer = recipientFarmerId
+      ? await this.prisma.farmer.findUnique({
+          where: { id: recipientFarmerId },
+          select: { userId: true },
+        })
+      : null;
     if (farmer) {
       await this.notifications.create({
         userId: farmer.userId,
@@ -187,7 +197,9 @@ export class FarmAlertsService {
       where,
       orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
       take: 100,
-      include: { farm: { select: { farmCode: true, name: true, farmerId: true } } },
+      include: {
+        farm: { select: { farmCode: true, name: true, farmerId: true } },
+      },
     });
     return alerts.map((a) => this.toPublic(a, isPremium));
   }
@@ -195,7 +207,9 @@ export class FarmAlertsService {
   async getOne(id: string, user: RequestUser): Promise<PublicAlert> {
     const alert = await this.prisma.farmAlert.findUnique({
       where: { id },
-      include: { farm: { select: { farmCode: true, name: true, farmerId: true } } },
+      include: {
+        farm: { select: { farmCode: true, name: true, farmerId: true } },
+      },
     });
     if (!alert) throw new NotFoundException(`Alert ${id} not found`);
     await this.assertAccess(alert, user);
@@ -207,7 +221,9 @@ export class FarmAlertsService {
   async complete(id: string, user: RequestUser): Promise<PublicAlert> {
     const alert = await this.prisma.farmAlert.findUnique({
       where: { id },
-      include: { farm: { select: { farmCode: true, name: true, farmerId: true } } },
+      include: {
+        farm: { select: { farmCode: true, name: true, farmerId: true } },
+      },
     });
     if (!alert) throw new NotFoundException(`Alert ${id} not found`);
     await this.assertAccess(alert, user);
@@ -223,19 +239,25 @@ export class FarmAlertsService {
         completedAt: new Date(),
         completedByUserId: user.id,
       },
-      include: { farm: { select: { farmCode: true, name: true, farmerId: true } } },
+      include: {
+        farm: { select: { farmCode: true, name: true, farmerId: true } },
+      },
     });
     return this.toPublic(updated, true);
   }
 
-  private async assertAccess(alert: AlertWithFarm, user: RequestUser): Promise<void> {
+  private async assertAccess(
+    alert: AlertWithFarm,
+    user: RequestUser,
+  ): Promise<void> {
     if (this.isStaff(user)) return;
     const farmer = await this.prisma.farmer.findUnique({
       where: { userId: user.id },
       select: { id: true },
     });
     const ok =
-      farmer && (alert.farm?.farmerId === farmer.id || alert.farmerId === farmer.id);
+      farmer &&
+      (alert.farm?.farmerId === farmer.id || alert.farmerId === farmer.id);
     if (!ok) throw new ForbiddenException('You cannot access this alert');
   }
 
@@ -252,10 +274,21 @@ export class FarmAlertsService {
         id: true,
         farmerId: true,
         cropCycles: {
-          where: { status: { in: [CropCycleStatus.PLANNED, CropCycleStatus.ACTIVE] } },
+          where: {
+            status: { in: [CropCycleStatus.PLANNED, CropCycleStatus.ACTIVE] },
+          },
           include: {
             activities: { select: { activityType: true } },
-            calendarTasks: { where: { status: CalendarTaskStatus.PENDING }, select: { id: true, taskKey: true, title: true, guidance: true, dueDate: true } },
+            calendarTasks: {
+              where: { status: CalendarTaskStatus.PENDING },
+              select: {
+                id: true,
+                taskKey: true,
+                title: true,
+                guidance: true,
+                dueDate: true,
+              },
+            },
           },
         },
       },
@@ -264,7 +297,9 @@ export class FarmAlertsService {
 
     const now = Date.now();
     let created = 0;
-    const add = async (input: Parameters<FarmAlertsService['createAlert']>[0]) => {
+    const add = async (
+      input: Parameters<FarmAlertsService['createAlert']>[0],
+    ) => {
       const a = await this.createAlert({ ...input, farmId });
       if (a) created += 1;
     };
@@ -308,7 +343,8 @@ export class FarmAlertsService {
             'A planned activity for this farm appears overdue. Open to review the detected issue.',
           recommendation:
             'Planting was scheduled but is not yet recorded as done. Confirm planting status or update the crop cycle.',
-          actionDetails: 'Record the planting activity or reschedule the crop cycle for this season.',
+          actionDetails:
+            'Record the planting activity or reschedule the crop cycle for this season.',
           cropCycleId: cycle.id,
           dedupeKey: `planting-overdue:${cycle.id}`,
         });
@@ -348,11 +384,16 @@ export class FarmAlertsService {
           await add({
             farmId,
             category: AlertCategory.ACTIVITY_OVERDUE,
-            urgency: task.dueDate.getTime() < now - 7 * DAY ? AlertUrgency.HIGH : AlertUrgency.MEDIUM,
+            urgency:
+              task.dueDate.getTime() < now - 7 * DAY
+                ? AlertUrgency.HIGH
+                : AlertUrgency.MEDIUM,
             title: task.title,
-            previewMessage: 'Kazi ya kalenda ya Mbalari inahitaji kufanywa kwenye shamba hili.',
+            previewMessage:
+              'Kazi ya kalenda ya Mbalari inahitaji kufanywa kwenye shamba hili.',
             recommendation: task.guidance,
-            actionDetails: 'Fungua kalenda ya zao, kamilisha kazi hii na uweke vipimo pamoja na picha inayohitajika.',
+            actionDetails:
+              'Fungua kalenda ya zao, kamilisha kazi hii na uweke vipimo pamoja na picha inayohitajika.',
             expectedActionDate: task.dueDate.toISOString(),
             cropCycleId: cycle.id,
             dedupeKey: `mbalari-task:${task.id}`,

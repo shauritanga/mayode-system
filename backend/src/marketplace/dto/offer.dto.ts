@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, IsNumber, Min, IsIn, IsOptional, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  Min,
+  IsIn,
+  IsOptional,
+  IsBoolean,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SubmitOfferDto {
@@ -7,7 +15,10 @@ export class SubmitOfferDto {
   @IsNotEmpty()
   farmerId: string;
 
-  @ApiProperty({ example: 1800000, description: 'Bid amount in TZS, below the asking price' })
+  @ApiProperty({
+    example: 1800000,
+    description: 'Bid amount in TZS, below the asking price',
+  })
   @IsNumber()
   @Min(0)
   offerAmount: number;

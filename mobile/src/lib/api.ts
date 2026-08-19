@@ -6,10 +6,12 @@ import { cachedRead, discardOfflineMutation, reconcileOfflineMutation, resolveRe
 /**
  * Base URL resolution order:
  *  1. EXPO_PUBLIC_API_URL env var (works with `expo start`)
- *  2. app.json > expo.extra.apiUrl
- *  3. Derive host from the Metro/dev-server URI (so a phone on the same
- *     Wi-Fi hits the developer's machine automatically) at :3001
+ *  2. app.json > expo.extra.apiUrl (production default)
+ *  3. Derive host from the Metro/dev-server URI at :3001 (only when apiUrl unset)
  *  4. localhost fallback
+ *
+ * Production points at PRODUCTION_API_URL via expo.extra.apiUrl.
+ * Local Nest: unset apiUrl or set EXPO_PUBLIC_API_URL=http://<lan-ip>:3001/api/v1
  */
 function resolveBaseUrl(): string {
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -27,6 +29,17 @@ function resolveBaseUrl(): string {
 }
 
 export const API_BASE_URL = resolveBaseUrl();
+
+/** Origin that serves static `/uploads/...` files (API lives under `/api/v1`). */
+export const MEDIA_BASE_URL = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+
+/** Turn a relative upload path into an absolute URL the Image component can load. */
+export function resolveMediaUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (/^(https?:|file:|content:|data:)/i.test(url)) return url;
+  if (url.startsWith('/')) return `${MEDIA_BASE_URL}${url}`;
+  return `${MEDIA_BASE_URL}/${url}`;
+}
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -174,6 +187,8 @@ export const usersApi = {
 export const farmersApi = {
   getAll: (params?: object) => api.get('/farmers', { params }),
   getOne: (id: string) => api.get(`/farmers/${id}`),
+  /** Current user's farmer profile — use this for FARMER role (control-number lookup is staff-only). */
+  me: () => api.get('/farmers/me'),
   getByControlNumber: (cn: string) => api.get(`/farmers/control-number/${cn}`),
   create: (data: object) => api.post('/farmers', data),
   update: (id: string, data: object) => api.patch(`/farmers/${id}`, data),
@@ -292,6 +307,7 @@ export const financeApi = {
     unitPrice?: number;
     totalCost: number;
     supplier?: string;
+    supplierId?: string;
     receiptUrl?: string;
     dateIncurred: string;
   }) => api.post('/finance/cost', data),
@@ -302,9 +318,45 @@ export const financeApi = {
     pricePerKg: number;
     totalRevenue: number;
     fairtradePremium?: number;
+    buyerId?: string;
     saleDate: string;
   }) => api.post('/finance/revenue', data),
   getCropCycleSummary: (cropCycleId: string) => api.get(`/finance/crop-cycle/${cropCycleId}/summary`),
+};
+
+export const buyersApi = {
+  list: () => api.get('/buyers'),
+};
+
+export const suppliersApi = {
+  getAll: () => api.get('/suppliers'),
+  getOne: (id: string) => api.get(`/suppliers/${id}`),
+};
+
+export const inventoryApi = {
+  mine: (params?: { cropCycleId?: string }) =>
+    api.get('/inventory/records/mine', { params }),
+  mySummary: () => api.get('/inventory/summary/mine'),
+  reportDelivery: (data: {
+    cropCycleId: string;
+    weightKg: number;
+    qualityGrade?: string;
+    moistureContentPct?: number;
+    warehouseLocation?: string;
+    receivedDate?: string;
+  }) => api.post('/inventory/records/mine', data),
+};
+
+export const insuranceApi = {
+  myPolicies: () => api.get('/insurance/policies/me'),
+  getPoliciesForFarmer: (farmerId: string) => api.get(`/insurance/policies/farmer/${farmerId}`),
+  createClaim: (data: {
+    policyId: string;
+    incidentDate: string;
+    incidentType: string;
+    description?: string;
+    claimedAmount: number;
+  }) => api.post('/insurance/claims', data),
 };
 
 // ── Locations ──
@@ -536,6 +588,11 @@ export const reportsApi = {
 };
 
 export const integrationsApi = {
+  catalog: () => api.get('/integrations/ai-catalog'),
   createAiRecord: (data: object) => api.post('/integrations/ai-records', data),
+  generateFieldAdvisory: (cropCycleId: string) =>
+    api.post(`/integrations/ai-records/field-advisory/${cropCycleId}`, {}),
   aiRecords: (params?: object) => api.get('/integrations/ai-records', { params }),
+  myAiRecords: (params?: object) =>
+    api.get('/integrations/ai-records/mine', { params }),
 };

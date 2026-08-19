@@ -99,6 +99,7 @@ export const authApi = {
 export const usersApi = {
   getAll: () => api.get('/users'),
   update: (id: string, data: object) => api.patch(`/users/${id}`, data),
+  updateProfile: (data: object) => api.put('/users/profile', data),
 };
 
 // ── Farmers ──
@@ -106,16 +107,27 @@ export const farmersApi = {
   getAll: (params?: object) => api.get('/farmers', { params }),
   /** Unpaginated, minimal-field list for dashboard aggregation — use this, not getAll(), when you need every farmer. */
   getAllUnpaginated: () => api.get('/farmers/all'),
+  overview: () => api.get('/farmers/overview'),
   getOne: (id: string) => api.get(`/farmers/${id}`),
   getMe: () => api.get('/farmers/me'),
   getByControlNumber: (controlNumber: string) => api.get(`/farmers/control-number/${encodeURIComponent(controlNumber)}`),
   update: (id: string, data: object) => api.patch(`/farmers/${id}`, data),
   assignOfficer: (id: string, officerId: string) => api.patch(`/farmers/${id}/assign-officer`, { officerId }),
   financialProfile: (id: string) => api.get(`/farmers/${id}/financial-profile`),
+  creditReadiness: (id: string) => api.get(`/farmers/${id}/credit-readiness`),
   listConsents: (id: string) => api.get(`/farmers/${id}/consents`),
   captureConsent: (id: string, data: object) => api.post(`/farmers/${id}/consents`, data),
   listQuestionnaires: (id: string) => api.get(`/farmers/${id}/questionnaires`),
   createQuestionnaire: (id: string, data: object) => api.post(`/farmers/${id}/questionnaires`, data),
+};
+
+export const partnerApi = {
+  docs: () => api.get('/partner/v1/docs'),
+  listKeys: () => api.get('/partner/keys'),
+  createKey: (partnerName: string) => api.post('/partner/keys', { partnerName }),
+  revokeKey: (id: string) => api.patch(`/partner/keys/${id}/revoke`),
+  listRequests: (id: string, take = 50) =>
+    api.get(`/partner/keys/${id}/requests`, { params: { take } }),
 };
 
 // ── MAMCOS ──
@@ -130,14 +142,14 @@ export const mamcosApi = {
   fieldOfficers: () => api.get('/mamcos/staff/field-officers'),
 };
 export const facilitiesApi = {
-  getIrrigationSchemes: (mamcosId?: string) => api.get('/irrigation-schemes', { params: mamcosId ? { mamcosId } : undefined }),
-  createIrrigationScheme: (data: object) => api.post('/irrigation-schemes', data),
-  updateIrrigationScheme: (id: string, data: object) => api.patch(`/irrigation-schemes/${id}`, data),
-  removeIrrigationScheme: (id: string) => api.delete(`/irrigation-schemes/${id}`),
-  getAggregationCentres: (mamcosId?: string) => api.get('/aggregation-centres', { params: mamcosId ? { mamcosId } : undefined }),
-  createAggregationCentre: (data: object) => api.post('/aggregation-centres', data),
-  updateAggregationCentre: (id: string, data: object) => api.patch(`/aggregation-centres/${id}`, data),
-  removeAggregationCentre: (id: string) => api.delete(`/aggregation-centres/${id}`),
+  getIrrigationSchemes: (mamcosId?: string) => api.get('/facilities/irrigation-schemes', { params: mamcosId ? { mamcosId } : undefined }),
+  createIrrigationScheme: (data: object) => api.post('/facilities/irrigation-schemes', data),
+  updateIrrigationScheme: (id: string, data: object) => api.patch(`/facilities/irrigation-schemes/${id}`, data),
+  removeIrrigationScheme: (id: string) => api.delete(`/facilities/irrigation-schemes/${id}`),
+  getAggregationCentres: (mamcosId?: string) => api.get('/facilities/aggregation-centres', { params: mamcosId ? { mamcosId } : undefined }),
+  createAggregationCentre: (data: object) => api.post('/facilities/aggregation-centres', data),
+  updateAggregationCentre: (id: string, data: object) => api.patch(`/facilities/aggregation-centres/${id}`, data),
+  removeAggregationCentre: (id: string) => api.delete(`/facilities/aggregation-centres/${id}`),
 };
 
 // ── Farms ──
@@ -229,6 +241,7 @@ export const insuranceApi = {
   createProvider: (data: object) => api.post('/insurance/providers', data),
   updateProvider: (id: string, data: object) => api.patch(`/insurance/providers/${id}`, data),
   getPolicies: () => api.get('/insurance/policies'),
+  myPolicies: () => api.get('/insurance/policies/me'),
   getPoliciesForFarmer: (farmerId: string) => api.get(`/insurance/policies/farmer/${farmerId}`),
   createPolicy: (data: object) => api.post('/insurance/policies', data),
   updatePolicyStatus: (id: string, status: string) => api.patch(`/insurance/policies/${id}/status`, { status }),
@@ -258,20 +271,46 @@ export const reportsApi = {
   fieldOfficerPerformance: (params?: object) => api.get('/reports/field-officer-performance', { params }),
   insuranceCoverage: (params?: object) => api.get('/reports/insurance-coverage', { params }),
   genderYouthInclusion: (params?: object) => api.get('/reports/gender-youth-inclusion', { params }),
+  builderSchema: () => api.get('/reports/builder/schema'),
+  runBuilder: (payload: object) => api.post('/reports/builder', payload),
+  downloadBuilder: (payload: object) => api.post('/reports/builder', payload, { responseType: 'blob' }),
   download: (path: string, params?: object) => api.get(path, { params, responseType: 'blob' }),
 };
 export const integrationsApi = {
+  catalog: () => api.get('/integrations/ai-catalog'),
   createAiRecord: (data: object) => api.post('/integrations/ai-records', data),
+  generateFieldAdvisory: (cropCycleId: string) =>
+    api.post(`/integrations/ai-records/field-advisory/${cropCycleId}`, {}),
   aiRecords: (params?: object) => api.get('/integrations/ai-records', { params }),
+  myAiRecords: (params?: object) =>
+    api.get('/integrations/ai-records/mine', { params }),
+  lotQuality: (lotId: string) =>
+    api.get(`/integrations/ai-records/lot/${lotId}/quality`),
 };
-export const buyerPortalApi = { profile: () => api.get('/buyer-portal/profile'), dashboard: () => api.get('/buyer-portal/dashboard'), traceability: (reference: string) => api.get(`/buyer-portal/traceability/${encodeURIComponent(reference)}`) };
+export const buyerPortalApi = {
+  profile: () => api.get('/buyer-portal/profile'),
+  me: () => api.get('/buyer-portal/me'),
+  dashboard: () => api.get('/buyer-portal/dashboard'),
+  createOrder: (data: object) => api.post('/buyer-portal/orders', data),
+  traceability: (reference: string) =>
+    api.get(`/buyer-portal/traceability/${encodeURIComponent(reference)}`),
+};
 export const governanceApi = {
   votes: () => api.get('/governance/votes'), createVote: (data: object) => api.post('/governance/votes', data),
   openVote: (id: string) => api.post(`/governance/votes/${id}/open`), closeVote: (id: string) => api.post(`/governance/votes/${id}/close`),
   respond: (voteId: string, optionId: string) => api.post(`/governance/votes/${voteId}/respond/${optionId}`),
   results: (id: string) => api.get(`/governance/votes/${id}/results`), projects: () => api.get('/governance/projects'), createProject: (data: object) => api.post('/governance/projects', data), updateProject: (id: string, data: object) => api.patch(`/governance/projects/${id}`, data), removeProject: (id: string) => api.delete(`/governance/projects/${id}`), meetings: () => api.get('/governance/meetings'), createMeeting: (data: object) => api.post('/governance/meetings', data), report: () => api.get('/governance/report'),
 };
-export const salesApi = { create: (data: object) => api.post('/sales', data), list: () => api.get('/sales'), settle: (id: string) => api.post(`/sales/${id}/settle`, {}), collect: (id: string, phoneNumber?: string) => api.post(`/sales/${id}/collect`, { phoneNumber }), approvePayouts: (id: string) => api.post(`/loans/sales/${id}/approve-payouts`), reconcilePayouts: (id: string) => api.post(`/loans/sales/${id}/reconcile-payouts`) };
+export const salesApi = {
+  create: (data: object) => api.post('/sales', data),
+  list: () => api.get('/sales'),
+  settle: (id: string) => api.post(`/sales/${id}/settle`, {}),
+  collect: (id: string, phoneNumber?: string) => api.post(`/sales/${id}/collect`, { phoneNumber }),
+  approvePayouts: (id: string) => api.post(`/loans/sales/${id}/approve-payouts`),
+  reconcilePayouts: (id: string) => api.post(`/loans/sales/${id}/reconcile-payouts`),
+  traceability: (reference: string) =>
+    api.get(`/sales/traceability/${encodeURIComponent(reference)}`),
+};
 export const buyersApi = { list: () => api.get('/buyers') };
 export const buyerOrdersApi = {
   getAll: () => api.get('/buyer-orders'),
@@ -285,8 +324,10 @@ export const buyerOrdersApi = {
 export const inventoryApi = {
   getAll: (params?: object) => api.get('/inventory/records', { params }),
   receive: (data: object) => api.post('/inventory/records', data),
+  updateStatus: (id: string, data: object) => api.patch(`/inventory/records/${id}/status`, data),
   createLot: (data: object) => api.post('/inventory/lots', data),
   lots: () => api.get('/inventory/lots'),
+  getLot: (lotNumber: string) => api.get(`/inventory/lots/${encodeURIComponent(lotNumber)}`),
   dashboardSummary: () => api.get('/inventory/dashboard-summary'),
 };
 
@@ -400,6 +441,7 @@ export const farmLeasesApi = {
   getAll: (params?: object) => api.get('/farm-leases', { params }),
   create: (data: object) => api.post('/farm-leases', data),
   officerVerify: (id: string, data: object) => api.patch(`/farm-leases/${id}/officer-verify`, data),
+  remove: (id: string) => api.delete(`/farm-leases/${id}`),
 };
 export const seasonalAssignmentsApi = {
   getAll: () => api.get('/seasonal-assignments'),
@@ -456,7 +498,13 @@ export const membershipsApi = {
   createPlan: (data: object) => api.post('/memberships/plans', data),
   start: (data: object) => api.post('/memberships/start', data),
   reconcile: () => api.post('/memberships/reconcile'),
+  reconcilePending: () => api.post('/memberships/reconcile-pending'),
+  reconcileOne: (id: string) => api.post(`/memberships/${id}/reconcile`),
   approve: (id: string, data?: object) => api.post(`/memberships/${id}/approve`, data || {}),
+};
+
+export const workspaceApi = {
+  context: () => api.get('/workspace/context'),
 };
 
 // ── Farm alerts ──

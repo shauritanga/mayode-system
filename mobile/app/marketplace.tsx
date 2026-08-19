@@ -1,14 +1,15 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { marketplaceApi } from '../../src/lib/data';
-import { useAuthStore } from '../../src/store/auth.store';
-import { useI18n } from '../../src/i18n';
-import { LandListingCard } from '../../src/components/marketplace/LandListingCard';
-import { TractorCard } from '../../src/components/marketplace/TractorCard';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import { marketplaceApi } from '../src/lib/data';
+import { useAuthStore } from '../src/store/auth.store';
+import { useI18n } from '../src/i18n';
+import { LandListingCard } from '../src/components/marketplace/LandListingCard';
+import { TractorCard } from '../src/components/marketplace/TractorCard';
 
-export default function MarketplaceTab() {
+/** M-LAX marketplace — opened from the drawer like Finances / Leases (stack + back). */
+export default function MarketplaceScreen() {
   const { user, farmerId } = useAuthStore();
   const router = useRouter();
   const { t } = useI18n();
@@ -49,7 +50,7 @@ export default function MarketplaceTab() {
         hectares: 2.0,
         terrainGrade: 'B',
         commissionRate: 0.1,
-        scheduledDate: new Date(Date.now() + 86400000 * 3).toISOString(), // 3 days from now
+        scheduledDate: new Date(Date.now() + 86400000 * 3).toISOString(),
       });
       Alert.alert(t('bookingConfirmed'), t('tractorBooked'));
       fetchMarketplace();
@@ -59,8 +60,17 @@ export default function MarketplaceTab() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Tabs */}
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: t('marketplace'),
+          headerStyle: { backgroundColor: '#065F46' },
+          headerTintColor: '#fff',
+          headerTitleStyle: { fontWeight: '800' },
+        }}
+      />
+
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tabBtn, tab === 'land' && styles.tabBtnActive]}
@@ -122,8 +132,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F3F4F6',
-    paddingTop: -50,
-    paddingBottom: -24,
   },
   tabContainer: {
     flexDirection: 'row',

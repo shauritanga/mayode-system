@@ -27,7 +27,10 @@ export class FarmingSeasonsController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Create a farming season (Admin only; periods are configurable, never hard-coded)' })
+  @ApiOperation({
+    summary:
+      'Create a farming season (Admin only; periods are configurable, never hard-coded)',
+  })
   create(@Body() dto: CreateFarmingSeasonDto) {
     return this.seasons.create(dto);
   }
@@ -39,7 +42,9 @@ export class FarmingSeasonsController {
   }
 
   @Get('current')
-  @ApiOperation({ summary: 'Get the current (registration-open/active) farming season' })
+  @ApiOperation({
+    summary: 'Get the current (registration-open/active) farming season',
+  })
   findCurrent() {
     return this.seasons.findCurrent();
   }

@@ -1,11 +1,25 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { LocationsService } from './locations.service';
-import { CreateDistrictDto, CreateRegionDto, CreateWardDto, UpdateLocationNameDto } from './dto/location.dto';
+import {
+  CreateDistrictDto,
+  CreateRegionDto,
+  CreateWardDto,
+  UpdateLocationNameDto,
+} from './dto/location.dto';
 
 @ApiTags('locations')
 @Controller('locations')

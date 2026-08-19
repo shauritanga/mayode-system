@@ -5,7 +5,11 @@ import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { MembershipsService } from '../memberships/memberships.service';
 import { DocumentsService } from '../uploads/documents.service';
 import { ActivitiesService } from '../activities/activities.service';
-import { CreateFarmDto, UpdateFarmDto, UpdateBoundaryDto } from './dto/farms.dto';
+import {
+  CreateFarmDto,
+  UpdateFarmDto,
+  UpdateBoundaryDto,
+} from './dto/farms.dto';
 import { QueryFarmsDto } from './dto/query-farms.dto';
 import { LinkDocumentDto } from '../farmers/dto/farmer-actions.dto';
 
@@ -75,7 +79,9 @@ export class FarmsService {
         previousCrops: dto.previousCrops || [],
       },
       include: {
-        farmer: { select: { controlNumber: true, firstName: true, lastName: true } },
+        farmer: {
+          select: { controlNumber: true, firstName: true, lastName: true },
+        },
         mamcos: { select: { name: true } },
       },
     });
@@ -93,8 +99,12 @@ export class FarmsService {
     const { search, mamcosId, farmerId, village, grade, isVerified } = query;
     let scopedMamcosId = mamcosId;
     if (user?.role === UserRole.MAMCOS_SECRETARY) {
-      const secretary = await this.prisma.mamcosStaff.findFirst({ where: { userId: user.id, role: MamcosStaffRole.SECRETARY }, select: { mamcosId: true } });
-      if (!secretary) throw new NotFoundException('AMCOS officer profile is missing');
+      const secretary = await this.prisma.mamcosStaff.findFirst({
+        where: { userId: user.id, role: MamcosStaffRole.SECRETARY },
+        select: { mamcosId: true },
+      });
+      if (!secretary)
+        throw new NotFoundException('AMCOS officer profile is missing');
       scopedMamcosId = secretary.mamcosId ?? undefined;
     }
     const where: Prisma.FarmWhereInput = {
@@ -102,7 +112,9 @@ export class FarmsService {
       ...(farmerId ? { farmerId } : {}),
       ...(village ? { village } : {}),
       ...(grade ? { grade } : {}),
-      ...(isVerified !== undefined ? { isVerified: isVerified === 'true' } : {}),
+      ...(isVerified !== undefined
+        ? { isVerified: isVerified === 'true' }
+        : {}),
       ...(search
         ? {
             OR: [
@@ -116,7 +128,9 @@ export class FarmsService {
     return this.prisma.farm.findMany({
       where,
       include: {
-        farmer: { select: { controlNumber: true, firstName: true, lastName: true } },
+        farmer: {
+          select: { controlNumber: true, firstName: true, lastName: true },
+        },
         mamcos: { select: { name: true } },
         _count: { select: { plots: true, cropCycles: true } },
       },
@@ -137,7 +151,9 @@ export class FarmsService {
         documents: { orderBy: { createdAt: 'desc' } },
         verifications: {
           include: {
-            fieldOfficer: { select: { employeeCode: true, firstName: true, lastName: true } },
+            fieldOfficer: {
+              select: { employeeCode: true, firstName: true, lastName: true },
+            },
           },
         },
         cropCycles: true,
@@ -217,16 +233,28 @@ export class FarmsService {
   /** AMCOS accepts a field-mapped boundary as the official farm geometry. */
   async reviewBoundary(id: string, user: RequestUser) {
     const farm = await this.findOne(id);
-    if (!farm.boundaryCoordinates || farm.centerLatitude == null || farm.centerLongitude == null) {
-      throw new NotFoundException('A GPS boundary must be mapped before AMCOS can approve this farm');
+    if (
+      !farm.boundaryCoordinates ||
+      farm.centerLatitude == null ||
+      farm.centerLongitude == null
+    ) {
+      throw new NotFoundException(
+        'A GPS boundary must be mapped before AMCOS can approve this farm',
+      );
     }
     if (user.role === 'MAMCOS_SECRETARY') {
-      const secretary = await this.prisma.mamcosStaff.findFirst({ where: { userId: user.id, role: MamcosStaffRole.SECRETARY }, select: { mamcosId: true } });
+      const secretary = await this.prisma.mamcosStaff.findFirst({
+        where: { userId: user.id, role: MamcosStaffRole.SECRETARY },
+        select: { mamcosId: true },
+      });
       if (!secretary || secretary.mamcosId !== farm.mamcosId) {
         throw new NotFoundException('This farm is outside your assigned AMCOS');
       }
     }
-    return this.prisma.farm.update({ where: { id }, data: { isVerified: true } });
+    return this.prisma.farm.update({
+      where: { id },
+      data: { isVerified: true },
+    });
   }
 
   async remove(id: string) {
@@ -241,7 +269,10 @@ export class FarmsService {
   async addDocument(farmId: string, dto: LinkDocumentDto, user: RequestUser) {
     await this.ownership.assertFarmAccess(user, farmId);
     const farm = await this.findOne(farmId);
-    const document = await this.documents.createForFarm(farmId, { ...dto, uploadedById: user.id });
+    const document = await this.documents.createForFarm(farmId, {
+      ...dto,
+      uploadedById: user.id,
+    });
     await this.activities.log(
       farm.farmerId,
       'document.added',
@@ -272,7 +303,8 @@ export class FarmsService {
     if (!farm) throw new NotFoundException(`Farm with ID ${id} not found`);
 
     const acres =
-      farm.actualAcres ?? (farm.socialHectares ? farm.socialHectares * 2.47105 : 0);
+      farm.actualAcres ??
+      (farm.socialHectares ? farm.socialHectares * 2.47105 : 0);
 
     // Premium gate: free users get a safe preview — never the analytics values.
     if (!(await this.memberships.hasPremiumAccess(user))) {
@@ -308,9 +340,13 @@ export class FarmsService {
       totalCosts,
       totalRevenues,
       netProfit: totalRevenues - totalCosts,
-      yieldPerAcre: acres > 0 ? Number((totalYieldKg / acres).toFixed(1)) : null,
+      yieldPerAcre:
+        acres > 0 ? Number((totalYieldKg / acres).toFixed(1)) : null,
       costPerAcre: acres > 0 ? Number((totalCosts / acres).toFixed(0)) : null,
-      costPerKg: totalYieldKg > 0 ? Number((totalCosts / totalYieldKg).toFixed(1)) : null,
+      costPerKg:
+        totalYieldKg > 0
+          ? Number((totalCosts / totalYieldKg).toFixed(1))
+          : null,
     };
   }
 
@@ -319,13 +355,14 @@ export class FarmsService {
   // --------------------------------------------------------------------------
 
   async getOverview() {
-    const [totalFarms, totalPlots, verified, mapped, byGrade] = await Promise.all([
-      this.prisma.farm.count(),
-      this.prisma.plot.count(),
-      this.prisma.farm.count({ where: { isVerified: true } }),
-      this.prisma.farm.count({ where: { centerLatitude: { not: null } } }),
-      this.prisma.farm.groupBy({ by: ['grade'], _count: true }),
-    ]);
+    const [totalFarms, totalPlots, verified, mapped, byGrade] =
+      await Promise.all([
+        this.prisma.farm.count(),
+        this.prisma.plot.count(),
+        this.prisma.farm.count({ where: { isVerified: true } }),
+        this.prisma.farm.count({ where: { centerLatitude: { not: null } } }),
+        this.prisma.farm.groupBy({ by: ['grade'], _count: true }),
+      ]);
 
     return {
       totalFarms,

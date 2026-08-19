@@ -98,10 +98,36 @@ export default function OfficerFarmerDetailScreen() {
         {farms.length === 0 ? (
           <Text style={styles.emptyText}>{t('noFarmersFound')}</Text>
         ) : farms.map((farm: any) => (
-          <TouchableOpacity key={farm.id} style={styles.row} onPress={() => router.push({ pathname: '/farm/[id]', params: { id: farm.id } })}>
-            <Text style={styles.rowTitle}>{farm.farmCode}</Text>
-            <Text style={styles.rowSub}>{farm.socialHectares} ha · {t('gradeValue', { grade: farm.grade })}</Text>
-          </TouchableOpacity>
+          <View key={farm.id} style={styles.row}>
+            <TouchableOpacity onPress={() => router.push({ pathname: '/farm/[id]', params: { id: farm.id } })}>
+              <Text style={styles.rowTitle}>{farm.farmCode}</Text>
+              <Text style={styles.rowSub}>{farm.socialHectares} ha · {t('gradeValue', { grade: farm.grade })}</Text>
+            </TouchableOpacity>
+            <View style={styles.farmActions}>
+              <TouchableOpacity
+                style={styles.farmActionBtn}
+                onPress={() => router.push({
+                  pathname: '/officer/visit-new',
+                  params: {
+                    farmerId: id,
+                    farmerName: `${farmer?.firstName ?? ''} ${farmer?.lastName ?? ''}`.trim(),
+                    farmId: farm.id,
+                  },
+                })}
+              >
+                <Text style={styles.farmActionText}>{t('logVisit')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.farmActionBtn, styles.farmActionSecondary]}
+                onPress={() => router.push({
+                  pathname: '/crop-cycles/[farmId]',
+                  params: { farmId: farm.id, farmCode: farm.farmCode },
+                })}
+              >
+                <Text style={[styles.farmActionText, styles.farmActionSecondaryText]}>{t('seasonRecords')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         ))}
 
         <Text style={styles.sectionTitle}>{t('visitHistory')}</Text>
@@ -141,6 +167,17 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 15, fontWeight: '800', color: '#111827', marginBottom: 10, marginTop: 4 },
   emptyText: { fontSize: 13, color: '#9CA3AF', marginBottom: 16 },
   row: { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' },
+  farmActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  farmActionBtn: {
+    flex: 1,
+    backgroundColor: '#065F46',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  farmActionSecondary: { backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' },
+  farmActionText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  farmActionSecondaryText: { color: '#065F46' },
   rowHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   rowTitle: { fontSize: 14, fontWeight: '700', color: '#111827', textTransform: 'capitalize' },
   rowSub: { fontSize: 12, color: '#6B7280', marginTop: 3 },

@@ -20,6 +20,7 @@ import {
 } from './dto/auth.dto';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UserRole, MamcosStaffRole } from '@prisma/client';
+import { normalizeMsisdn } from '../messaging/sms.service';
 
 /** Roles only a SUPER_ADMIN may grant; an ADMIN cannot create peers or escalate to SUPER_ADMIN. */
 const SUPER_ADMIN_ONLY_ROLES: UserRole[] = [
@@ -161,7 +162,6 @@ export class AuthService {
    */
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
     const {
-      phone,
       email,
       password,
       firstName,
@@ -169,6 +169,7 @@ export class AuthService {
       language,
       dataShareConsent,
     } = registerDto;
+    const phone = normalizeMsisdn(registerDto.phone);
 
     const existingUser = await this.prisma.user.findFirst({
       where: {
@@ -369,7 +370,8 @@ export class AuthService {
    * User Login
    */
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
-    const { phone, password } = loginDto;
+    const { password } = loginDto;
+    const phone = normalizeMsisdn(loginDto.phone);
 
     const user = await this.prisma.user.findUnique({
       where: { phone },

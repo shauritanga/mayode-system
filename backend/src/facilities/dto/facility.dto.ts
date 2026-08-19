@@ -8,10 +8,14 @@ export class UpsertIrrigationSchemeDto {
   @IsOptional() @IsNumber() coverageHectares?: number;
   @IsOptional() @IsString() waterSource?: string;
   @ApiPropertyOptional({ default: true })
-  @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
 
-export class UpdateIrrigationSchemeDto extends PartialType(UpsertIrrigationSchemeDto) {}
+export class UpdateIrrigationSchemeDto extends PartialType(
+  UpsertIrrigationSchemeDto,
+) {}
 
 export class UpsertAggregationCentreDto {
   @IsOptional() @IsString() mamcosId?: string;
@@ -21,7 +25,11 @@ export class UpsertAggregationCentreDto {
   @IsOptional() @IsString() contactPerson?: string;
   @IsOptional() @IsString() contactPhone?: string;
   @ApiPropertyOptional({ default: true })
-  @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
 
-export class UpdateAggregationCentreDto extends PartialType(UpsertAggregationCentreDto) {}
+export class UpdateAggregationCentreDto extends PartialType(
+  UpsertAggregationCentreDto,
+) {}

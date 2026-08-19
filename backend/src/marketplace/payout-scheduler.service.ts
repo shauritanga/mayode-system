@@ -28,10 +28,14 @@ export class PayoutSchedulerService {
         if (after && after.payoutStatus !== before) resolved++;
       }
       if (processing.length > 0) {
-        this.logger.log(`M-LAX payout reconcile: ${resolved}/${processing.length} resolved`);
+        this.logger.log(
+          `M-LAX payout reconcile: ${resolved}/${processing.length} resolved`,
+        );
       }
     } catch (e) {
-      this.logger.error(`M-LAX payout reconcile job failed: ${e instanceof Error ? e.message : e}`);
+      this.logger.error(
+        `M-LAX payout reconcile job failed: ${e instanceof Error ? e.message : e}`,
+      );
     }
   }
 }

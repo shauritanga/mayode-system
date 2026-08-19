@@ -1,6 +1,6 @@
 'use client';
 import type { ReactNode } from 'react';
-import { EmptyState, MetricTile, money, RoleHero } from '@/components/role-dashboards/DashboardPrimitives';
+import { EmptyState, MetricTile, money } from '@/components/role-dashboards/DashboardPrimitives';
 import { FarmerDataProvider, useFarmerData } from './FarmerDataContext';
 
 function FarmerShell({ children }: { children: ReactNode }) {
@@ -8,7 +8,6 @@ function FarmerShell({ children }: { children: ReactNode }) {
 
   if (error && !farmer) {
     return <div className="role-dashboard">
-      <RoleHero eyebrow="Farmer workspace" title="Your farm business" subtitle="Personal records, payments, crop performance and consent status." />
       <EmptyState>{error}</EmptyState>
     </div>;
   }
@@ -17,12 +16,6 @@ function FarmerShell({ children }: { children: ReactNode }) {
   const production = profile?.production;
 
   return <div className="role-dashboard">
-    <RoleHero
-      eyebrow="Farmer workspace"
-      title={farmer ? `${farmer.firstName} ${farmer.lastName}` : 'Your farm business'}
-      subtitle="A complete farmer web portal for records, crop cycles, finance, membership, votes, alerts, marketplace actions and consent. Mobile remains best for GPS, camera and offline field capture."
-    />
-
     {message && <div className="alert-box alert-success">{message}</div>}
     {error && <div className="alert-box alert-danger">{error}</div>}
 

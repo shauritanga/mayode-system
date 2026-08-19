@@ -17,15 +17,24 @@ export class WeatherController {
   constructor(private readonly weather: WeatherService) {}
 
   @Get('forecast')
-  @ApiOperation({ summary: 'Live 7-day forecast + flood/drought risk flags for a coordinate (Open-Meteo)' })
+  @ApiOperation({
+    summary:
+      'Live 7-day forecast + flood/drought risk flags for a coordinate (Open-Meteo)',
+  })
   getForecast(@Query() query: ForecastQueryDto) {
     return this.weather.getForecast(query.lat, query.lon);
   }
 
   @Post('alerts')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
-  @ApiOperation({ summary: 'Issue an early-warning alert, broadcast via SMS to farmers in the affected area' })
-  createAlert(@CurrentUser() user: RequestUser, @Body() dto: CreateWeatherAlertDto) {
+  @ApiOperation({
+    summary:
+      'Issue an early-warning alert, broadcast via SMS to farmers in the affected area',
+  })
+  createAlert(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: CreateWeatherAlertDto,
+  ) {
     return this.weather.createAlert(user.id, dto);
   }
 

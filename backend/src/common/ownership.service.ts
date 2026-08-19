@@ -1,4 +1,8 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole, VerificationStatus } from '@prisma/client';
 
@@ -44,7 +48,9 @@ export class OwnershipService {
     if (this.isPrivileged(user)) return;
     const ownFarmerId = await this.farmerIdForUser(user.id);
     if (ownFarmerId !== farmerId) {
-      throw new ForbiddenException('You can only access your own farmer records');
+      throw new ForbiddenException(
+        'You can only access your own farmer records',
+      );
     }
   }
 
@@ -52,8 +58,12 @@ export class OwnershipService {
     if (this.isPrivileged(user)) return;
     const ownFarmerId = await this.farmerIdForUser(user.id);
     if (!ownFarmerId) {
-      throw new ForbiddenException('A farmer profile is required to access a farm');
+      throw new ForbiddenException(
+        'A farmer profile is required to access a farm',
+      );
     }
+
+    // Primary path: verified seasonal operator (owner-operated or renter).
     const assignment = await this.prisma.seasonalFarmAssignment.findFirst({
       where: {
         farmId,
@@ -63,11 +73,20 @@ export class OwnershipService {
       },
       select: { id: true },
     });
-    if (!assignment) {
-      throw new ForbiddenException(
-        'You need an active, field-verified seasonal assignment to access this farm',
-      );
-    }
+    if (assignment) return;
+
+    // Owner of a personally registered farm may access without an assignment
+    // (bootstrap for self-operate / first crop cycle). AMCOS/renter farms keep
+    // Farm.farmerId as metadata and still require a verified assignment above.
+    const farm = await this.prisma.farm.findUnique({
+      where: { id: farmId },
+      select: { farmerId: true },
+    });
+    if (farm?.farmerId === ownFarmerId) return;
+
+    throw new ForbiddenException(
+      'You need an active, field-verified seasonal assignment to access this farm',
+    );
   }
 
   async assertPlotAccess(user: RequestUser, plotId: string): Promise<void> {

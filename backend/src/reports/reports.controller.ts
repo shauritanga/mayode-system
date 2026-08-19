@@ -14,8 +14,20 @@ import { ExportService } from '../common/export.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { CreatePremiumFundEntryDto, ReportFormatDto } from './dto/reports.dto';
+import {
+  CreatePremiumFundEntryDto,
+  ReportFormatDto,
+  RunBuilderDto,
+} from './dto/reports.dto';
+import { ReportBuilderService } from './report-builder.service';
 import { ReportsService } from './reports.service';
+
+const REPORT_ROLES = [
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+  UserRole.MAMCOS_SECRETARY,
+  UserRole.AUDITOR,
+];
 
 @ApiTags('reports')
 @ApiBearerAuth()
@@ -25,6 +37,7 @@ export class ReportsController {
   constructor(
     private readonly reports: ReportsService,
     private readonly exporter: ExportService,
+    private readonly builder: ReportBuilderService,
   ) {}
 
   private async send(
@@ -144,7 +157,10 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
-  @ApiOperation({ summary: 'Field-officer performance: visits, farms mapped, farmers verified, activities logged' })
+  @ApiOperation({
+    summary:
+      'Field-officer performance: visits, farms mapped, farmers verified, activities logged',
+  })
   async fieldOfficerPerformance(
     @Query() query: ReportFormatDto,
     @Res({ passthrough: true }) response: Response,
@@ -164,7 +180,10 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
-  @ApiOperation({ summary: 'Insurance coverage report: policies and claims by status/product type, exportable' })
+  @ApiOperation({
+    summary:
+      'Insurance coverage report: policies and claims by status/product type, exportable',
+  })
   async insuranceCoverage(
     @Query() query: ReportFormatDto,
     @Res({ passthrough: true }) response: Response,
@@ -184,7 +203,9 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
-  @ApiOperation({ summary: 'Gender / youth inclusion breakdown across registered farmers' })
+  @ApiOperation({
+    summary: 'Gender / youth inclusion breakdown across registered farmers',
+  })
   async genderYouthInclusion(
     @Query() query: ReportFormatDto,
     @Res({ passthrough: true }) response: Response,
@@ -198,11 +219,23 @@ export class ReportsController {
   }
 
   @Get('kpis')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
   kpis() {
     return this.reports.kpis();
   }
 
   @Get('compliance-summary')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
   async complianceSummary() {
     const [kpis, membershipGrowth] = await Promise.all([
       this.reports.kpis(),
@@ -218,7 +251,17 @@ export class ReportsController {
   }
 
   @Get('impact')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR, UserRole.BUYER)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.BUYER,
+  )
+  @ApiOperation({
+    summary:
+      'Grantor/partner impact pack: KPIs, season yields, membership growth, community projects',
+  })
   impact() {
     return this.reports.impactReport();
   }
@@ -239,14 +282,58 @@ export class ReportsController {
   }
 
   @Get('export-info')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
   exportInfo() {
     return {
       supportedFormats: ['json', 'csv', 'xlsx', 'pdf'],
-      usage: 'Add ?format=csv, ?format=xlsx or ?format=pdf to a report endpoint.',
+      usage:
+        'Add ?format=csv, ?format=xlsx or ?format=pdf to a report endpoint.',
     };
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Get('builder/schema')
+  @Roles(...REPORT_ROLES)
+  @ApiOperation({
+    summary:
+      'Report-builder catalog: entities and their selectable columns (for the report-builder UI)',
+  })
+  builderSchema() {
+    return this.builder.schema();
+  }
+
+  @Post('builder')
+  @Roles(...REPORT_ROLES)
+  @ApiOperation({
+    summary:
+      'Run a custom report — pick an entity and columns; preview as JSON (default) or export as CSV/XLSX/PDF',
+  })
+  async build(
+    @Body() dto: RunBuilderDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.builder.run(dto);
+    if (!dto.format || dto.format === 'json') return result;
+
+    // Exports use human-readable labels as headers; JSON keeps stable keys.
+    const labeled = result.rows.map((row) =>
+      Object.fromEntries(
+        result.columns.map((c) => [c.label, row[c.key] ?? '']),
+      ),
+    );
+    const slug =
+      result.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'report';
+    const stamp = new Date().toISOString().slice(0, 10);
+    return this.send(labeled, `${slug}-${stamp}`, dto.format, response);
+  }
+
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @Get('premium-fund-balance')
   async premiumFundBalance() {

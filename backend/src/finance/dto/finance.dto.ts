@@ -53,12 +53,18 @@ export class CreateInputCostDto {
   @IsNumber()
   totalCost: number;
 
-  @ApiPropertyOptional({ example: 'Mbarali Agro-Suppliers Ltd', description: 'Free-text supplier name (legacy field)' })
+  @ApiPropertyOptional({
+    example: 'Mbarali Agro-Suppliers Ltd',
+    description: 'Free-text supplier name (legacy field)',
+  })
   @IsString()
   @IsOptional()
   supplier?: string;
 
-  @ApiPropertyOptional({ example: 'supplier-uuid-1234', description: 'ID of a registered Supplier record' })
+  @ApiPropertyOptional({
+    example: 'supplier-uuid-1234',
+    description: 'ID of a registered Supplier record',
+  })
   @IsString()
   @IsOptional()
   supplierId?: string;
@@ -68,7 +74,10 @@ export class CreateInputCostDto {
   @IsOptional()
   paymentStatus?: InputPaymentStatus;
 
-  @ApiPropertyOptional({ example: 'loan-record-uuid-1234', description: 'LoanRecord this input purchase is financed against' })
+  @ApiPropertyOptional({
+    example: 'loan-record-uuid-1234',
+    description: 'LoanRecord this input purchase is financed against',
+  })
   @IsString()
   @IsOptional()
   loanRecordId?: string;

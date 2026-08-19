@@ -52,12 +52,23 @@ export class FinanceController {
 
   @Get('costs')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR)
-  @ApiOperation({ summary: 'Get all input costs across the system (staff only)' })
+  @ApiOperation({
+    summary: 'Get all input costs across the system (staff only)',
+  })
   findAllInputCosts() {
     return this.financeService.findAllInputCosts();
   }
 
   @Get('crop-cycle/:cropCycleId/summary')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FINANCIAL_PROVIDER,
+    UserRole.FARMER,
+  )
   @ApiOperation({
     summary:
       'Get complete financial summary & profitability margin for a crop cycle',

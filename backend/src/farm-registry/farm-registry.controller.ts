@@ -73,11 +73,7 @@ export class FarmRegistryController {
   }
 
   @Post(':id/claim')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.FIELD_OFFICER,
-    UserRole.FARMER,
-  )
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({
     summary:
       'Owner confirms & claims a pre-registered farm (materializes a Farm)',
@@ -87,11 +83,7 @@ export class FarmRegistryController {
   }
 
   @Post(':id/reject')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.FIELD_OFFICER,
-    UserRole.FARMER,
-  )
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({
     summary:
       'Owner rejects a pre-registered farm as not theirs (marks disputed)',

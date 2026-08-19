@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { farmLeasesApi, seasonalAssignmentsApi, farmOwnershipsApi, farmsApi, farmingSeasonsApi } from '@/lib/api';
+import { useAuthStore } from '@/store/auth.store';
 import Modal from '@/components/Modal';
 
 const OFFICER_METHODS = [
@@ -60,6 +61,24 @@ export default function LeasesPage() {
   const [loading, setLoading] = useState(true);
   const [verifyTarget, setVerifyTarget] = useState<Lease | null>(null);
   const [showAssignForm, setShowAssignForm] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const role = useAuthStore(s => s.user?.role);
+  const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN';
+
+  const handleDelete = async (l: Lease) => {
+    const label = `${l.farm?.farmCode ?? 'this farm'} · ${l.farmingSeason?.name ?? 'season'}`;
+    if (!window.confirm(`Delete the lease for ${label}? This cannot be undone.`)) return;
+    setDeletingId(l.id);
+    try {
+      await farmLeasesApi.remove(l.id);
+      setLeases(prev => prev.filter(x => x.id !== l.id));
+    } catch (e) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      window.alert(msg || 'Could not delete this lease.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const load = () => {
     setLoading(true);
@@ -140,15 +159,27 @@ export default function LeasesPage() {
                       <td>{statusBadge(l.officerConfirmationStatus)}</td>
                       <td>{statusBadge(l.status)}</td>
                       <td>
-                        {l.officerConfirmationStatus !== 'VERIFIED' && (
-                          <button
-                            className="btn-secondary"
-                            style={{ fontSize: '11px', padding: '5px 10px' }}
-                            onClick={() => setVerifyTarget(l)}
-                          >
-                            Officer verify
-                          </button>
-                        )}
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          {l.officerConfirmationStatus !== 'VERIFIED' && (
+                            <button
+                              className="btn-secondary"
+                              style={{ fontSize: '11px', padding: '5px 10px' }}
+                              onClick={() => setVerifyTarget(l)}
+                            >
+                              Officer verify
+                            </button>
+                          )}
+                          {isAdmin && l.status !== 'ACTIVE' && l.status !== 'COMPLETED' && (
+                            <button
+                              className="btn-secondary"
+                              style={{ fontSize: '11px', padding: '5px 10px', color: 'var(--red-400)', borderColor: 'var(--red-400)' }}
+                              disabled={deletingId === l.id}
+                              onClick={() => handleDelete(l)}
+                            >
+                              {deletingId === l.id ? 'Deleting…' : 'Delete'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

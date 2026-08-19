@@ -6,7 +6,6 @@ import {
   EmptyState,
   InsightPanel,
   MetricTile,
-  RoleHero,
 } from '@/components/role-dashboards/DashboardPrimitives';
 import { cropCyclesApi, farmersApi, farmsApi } from '@/lib/api';
 
@@ -39,11 +38,6 @@ export default function FieldOfficerDashboardPage() {
   const activeCycles = cycles.filter((cycle) => !['COMPLETED', 'CANCELLED'].includes(cycle.status));
 
   return <div className="role-dashboard">
-    <RoleHero
-      eyebrow="Field operations"
-      title="Field Officer Dashboard"
-      subtitle="A focused workspace for registration, GPS/photo verification, field surveys and crop-cycle follow-up."
-    />
     {error && <EmptyState>{error}</EmptyState>}
 
     <div className="role-grid">
@@ -73,6 +67,7 @@ export default function FieldOfficerDashboardPage() {
           <ActionLink href="/dashboard/farm-registry" title="Register farm evidence" text="Capture farm details, GPS and ownership evidence." />
           <ActionLink href="/dashboard/field-surveys" title="Submit field survey" text="Record soil, road, water and physical observations." />
           <ActionLink href="/dashboard/crop-cycles" title="Log crop activity" text="Track planting, input use, labor, costs and harvest." />
+          <ActionLink href="/dashboard/ai" title="AI Insights" text="Generate field advisories or log soil tests for farms you visit." />
         </div>
       </InsightPanel>
     </div>

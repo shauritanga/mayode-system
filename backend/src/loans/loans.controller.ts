@@ -19,11 +19,25 @@ export class LoansController {
   create(@Body() dto: CreateLoanDto) {
     return this.loans.create(dto);
   }
-  @Get('farmer/:farmerId') list(@Param('farmerId') farmerId: string) {
+  @Get('farmer/:farmerId')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FINANCIAL_PROVIDER,
+    UserRole.FARMER,
+  )
+  list(@Param('farmerId') farmerId: string) {
     return this.loans.listForFarmer(farmerId);
   }
   @Get()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR, UserRole.FINANCIAL_PROVIDER)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.AUDITOR,
+    UserRole.FINANCIAL_PROVIDER,
+  )
   findAll() {
     return this.loans.findAll();
   }

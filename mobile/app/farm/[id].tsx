@@ -1,19 +1,26 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Image,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
+  ActivityIndicator, Alert, Image, Modal, Pressable, Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from 'expo-router';
-import { WebView } from 'react-native-webview';
 import * as ImagePicker from 'expo-image-picker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Add01Icon, Location01Icon, Layers01Icon, Edit02Icon, SquareLock02Icon, CheckmarkCircle02Icon, UserMultiple02Icon, Camera01Icon, File01Icon, WheatIcon } from '@hugeicons/core-free-icons';
-import { farmsApi, ownershipApi, assignmentsApi, seasonsApi, uploadsApi } from '../../src/lib/data';
-import { boundaryPreviewHtml } from '../../src/lib/leaflet-preview-html';
+import {
+  Location01Icon, Layers01Icon, SquareLock02Icon,
+  CheckmarkCircle02Icon, UserMultiple02Icon,
+  EllipsisVerticalIcon,
+} from '@hugeicons/core-free-icons';
+import { farmsApi, ownershipApi, assignmentsApi, seasonsApi, uploadsApi, resolveMediaUrl } from '../../src/lib/data';
+import { FarmBoundaryPreview } from '../../src/components/FarmBoundaryPreview';
+import { isFarmBoundaryMapped } from '../../src/lib/farm-geo';
 import { useI18n } from '../../src/i18n';
 import { useAuthStore } from '../../src/store/auth.store';
 
 const STAFF_ROLES = ['SUPER_ADMIN', 'ADMIN', 'FIELD_OFFICER', 'MAMCOS_SECRETARY'];
+const FARM_MENU_TIP_KEY = 'mayode.farm.overflow.tip.seen';
 
 interface Plot {
   id: string; plotCode: string; name?: string; sizeAcres?: number;
@@ -42,6 +49,8 @@ interface Assignment {
   activeFarmer?: { firstName: string; lastName: string };
 }
 
+type OverflowItem = { key: string; label: string; onPress: () => void; destructive?: boolean };
+
 export default function FarmDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -51,9 +60,13 @@ export default function FarmDetail() {
   const [prod, setProd] = useState<Productivity | null>(null);
   const [ownerships, setOwnerships] = useState<Ownership[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [ownershipLoaded, setOwnershipLoaded] = useState(false);
+  const [assignmentsLoaded, setAssignmentsLoaded] = useState(false);
   const [photos, setPhotos] = useState<{ id: string; url: string; caption?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [busyOwn, setBusyOwn] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -68,41 +81,257 @@ export default function FarmDetail() {
       ]);
       if (f.status === 'fulfilled') setFarm(f.value.data);
       if (p.status === 'fulfilled') setProd(p.value.data);
-      if (o.status === 'fulfilled') setOwnerships(o.value.data ?? []);
-      if (a.status === 'fulfilled') setAssignments(a.value.data ?? []);
+      if (o.status === 'fulfilled') {
+        setOwnerships(o.value.data ?? []);
+        setOwnershipLoaded(true);
+      } else {
+        setOwnershipLoaded(false);
+      }
+      if (a.status === 'fulfilled') {
+        setAssignments(a.value.data ?? []);
+        setAssignmentsLoaded(true);
+      } else {
+        setAssignmentsLoaded(false);
+      }
       if (ph.status === 'fulfilled') setPhotos(ph.value.data ?? []);
     } finally {
       setLoading(false);
     }
   }, [id]);
 
-  const addPhoto = useCallback(async () => {
-    if (!id || uploadingPhoto) return;
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert(t('farmPhotos'), t('cameraPermissionNeeded'));
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 });
-    if (result.canceled || !result.assets?.length) return;
-    const asset = result.assets[0];
+  const uploadFarmPhotos = useCallback(async (assets: ImagePicker.ImagePickerAsset[]) => {
+    if (!id || !assets.length) return;
     setUploadingPhoto(true);
     try {
-      const up = await uploadsApi.uploadFile({
-        uri: asset.uri,
-        name: asset.fileName || `farm-${Date.now()}.jpg`,
-        type: asset.mimeType || 'image/jpeg',
-      });
-      await farmsApi.addPhoto(id, { url: up.data.url });
+      for (let i = 0; i < assets.length; i += 1) {
+        const asset = assets[i];
+        const payload = {
+          uri: asset.uri,
+          name: asset.fileName || `farm-${Date.now()}-${i}.jpg`,
+          type: asset.mimeType || 'image/jpeg',
+        };
+        let up;
+        try {
+          up = await uploadsApi.uploadFile(payload);
+        } catch {
+          // One retry for flaky mobile networks before failing the batch.
+          up = await uploadsApi.uploadFile(payload);
+        }
+        const url = resolveMediaUrl(up.data.url) || up.data.url;
+        await farmsApi.addPhoto(id, { url });
+      }
       await load();
     } catch (e: any) {
       Alert.alert(t('farmPhotos'), e?.response?.data?.message || String(e?.message ?? e));
     } finally {
       setUploadingPhoto(false);
     }
-  }, [id, uploadingPhoto, load, t]);
+  }, [id, load, t]);
+
+  const openOverflowMenu = useCallback(async () => {
+    setMenuOpen(true);
+    try {
+      const seen = await AsyncStorage.getItem(FARM_MENU_TIP_KEY);
+      if (!seen) {
+        await AsyncStorage.setItem(FARM_MENU_TIP_KEY, '1');
+        Alert.alert(t('moreOptions'), t('farmOverflowHint'));
+      }
+    } catch {
+      /* tip is best-effort */
+    }
+  }, [t]);
+
+  const addPhoto = useCallback(() => {
+    if (!id || uploadingPhoto) return;
+    Alert.alert(t('addPhoto'), t('photosHint'), [
+      {
+        text: t('takePhoto'),
+        onPress: () => {
+          void (async () => {
+            const perm = await ImagePicker.requestCameraPermissionsAsync();
+            if (!perm.granted) {
+              Alert.alert(t('farmPhotos'), t('cameraPermissionNeeded'));
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              quality: 0.6,
+              allowsEditing: false,
+            });
+            if (result.canceled || !result.assets?.length) return;
+            await uploadFarmPhotos(result.assets);
+          })();
+        },
+      },
+      {
+        text: t('chooseFromGallery'),
+        onPress: () => {
+          void (async () => {
+            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!perm.granted) {
+              Alert.alert(t('farmPhotos'), t('allowPhotoAccess'));
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 0.6,
+              allowsMultipleSelection: true,
+              selectionLimit: 8,
+            });
+            if (result.canceled || !result.assets?.length) return;
+            await uploadFarmPhotos(result.assets);
+          })();
+        },
+      },
+      { text: t('cancel'), style: 'cancel' },
+    ]);
+  }, [id, uploadingPhoto, t, uploadFarmPhotos]);
+
+  const confirmOwnership = useCallback(async () => {
+    if (!farm || busyOwn) return;
+    setBusyOwn(true);
+    try {
+      await ownershipApi.confirm(farm.id);
+      Alert.alert(t('ownershipAndSeason'), t('ownershipConfirmed'));
+      await load();
+    } catch (e: any) {
+      Alert.alert(t('ownershipAndSeason'), e?.response?.data?.message || String(e?.message ?? e));
+    } finally {
+      setBusyOwn(false);
+    }
+  }, [farm, busyOwn, load, t]);
+
+  const selfOperate = useCallback(async () => {
+    if (!farm || busyOwn) return;
+    setBusyOwn(true);
+    try {
+      const season = await seasonsApi.current();
+      if (!season.data?.id) {
+        Alert.alert(t('ownershipAndSeason'), t('noCurrentSeason'));
+        return;
+      }
+      await assignmentsApi.selfOperate({ farmId: farm.id, farmingSeasonId: season.data.id });
+      Alert.alert(t('ownershipAndSeason'), t('selfOperateDone'));
+      await load();
+    } catch (e: any) {
+      Alert.alert(t('ownershipAndSeason'), e?.response?.data?.message || String(e?.message ?? e));
+    } finally {
+      setBusyOwn(false);
+    }
+  }, [farm, busyOwn, load, t]);
+
+  const approveBoundary = useCallback(async () => {
+    if (!farm) return;
+    try {
+      await farmsApi.reviewBoundary(farm.id);
+      Alert.alert(t('boundaryApprovedTitle'), t('boundaryApprovedMessage'));
+      await load();
+    } catch (e: any) {
+      Alert.alert(t('cannotApproveBoundary'), e?.response?.data?.message || e?.message || t('mapBoundaryFirst'));
+    }
+  }, [farm, load, t]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const confirmedOwnership = ownerships.some((o) => o.confirmationStatus === 'VERIFIED');
+  const activeAssignment = assignments.find((a) => a.status === 'VERIFIED') || assignments[0];
+  const hasGPS = farm ? isFarmBoundaryMapped(farm) : false;
+  const isStaff = STAFF_ROLES.includes(user?.role ?? '');
+  const isSecretary = user?.role === 'MAMCOS_SECRETARY';
+
+  const overflowItems: OverflowItem[] = useMemo(() => {
+    if (!farm) return [];
+    const openBoundary = () =>
+      router.push({ pathname: '/boundary', params: { id: farm.id, label: t('farmContext', { code: farm.farmCode }) } });
+
+    const items: OverflowItem[] = [];
+
+    // Only offer ownership/season mutations when those APIs loaded successfully.
+    // A failed 403 must not look like "unconfirmed ownership".
+    if (ownershipLoaded && !confirmedOwnership) {
+      items.push({
+        key: 'confirm-own',
+        label: t('confirmOwnership'),
+        onPress: () => { void confirmOwnership(); },
+      });
+    } else if (ownershipLoaded && assignmentsLoaded && confirmedOwnership && !activeAssignment) {
+      items.push(
+        {
+          key: 'self-operate',
+          label: t('selfOperate'),
+          onPress: () => { void selfOperate(); },
+        },
+        {
+          key: 'lease',
+          label: t('addLease'),
+          onPress: () => router.push({ pathname: '/lease-new', params: { farmId: farm.id, farmCode: farm.farmCode } }),
+        },
+      );
+    }
+
+    items.push({
+      key: 'season-records',
+      label: t('openSeasonRecords'),
+      onPress: () => router.push({ pathname: '/crop-cycles/[farmId]', params: { farmId: farm.id, farmCode: farm.farmCode } }),
+    });
+
+    items.push({
+      key: 'boundary',
+      label: hasGPS ? t('editFarmBoundary') : t('walkFarmBoundary'),
+      onPress: openBoundary,
+    });
+
+    items.push(
+      {
+        key: 'add-photo',
+        label: uploadingPhoto ? t('uploadingPhotos') : t('addPhoto'),
+        onPress: () => { if (!uploadingPhoto) addPhoto(); },
+      },
+      {
+        key: 'add-plot',
+        label: t('addPlot'),
+        onPress: () => router.push({ pathname: '/plot-new', params: { farmId: farm.id, farmCode: farm.farmCode } }),
+      },
+      {
+        key: 'correction',
+        label: t('suggestCorrection'),
+        onPress: () => router.push({ pathname: '/farm-correction', params: { farmId: farm.id, farmCode: farm.farmCode } }),
+      },
+      {
+        key: 'report',
+        label: t('viewFarmReport'),
+        onPress: () => router.push({ pathname: '/farm-report/[id]', params: { id: farm.id } }),
+      },
+    );
+
+    if (isStaff) {
+      items.push({
+        key: 'survey',
+        label: t('recordFieldSurvey'),
+        onPress: () => router.push({ pathname: '/field-survey', params: { farmId: farm.id, farmCode: farm.farmCode } }),
+      });
+    }
+    if (isSecretary && !farm.isVerified) {
+      items.push({
+        key: 'approve-boundary',
+        label: t('approveBoundary'),
+        onPress: () => { void approveBoundary(); },
+      });
+    }
+    if (isSecretary && farm.isVerified) {
+      items.push({
+        key: 'assign-renter',
+        label: t('assignRenter'),
+        onPress: () => router.push({ pathname: '/lease-new', params: { farmId: farm.id, farmCode: farm.farmCode } }),
+      });
+    }
+
+    return items;
+  }, [
+    farm, t, router, confirmedOwnership, activeAssignment, hasGPS,
+    confirmOwnership, selfOperate, addPhoto, uploadingPhoto,
+    isStaff, isSecretary, approveBoundary, ownershipLoaded, assignmentsLoaded,
+  ]);
 
   if (loading && !farm) {
     return (
@@ -113,17 +342,57 @@ export default function FarmDetail() {
     return <SafeAreaView style={styles.center}><Text>{t('farmNotFound')}</Text></SafeAreaView>;
   }
 
-  const hasGPS = !!farm.centerLatitude;
   const plots = farm.plots || [];
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <Stack.Screen options={{ headerShown: true, title: farm.farmCode }} />
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: farm.farmCode,
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => { void openOverflowMenu(); }}
+              hitSlop={12}
+              style={styles.headerMoreBtn}
+              accessibilityRole="button"
+              accessibilityLabel={t('moreOptions')}
+            >
+              <HugeiconsIcon icon={EllipsisVerticalIcon} size={22} color="#FFFFFF" strokeWidth={2} />
+            </TouchableOpacity>
+          ),
+        }}
+      />
+
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
+          <View style={styles.menuWrap} onStartShouldSetResponder={() => true}>
+            <View style={styles.menuSheet}>
+              {overflowItems.map((item, index) => (
+                <TouchableOpacity
+                  key={item.key}
+                  style={[styles.menuItem, index === overflowItems.length - 1 && styles.menuItemLast]}
+                  onPress={() => {
+                    setMenuOpen(false);
+                    item.onPress();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.menuItemText}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={styles.menuCancel} onPress={() => setMenuOpen(false)} activeOpacity={0.7}>
+              <Text style={styles.menuCancelText}>{t('cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
       <ScrollView
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#10B981" />}
       >
-        {/* Header card */}
         <View style={styles.card}>
           <Text style={styles.farmCode}>{farm.farmCode}</Text>
           {!!farm.name && <Text style={styles.name}>{farm.name}</Text>}
@@ -143,7 +412,6 @@ export default function FarmDetail() {
           </View>
         </View>
 
-        {/* Attributes */}
         <View style={styles.grid}>
           <Attr label={t('socialHectares')} value={`${farm.socialHectares} ha`} />
           <Attr label={t('actualAcres')} value={farm.actualAcres ? `${farm.actualAcres} ac` : '—'} />
@@ -158,95 +426,34 @@ export default function FarmDetail() {
           {farm.ownershipType === 'RENTED' && <Attr label={t('ownerName')} value={farm.ownerName || '—'} />}
         </View>
 
-        {/* Ownership & seasonal use */}
         <OwnershipSeasonCard
-          farmId={farm.id}
-          farmCode={farm.farmCode}
           ownerships={ownerships}
           assignments={assignments}
-          onChanged={load}
+          ownershipLoaded={ownershipLoaded}
+          assignmentsLoaded={assignmentsLoaded}
         />
 
-        {/* Farm photos (owner comment §2.5: 3–5 photos) */}
         <View style={styles.card}>
-          <View style={styles.plotsHeader}>
-            <Text style={styles.sectionTitle}>{t('farmPhotos')} ({photos.length})</Text>
-            <TouchableOpacity style={styles.addPlotBtn} onPress={addPhoto} disabled={uploadingPhoto}>
-              {uploadingPhoto
-                ? <ActivityIndicator size="small" color="#10B981" />
-                : <><HugeiconsIcon icon={Camera01Icon} size={16} color="#10B981" strokeWidth={2} /><Text style={styles.addPlotText}>{t('addPhoto')}</Text></>}
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.sectionTitle}>{t('farmPhotos')} ({photos.length})</Text>
+          {uploadingPhoto && (
+            <View style={styles.uploadRow}>
+              <ActivityIndicator size="small" color="#10B981" />
+              <Text style={styles.uploadText}>{t('uploadingPhotos')}</Text>
+            </View>
+          )}
           {photos.length === 0 ? (
             <Text style={styles.photosHint}>{t('photosHint')}</Text>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
-              {photos.map((p) => (
-                <Image key={p.id} source={{ uri: p.url }} style={styles.photoThumb} />
-              ))}
+              {photos.map((p) => {
+                const uri = resolveMediaUrl(p.url);
+                if (!uri) return null;
+                return <Image key={p.id} source={{ uri }} style={styles.photoThumb} />;
+              })}
             </ScrollView>
           )}
         </View>
 
-        {/* Farming activities: crop cycles, activity log, expenses — a free feature */}
-        <TouchableOpacity
-          style={styles.reportBtn}
-          onPress={() => router.push({ pathname: '/crop-cycles/[farmId]', params: { farmId: farm.id, farmCode: farm.farmCode } })}
-        >
-          <HugeiconsIcon icon={WheatIcon} size={18} color="#fff" strokeWidth={2} />
-          <Text style={styles.reportBtnText}>{t('farmingActivities')}</Text>
-        </TouchableOpacity>
-
-        {/* Printable analytics report (premium) */}
-        <TouchableOpacity
-          style={styles.reportBtn}
-          onPress={() => router.push({ pathname: '/farm-report/[id]', params: { id: farm.id } })}
-        >
-          <HugeiconsIcon icon={File01Icon} size={18} color="#fff" strokeWidth={2} />
-          <Text style={styles.reportBtnText}>{t('viewFarmReport')}</Text>
-        </TouchableOpacity>
-
-        {/* Suggest a correction (prompt2 §19) — never overwrites data directly, held for officer review */}
-        <TouchableOpacity
-          style={styles.correctionBtn}
-          onPress={() => router.push({ pathname: '/farm-correction', params: { farmId: farm.id, farmCode: farm.farmCode } })}
-        >
-          <HugeiconsIcon icon={Edit02Icon} size={16} color="#065F46" strokeWidth={2} />
-          <Text style={styles.correctionBtnText}>{t('suggestCorrection')}</Text>
-        </TouchableOpacity>
-
-        {/* Field survey — staff only (screen itself gates by role) */}
-        {STAFF_ROLES.includes(user?.role ?? '') && (
-          <>
-            <TouchableOpacity style={styles.correctionBtn} onPress={() => router.push({ pathname: '/boundary', params: { id: farm.id, label: `Map ${farm.farmCode}` } })}>
-              <HugeiconsIcon icon={Location01Icon} size={16} color="#065F46" strokeWidth={2} />
-              <Text style={styles.correctionBtnText}>Map official boundary</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.correctionBtn} onPress={() => router.push({ pathname: '/field-survey', params: { farmId: farm.id, farmCode: farm.farmCode } })}>
-              <HugeiconsIcon icon={Location01Icon} size={16} color="#065F46" strokeWidth={2} />
-              <Text style={styles.correctionBtnText}>{t('recordFieldSurvey')}</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {user?.role === 'MAMCOS_SECRETARY' && !farm.isVerified && (
-          <TouchableOpacity style={styles.correctionBtn} onPress={async () => {
-            try { await farmsApi.reviewBoundary(farm.id); Alert.alert('Boundary approved', 'This is now the official AMCOS farm boundary.'); load(); }
-            catch (e: any) { Alert.alert('Cannot approve boundary', e?.response?.data?.message || e?.message || 'Map the boundary first.'); }
-          }}>
-            <HugeiconsIcon icon={CheckmarkCircle02Icon} size={16} color="#065F46" strokeWidth={2} />
-            <Text style={styles.correctionBtnText}>Approve official boundary</Text>
-          </TouchableOpacity>
-        )}
-
-        {user?.role === 'MAMCOS_SECRETARY' && farm.isVerified && (
-          <TouchableOpacity style={styles.correctionBtn} onPress={() => router.push({ pathname: '/lease-new', params: { farmId: farm.id, farmCode: farm.farmCode } })}>
-            <HugeiconsIcon icon={UserMultiple02Icon} size={16} color="#065F46" strokeWidth={2} />
-            <Text style={styles.correctionBtnText}>Assign renter for this season</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Productivity — premium-gated by the backend */}
         {prod && (
           prod.locked ? (
             <View style={styles.lockedCard}>
@@ -254,7 +461,6 @@ export default function FarmDetail() {
                 <HugeiconsIcon icon={SquareLock02Icon} size={20} color="#B45309" strokeWidth={2} />
                 <Text style={styles.lockedTitle}>{t('premiumLocked')}</Text>
               </View>
-              {/* Safe preview: counts only, never the analytics values */}
               <View style={styles.grid}>
                 <Attr label={t('cropCycles')} value={`${prod.cropCycles}`} />
                 <Attr label={t('plots')} value={`${prod.plots}`} />
@@ -277,27 +483,11 @@ export default function FarmDetail() {
           )
         )}
 
-        {/* Boundary */}
-        {hasGPS && farm.boundaryCoordinates ? (
+        {hasGPS ? (
           <View style={styles.boundaryCard}>
-            <View style={styles.boundaryHeader}>
-              <Text style={styles.sectionTitle}>{t('farmBoundary')}</Text>
-              <TouchableOpacity
-                style={styles.editBoundaryBtn}
-                onPress={() => router.push({ pathname: '/boundary', params: { id: farm.id, label: t('farmContext', { code: farm.farmCode }) } })}
-              >
-                <HugeiconsIcon icon={Edit02Icon} size={14} color="#10B981" strokeWidth={2} />
-                <Text style={styles.editBoundaryText}>{t('edit')}</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.sectionTitle}>{t('farmBoundary')}</Text>
             <View style={styles.miniMapWrap} pointerEvents="none">
-              <WebView
-                originWhitelist={['*']}
-                source={{ html: boundaryPreviewHtml(farm.boundaryCoordinates) }}
-                javaScriptEnabled
-                scrollEnabled={false}
-                style={styles.miniMap}
-              />
+              <FarmBoundaryPreview boundaryCoordinates={farm.boundaryCoordinates} height={190} style={styles.miniMapPreview} />
             </View>
             <View style={styles.boundaryStats}>
               <View style={styles.mappedChip}>
@@ -312,26 +502,13 @@ export default function FarmDetail() {
             </View>
           </View>
         ) : (
-          <TouchableOpacity
-            style={styles.gpsBtn}
-            onPress={() => router.push({ pathname: '/boundary', params: { id: farm.id, label: t('farmContext', { code: farm.farmCode }) } })}
-          >
-            <HugeiconsIcon icon={Location01Icon} size={18} color="#fff" strokeWidth={2} />
-            <Text style={styles.gpsBtnText}>{t('walkFarmBoundary')}</Text>
-          </TouchableOpacity>
+          <View style={styles.unmappedCard}>
+            <HugeiconsIcon icon={Location01Icon} size={18} color="#9CA3AF" strokeWidth={2} />
+            <Text style={styles.unmappedText}>{t('farmBoundaryUnmapped')}</Text>
+          </View>
         )}
 
-        {/* Plots */}
-        <View style={styles.plotsHeader}>
-          <Text style={styles.sectionTitle}>{t('plots')} ({plots.length})</Text>
-          <TouchableOpacity
-            style={styles.addPlotBtn}
-            onPress={() => router.push({ pathname: '/plot-new', params: { farmId: farm.id, farmCode: farm.farmCode } })}
-          >
-            <HugeiconsIcon icon={Add01Icon} size={16} color="#10B981" strokeWidth={2} />
-            <Text style={styles.addPlotText}>{t('addPlot')}</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.sectionTitle}>{t('plots')} ({plots.length})</Text>
 
         {plots.length === 0 ? (
           <View style={styles.emptyPlots}>
@@ -374,56 +551,18 @@ function Attr({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * Ownership confirmation + seasonal use (owner comments §7, §9, §13).
- * The legal owner confirms the farm belongs to them, then either declares
- * self-farming for the current season or adds a lease naming a renter.
- */
+/** Status-only ownership/season card — actions live in the header menu. */
 function OwnershipSeasonCard({
-  farmId, farmCode, ownerships, assignments, onChanged,
+  ownerships, assignments, ownershipLoaded, assignmentsLoaded,
 }: {
-  farmId: string; farmCode: string;
-  ownerships: Ownership[]; assignments: Assignment[]; onChanged: () => void;
+  ownerships: Ownership[];
+  assignments: Assignment[];
+  ownershipLoaded: boolean;
+  assignmentsLoaded: boolean;
 }) {
   const { t } = useI18n();
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-
-  const confirmed = ownerships.some((o) => o.confirmationStatus === 'VERIFIED');
+  const confirmed = ownershipLoaded && ownerships.some((o) => o.confirmationStatus === 'VERIFIED');
   const activeAssignment = assignments.find((a) => a.status === 'VERIFIED') || assignments[0];
-
-  const confirmOwnership = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await ownershipApi.confirm(farmId);
-      Alert.alert(t('ownershipAndSeason'), t('ownershipConfirmed'));
-      onChanged();
-    } catch (e: any) {
-      Alert.alert(t('ownershipAndSeason'), e?.response?.data?.message || String(e?.message ?? e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const selfOperate = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const season = await seasonsApi.current();
-      if (!season.data?.id) {
-        Alert.alert(t('ownershipAndSeason'), t('noCurrentSeason'));
-        return;
-      }
-      await assignmentsApi.selfOperate({ farmId, farmingSeasonId: season.data.id });
-      Alert.alert(t('ownershipAndSeason'), t('selfOperateDone'));
-      onChanged();
-    } catch (e: any) {
-      Alert.alert(t('ownershipAndSeason'), e?.response?.data?.message || String(e?.message ?? e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const assignmentLabel = (type: string) =>
     type === 'OWNER_OPERATED' ? t('ownerOperated') : type === 'RENTED' ? t('rented') : type;
@@ -431,7 +570,6 @@ function OwnershipSeasonCard({
   return (
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>{t('ownershipAndSeason')}</Text>
-
       <View style={styles.ownRow}>
         <HugeiconsIcon
           icon={confirmed ? CheckmarkCircle02Icon : UserMultiple02Icon}
@@ -440,11 +578,16 @@ function OwnershipSeasonCard({
           strokeWidth={2}
         />
         <Text style={styles.ownText}>
-          {confirmed ? t('ownershipConfirmed') : t('ownershipConfirmPrompt')}
+          {!ownershipLoaded
+            ? t('ownershipStatusUnavailable')
+            : confirmed
+              ? t('ownershipConfirmed')
+              : t('ownershipPending')}
         </Text>
       </View>
-
-      {activeAssignment && (
+      {!assignmentsLoaded ? (
+        <Text style={styles.seasonEmpty}>{t('seasonStatusUnavailable')}</Text>
+      ) : activeAssignment ? (
         <View style={styles.assignChip}>
           <Text style={styles.assignChipText}>
             {assignmentLabel(activeAssignment.assignmentType)}
@@ -454,28 +597,14 @@ function OwnershipSeasonCard({
               : ''}
           </Text>
         </View>
+      ) : (
+        <View>
+          <Text style={styles.seasonEmpty}>{t('noSeasonAssignment')}</Text>
+          {confirmed ? (
+            <Text style={styles.seasonHint}>{t('seasonSetupHint')}</Text>
+          ) : null}
+        </View>
       )}
-
-      <View style={styles.ownActions}>
-        {!confirmed && (
-          <TouchableOpacity style={[styles.ownBtn, busy && { opacity: 0.6 }]} onPress={confirmOwnership} disabled={busy}>
-            <Text style={styles.ownBtnText}>{t('confirmOwnership')}</Text>
-          </TouchableOpacity>
-        )}
-        {confirmed && !activeAssignment && (
-          <TouchableOpacity style={[styles.ownBtnOutline, busy && { opacity: 0.6 }]} onPress={selfOperate} disabled={busy}>
-            <Text style={styles.ownBtnOutlineText}>{t('selfOperate')}</Text>
-          </TouchableOpacity>
-        )}
-        {confirmed && (
-          <TouchableOpacity
-            style={styles.ownBtn}
-            onPress={() => router.push({ pathname: '/lease-new', params: { farmId, farmCode } })}
-          >
-            <Text style={styles.ownBtnText}>{t('addLease')}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
     </View>
   );
 }
@@ -483,6 +612,40 @@ function OwnershipSeasonCard({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
+  headerMoreBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  menuBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(17,24,39,0.35)',
+    justifyContent: 'flex-end',
+  },
+  menuWrap: {
+    marginHorizontal: 12,
+    marginBottom: Platform.OS === 'ios' ? 28 : 16,
+    gap: 8,
+  },
+  menuSheet: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  menuItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
+  },
+  menuItemLast: { borderBottomWidth: 0 },
+  menuItemText: { fontSize: 16, fontWeight: '600', color: '#111827', textAlign: 'center' },
+  menuCancel: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  menuCancelText: { fontSize: 16, fontWeight: '700', color: '#6B7280', textAlign: 'center' },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E5E7EB' },
   farmCode: { fontSize: 22, fontWeight: '900', color: '#10B981' },
   name: { fontSize: 15, fontWeight: '700', color: '#111827', marginTop: 2 },
@@ -493,29 +656,30 @@ const styles = StyleSheet.create({
   badgeGreen: { backgroundColor: 'rgba(16,185,129,0.15)' }, badgeGreenText: { color: '#10B981', fontSize: 11, fontWeight: '700' },
   badgeGold: { backgroundColor: 'rgba(245,158,11,0.15)' }, badgeGoldText: { color: '#F59E0B', fontSize: 11, fontWeight: '700' },
   badgeGray: { backgroundColor: '#F3F4F6' }, badgeGrayText: { color: '#9CA3AF', fontSize: 11, fontWeight: '700' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   attr: { width: '48%', backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#F3F4F6' },
   attrLabel: { fontSize: 11, color: '#6B7280', fontWeight: '600' },
   attrValue: { fontSize: 15, fontWeight: '700', color: '#111827', marginTop: 2 },
   sectionTitle: { fontSize: 15, fontWeight: '800', color: '#111827', marginBottom: 10 },
-  gpsBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#065F46', paddingVertical: 14, borderRadius: 14, marginBottom: 18,
+  unmappedCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  gpsBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  unmappedText: { flex: 1, fontSize: 13, color: '#6B7280', lineHeight: 19 },
   boundaryCard: { backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 18, borderWidth: 1, borderColor: '#E5E7EB' },
-  boundaryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  editBoundaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(16,185,129,0.12)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 10 },
-  editBoundaryText: { color: '#10B981', fontWeight: '700', fontSize: 13 },
   miniMapWrap: { height: 190, borderRadius: 12, overflow: 'hidden', backgroundColor: '#0b1f17' },
-  miniMap: { flex: 1, backgroundColor: 'transparent' },
+  miniMapPreview: { height: 190, borderRadius: 12, borderWidth: 0 },
   boundaryStats: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
   mappedChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(16,185,129,0.12)', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 10 },
   mappedChipText: { color: '#10B981', fontWeight: '700', fontSize: 12 },
   boundaryArea: { fontSize: 14, fontWeight: '700', color: '#111827' },
-  plotsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  addPlotBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(16,185,129,0.12)', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 },
-  addPlotText: { color: '#10B981', fontWeight: '700', fontSize: 13 },
   emptyPlots: { alignItems: 'center', padding: 24, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB' },
   emptyText: { color: '#6B7280', fontSize: 13, textAlign: 'center', marginTop: 10 },
   plotCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 14, borderRadius: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' },
@@ -524,34 +688,20 @@ const styles = StyleSheet.create({
   plotGpsBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(59,130,246,0.12)', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 },
   plotGpsBtnDone: { backgroundColor: 'rgba(16,185,129,0.12)' },
   plotGpsText: { color: '#3B82F6', fontWeight: '700', fontSize: 12 },
-  // Locked premium analytics
   lockedCard: { backgroundColor: '#FFFBEB', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#FDE68A' },
   lockedHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   lockedTitle: { fontSize: 15, fontWeight: '800', color: '#92400E' },
   lockedMsg: { fontSize: 13, color: '#92400E', marginTop: 12, lineHeight: 19 },
   unlockBtn: { backgroundColor: '#F59E0B', paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginTop: 12 },
   unlockBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  // Ownership & seasonal use
   ownRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   ownText: { fontSize: 13, color: '#374151', flex: 1, lineHeight: 19 },
-  assignChip: { backgroundColor: 'rgba(16,185,129,0.10)', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, marginBottom: 10 },
+  assignChip: { backgroundColor: 'rgba(16,185,129,0.10)', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12 },
   assignChipText: { fontSize: 12, fontWeight: '700', color: '#065F46' },
-  ownActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  ownBtn: { backgroundColor: '#10B981', paddingVertical: 11, paddingHorizontal: 16, borderRadius: 12 },
-  ownBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  ownBtnOutline: { borderWidth: 1.5, borderColor: '#10B981', paddingVertical: 11, paddingHorizontal: 16, borderRadius: 12 },
-  ownBtnOutlineText: { color: '#10B981', fontWeight: '800', fontSize: 13 },
+  seasonEmpty: { fontSize: 13, color: '#6B7280', lineHeight: 19 },
+  seasonHint: { fontSize: 12, color: '#047857', lineHeight: 18, marginTop: 6 },
+  uploadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  uploadText: { fontSize: 13, color: '#059669', fontWeight: '600' },
   photosHint: { fontSize: 13, color: '#6B7280', marginTop: 6, lineHeight: 19 },
   photoThumb: { width: 96, height: 96, borderRadius: 12, marginRight: 10, backgroundColor: '#E5E7EB' },
-  reportBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#065F46', paddingVertical: 14, borderRadius: 14, marginBottom: 18,
-  },
-  reportBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  correctionBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#065F46',
-    paddingVertical: 12, borderRadius: 14, marginBottom: 12,
-  },
-  correctionBtnText: { color: '#065F46', fontWeight: '800', fontSize: 14 },
 });

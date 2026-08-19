@@ -4,10 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { QuestionIcon, Logout01Icon, ArrowRight01Icon, Edit02Icon, File01Icon, StarIcon, Agreement01Icon, SecurityCheckIcon, GiftIcon } from '@hugeicons/core-free-icons';
-import { useAuthStore } from '../../src/store/auth.store';
-import { authApi, farmersApi } from '../../src/lib/data';
+import { useAuthStore } from '../../../src/store/auth.store';
+import { authApi, farmersApi } from '../../../src/lib/data';
 import { StatusBar } from 'expo-status-bar';
-import { Language, useI18n } from '../../src/i18n';
+import { Language, useI18n } from '../../../src/i18n';
 
 export default function ProfileTab() {
   const { user, farmerId, clearAuth } = useAuthStore();

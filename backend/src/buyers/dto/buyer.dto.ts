@@ -5,19 +5,24 @@ export class UpsertBuyerDto {
   @IsString()
   name: string;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   fairtradeCertNumber?: string;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   contactPerson?: string;
 
-  @IsOptional() @IsEmail()
+  @IsOptional()
+  @IsEmail()
   contactEmail?: string;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   contactPhone?: string;
 
   @ApiPropertyOptional({ default: false })
-  @IsOptional() @IsBoolean()
+  @IsOptional()
+  @IsBoolean()
   isCertified?: boolean;
 }

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { membershipsApi } from '@/lib/api';
+import { useAuthStore } from '@/store/auth.store';
 import Modal from '@/components/Modal';
 
 interface Plan {
@@ -38,6 +39,8 @@ const statusBadge = (s: string) => {
 const emptyPlan = { name: '', description: '', priceTzs: '', durationType: 'SEASON', features: '' };
 
 export default function MembershipsPage() {
+  const role = useAuthStore((s) => s.user?.role);
+  const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN';
   const [tab, setTab] = useState<'members' | 'plans'>('members');
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -47,18 +50,20 @@ export default function MembershipsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [approving, setApproving] = useState<string | null>(null);
+  const [reconciling, setReconciling] = useState(false);
+  const [reconcileNotice, setReconcileNotice] = useState('');
 
   const load = () => {
     setLoading(true);
     Promise.all([
-      membershipsApi.getAll().then(res => setMemberships(res.data || [])),
-      membershipsApi.listPlans().then(res => setPlans(res.data || [])),
+      membershipsApi.getAll().then((res) => setMemberships(res.data || [])),
+      membershipsApi.listPlans().then((res) => setPlans(res.data || [])),
     ]).catch(console.error).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
 
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const submitPlan = async () => {
     setError('');
@@ -73,7 +78,7 @@ export default function MembershipsPage() {
         description: form.description || undefined,
         priceTzs: Number(form.priceTzs),
         durationType: form.durationType,
-        features: form.features ? form.features.split(',').map(f => f.trim()).filter(Boolean) : [],
+        features: form.features ? form.features.split(',').map((f) => f.trim()).filter(Boolean) : [],
       });
       setForm({ ...emptyPlan });
       setShowForm(false);
@@ -98,8 +103,41 @@ export default function MembershipsPage() {
     }
   };
 
-  const active = memberships.filter(m => m.status === 'ACTIVE').length;
-  const pending = memberships.filter(m => m.status === 'PENDING' || m.status === 'PAYMENT_PENDING').length;
+  const reconcileOne = async (id: string) => {
+    setApproving(id);
+    setReconcileNotice('');
+    try {
+      const res = await membershipsApi.reconcileOne(id);
+      setReconcileNotice(
+        res.data?.active
+          ? 'Payment confirmed — membership activated.'
+          : `Still ${res.data?.paymentStatus || res.data?.status || 'pending'} with the payment provider.`,
+      );
+      load();
+    } catch (e: any) {
+      setReconcileNotice(e?.response?.data?.message || 'Could not reconcile this payment.');
+    } finally {
+      setApproving(null);
+    }
+  };
+
+  const reconcileAllPending = async () => {
+    setReconciling(true);
+    setReconcileNotice('');
+    try {
+      const res = await membershipsApi.reconcilePending();
+      const { checked = 0, activated = 0 } = res.data || {};
+      setReconcileNotice(`Checked ${checked} pending payment(s); activated ${activated}.`);
+      load();
+    } catch (e: any) {
+      setReconcileNotice(e?.response?.data?.message || 'Could not reconcile pending payments.');
+    } finally {
+      setReconciling(false);
+    }
+  };
+
+  const active = memberships.filter((m) => m.status === 'ACTIVE').length;
+  const pending = memberships.filter((m) => m.status === 'PENDING' || m.status === 'PAYMENT_PENDING').length;
 
   return (
     <div>
@@ -111,19 +149,32 @@ export default function MembershipsPage() {
           </div>
           <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Premium plans and farmer membership status — gates farm analytics</p>
         </div>
-        {tab === 'plans' && (
-          <button className="btn-primary" onClick={() => setShowForm(true)}>
-            + New plan
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {isAdmin && tab === 'members' && pending > 0 && (
+            <button className="btn-secondary" onClick={reconcileAllPending} disabled={reconciling}>
+              {reconciling ? 'Reconciling…' : 'Reconcile pending payments'}
+            </button>
+          )}
+          {isAdmin && tab === 'plans' && (
+            <button className="btn-primary" onClick={() => setShowForm(true)}>
+              + New plan
+            </button>
+          )}
+        </div>
       </div>
+
+      {reconcileNotice && (
+        <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', fontSize: 13, color: 'var(--text-1)' }}>
+          {reconcileNotice}
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         {[
           { label: 'Active members', value: active, color: 'var(--accent)' },
           { label: 'Awaiting payment', value: pending, color: 'var(--gold-400)' },
           { label: 'Plans', value: plans.length, color: 'var(--blue-500)' },
-        ].map(s => (
+        ].map((s) => (
           <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>
             <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.label}</div>
@@ -132,7 +183,7 @@ export default function MembershipsPage() {
       </div>
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        {(['members', 'plans'] as const).map(t => (
+        {(['members', 'plans'] as const).map((t) => (
           <button
             key={t}
             className={tab === t ? 'btn-primary' : 'btn-secondary'}
@@ -159,18 +210,18 @@ export default function MembershipsPage() {
           }
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
-            <Field label="Plan name *" value={form.name} onChange={v => set('name', v)} placeholder="Season Premium" />
-            <Field label="Price (TZS) *" value={form.priceTzs} onChange={v => set('priceTzs', v)} placeholder="15000" />
+            <Field label="Plan name *" value={form.name} onChange={(v) => set('name', v)} placeholder="Season Premium" />
+            <Field label="Price (TZS) *" value={form.priceTzs} onChange={(v) => set('priceTzs', v)} placeholder="15000" />
             <div>
               <label style={labelStyle}>Duration type</label>
-              <select className="input-field" value={form.durationType} onChange={e => set('durationType', e.target.value)}>
+              <select className="input-field" value={form.durationType} onChange={(e) => set('durationType', e.target.value)}>
                 <option value="SEASON">Season</option>
                 <option value="ANNUAL">Annual</option>
                 <option value="CUSTOM">Custom</option>
               </select>
             </div>
-            <Field label="Description" value={form.description} onChange={v => set('description', v)} placeholder="Full analytics for one season" />
-            <Field label="Features (comma-separated)" value={form.features} onChange={v => set('features', v)} placeholder="Farm analytics, Yield forecasts" />
+            <Field label="Description" value={form.description} onChange={(v) => set('description', v)} placeholder="Full analytics for one season" />
+            <Field label="Features (comma-separated)" value={form.features} onChange={(v) => set('features', v)} placeholder="Farm analytics, Yield forecasts" />
           </div>
           {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
         </Modal>
@@ -189,7 +240,7 @@ export default function MembershipsPage() {
                   <tr><th>Farmer</th><th>Phone</th><th>Plan</th><th>Season</th><th>Period</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
-                  {memberships.map(m => (
+                  {memberships.map((m) => (
                     <tr key={m.id}>
                       <td style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>{m.farmer ? `${m.farmer.firstName} ${m.farmer.lastName}` : '—'}</td>
                       <td style={{ color: 'var(--neutral-400)', fontSize: '12px', fontFamily: 'monospace' }}>{m.user?.phone || '—'}</td>
@@ -198,15 +249,25 @@ export default function MembershipsPage() {
                       <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{m.startDate ? `${fmtDate(m.startDate)} → ${fmtDate(m.endDate)}` : '—'}</td>
                       <td>{statusBadge(m.status)}</td>
                       <td>
-                        {(m.status === 'PENDING' || m.status === 'PAYMENT_PENDING') && (
-                          <button
-                            className="btn-secondary"
-                            style={{ fontSize: '11px', padding: '5px 10px' }}
-                            disabled={approving === m.id}
-                            onClick={() => approve(m.id)}
-                          >
-                            {approving === m.id ? 'Approving…' : 'Approve'}
-                          </button>
+                        {(m.status === 'PENDING' || m.status === 'PAYMENT_PENDING') && isAdmin && (
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button
+                              className="btn-secondary"
+                              style={{ fontSize: '11px', padding: '5px 10px' }}
+                              disabled={approving === m.id}
+                              onClick={() => reconcileOne(m.id)}
+                            >
+                              {approving === m.id ? '…' : 'Reconcile'}
+                            </button>
+                            <button
+                              className="btn-secondary"
+                              style={{ fontSize: '11px', padding: '5px 10px' }}
+                              disabled={approving === m.id}
+                              onClick={() => approve(m.id)}
+                            >
+                              {approving === m.id ? '…' : 'Approve'}
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -225,7 +286,7 @@ export default function MembershipsPage() {
                   <tr><th>Plan</th><th>Price</th><th>Duration</th><th>Features</th><th>Active</th></tr>
                 </thead>
                 <tbody>
-                  {plans.map(p => (
+                  {plans.map((p) => (
                     <tr key={p.id}>
                       <td style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>{p.name}</td>
                       <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{p.priceTzs.toLocaleString()} TZS</td>
@@ -255,7 +316,7 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
   return (
     <div>
       <label style={labelStyle}>{label}</label>
-      <input className="input-field" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+      <input className="input-field" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
     </div>
   );
 }

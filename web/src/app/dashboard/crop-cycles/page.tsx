@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { cropCyclesApi } from '@/lib/api';
 
 interface CropCycle {
@@ -11,9 +12,11 @@ interface CropCycle {
   actualYieldKg?: number;
   plantingDate?: string;
   harvestDate?: string;
-  farmer?: { firstName: string; lastName: string; controlNumber: string };
-  farm?: { farmCode: string };
+  farmer?: { id?: string; firstName: string; lastName: string; controlNumber: string };
+  farm?: { id?: string; farmCode: string };
 }
+
+type StatusFilter = 'all' | 'PLANNED' | 'ACTIVE' | 'HARVESTED' | 'COMPLETED';
 
 const cycleStatusBadge = (status: string) => {
   const map: Record<string, string> = {
@@ -29,6 +32,7 @@ export default function CropCyclesPage() {
   const [cycles, setCycles] = useState<CropCycle[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   useEffect(() => {
     cropCyclesApi.getAll()
@@ -37,9 +41,22 @@ export default function CropCyclesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = cycles.filter(c =>
-    `${c.season} ${c.farmer?.firstName} ${c.farmer?.lastName} ${c.riceVariety || ''}`.toLowerCase().includes(search.toLowerCase())
+  const seasons = useMemo(
+    () => Array.from(new Set(cycles.map((c) => c.season).filter(Boolean))).sort(),
+    [cycles],
   );
+  const [seasonFilter, setSeasonFilter] = useState<string>('all');
+
+  const filtered = cycles.filter((c) => {
+    const q = search.toLowerCase();
+    const matchesSearch =
+      `${c.season} ${c.farmer?.firstName} ${c.farmer?.lastName} ${c.farmer?.controlNumber || ''} ${c.farm?.farmCode || ''} ${c.riceVariety || ''}`
+        .toLowerCase()
+        .includes(q);
+    const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
+    const matchesSeason = seasonFilter === 'all' || c.season === seasonFilter;
+    return matchesSearch && matchesStatus && matchesSeason;
+  });
 
   return (
     <div>
@@ -54,7 +71,7 @@ export default function CropCyclesPage() {
         <input
           id="crop-cycles-search"
           type="search"
-          placeholder="Search season, farmer, or variety…"
+          placeholder="Search season, farmer, farm, or variety…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="input-field"
@@ -62,18 +79,61 @@ export default function CropCyclesPage() {
         />
       </div>
 
-      {/* Status Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '16px' }}>
         {(['PLANNED', 'ACTIVE', 'HARVESTED', 'COMPLETED'] as const).map((s) => {
           const count = cycles.filter(c => c.status === s).length;
           const colors: Record<string, string> = { PLANNED: 'var(--neutral-500)', ACTIVE: 'var(--accent)', HARVESTED: 'var(--gold-400)', COMPLETED: 'var(--blue-500)' };
+          const active = statusFilter === s;
           return (
-            <div key={s} className="stat-card" style={{ padding: '16px' }}>
+            <button
+              key={s}
+              type="button"
+              className="stat-card"
+              onClick={() => setStatusFilter(active ? 'all' : s)}
+              style={{
+                padding: '16px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                border: active ? '2px solid var(--accent)' : undefined,
+              }}
+            >
               <div style={{ fontSize: '22px', fontWeight: 700, color: colors[s], fontFamily: 'Outfit, sans-serif' }}>{count}</div>
               <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s}</div>
-            </div>
+            </button>
           );
         })}
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px', alignItems: 'center' }}>
+        <span style={{ fontSize: '12px', color: 'var(--neutral-500)', marginRight: '4px' }}>Season</span>
+        <button
+          type="button"
+          className={`badge ${seasonFilter === 'all' ? 'badge-green' : 'badge-gray'}`}
+          onClick={() => setSeasonFilter('all')}
+          style={{ cursor: 'pointer', border: 'none' }}
+        >
+          All
+        </button>
+        {seasons.map((season) => (
+          <button
+            key={season}
+            type="button"
+            className={`badge ${seasonFilter === season ? 'badge-green' : 'badge-gray'}`}
+            onClick={() => setSeasonFilter(season)}
+            style={{ cursor: 'pointer', border: 'none' }}
+          >
+            {season}
+          </button>
+        ))}
+        {(statusFilter !== 'all' || seasonFilter !== 'all') && (
+          <button
+            type="button"
+            onClick={() => { setStatusFilter('all'); setSeasonFilter('all'); }}
+            style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
@@ -104,9 +164,22 @@ export default function CropCyclesPage() {
                       <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
                         {c.farmer ? `${c.farmer.firstName} ${c.farmer.lastName}` : '—'}
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{c.farmer?.controlNumber}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{c.farmer?.controlNumber || '—'}</div>
                     </td>
-                    <td style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--accent)' }}>{c.farm?.farmCode || '—'}</td>
+                    <td>
+                      {c.farm?.id ? (
+                        <Link
+                          href={`/dashboard/farms/${c.farm.id}`}
+                          style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}
+                        >
+                          {c.farm.farmCode}
+                        </Link>
+                      ) : (
+                        <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--neutral-400)' }}>
+                          {c.farm?.farmCode || '—'}
+                        </span>
+                      )}
+                    </td>
                     <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{c.riceVariety || '—'}</td>
                     <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{c.estimatedYieldKg ? `${c.estimatedYieldKg} kg` : '—'}</td>
                     <td style={{ fontWeight: c.actualYieldKg ? 700 : 400, color: c.actualYieldKg ? 'var(--accent)' : 'var(--neutral-600)', fontSize: '13px' }}>

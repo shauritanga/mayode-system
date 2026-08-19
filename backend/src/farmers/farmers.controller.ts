@@ -76,14 +76,15 @@ export class FarmersController {
     const result = await this.farmersService.findAll(query);
     if (!query.format || query.format === 'json') return result;
     const rows = result.data.map((farmer: any) => ({
-      controlNumber: farmer.controlNumber,
-      firstName: farmer.firstName,
-      lastName: farmer.lastName,
-      phone: farmer.user?.phone ?? '',
-      village: farmer.village ?? '',
+      farmerId: farmer.controlNumber,
+      fullName: `${farmer.firstName} ${farmer.lastName}`.trim(),
+      gender: farmer.gender ?? '',
       district: farmer.district ?? '',
-      region: farmer.region ?? '',
-      verificationStatus: farmer.verificationStatus,
+      ward: farmer.ward ?? '',
+      village: farmer.village ?? '',
+      groupName: farmer.mamcos?.name ?? '',
+      farmSizeHa: farmer.farmSizeHa ?? 0,
+      status: farmer.verificationStatus,
     }));
     if (query.format === 'csv') {
       response.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -115,6 +116,7 @@ export class FarmersController {
   @Get('overview')
   @Roles(
     UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
@@ -143,6 +145,14 @@ export class FarmersController {
   }
 
   @Get('control-number/:controlNumber')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FINANCIAL_PROVIDER,
+  )
   @ApiOperation({
     summary: 'Get farmer by unique Control Number (e.g., MYD-00001)',
   })
@@ -152,12 +162,22 @@ export class FarmersController {
 
   @Get('me')
   @Roles(UserRole.FARMER)
-  @ApiOperation({ summary: 'Get the farmer profile linked to the current user' })
+  @ApiOperation({
+    summary: 'Get the farmer profile linked to the current user',
+  })
   findMe(@CurrentUser() user: RequestUser) {
     return this.farmersService.findMe(user.id);
   }
 
   @Get(':id')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
   @ApiOperation({
     summary:
       'Get farmer profile by ID (household, documents, verifications, farms)',
@@ -167,6 +187,15 @@ export class FarmersController {
   }
 
   @Get(':id/credit-score')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+    UserRole.FINANCIAL_PROVIDER,
+  )
   @ApiOperation({ summary: 'Get stored credit score and blacklist status' })
   getCreditScore(@Param('id') id: string) {
     return this.farmersService.getCreditScore(id);
@@ -191,6 +220,14 @@ export class FarmersController {
   }
 
   @Get(':id/production-summary')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
   @ApiOperation({
     summary: 'Farmer production history summary (yields per cycle)',
   })
@@ -202,6 +239,15 @@ export class FarmersController {
   }
 
   @Get(':id/financial-summary')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+    UserRole.FINANCIAL_PROVIDER,
+  )
   @ApiOperation({
     summary:
       'Farmer financial summary (costs, revenues, net profit). Premium: free users receive a locked preview.',
@@ -263,15 +309,16 @@ export class FarmersController {
     UserRole.FARMER,
   )
   @ApiOperation({ summary: 'List formal consent records for a farmer' })
-  listConsents(
-    @Param('id') id: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  listConsents(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.farmersService.listConsents(id, user);
   }
 
   @Post(':id/questionnaires')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+  )
   @ApiOperation({
     summary:
       'Capture official MAYOData farmer/farm questionnaire sections as an auditable record',
@@ -302,12 +349,26 @@ export class FarmersController {
   }
 
   @Get(':id/documents')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
   @ApiOperation({ summary: 'List a farmer’s uploaded documents' })
   listDocuments(@Param('id') id: string) {
     return this.farmersService.listDocuments(id);
   }
 
   @Patch(':id')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.FARMER,
+  )
   @ApiOperation({
     summary: 'Update farmer profile (own profile for farmers, any for staff)',
   })
@@ -321,7 +382,9 @@ export class FarmersController {
 
   @Patch(':id/assign-officer')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
-  @ApiOperation({ summary: 'Assign a field officer as responsible for a farmer\'s follow-up' })
+  @ApiOperation({
+    summary: "Assign a field officer as responsible for a farmer's follow-up",
+  })
   assignOfficer(@Param('id') id: string, @Body() dto: AssignOfficerDto) {
     return this.farmersService.assignOfficer(id, dto);
   }
@@ -360,6 +423,12 @@ export class FarmersController {
   }
 
   @Put(':id/household')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.FARMER,
+  )
   @ApiOperation({ summary: 'Create or update a farmer’s household record' })
   upsertHousehold(
     @Param('id') id: string,
@@ -370,6 +439,12 @@ export class FarmersController {
   }
 
   @Post(':id/documents')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.FARMER,
+  )
   @ApiOperation({
     summary: 'Link an uploaded file as a typed document on the farmer',
   })
@@ -382,6 +457,12 @@ export class FarmersController {
   }
 
   @Post(':id/identity')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.FARMER,
+  )
   @ApiOperation({
     summary:
       'Submit final-stage identity verification (ID document, number, photo/face capture) for officer review',

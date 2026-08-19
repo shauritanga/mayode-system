@@ -1,2 +1,37 @@
 import { apportionSale } from './allocation';
-describe('apportionSale', () => { it('allocates sale quantity, revenue and premium by source weight', () => { const result = apportionSale([{ farmerId: 'a', weightKg: 250 }, { farmerId: 'b', weightKg: 750 }], 800, 960000, 40000); expect(result).toEqual([{ farmerId: 'a', inventoryWeightKg: 250, weightShare: 0.25, quantityKg: 200, grossAmount: 240000, fairtradePremium: 10000 }, { farmerId: 'b', inventoryWeightKg: 750, weightShare: 0.75, quantityKg: 600, grossAmount: 720000, fairtradePremium: 30000 }]); }); it('rejects a zero-weight lot', () => { expect(() => apportionSale([{ farmerId: 'a', weightKg: 0 }], 1, 1)).toThrow('Lot source weight'); }); });
+describe('apportionSale', () => {
+  it('allocates sale quantity, revenue and premium by source weight', () => {
+    const result = apportionSale(
+      [
+        { farmerId: 'a', weightKg: 250 },
+        { farmerId: 'b', weightKg: 750 },
+      ],
+      800,
+      960000,
+      40000,
+    );
+    expect(result).toEqual([
+      {
+        farmerId: 'a',
+        inventoryWeightKg: 250,
+        weightShare: 0.25,
+        quantityKg: 200,
+        grossAmount: 240000,
+        fairtradePremium: 10000,
+      },
+      {
+        farmerId: 'b',
+        inventoryWeightKg: 750,
+        weightShare: 0.75,
+        quantityKg: 600,
+        grossAmount: 720000,
+        fairtradePremium: 30000,
+      },
+    ]);
+  });
+  it('rejects a zero-weight lot', () => {
+    expect(() => apportionSale([{ farmerId: 'a', weightKg: 0 }], 1, 1)).toThrow(
+      'Lot source weight',
+    );
+  });
+});

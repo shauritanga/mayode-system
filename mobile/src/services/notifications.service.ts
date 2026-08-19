@@ -1,13 +1,33 @@
-import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { ENABLE_PUSH_NOTIFICATIONS } from '../lib/config';
+
+/**
+ * Expo Go (SDK 53+) throws on import of expo-notifications on Android.
+ * Keep the module out of the Expo Go bundle path so the app can still run.
+ */
+const isExpoGo = Constants.appOwnership === 'expo';
+
+type NotificationsModule = typeof import('expo-notifications');
+type Subscription = { remove: () => void };
+
+let Notifications: NotificationsModule | null = null;
+if (!isExpoGo) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  Notifications = require('expo-notifications') as NotificationsModule;
+}
+
+export function isPushSupported(): boolean {
+  return !isExpoGo && Notifications != null && ENABLE_PUSH_NOTIFICATIONS;
+}
 
 /**
  * Configure how notifications are presented when the app is in the FOREGROUND.
  * Must be called once at app startup before any notifications can arrive.
  */
 export function setNotificationHandler() {
+  if (!Notifications) return;
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -21,11 +41,13 @@ export function setNotificationHandler() {
 
 /**
  * Request notification permissions and obtain an Expo Push Token.
- * Returns the token string if successful, or null if permissions denied / not a physical device.
+ * Returns the token string if successful, or null if unavailable / Expo Go.
  */
 export async function registerForPushNotifications(): Promise<string | null> {
-  // Skip entirely until FCM credentials + a real EAS projectId are configured.
-  if (!ENABLE_PUSH_NOTIFICATIONS) {
+  if (!isPushSupported() || !Notifications) {
+    if (isExpoGo) {
+      console.warn('[Notifications] Push is unavailable in Expo Go — use a development build.');
+    }
     return null;
   }
 
@@ -34,11 +56,9 @@ export async function registerForPushNotifications(): Promise<string | null> {
     return null;
   }
 
-  // Check existing permission status
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
 
-  // Request permission if not already granted
   if (existingStatus !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
@@ -49,7 +69,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
     return null;
   }
 
-  // Set up Android notification channel
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('mayode-default', {
       name: 'MAYODE Notifications',
@@ -65,8 +84,23 @@ export async function registerForPushNotifications(): Promise<string | null> {
     console.log('[Notifications] Expo Push Token:', token.data);
     return token.data;
   } catch (error) {
-    // Downgraded from console.error so it never triggers the dev red-box overlay.
     console.warn('[Notifications] Push token unavailable (FCM not configured):', error);
     return null;
   }
+}
+
+export function addNotificationReceivedListener(
+  listener: (notification: unknown) => void,
+): Subscription | null {
+  if (!Notifications) return null;
+  return Notifications.addNotificationReceivedListener(listener as never);
+}
+
+export function addNotificationResponseReceivedListener(
+  listener: (response: {
+    notification: { request: { content: { data: Record<string, unknown> } } };
+  }) => void,
+): Subscription | null {
+  if (!Notifications) return null;
+  return Notifications.addNotificationResponseReceivedListener(listener as never);
 }

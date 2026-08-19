@@ -1,28 +1,7 @@
+'use client';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-
-export function RoleHero({
-  eyebrow,
-  title,
-  subtitle,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  subtitle: string;
-  children?: ReactNode;
-}) {
-  return (
-    <section className="role-hero">
-      <div>
-        <p className="page-kicker">{eyebrow}</p>
-        <h1>{title}</h1>
-        <p>{subtitle}</p>
-      </div>
-      {children && <div className="role-hero-action">{children}</div>}
-    </section>
-  );
-}
+import { CountUpValue } from '@/components/CountUpValue';
 
 export function MetricTile({
   label,
@@ -38,9 +17,21 @@ export function MetricTile({
   return (
     <article className={`metric-tile metric-tile-${tone}`}>
       <span>{label}</span>
-      <strong>{value}</strong>
+      <strong>
+        <CountUpValue value={value} />
+      </strong>
       {hint && <small>{hint}</small>}
     </article>
+  );
+}
+
+export function MetricTileSkeleton() {
+  return (
+    <div className="metric-tile" aria-hidden="true">
+      <div className="skeleton skeleton-text" style={{ width: '45%' }} />
+      <div className="skeleton skeleton-title" style={{ marginTop: 14 }} />
+      <div className="skeleton skeleton-text" style={{ width: '70%', marginTop: 8 }} />
+    </div>
   );
 }
 

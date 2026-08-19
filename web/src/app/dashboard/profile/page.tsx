@@ -30,7 +30,7 @@ export default function ProfilePage() {
     setSavingLanguage(true);
     setMessage('');
     try {
-      await usersApi.update(user.id, { language });
+      await usersApi.updateProfile({ language });
       updateUser({ language });
       setMessage(language === 'sw' ? 'Lugha imehifadhiwa.' : 'Language preference saved.');
     } finally {

@@ -9,7 +9,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MamcosService } from './mamcos.service';
-import { CreateMamcosDto, UpdateMamcosDto, AssignFarmerDto, CreateSecretaryDto } from './dto/mamcos.dto';
+import {
+  CreateMamcosDto,
+  UpdateMamcosDto,
+  AssignFarmerDto,
+  CreateSecretaryDto,
+} from './dto/mamcos.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -25,12 +30,21 @@ export class MamcosController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Create a new MAMCOS cooperative scheme (Admin only)' })
+  @ApiOperation({
+    summary: 'Create a new MAMCOS cooperative scheme (Admin only)',
+  })
   create(@Body() createMamcosDto: CreateMamcosDto) {
     return this.mamcosService.create(createMamcosDto);
   }
 
   @Get()
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
   @ApiOperation({ summary: 'Get all MAMCOS cooperative schemes' })
   findAll() {
     return this.mamcosService.findAll();
@@ -38,19 +52,33 @@ export class MamcosController {
 
   @Get('secretary-dashboard')
   @Roles(UserRole.MAMCOS_SECRETARY)
-  @ApiOperation({ summary: 'Get MAMCOS Secretary dashboard (active scheme, farmers, stability bonus)' })
+  @ApiOperation({
+    summary:
+      'Get MAMCOS Secretary dashboard (active scheme, farmers, stability bonus)',
+  })
   getSecretaryDashboard(@CurrentUser() user: { id: string }) {
     return this.mamcosService.getSecretaryDashboard(user.id);
   }
 
   @Get('staff/field-officers')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
-  @ApiOperation({ summary: 'Platform-wide field officer directory (for admin assignment pickers)' })
+  @ApiOperation({
+    summary:
+      'Platform-wide field officer directory (for admin assignment pickers)',
+  })
   findAllFieldOfficers() {
     return this.mamcosService.findAllFieldOfficers();
   }
 
   @Get(':id')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
   @ApiOperation({ summary: 'Get MAMCOS details by ID' })
   findOne(@Param('id') id: string) {
     return this.mamcosService.findOne(id);
@@ -64,16 +92,29 @@ export class MamcosController {
   }
 
   @Post(':id/assign-farmer')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY, UserRole.FIELD_OFFICER)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.FIELD_OFFICER,
+  )
   @ApiOperation({ summary: 'Assign a farmer to a MAMCOS cooperative scheme' })
-  assignFarmer(@Param('id') id: string, @Body() assignFarmerDto: AssignFarmerDto) {
+  assignFarmer(
+    @Param('id') id: string,
+    @Body() assignFarmerDto: AssignFarmerDto,
+  ) {
     return this.mamcosService.assignFarmer(id, assignFarmerDto);
   }
 
   @Post(':id/secretary')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Register a secretary for a MAMCOS cooperative scheme' })
-  createSecretary(@Param('id') id: string, @Body() createSecretaryDto: CreateSecretaryDto) {
+  @ApiOperation({
+    summary: 'Register a secretary for a MAMCOS cooperative scheme',
+  })
+  createSecretary(
+    @Param('id') id: string,
+    @Body() createSecretaryDto: CreateSecretaryDto,
+  ) {
     return this.mamcosService.createSecretary(id, createSecretaryDto);
   }
 }

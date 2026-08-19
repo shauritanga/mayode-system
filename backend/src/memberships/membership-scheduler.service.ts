@@ -19,12 +19,17 @@ export class MembershipSchedulerService {
   })
   async run(): Promise<void> {
     try {
-      const { remindersSent, expired } = await this.memberships.processExpiries();
+      const { remindersSent, expired } =
+        await this.memberships.processExpiries();
       if (remindersSent > 0 || expired > 0) {
-        this.logger.log(`Membership expiry: ${remindersSent} reminder(s), ${expired} expired`);
+        this.logger.log(
+          `Membership expiry: ${remindersSent} reminder(s), ${expired} expired`,
+        );
       }
     } catch (e) {
-      this.logger.error(`Membership expiry job failed: ${e instanceof Error ? e.message : e}`);
+      this.logger.error(
+        `Membership expiry job failed: ${e instanceof Error ? e.message : e}`,
+      );
     }
   }
 }

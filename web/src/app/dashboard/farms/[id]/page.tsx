@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { farmsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
+import { isFarmBoundaryMapped } from '@/lib/farm-geo';
 
 interface FarmDetail {
   id: string;
@@ -75,7 +76,7 @@ export default function FarmDetailPage() {
     return <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Farm not found.</div>;
   }
 
-  const hasBoundary = !!farm.boundaryCoordinates && farm.centerLatitude != null;
+  const hasBoundary = isFarmBoundaryMapped(farm);
   const canApprove = (role === 'MAMCOS_SECRETARY' || role === 'SUPER_ADMIN') && !farm.isVerified;
 
   return (

@@ -1,2 +1,18 @@
 import { calculateLoanDeductions } from './deduction';
-describe('calculateLoanDeductions', () => { it('caps deductions at both the balance owed and payment amount', () => { expect(calculateLoanDeductions(100000, [{ id: 'a', amountOwed: 15000, autoDeductPercent: 30 }, { id: 'b', amountOwed: 90000, autoDeductPercent: 80 }])).toEqual({ deductions: [{ loanId: 'a', amount: 15000 }, { loanId: 'b', amount: 80000 }], totalDeduction: 95000, netAmount: 5000 }); }); });
+describe('calculateLoanDeductions', () => {
+  it('caps deductions at both the balance owed and payment amount', () => {
+    expect(
+      calculateLoanDeductions(100000, [
+        { id: 'a', amountOwed: 15000, autoDeductPercent: 30 },
+        { id: 'b', amountOwed: 90000, autoDeductPercent: 80 },
+      ]),
+    ).toEqual({
+      deductions: [
+        { loanId: 'a', amount: 15000 },
+        { loanId: 'b', amount: 80000 },
+      ],
+      totalDeduction: 95000,
+      netAmount: 5000,
+    });
+  });
+});

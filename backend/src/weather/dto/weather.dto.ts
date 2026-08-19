@@ -10,19 +10,23 @@ import {
 import { WeatherAlertSeverity, WeatherAlertType } from '@prisma/client';
 
 export class CreateWeatherAlertDto {
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   region?: string;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   district?: string;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   ward?: string;
 
   @IsEnum(WeatherAlertType)
   alertType: WeatherAlertType;
 
-  @IsOptional() @IsEnum(WeatherAlertSeverity)
+  @IsOptional()
+  @IsEnum(WeatherAlertSeverity)
   severity?: WeatherAlertSeverity;
 
   @IsString()
@@ -31,7 +35,8 @@ export class CreateWeatherAlertDto {
   @IsString()
   message: string;
 
-  @IsOptional() @IsDateString()
+  @IsOptional()
+  @IsDateString()
   validUntil?: string;
 }
 

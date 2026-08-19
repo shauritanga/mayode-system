@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -38,7 +39,11 @@ export class FarmLeasesController {
   constructor(private readonly leases: FarmLeasesService) {}
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+  )
   @ApiOperation({
     summary:
       'Owner adds a lease: names the renter for a farm and season (Add Lease)',
@@ -58,17 +63,27 @@ export class FarmLeasesController {
   @ApiOperation({
     summary: 'All leases, optionally filtered by status (staff only)',
   })
-  findAll(@Query('status') status?: LeaseStatus, @CurrentUser() user?: RequestUser) {
+  findAll(
+    @Query('status') status?: LeaseStatus,
+    @CurrentUser() user?: RequestUser,
+  ) {
     return this.leases.findAllLeases(status, user);
   }
 
   @Get('farm/:farmId')
+  @Roles(...STAFF_ROLES)
   @ApiOperation({ summary: 'Leases for a farm' })
   findForFarm(@Param('farmId') farmId: string) {
     return this.leases.findForFarm(farmId);
   }
 
   @Patch(':id/renter-confirm')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.FARMER,
+  )
   @ApiOperation({
     summary: 'Renter confirms the lease and becomes the active seasonal user',
   })
@@ -77,6 +92,12 @@ export class FarmLeasesController {
   }
 
   @Patch(':id/renter-reject')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.FARMER,
+  )
   @ApiOperation({ summary: 'Renter rejects the lease; the owner is notified' })
   renterReject(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.leases.renterReject(id, user);
@@ -98,6 +119,16 @@ export class FarmLeasesController {
   ) {
     return this.leases.officerVerify(id, user, dto);
   }
+
+  @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({
+    summary:
+      'Delete a lease that never went active (Admin only). ACTIVE/COMPLETED leases are kept for the audit trail',
+  })
+  remove(@Param('id') id: string) {
+    return this.leases.remove(id);
+  }
 }
 
 @ApiTags('seasonal-assignments')
@@ -108,11 +139,7 @@ export class SeasonalAssignmentsController {
   constructor(private readonly leases: FarmLeasesService) {}
 
   @Post('self-operate')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.FIELD_OFFICER,
-    UserRole.FARMER,
-  )
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({
     summary:
       'Owner declares self-farming for a season (OWNER_OPERATED assignment)',
@@ -130,9 +157,13 @@ export class SeasonalAssignmentsController {
   }
 
   @Get('farm/:farmId')
+  @Roles(...STAFF_ROLES, UserRole.FARMER)
   @ApiOperation({ summary: 'Seasonal assignments for a farm' })
-  forFarm(@Param('farmId') farmId: string) {
-    return this.leases.findAssignmentsForFarm(farmId);
+  forFarm(
+    @Param('farmId') farmId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.leases.findAssignmentsForFarm(farmId, user);
   }
 
   @Get()
@@ -151,11 +182,7 @@ export class FarmOwnershipsController {
   constructor(private readonly leases: FarmLeasesService) {}
 
   @Post('farm/:farmId/confirm')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.FIELD_OFFICER,
-    UserRole.FARMER,
-  )
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({
     summary:
       'Owner confirms the farm registered under their profile belongs to them',
@@ -169,9 +196,13 @@ export class FarmOwnershipsController {
   }
 
   @Get('farm/:farmId')
+  @Roles(...STAFF_ROLES, UserRole.FARMER)
   @ApiOperation({ summary: 'Ownership records for a farm' })
-  forFarm(@Param('farmId') farmId: string) {
-    return this.leases.findOwnershipForFarm(farmId);
+  forFarm(
+    @Param('farmId') farmId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.leases.findOwnershipForFarm(farmId, user);
   }
 
   @Get()

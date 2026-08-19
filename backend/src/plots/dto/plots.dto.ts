@@ -9,12 +9,18 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePlotDto {
-  @ApiProperty({ example: 'farm-uuid-1234', description: 'ID of the parent farm' })
+  @ApiProperty({
+    example: 'farm-uuid-1234',
+    description: 'ID of the parent farm',
+  })
   @IsString()
   @IsNotEmpty()
   farmId: string;
 
-  @ApiPropertyOptional({ example: 'North Paddy', description: 'Human-friendly plot name' })
+  @ApiPropertyOptional({
+    example: 'North Paddy',
+    description: 'Human-friendly plot name',
+  })
   @IsString()
   @IsOptional()
   name?: string;
@@ -58,7 +64,10 @@ export class UpdatePlotDto {
   @IsOptional()
   irrigationStatus?: string;
 
-  @ApiPropertyOptional({ example: 'VEGETATIVE', description: 'Current crop stage label' })
+  @ApiPropertyOptional({
+    example: 'VEGETATIVE',
+    description: 'Current crop stage label',
+  })
   @IsString()
   @IsOptional()
   currentStage?: string;

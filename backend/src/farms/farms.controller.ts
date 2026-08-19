@@ -11,7 +11,11 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FarmsService } from './farms.service';
-import { CreateFarmDto, UpdateFarmDto, UpdateBoundaryDto } from './dto/farms.dto';
+import {
+  CreateFarmDto,
+  UpdateFarmDto,
+  UpdateBoundaryDto,
+} from './dto/farms.dto';
 import { QueryFarmsDto } from './dto/query-farms.dto';
 import { LinkDocumentDto } from '../farmers/dto/farmer-actions.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -30,31 +34,69 @@ export class FarmsController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
-  @ApiOperation({ summary: 'Register a new farm with auto-generated Farm Code (e.g., FP-JD-01)' })
+  @ApiOperation({
+    summary:
+      'Register a new farm with auto-generated Farm Code (e.g., FP-JD-01)',
+  })
   create(@Body() dto: CreateFarmDto, @CurrentUser() user: RequestUser) {
     return this.farmsService.create(dto, user);
   }
 
   @Get()
-  @ApiOperation({ summary: 'List farms (filter by farmer/cooperative/grade/verified/village)' })
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
+  @ApiOperation({
+    summary: 'List farms (filter by farmer/cooperative/grade/verified/village)',
+  })
   findAll(@Query() query: QueryFarmsDto, @CurrentUser() user: RequestUser) {
     return this.farmsService.findAll(query, user);
   }
 
   @Get('overview')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY, UserRole.AUDITOR)
-  @ApiOperation({ summary: 'Farm/plot dashboard aggregates (mapped, verified, by grade)' })
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
+  @ApiOperation({
+    summary: 'Farm/plot dashboard aggregates (mapped, verified, by grade)',
+  })
   overview() {
     return this.farmsService.getOverview();
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get farm details by ID (plots, documents, verifications, crop cycles)' })
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
+  @ApiOperation({
+    summary:
+      'Get farm details by ID (plots, documents, verifications, crop cycles)',
+  })
   findOne(@Param('id') id: string) {
     return this.farmsService.findOne(id);
   }
 
   @Get(':id/productivity')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
   @ApiOperation({
     summary:
       'Farm productivity report (yield/acre, cost/acre, cost/kg). Premium: free users receive a locked preview.',
@@ -64,12 +106,28 @@ export class FarmsController {
   }
 
   @Get(':id/documents')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
   @ApiOperation({ summary: 'List a farm’s documents' })
   listDocuments(@Param('id') id: string) {
     return this.farmsService.listDocuments(id);
   }
 
   @Get('farmer/:farmerId')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
   @ApiOperation({ summary: 'Get all farms owned by a specific farmer' })
   findByFarmerId(@Param('farmerId') farmerId: string) {
     return this.farmsService.findByFarmerId(farmerId);
@@ -88,7 +146,9 @@ export class FarmsController {
 
   @Patch(':id/boundary')
   @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
-  @ApiOperation({ summary: 'Update farm GPS boundary (GeoJSON Polygon) and center Lat/Lng' })
+  @ApiOperation({
+    summary: 'Update farm GPS boundary (GeoJSON Polygon) and center Lat/Lng',
+  })
   updateBoundary(
     @Param('id') id: string,
     @Body() dto: UpdateBoundaryDto,
@@ -99,7 +159,9 @@ export class FarmsController {
 
   @Post(':id/review-boundary')
   @Roles(UserRole.SUPER_ADMIN, UserRole.MAMCOS_SECRETARY)
-  @ApiOperation({ summary: 'AMCOS reviews and approves a mapped farm boundary' })
+  @ApiOperation({
+    summary: 'AMCOS reviews and approves a mapped farm boundary',
+  })
   reviewBoundary(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.farmsService.reviewBoundary(id, user);
   }

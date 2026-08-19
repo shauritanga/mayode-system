@@ -25,7 +25,10 @@ import { DocumentsService } from './documents.service';
             },
           }),
           limits: {
-            fileSize: parseInt(config.get<string>('MAX_FILE_SIZE') || '10485760', 10),
+            fileSize: parseInt(
+              config.get<string>('MAX_FILE_SIZE') || '10485760',
+              10,
+            ),
           },
         };
       },

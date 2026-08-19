@@ -31,7 +31,10 @@ export class AuditInterceptor implements NestInterceptor {
     const path: string = req.route?.path || req.url || '';
     const segments = path.split('/').filter(Boolean);
     const apiIdx = segments.findIndex((s: string) => s === 'v1');
-    const entityType = apiIdx >= 0 ? segments[apiIdx + 1] || 'unknown' : segments[0] || 'unknown';
+    const entityType =
+      apiIdx >= 0
+        ? segments[apiIdx + 1] || 'unknown'
+        : segments[0] || 'unknown';
     const action = `${entityType}.${method.toLowerCase()}`;
 
     return next.handle().pipe(
@@ -81,8 +84,12 @@ export class AuditInterceptor implements NestInterceptor {
       'nationalId',
     ];
     const clone: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-      clone[key] = sensitive.some((needle) => key.toLowerCase().includes(needle.toLowerCase()))
+    for (const [key, item] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
+      clone[key] = sensitive.some((needle) =>
+        key.toLowerCase().includes(needle.toLowerCase()),
+      )
         ? '***'
         : this.redact(item);
     }

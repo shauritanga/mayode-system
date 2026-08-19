@@ -1,17 +1,12 @@
-import {
-  IsDateString,
-  IsObject,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsDateString, IsObject, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateAiIntegrationRecordDto {
   @IsString()
   @ApiProperty({
-    example: 'SOIL_TESTER',
+    example: 'FIELD_ADVISORY',
     description:
-      'Source system/type, e.g. SOIL_TESTER, DRONE_REPORT, RICE_SORTER, QR_TRACEABILITY, LOGISTICS_OPTIMIZER',
+      'Source system/type: FIELD_ADVISORY, SOIL_TESTER, DRONE_REPORT, RICE_SORTER, QR_TRACEABILITY, LOGISTICS_OPTIMIZER',
   })
   sourceType: string;
 

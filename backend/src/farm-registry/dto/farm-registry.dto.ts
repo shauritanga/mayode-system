@@ -9,12 +9,18 @@ import {
 } from 'class-validator';
 
 export class PreRegisterFarmDto {
-  @ApiPropertyOptional({ example: 'AMCOS registry contact', description: 'Optional historical contact; AMCOS is the legal farm owner' })
+  @ApiPropertyOptional({
+    example: 'AMCOS registry contact',
+    description: 'Optional historical contact; AMCOS is the legal farm owner',
+  })
   @IsOptional()
   @IsString()
   ownerName?: string;
 
-  @ApiPropertyOptional({ example: '+255712345678', description: 'Optional historical contact number' })
+  @ApiPropertyOptional({
+    example: '+255712345678',
+    description: 'Optional historical contact number',
+  })
   @IsOptional()
   @IsString()
   @Matches(/^\+?[0-9]{9,15}$/, {

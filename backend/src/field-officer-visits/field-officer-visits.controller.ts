@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { FieldOfficerVisitsService } from './field-officer-visits.service';
@@ -19,14 +27,19 @@ export class FieldOfficerVisitsController {
 
   @Post()
   @Roles(UserRole.FIELD_OFFICER)
-  @ApiOperation({ summary: 'Log a timestamped visit to a farmer (Field Officer only, own AMCOS only)' })
+  @ApiOperation({
+    summary:
+      'Log a timestamped visit to a farmer (Field Officer only, own AMCOS only)',
+  })
   create(@CurrentUser() user: RequestUser, @Body() dto: CreateVisitDto) {
     return this.visits.create(user.id, dto);
   }
 
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Get all field officer visits across the system (staff only)' })
+  @ApiOperation({
+    summary: 'Get all field officer visits across the system (staff only)',
+  })
   findAll() {
     return this.visits.findAll();
   }
@@ -40,15 +53,26 @@ export class FieldOfficerVisitsController {
 
   @Get('calendar')
   @Roles(UserRole.FIELD_OFFICER)
-  @ApiOperation({ summary: 'Combined calendar: own visits + upcoming crop-cycle milestones for the AMCOS' })
+  @ApiOperation({
+    summary:
+      'Combined calendar: own visits + upcoming crop-cycle milestones for the AMCOS',
+  })
   calendar(@CurrentUser() user: RequestUser, @Query() query: CalendarQueryDto) {
     return this.visits.calendar(user.id, query);
   }
 
   @Get('farmer/:farmerId')
-  @Roles(UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Roles(
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+  )
   @ApiOperation({ summary: 'Visit history for one farmer' })
-  findForFarmer(@Param('farmerId') farmerId: string, @CurrentUser() user: RequestUser) {
+  findForFarmer(
+    @Param('farmerId') farmerId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
     return this.visits.findForFarmer(farmerId, user);
   }
 }

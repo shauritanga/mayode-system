@@ -82,7 +82,14 @@ export class MembershipsService {
       orderBy: { createdAt: 'desc' },
       include: {
         user: { select: { id: true, phone: true } },
-        farmer: { select: { id: true, firstName: true, lastName: true, controlNumber: true } },
+        farmer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            controlNumber: true,
+          },
+        },
         plan: { select: { id: true, name: true, priceTzs: true } },
         farmingSeason: { select: { id: true, name: true } },
       },
@@ -120,7 +127,10 @@ export class MembershipsService {
   }
 
   /** Staff roles bypass the membership requirement. */
-  async hasPremiumAccess(user: { id: string; role: UserRole }): Promise<boolean> {
+  async hasPremiumAccess(user: {
+    id: string;
+    role: UserRole;
+  }): Promise<boolean> {
     if (PREMIUM_BYPASS_ROLES.includes(user.role)) return true;
     return this.hasActiveMembership(user.id);
   }
@@ -278,11 +288,19 @@ export class MembershipsService {
         body: 'Your membership payment was not completed. You can try again from the Membership screen.',
         data: { membershipId: membership.id },
       });
-      return { status: membership.status, active: false, paymentStatus: 'FAILED' };
+      return {
+        status: membership.status,
+        active: false,
+        paymentStatus: 'FAILED',
+      };
     }
 
     // Still processing / pending.
-    return { status: membership.status, active: false, paymentStatus: payment?.status ?? 'PENDING' };
+    return {
+      status: membership.status,
+      active: false,
+      paymentStatus: payment?.status ?? 'PENDING',
+    };
   }
 
   /** Mobile poll: re-query the user's latest pending membership if any. */
@@ -293,8 +311,82 @@ export class MembershipsService {
       select: { orderReference: true, status: true },
     });
     if (!membership) return { active: false, status: null };
-    if (ACTIVE_STATUSES.includes(membership.status) || !membership.orderReference) {
-      return { active: ACTIVE_STATUSES.includes(membership.status), status: membership.status };
+    if (
+      ACTIVE_STATUSES.includes(membership.status) ||
+      !membership.orderReference
+    ) {
+      return {
+        active: ACTIVE_STATUSES.includes(membership.status),
+        status: membership.status,
+      };
+    }
+    return this.reconcilePayment(membership.orderReference);
+  }
+
+  /**
+   * Staff: re-query ClickPesa for every pending membership that has an order
+   * reference. Idempotent — already-active rows are skipped.
+   */
+  async reconcilePendingPayments() {
+    const pending = await this.prisma.membership.findMany({
+      where: {
+        status: {
+          in: [MembershipStatus.PENDING, MembershipStatus.PAYMENT_PENDING],
+        },
+        orderReference: { not: null },
+      },
+      select: { id: true, orderReference: true },
+      take: 100,
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const results: {
+      id: string;
+      orderReference: string | null;
+      status?: string;
+      active?: boolean;
+      error?: string;
+    }[] = [];
+
+    for (const row of pending) {
+      try {
+        const outcome = await this.reconcilePayment(row.orderReference!);
+        results.push({
+          id: row.id,
+          orderReference: row.orderReference,
+          ...outcome,
+        });
+      } catch (e) {
+        results.push({
+          id: row.id,
+          orderReference: row.orderReference,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    const activated = results.filter((r) => r.active).length;
+    return {
+      checked: results.length,
+      activated,
+      results,
+    };
+  }
+
+  /** Staff: reconcile one membership by id (ClickPesa order or no-op if active). */
+  async reconcileById(id: string) {
+    const membership = await this.prisma.membership.findUnique({
+      where: { id },
+      select: { orderReference: true, status: true },
+    });
+    if (!membership) throw new NotFoundException('Membership not found');
+    if (ACTIVE_STATUSES.includes(membership.status)) {
+      return { status: membership.status, active: true };
+    }
+    if (!membership.orderReference) {
+      throw new BadRequestException(
+        'This membership has no payment order to reconcile — use Approve instead',
+      );
     }
     return this.reconcilePayment(membership.orderReference);
   }
@@ -344,8 +436,23 @@ export class MembershipsService {
       return m;
     });
 
-    const payments = await this.prisma.payment.findMany({ where: { membershipId: id, status: PaymentStatus.CLEARED } });
-    await Promise.all(payments.map((payment) => this.accounting.postToLedger('MembershipPayment', payment.id, payment.paidAt ?? now, `Membership payment ${membership.plan.name}`, [{ code: '1000', debit: payment.amount }, { code: '4200', credit: payment.amount }])));
+    const payments = await this.prisma.payment.findMany({
+      where: { membershipId: id, status: PaymentStatus.CLEARED },
+    });
+    await Promise.all(
+      payments.map((payment) =>
+        this.accounting.postToLedger(
+          'MembershipPayment',
+          payment.id,
+          payment.paidAt ?? now,
+          `Membership payment ${membership.plan.name}`,
+          [
+            { code: '1000', debit: payment.amount },
+            { code: '4200', credit: payment.amount },
+          ],
+        ),
+      ),
+    );
 
     await this.notifications.create({
       userId: membership.userId,
@@ -362,7 +469,11 @@ export class MembershipsService {
    * Manual activation by an admin (sponsored/waived, or when ClickPesa isn't
    * used). Payment confirmation is trusted to the approving staff member.
    */
-  async approve(id: string, approvedByUserId: string, dto: ApproveMembershipDto) {
+  async approve(
+    id: string,
+    approvedByUserId: string,
+    dto: ApproveMembershipDto,
+  ) {
     const membership = await this.prisma.membership.findUnique({
       where: { id },
       select: { status: true },
@@ -388,9 +499,13 @@ export class MembershipsService {
    *    notice. Expiry never touches farm/ownership/activity data — only the
    *    premium entitlement lapses.
    */
-  async processExpiries(windowDays = Number(process.env.MEMBERSHIP_REMINDER_DAYS) || 7) {
+  async processExpiries(
+    windowDays = Number(process.env.MEMBERSHIP_REMINDER_DAYS) || 7,
+  ) {
     const now = new Date();
-    const windowEnd = new Date(now.getTime() + windowDays * 24 * 60 * 60 * 1000);
+    const windowEnd = new Date(
+      now.getTime() + windowDays * 24 * 60 * 60 * 1000,
+    );
 
     // 1. Renewal reminders for memberships expiring soon (once each).
     const expiringSoon = await this.prisma.membership.findMany({
@@ -399,7 +514,10 @@ export class MembershipsService {
         endDate: { gte: now, lte: windowEnd },
         expiryReminderSentAt: null,
       },
-      include: { plan: { select: { name: true } }, user: { select: { phone: true } } },
+      include: {
+        plan: { select: { name: true } },
+        user: { select: { phone: true } },
+      },
     });
     for (const m of expiringSoon) {
       const when = m.endDate ? m.endDate.toLocaleDateString('en-GB') : 'soon';
@@ -411,7 +529,12 @@ export class MembershipsService {
         body: msg,
         data: { membershipId: m.id },
       });
-      if (m.user?.phone) await this.sms.send(m.user.phone, `MAYOData: ${msg}`, 'membership_expiry');
+      if (m.user?.phone)
+        await this.sms.send(
+          m.user.phone,
+          `MAYOData: ${msg}`,
+          'membership_expiry',
+        );
       await this.prisma.membership.update({
         where: { id: m.id },
         data: { expiryReminderSentAt: now },

@@ -30,11 +30,25 @@ export class SuppliersController {
   }
 
   @Get()
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
   findAll() {
     return this.suppliers.findAll();
   }
 
   @Get(':id')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
   findOne(@Param('id') id: string) {
     return this.suppliers.findOne(id);
   }

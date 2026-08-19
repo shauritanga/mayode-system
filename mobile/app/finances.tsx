@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { SquareLock02Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
+import { SquareLock02Icon, Cancel01Icon, Wallet01Icon, CoinsDollarIcon } from '@hugeicons/core-free-icons';
 import { farmersApi } from '../src/lib/data';
 import { useAuthStore } from '../src/store/auth.store';
 import { useI18n } from '../src/i18n';
@@ -62,6 +62,24 @@ export default function FinancesScreen() {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Stack.Screen options={{ headerShown: true, title: t('finances') }} />
       <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => router.push({ pathname: '/activity-select-cycle', params: { purpose: 'expense' } })}
+          >
+            <HugeiconsIcon icon={Wallet01Icon} size={18} color="#065F46" strokeWidth={2} />
+            <Text style={styles.actionText}>{t('addExpense')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => router.push({ pathname: '/activity-select-cycle', params: { purpose: 'sale' } })}
+          >
+            <HugeiconsIcon icon={CoinsDollarIcon} size={18} color="#065F46" strokeWidth={2} />
+            <Text style={styles.actionText}>{t('recordSale')}</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.actionsHint}>{t('financeRecordViaSeasonHint')}</Text>
+
         {financial?.locked ? (
           <View style={styles.lockedCard}>
             <View style={styles.lockedHeader}>
@@ -166,4 +184,19 @@ const styles = StyleSheet.create({
   lockedMsg: { fontSize: 13, color: '#92400E', marginTop: 4, lineHeight: 19 },
   unlockBtn: { backgroundColor: '#B45309', borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 14 },
   unlockBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#065F46',
+  },
+  actionText: { color: '#065F46', fontWeight: '800', fontSize: 13 },
+  actionsHint: { fontSize: 12, color: '#6B7280', lineHeight: 17, marginBottom: 16 },
 });

@@ -3,6 +3,7 @@ import { FarmLeasesModule } from '../farm-leases/farm-leases.module';
 import { FarmRegistryModule } from '../farm-registry/farm-registry.module';
 import { MessagingController } from './messaging.controller';
 import { UssdService } from './ussd.service';
+import { WebhookSecretGuard } from './webhook-secret.guard';
 
 /**
  * Inbound SMS + USSD webhooks. Imports FarmLeasesModule/FarmRegistryModule for
@@ -12,6 +13,6 @@ import { UssdService } from './ussd.service';
 @Module({
   imports: [FarmLeasesModule, FarmRegistryModule],
   controllers: [MessagingController],
-  providers: [UssdService],
+  providers: [UssdService, WebhookSecretGuard],
 })
 export class MessagingModule {}

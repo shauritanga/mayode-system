@@ -4,10 +4,12 @@ import { Tabs, useRouter, usePathname, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Home01Icon, Plant01Icon, ShoppingCart02Icon, UserCircleIcon, Notification03Icon, BellIcon, TaskDaily01Icon, UserGroupIcon, Calendar01Icon } from '@hugeicons/core-free-icons';
-import { notificationsApi } from '../../src/lib/data';
-import { useI18n } from '../../src/i18n';
-import { useAuthStore } from '../../src/store/auth.store';
+import { Home01Icon, Plant01Icon, UserCircleIcon, BellIcon, TaskDaily01Icon, UserGroupIcon, Calendar01Icon } from '@hugeicons/core-free-icons';
+// Bottom tabs: Dashboard · Farms · Activities · Profile (M-LAX is a root stack screen from the drawer)
+import { notificationsApi } from '../../../src/lib/data';
+import { useI18n } from '../../../src/i18n';
+import { useAuthStore } from '../../../src/store/auth.store';
+import { DrawerMenuButton } from '../../../src/components/DrawerMenuButton';
 
 /** Bell button with live unread badge; opens the notification center. */
 export function NotificationBell({ light = false }: { light?: boolean }) {
@@ -47,7 +49,10 @@ function CustomTopAppBar({ options }: any) {
     <SafeAreaView edges={['top']} style={styles.appBarContainer}>
       <StatusBar style="light" />
       <View style={styles.appBar}>
-        <Text style={styles.appBarTitle}>{options.title || t('dashboard')}</Text>
+        <View style={styles.appBarLeft}>
+          <DrawerMenuButton light />
+          <Text style={styles.appBarTitle} numberOfLines={1}>{options.title || t('dashboard')}</Text>
+        </View>
         <NotificationBell light />
       </View>
     </SafeAreaView>
@@ -66,9 +71,9 @@ function CustomBottomNav() {
       <SafeAreaView edges={['bottom']} style={styles.bottomNavContainer}>
         <View style={styles.bottomNav}>
           <NavButton icon={Home01Icon} label="Workspace" active={pathname === '/' || pathname === '/(tabs)'} onPress={() => router.push('/')} />
-          <NavButton icon={UserGroupIcon} label={t('myFarmers')} active={pathname.startsWith('/officer/farmer')} onPress={() => router.push('/officer/farmers')} />
-          <NavButton icon={Calendar01Icon} label={t('calendar')} active={pathname === '/officer/calendar'} onPress={() => router.push('/officer/calendar')} />
-          <NavButton icon={TaskDaily01Icon} label={t('reports')} active={pathname === '/officer/reports'} onPress={() => router.push('/officer/reports')} />
+          <NavButton icon={UserGroupIcon} label={t('myFarmers')} active={pathname.includes('/officer/farmer')} onPress={() => router.push('/officer/farmers')} />
+          <NavButton icon={Calendar01Icon} label={t('calendar')} active={pathname.includes('/officer/calendar')} onPress={() => router.push('/officer/calendar')} />
+          <NavButton icon={TaskDaily01Icon} label={t('reports')} active={pathname.includes('/officer/reports')} onPress={() => router.push('/officer/reports')} />
           <NavButton icon={UserCircleIcon} label={t('profile')} active={pathname === '/profile' || pathname === '/(tabs)/profile'} onPress={() => router.push('/profile')} />
         </View>
       </SafeAreaView>
@@ -92,7 +97,6 @@ function CustomBottomNav() {
   const isDashboard = pathname === '/' || pathname === '/(tabs)';
   const isFarms = pathname === '/farms' || pathname === '/(tabs)/farms';
   const isActivities = pathname === '/activities';
-  const isMarketplace = pathname === '/marketplace' || pathname === '/(tabs)/marketplace';
   const isProfile = pathname === '/profile' || pathname === '/(tabs)/profile';
 
   return (
@@ -145,21 +149,6 @@ function CustomBottomNav() {
 
         <TouchableOpacity
           style={styles.navTab}
-          onPress={() => router.push('/marketplace')}
-        >
-          <HugeiconsIcon
-            icon={ShoppingCart02Icon}
-            size={24}
-            color={isMarketplace ? '#10B981' : '#6B7280'}
-            strokeWidth={isMarketplace ? 2 : 1.5}
-          />
-          <Text style={[styles.navText, isMarketplace && styles.navTextActive]}>
-            M-LAX
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navTab}
           onPress={() => router.push('/profile')}
         >
           <HugeiconsIcon
@@ -199,7 +188,6 @@ export default function TabsLayout() {
       {/* Farms tab has its own Stack (farms/_layout) that renders headers per screen */}
       <Tabs.Screen name="farms" options={{ title: t('manageFarms'), headerShown: false }} />
       <Tabs.Screen name="activities" options={{ title: t('recentActivities') }} />
-      <Tabs.Screen name="marketplace" options={{ title: t('marketplace') }} />
       <Tabs.Screen name="profile" options={{ title: t('myProfile') }} />
     </Tabs>
   );
@@ -215,11 +203,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: '#065F46',
   },
+  appBarLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginRight: 8,
+  },
   appBarTitle: {
+    flexShrink: 1,
     fontSize: 19,
     fontWeight: '800',
     color: '#FFFFFF',

@@ -37,6 +37,9 @@ real API.
 
 ## Phase A — Buyer directory (blocks proper Fairtrade attribution)
 
+**Status (2026-08):** Backend + web buyers CRUD exist. Mobile harvest sale now has an optional
+buyer picker (`buyerId` on `POST /finance/revenue`); `GET /buyers` allows `FARMER`.
+
 **Problem**: `Revenue.buyerId` and `Sale.buyerId` reference a `Buyer` model that has
 **no controller, no service, no endpoint anywhere**. The revenue screen built in the
 last pass deliberately omits buyer selection because there's nothing to select from.
@@ -63,10 +66,12 @@ last pass deliberately omits buyer selection because there's nothing to select f
 
 ## Phase B — Inventory module has zero mobile presence
 
-**Problem**: `InventoryModule` (post-harvest stock, lots, receiving) exists on the
-backend with a full service, but `mobile/src/lib/api.ts` has no `inventoryApi` at all
-and no screen references it. Web has a dashboard page (`/dashboard/inventory`) but it's
-staff-only viewing, not farmer-facing.
+**Status (2026-08):** Farmer mobile warehouse stock shipped — `GET/POST /inventory/records/mine`,
+`GET /inventory/summary/mine`, drawer **Warehouse stock**, crop-cycle entry after harvest,
+activity feed `inventory.received`. Official AMCOS weigh-in remains staff `POST /inventory/records`.
+
+**Problem** (historical): `InventoryModule` existed on the backend with a full service, but
+mobile had no `inventoryApi` and no screen. Web dashboard was staff-only.
 
 **Decide first**: is inventory tracking meant to be farmer-facing (e.g. "how many bags
 of paddy do I have in storage") or purely a MAMCOS/warehouse concern? `prompt.md` §2.1
@@ -121,9 +126,10 @@ a screen for a model that's about to be deprecated is wasted work.
 
 ## Phase E — Weather provider indicator (small, high-visibility)
 
-**Problem**: `comments-from-owner.md` §2.3 explicitly asked "confirm whether weather
-shows real data" — it does, but the UI never surfaces *which* provider served it, so
-from the owner's seat it still looks unconfirmed.
+**Status (2026-08):** Mobile home already shows `Live weather from {provider}`. Web weather
+page now shows a Live · provider badge from the forecast API (`provider: Open-Meteo`).
+
+**Problem** (historical): owner asked to confirm real weather data; UI never named the provider.
 
 **Mobile**: wherever weather is rendered (farm detail / dashboard weather card), add a
 small caption using the `provider` field already returned by `weather.service.ts` —

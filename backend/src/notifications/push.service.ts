@@ -42,7 +42,7 @@ export class PushService {
       select: { pushToken: true },
     });
     if (!isExpoToken(user?.pushToken)) return;
-    await this.sendToTokens([user!.pushToken!], message);
+    await this.sendToTokens([user.pushToken], message);
   }
 
   /** Push to many users by id (batched by Expo's 100-message limit). */
@@ -60,7 +60,10 @@ export class PushService {
    * Post messages to Expo and reconcile the response. Never throws — push is
    * best-effort and must not break the enqueue path.
    */
-  private async sendToTokens(tokens: string[], message: PushMessage): Promise<void> {
+  private async sendToTokens(
+    tokens: string[],
+    message: PushMessage,
+  ): Promise<void> {
     if (tokens.length === 0) return;
 
     for (let i = 0; i < tokens.length; i += 100) {
@@ -78,12 +81,16 @@ export class PushService {
           headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
-            ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
+            ...(this.accessToken
+              ? { Authorization: `Bearer ${this.accessToken}` }
+              : {}),
           },
           body: JSON.stringify(messages),
         });
         if (!res.ok) {
-          this.logger.error(`Expo push failed: ${res.status} ${await res.text()}`);
+          this.logger.error(
+            `Expo push failed: ${res.status} ${await res.text()}`,
+          );
           continue;
         }
         const json = (await res.json()) as {
@@ -91,7 +98,9 @@ export class PushService {
         };
         await this.reconcile(batch, json.data ?? []);
       } catch (e) {
-        this.logger.error(`Expo push error: ${e instanceof Error ? e.message : e}`);
+        this.logger.error(
+          `Expo push error: ${e instanceof Error ? e.message : e}`,
+        );
       }
     }
   }
@@ -103,7 +112,10 @@ export class PushService {
   ): Promise<void> {
     const dead: string[] = [];
     tickets.forEach((ticket, idx) => {
-      if (ticket.status === 'error' && ticket.details?.error === 'DeviceNotRegistered') {
+      if (
+        ticket.status === 'error' &&
+        ticket.details?.error === 'DeviceNotRegistered'
+      ) {
         dead.push(tokens[idx]);
       }
     });

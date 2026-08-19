@@ -25,11 +25,16 @@ export class CreateVisitDto {
   @IsOptional()
   cropCycleId?: string;
 
-  @ApiProperty({ enum: FieldOfficerVisitPurpose, example: FieldOfficerVisitPurpose.ROUTINE_CHECK })
+  @ApiProperty({
+    enum: FieldOfficerVisitPurpose,
+    example: FieldOfficerVisitPurpose.ROUTINE_CHECK,
+  })
   @IsEnum(FieldOfficerVisitPurpose)
   purpose: FieldOfficerVisitPurpose;
 
-  @ApiPropertyOptional({ example: 'Discussed fertilizer timing for the current crop cycle.' })
+  @ApiPropertyOptional({
+    example: 'Discussed fertilizer timing for the current crop cycle.',
+  })
   @IsString()
   @IsOptional()
   notes?: string;

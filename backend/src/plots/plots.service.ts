@@ -2,7 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { ActivitiesService } from '../activities/activities.service';
-import { CreatePlotDto, UpdatePlotDto, UpdatePlotBoundaryDto } from './dto/plots.dto';
+import {
+  CreatePlotDto,
+  UpdatePlotDto,
+  UpdatePlotBoundaryDto,
+} from './dto/plots.dto';
 
 @Injectable()
 export class PlotsService {
@@ -80,7 +84,9 @@ export class PlotsService {
             farmCode: true,
             name: true,
             farmerId: true,
-            farmer: { select: { controlNumber: true, firstName: true, lastName: true } },
+            farmer: {
+              select: { controlNumber: true, firstName: true, lastName: true },
+            },
           },
         },
         cropCycles: {
@@ -98,7 +104,11 @@ export class PlotsService {
     return this.prisma.plot.update({ where: { id }, data: dto });
   }
 
-  async updateBoundary(id: string, dto: UpdatePlotBoundaryDto, user: RequestUser) {
+  async updateBoundary(
+    id: string,
+    dto: UpdatePlotBoundaryDto,
+    user: RequestUser,
+  ) {
     await this.ownership.assertPlotAccess(user, id);
     const existing = await this.findOne(id);
     const plot = await this.prisma.plot.update({

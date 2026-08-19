@@ -161,6 +161,7 @@ export class FarmersService {
         include: {
           user: { select: { phone: true, email: true, isActive: true } },
           mamcos: { select: { name: true } },
+          farms: { select: { socialHectares: true } },
           _count: { select: { farms: true, cropCycles: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -170,7 +171,10 @@ export class FarmersService {
     ]);
 
     return {
-      data,
+      data: data.map(({ farms, ...farmer }) => ({
+        ...farmer,
+        farmSizeHa: farms.reduce((sum, f) => sum + (f.socialHectares ?? 0), 0),
+      })),
       pagination: {
         total,
         page,
@@ -306,7 +310,9 @@ export class FarmersService {
       select: { id: true, role: true },
     });
     if (!officer) {
-      throw new NotFoundException(`Field officer with ID ${dto.officerId} not found`);
+      throw new NotFoundException(
+        `Field officer with ID ${dto.officerId} not found`,
+      );
     }
     if (officer.role !== MamcosStaffRole.FIELD_OFFICER) {
       throw new ConflictException('Assignee must be a field officer');
@@ -790,8 +796,9 @@ export class FarmersService {
       (sum, loan) => sum + loan.amountOwed,
       0,
     );
-    const activeLoanCount = farmer.loanRecords.filter((loan) => loan.isActive)
-      .length;
+    const activeLoanCount = farmer.loanRecords.filter(
+      (loan) => loan.isActive,
+    ).length;
 
     const readiness = await this.getCreditReadiness(farmerId, user);
     const latestFinancialConsent = farmer.consentRecords.find((record) =>
@@ -960,7 +967,13 @@ export class FarmersService {
       0,
     );
     const farmSizeScore =
-      totalHectares >= 2 ? 10 : totalHectares >= 1 ? 6 : totalHectares > 0 ? 3 : 0;
+      totalHectares >= 2
+        ? 10
+        : totalHectares >= 1
+          ? 6
+          : totalHectares > 0
+            ? 3
+            : 0;
 
     // 8. Insurance status (max 10) — an active policy demonstrates managed production risk
     const hasActiveInsurance = farmer.insurancePolicies.some(

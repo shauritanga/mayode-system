@@ -7,7 +7,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Camera01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
-import { leasesApi, uploadsApi } from '../src/lib/data';
+import { leasesApi, uploadsApi, resolveMediaUrl } from '../src/lib/data';
 import { useI18n } from '../src/i18n';
 
 const DECISIONS = ['VERIFIED', 'REJECTED', 'NEEDS_MORE_INFO', 'DISPUTED'] as const;
@@ -118,7 +118,7 @@ export default function LeaseVerify() {
           <View style={styles.evidenceRow}>
             {evidenceUrls.map((url) => (
               <View key={url} style={styles.thumbWrap}>
-                <Image source={{ uri: url }} style={styles.thumb} />
+                <Image source={{ uri: resolveMediaUrl(url) ?? url }} style={styles.thumb} />
                 <TouchableOpacity style={styles.thumbRemove} onPress={() => removeEvidence(url)}>
                   <HugeiconsIcon icon={Cancel01Icon} size={12} color="#fff" strokeWidth={2.5} />
                 </TouchableOpacity>

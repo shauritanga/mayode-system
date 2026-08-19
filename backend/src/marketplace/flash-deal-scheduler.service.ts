@@ -22,10 +22,14 @@ export class FlashDealSchedulerService {
     try {
       const dropped = await this.marketplace.applyDueFlashDealDrops();
       if (dropped > 0) {
-        this.logger.log(`M-LAX flash-deal auto-drop: ${dropped} listing(s) repriced`);
+        this.logger.log(
+          `M-LAX flash-deal auto-drop: ${dropped} listing(s) repriced`,
+        );
       }
     } catch (e) {
-      this.logger.error(`M-LAX flash-deal auto-drop job failed: ${e instanceof Error ? e.message : e}`);
+      this.logger.error(
+        `M-LAX flash-deal auto-drop job failed: ${e instanceof Error ? e.message : e}`,
+      );
     }
   }
 }

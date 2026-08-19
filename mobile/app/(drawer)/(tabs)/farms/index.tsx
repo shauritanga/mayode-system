@@ -5,10 +5,12 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Location01Icon, Tree02Icon } from '@hugeicons/core-free-icons';
-import { farmsApi, workspaceApi } from '../../../src/lib/data';
-import { useAuthStore } from '../../../src/store/auth.store';
+import { farmsApi, workspaceApi } from '../../../../src/lib/data';
+import { useAuthStore } from '../../../../src/store/auth.store';
 import { StatusBar } from 'expo-status-bar';
-import { useI18n } from '../../../src/i18n';
+import { useI18n } from '../../../../src/i18n';
+import { isFarmBoundaryMapped } from '../../../../src/lib/farm-geo';
+import { FarmBoundaryPreview } from '../../../../src/components/FarmBoundaryPreview';
 
 interface Farm {
   id: string;
@@ -51,11 +53,20 @@ export default function FarmsIndex() {
         const assignments = assignmentsRes.data?.activeAssignments ?? [];
         const assignedFarms = assignments.map((assignment: any) => ({
           ...assignment.farm,
-          grade: assignment.farm?.grade || 'C', socialHectares: assignment.farm?.socialHectares || 0,
-          hasIrrigation: !!assignment.farm?.hasIrrigation, isLeased: true, isVerified: true,
+          grade: assignment.farm?.grade || 'C',
+          socialHectares: assignment.farm?.socialHectares || 0,
+          hasIrrigation: !!assignment.farm?.hasIrrigation,
+          isLeased: true,
+          isVerified: assignment.farm?.isVerified ?? true,
         }));
+        // Merge carefully: assignment payloads used to overwrite owned farms and
+        // strip GPS/boundary fields. Prefer the richer record for each id.
         const byId = new Map<string, Farm>();
-        [...owned, ...assignedFarms].forEach((f: Farm) => byId.set(f.id, f));
+        // Assignments first, owned last — owned record wins on overlapping fields (GPS/boundary).
+        for (const farm of [...assignedFarms, ...owned]) {
+          const prev = byId.get(farm.id);
+          byId.set(farm.id, prev ? { ...prev, ...farm } : farm);
+        }
         setFarms(Array.from(byId.values()));
       }
     } catch (e) {
@@ -94,7 +105,7 @@ export default function FarmsIndex() {
         ) : (
           farms.map((farm) => {
             const grade = gradeColors[farm.grade] || gradeColors.B;
-            const hasGPS = !!farm.centerLatitude && !!farm.centerLongitude;
+            const mapped = isFarmBoundaryMapped(farm);
             return (
               <TouchableOpacity
                 key={farm.id}
@@ -102,6 +113,14 @@ export default function FarmsIndex() {
                 onPress={() => router.push({ pathname: '/farm/[id]', params: { id: farm.id } })}
                 activeOpacity={0.8}
               >
+                {mapped ? (
+                  <FarmBoundaryPreview
+                    boundaryCoordinates={farm.boundaryCoordinates}
+                    height={132}
+                    style={styles.cardMap}
+                  />
+                ) : null}
+
                 <View style={styles.farmHeader}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.farmCode}>{farm.farmCode}</Text>
@@ -141,13 +160,13 @@ export default function FarmsIndex() {
                   </View>
                   <View style={styles.detailItem}>
                     <Text style={styles.detailLabel}>{t('gpsBoundary')}</Text>
-                    <Text style={[styles.detailValue, { color: hasGPS ? '#10B981' : '#9CA3AF' }]}>
-                      {hasGPS ? t('mappedPin') : t('notMappedWarn')}
+                    <Text style={[styles.detailValue, { color: mapped ? '#10B981' : '#9CA3AF' }]}>
+                      {mapped ? t('mappedPin') : t('notMappedWarn')}
                     </Text>
                   </View>
                 </View>
 
-                {!hasGPS && (
+                {!mapped && (
                   <TouchableOpacity
                     style={styles.gpsPrompt}
                     onPress={() => router.push({ pathname: '/boundary', params: { id: farm.id } })}
@@ -194,7 +213,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#E5E7EB',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    overflow: 'hidden',
   },
+  cardMap: { marginHorizontal: -18, marginTop: -18, marginBottom: 14, borderRadius: 0, borderWidth: 0 },
   farmHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   farmCode: { fontSize: 18, fontWeight: '800', color: '#10B981' },
   farmerName: { fontSize: 13, color: '#374151', fontWeight: '600', marginTop: 2 },

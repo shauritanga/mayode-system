@@ -32,7 +32,10 @@ export class CreateRewardCampaignDto {
   @IsEnum(RewardType)
   rewardType: RewardType;
 
-  @ApiPropertyOptional({ example: 4, description: 'Reward quantity per winner (e.g. bags)' })
+  @ApiPropertyOptional({
+    example: 4,
+    description: 'Reward quantity per winner (e.g. bags)',
+  })
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -43,12 +46,17 @@ export class CreateRewardCampaignDto {
   @Min(1)
   numberOfWinners: number;
 
-  @ApiPropertyOptional({ description: 'Restrict eligibility to a farming season' })
+  @ApiPropertyOptional({
+    description: 'Restrict eligibility to a farming season',
+  })
   @IsOptional()
   @IsUUID()
   farmingSeasonId?: string;
 
-  @ApiPropertyOptional({ type: [String], description: 'Restrict to these cooperative (AMCOS) IDs' })
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Restrict to these cooperative (AMCOS) IDs',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -64,7 +72,10 @@ export class CreateRewardCampaignDto {
   @IsDateString()
   eligibilityEndDate?: string;
 
-  @ApiPropertyOptional({ enum: SelectionMethod, default: SelectionMethod.RANDOM })
+  @ApiPropertyOptional({
+    enum: SelectionMethod,
+    default: SelectionMethod.RANDOM,
+  })
   @IsOptional()
   @IsEnum(SelectionMethod)
   selectionMethod?: SelectionMethod;

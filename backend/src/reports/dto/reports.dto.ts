@@ -1,4 +1,14 @@
-import { IsBoolean, IsDateString, IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { Gender, PremiumFundEntryType } from '@prisma/client';
 
@@ -25,7 +35,11 @@ export class ReportFilterDto extends DateRangeDto {
 }
 
 export class ReportFormatDto extends ReportFilterDto {
-  @IsOptional() @IsEnum(['json', 'csv', 'xlsx', 'pdf'] as const) format?: 'json' | 'csv' | 'xlsx' | 'pdf';
+  @IsOptional() @IsEnum(['json', 'csv', 'xlsx', 'pdf'] as const) format?:
+    | 'json'
+    | 'csv'
+    | 'xlsx'
+    | 'pdf';
 }
 
 export class CreatePremiumFundEntryDto {
@@ -33,4 +47,26 @@ export class CreatePremiumFundEntryDto {
   @IsNumber() @Min(0.01) amount: number;
   @IsString() description: string;
   @IsOptional() @IsDateString() entryDate?: string;
+}
+
+/**
+ * Custom report run: entity + column keys are validated against the
+ * server-side catalog, so no raw field names ever reach Prisma.
+ */
+export class RunBuilderDto extends ReportFilterDto {
+  @IsString() entity: string;
+  @IsArray() @ArrayMinSize(1) @IsString({ each: true }) columns: string[];
+  /**
+   * Related entities to join in (e.g. ["farmers", "farms"]). Their columns are
+   * requested namespaced as "entity.column". Validated against the server-side
+   * join graph — at most one expanding (one-to-many) relation per report.
+   */
+  @IsOptional() @IsArray() @IsString({ each: true }) joins?: string[];
+  @IsOptional() @IsEnum(['json', 'csv', 'xlsx', 'pdf'] as const) format?:
+    | 'json'
+    | 'csv'
+    | 'xlsx'
+    | 'pdf';
+  @IsOptional() @IsString() name?: string;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(1) limit?: number;
 }

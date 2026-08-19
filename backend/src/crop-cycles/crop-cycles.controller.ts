@@ -31,6 +31,7 @@ import { ReportFormatDto } from '../reports/dto/reports.dto';
 
 const STAFF_ROLES = [
   UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
   UserRole.FIELD_OFFICER,
   UserRole.MAMCOS_SECRETARY,
   UserRole.AUDITOR,
@@ -127,7 +128,9 @@ export class CropCyclesController {
 
   @Get('activity/:id')
   @Roles(...STAFF_ROLES)
-  @ApiOperation({ summary: 'Get a single activity log entry by ID (staff only)' })
+  @ApiOperation({
+    summary: 'Get a single activity log entry by ID (staff only)',
+  })
   findActivityLog(@Param('id') id: string) {
     return this.cropCyclesService.findActivityLogById(id);
   }
@@ -135,7 +138,10 @@ export class CropCyclesController {
   @Patch('activity/:id')
   @Roles(...STAFF_ROLES)
   @ApiOperation({ summary: 'Edit an activity log entry (staff only)' })
-  updateActivityLog(@Param('id') id: string, @Body() dto: UpdateActivityLogDto) {
+  updateActivityLog(
+    @Param('id') id: string,
+    @Body() dto: UpdateActivityLogDto,
+  ) {
     return this.cropCyclesService.updateActivityLog(id, dto);
   }
 
@@ -147,6 +153,7 @@ export class CropCyclesController {
   }
 
   @Get(':id')
+  @Roles(...STAFF_ROLES, UserRole.FARMER)
   @ApiOperation({
     summary:
       'Get crop cycle details by ID (with activity logs, costs, revenues)',
@@ -156,6 +163,7 @@ export class CropCyclesController {
   }
 
   @Get('farm/:farmId')
+  @Roles(...STAFF_ROLES, UserRole.FARMER)
   @ApiOperation({ summary: 'Get all crop cycles for a specific farm' })
   findByFarmId(
     @Param('farmId') farmId: string,
@@ -165,6 +173,7 @@ export class CropCyclesController {
   }
 
   @Get('farmer/:farmerId')
+  @Roles(...STAFF_ROLES, UserRole.FARMER)
   @ApiOperation({ summary: 'Get all crop cycles owned by a specific farmer' })
   findByFarmerId(
     @Param('farmerId') farmerId: string,

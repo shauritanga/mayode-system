@@ -121,7 +121,12 @@ export class CropCyclesService {
       include: {
         farm: { select: { id: true, farmCode: true, socialHectares: true } },
         farmer: {
-          select: { id: true, controlNumber: true, firstName: true, lastName: true },
+          select: {
+            id: true,
+            controlNumber: true,
+            firstName: true,
+            lastName: true,
+          },
         },
         _count: { select: { activities: true, costs: true, revenues: true } },
       },
@@ -133,8 +138,21 @@ export class CropCyclesService {
     return this.prisma.activityLog.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        fieldOfficer: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
-        cropCycle: { select: { season: true, riceVariety: true, farm: { select: { farmCode: true } } } },
+        fieldOfficer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            employeeCode: true,
+          },
+        },
+        cropCycle: {
+          select: {
+            season: true,
+            riceVariety: true,
+            farm: { select: { farmCode: true } },
+          },
+        },
       },
     });
   }
@@ -143,11 +161,25 @@ export class CropCyclesService {
     const activity = await this.prisma.activityLog.findUnique({
       where: { id },
       include: {
-        fieldOfficer: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
-        cropCycle: { select: { season: true, riceVariety: true, farm: { select: { farmCode: true } } } },
+        fieldOfficer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            employeeCode: true,
+          },
+        },
+        cropCycle: {
+          select: {
+            season: true,
+            riceVariety: true,
+            farm: { select: { farmCode: true } },
+          },
+        },
       },
     });
-    if (!activity) throw new NotFoundException(`Activity log with ID ${id} not found`);
+    if (!activity)
+      throw new NotFoundException(`Activity log with ID ${id} not found`);
     return activity;
   }
 
@@ -161,7 +193,14 @@ export class CropCyclesService {
         inputsUsed: dto.inputsUsed ?? undefined,
       },
       include: {
-        fieldOfficer: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
+        fieldOfficer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            employeeCode: true,
+          },
+        },
       },
     });
   }
@@ -244,7 +283,7 @@ export class CropCyclesService {
       ? new Date(toStr)
       : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const [cycles, activityLogs] = await Promise.all([
+    const [cycles, activityLogs, riceTasks] = await Promise.all([
       this.prisma.cropCycle.findMany({
         where: {
           farmerId: farmer.id,
@@ -270,6 +309,20 @@ export class CropCyclesService {
           },
         },
       }),
+      this.prisma.riceCalendarTask.findMany({
+        where: {
+          cropCycle: { farmerId: farmer.id },
+          dueDate: { gte: from, lte: to },
+        },
+        include: {
+          cropCycle: {
+            select: {
+              id: true,
+              farm: { select: { id: true, farmCode: true, name: true } },
+            },
+          },
+        },
+      }),
     ]);
 
     const entries = [
@@ -280,6 +333,15 @@ export class CropCyclesService {
         activityType: a.activityType,
         cropCycleId: a.cropCycleId,
         farm: a.cropCycle.farm,
+      })),
+      ...riceTasks.map((task) => ({
+        type: 'RICE_TASK' as const,
+        date: task.dueDate,
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        cropCycleId: task.cropCycleId,
+        farm: task.cropCycle.farm,
       })),
       ...cycles
         .filter(
@@ -345,7 +407,10 @@ export class CropCyclesService {
     });
 
     if (dto.plantingDate || dto.expectedHarvest) {
-      await this.riceProtocols.scheduleForCycle(cropCycle.id, cropCycle.farm?.mamcosId);
+      await this.riceProtocols.scheduleForCycle(
+        cropCycle.id,
+        cropCycle.farm?.mamcosId,
+      );
     }
 
     if (dto.status && dto.status !== existing.status) {

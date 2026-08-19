@@ -58,11 +58,11 @@
       ]
     ],
     "extra": {
-      "apiUrl": "http://139.59.139.30:3002/api/v1",
       "router": {},
       "eas": {
         "projectId": "12fa966a-1b88-4a37-aadc-a648cc002a31"
-      }
+      },
+      "apiUrl": "http://139.59.139.30:3002/api/v1"
     },
     "owner": "shauritanga"
   }

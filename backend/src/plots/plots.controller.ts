@@ -9,7 +9,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { PlotsService } from './plots.service';
 import {
   CreatePlotDto,
@@ -31,8 +36,15 @@ export class PlotsController {
   constructor(private readonly plotsService: PlotsService) {}
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
-  @ApiOperation({ summary: 'Create a plot under a farm (auto plot code, e.g. FP-JD-01-P1)' })
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.FARMER,
+  )
+  @ApiOperation({
+    summary: 'Create a plot under a farm (auto plot code, e.g. FP-JD-01-P1)',
+  })
   create(@Body() dto: CreatePlotDto, @CurrentUser() user: RequestUser) {
     return this.plotsService.create(dto, user);
   }
@@ -57,7 +69,12 @@ export class PlotsController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.FARMER,
+  )
   @ApiOperation({ summary: 'Update plot details' })
   update(
     @Param('id') id: string,
@@ -68,8 +85,15 @@ export class PlotsController {
   }
 
   @Patch(':id/boundary')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
-  @ApiOperation({ summary: 'Update plot GPS boundary (GeoJSON Polygon) and center Lat/Lng' })
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.FARMER,
+  )
+  @ApiOperation({
+    summary: 'Update plot GPS boundary (GeoJSON Polygon) and center Lat/Lng',
+  })
   updateBoundary(
     @Param('id') id: string,
     @Body() dto: UpdatePlotBoundaryDto,

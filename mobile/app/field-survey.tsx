@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Location01Icon, CheckmarkCircle02Icon, Camera01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
-import { fieldSurveysApi, farmsApi, uploadsApi } from '../src/lib/data';
+import { fieldSurveysApi, farmsApi, uploadsApi, resolveMediaUrl } from '../src/lib/data';
 import { getCurrentPoint } from '../src/services/location.service';
 import { useI18n } from '../src/i18n';
 import { useAuthStore } from '../src/store/auth.store';
@@ -201,7 +201,7 @@ export default function FieldSurveyScreen() {
           <View style={styles.photoRow}>
             {photoUrls.map((url) => (
               <View key={url} style={styles.thumbWrap}>
-                <Image source={{ uri: url }} style={styles.thumb} />
+                <Image source={{ uri: resolveMediaUrl(url) ?? url }} style={styles.thumb} />
                 <TouchableOpacity style={styles.thumbRemove} onPress={() => removePhoto(url)}>
                   <HugeiconsIcon icon={Cancel01Icon} size={12} color="#fff" strokeWidth={2.5} />
                 </TouchableOpacity>

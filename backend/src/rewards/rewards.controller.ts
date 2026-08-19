@@ -43,7 +43,10 @@ export class RewardsController {
   @Post('campaigns')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @ApiOperation({ summary: 'Create a reward campaign (admin)' })
-  createCampaign(@Body() dto: CreateRewardCampaignDto, @CurrentUser() user: RequestUser) {
+  createCampaign(
+    @Body() dto: CreateRewardCampaignDto,
+    @CurrentUser() user: RequestUser,
+  ) {
     return this.rewards.createCampaign(dto, user);
   }
 
@@ -78,14 +81,18 @@ export class RewardsController {
 
   @Get('campaigns/:id/reproduce')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR)
-  @ApiOperation({ summary: 'Reproduce winners from the stored seed + snapshot (audit)' })
+  @ApiOperation({
+    summary: 'Reproduce winners from the stored seed + snapshot (audit)',
+  })
   reproduce(@Param('id') id: string) {
     return this.rewards.reproduceSelection(id);
   }
 
   @Post('campaigns/:id/approve')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Approve & announce winners — notifies each in-app + SMS (admin)' })
+  @ApiOperation({
+    summary: 'Approve & announce winners — notifies each in-app + SMS (admin)',
+  })
   approve(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.rewards.approveAndNotify(id, user);
   }

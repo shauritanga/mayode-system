@@ -18,13 +18,16 @@ export class UpsertInsuranceProviderDto {
   @IsString()
   name: string;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   contactPerson?: string;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   phone?: string;
 
-  @IsOptional() @IsEmail()
+  @IsOptional()
+  @IsEmail()
   email?: string;
 }
 
@@ -32,10 +35,12 @@ export class CreateInsurancePolicyDto {
   @IsString()
   farmerId: string;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   farmId?: string;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   cropCycleId?: string;
 
   @IsString()
@@ -44,22 +49,28 @@ export class CreateInsurancePolicyDto {
   @IsEnum(InsuranceProductType)
   productType: InsuranceProductType;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   riceVariety?: string;
 
-  @IsNumber() @Min(0.01)
+  @IsNumber()
+  @Min(0.01)
   insuredAreaHectares: number;
 
-  @IsNumber() @Min(0)
+  @IsNumber()
+  @Min(0)
   sumInsured: number;
 
-  @IsNumber() @Min(0)
+  @IsNumber()
+  @Min(0)
   premiumAmount: number;
 
-  @IsOptional() @IsDateString()
+  @IsOptional()
+  @IsDateString()
   startDate?: string;
 
-  @IsOptional() @IsDateString()
+  @IsOptional()
+  @IsDateString()
   endDate?: string;
 }
 
@@ -69,22 +80,31 @@ export class UpdatePolicyStatusDto {
 }
 
 export class AmendPolicyDto {
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   riceVariety?: string;
 
-  @IsOptional() @IsNumber() @Min(0.01)
+  @IsOptional()
+  @IsNumber()
+  @Min(0.01)
   insuredAreaHectares?: number;
 
-  @IsOptional() @IsNumber() @Min(0)
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
   sumInsured?: number;
 
-  @IsOptional() @IsNumber() @Min(0)
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
   premiumAmount?: number;
 
-  @IsOptional() @IsDateString()
+  @IsOptional()
+  @IsDateString()
   startDate?: string;
 
-  @IsOptional() @IsDateString()
+  @IsOptional()
+  @IsDateString()
   endDate?: string;
 }
 
@@ -92,13 +112,18 @@ export class RenewPolicyDto {
   @IsDateString()
   startDate: string;
 
-  @IsOptional() @IsDateString()
+  @IsOptional()
+  @IsDateString()
   endDate?: string;
 
-  @IsOptional() @IsNumber() @Min(0)
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
   sumInsured?: number;
 
-  @IsOptional() @IsNumber() @Min(0)
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
   premiumAmount?: number;
 }
 
@@ -112,19 +137,23 @@ export class CreateInsuranceClaimDto {
   @IsString()
   incidentType: string;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   description?: string;
 
-  @IsNumber() @Min(0)
+  @IsNumber()
+  @Min(0)
   claimedAmount: number;
 }
 
 export class InspectClaimDto {
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   inspectionNotes?: string;
 
   @ApiPropertyOptional({ enum: ClaimStatus })
-  @IsOptional() @IsEnum(ClaimStatus)
+  @IsOptional()
+  @IsEnum(ClaimStatus)
   status?: ClaimStatus;
 }
 
@@ -132,6 +161,8 @@ export class UpdateClaimPaymentDto {
   @IsEnum(ClaimStatus)
   status: ClaimStatus;
 
-  @IsOptional() @IsNumber() @Min(0)
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
   paidAmount?: number;
 }

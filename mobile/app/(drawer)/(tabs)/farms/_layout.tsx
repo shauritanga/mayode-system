@@ -1,6 +1,7 @@
 import React from 'react';
 import { Stack } from 'expo-router';
-import { useI18n } from '../../../src/i18n';
+import { useI18n } from '../../../../src/i18n';
+import { DrawerMenuButton } from '../../../../src/components/DrawerMenuButton';
 
 /**
  * Stack navigator for the Farms tab — it only holds the list. Detail, register,
@@ -15,6 +16,7 @@ export default function FarmsLayout() {
         headerStyle: { backgroundColor: '#065F46' },
         headerTintColor: '#FFFFFF',
         headerTitleStyle: { fontWeight: '800' },
+        headerLeft: () => <DrawerMenuButton light />,
       }}
     >
       <Stack.Screen name="index" options={{ title: t('farms') }} />

@@ -17,7 +17,7 @@ function initials(firstName?: string, lastName?: string, phone?: string): string
  * Avatar + dropdown (Profile / Logout), shared between the sticky header (compact)
  * and the sidebar footer (full name + role visible). Click-outside and Escape close it.
  */
-export default function UserMenu({ variant = 'header' }: { variant?: 'header' | 'sidebar' }) {
+export default function UserMenu({ variant = 'header', collapsed = false }: { variant?: 'header' | 'sidebar'; collapsed?: boolean }) {
   const { user, clearAuth } = useAuthStore();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -54,16 +54,19 @@ export default function UserMenu({ variant = 'header' }: { variant?: 'header' | 
       <button
         id="user-menu-trigger"
         onClick={() => setOpen((o) => !o)}
+        title={collapsed ? displayName : undefined}
+        aria-label={collapsed ? `Account menu — ${displayName}` : undefined}
         style={{
           display: 'flex',
           alignItems: 'center',
+          justifyContent: collapsed ? 'center' : undefined,
           gap: '10px',
-          background: variant === 'sidebar' ? 'var(--surface-2)' : 'transparent',
-          border: variant === 'sidebar' ? '1px solid var(--border)' : '1px solid transparent',
+          background: variant === 'sidebar' && !collapsed ? 'var(--surface-2)' : 'transparent',
+          border: variant === 'sidebar' && !collapsed ? '1px solid var(--border)' : '1px solid transparent',
           borderRadius: variant === 'sidebar' ? '12px' : '10px',
-          padding: variant === 'sidebar' ? '8px 10px' : '4px 8px 4px 4px',
+          padding: collapsed ? '4px' : variant === 'sidebar' ? '8px 10px' : '4px 8px 4px 4px',
           cursor: 'pointer',
-          width: variant === 'sidebar' ? '100%' : 'auto',
+          width: variant === 'sidebar' && !collapsed ? '100%' : 'auto',
           transition: 'all 0.15s ease',
         }}
       >
@@ -73,7 +76,7 @@ export default function UserMenu({ variant = 'header' }: { variant?: 'header' | 
         >
           {initialsText}
         </span>
-        {variant === 'sidebar' && (
+        {variant === 'sidebar' && !collapsed && (
           <span style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {displayName}
@@ -81,7 +84,9 @@ export default function UserMenu({ variant = 'header' }: { variant?: 'header' | 
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{user?.role}</div>
           </span>
         )}
-        <HugeiconsIcon icon={ChevronDownIcon} size={14} color="var(--text-secondary)" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+        {!collapsed && (
+          <HugeiconsIcon icon={ChevronDownIcon} size={14} color="var(--text-secondary)" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+        )}
       </button>
 
       {open && (
@@ -89,7 +94,9 @@ export default function UserMenu({ variant = 'header' }: { variant?: 'header' | 
           className="dropdown-menu"
           style={
             variant === 'sidebar'
-              ? { bottom: 'calc(100% + 8px)', left: 0, right: 0 }
+              ? collapsed
+                ? { bottom: 'calc(100% + 8px)', left: 0 }
+                : { bottom: 'calc(100% + 8px)', left: 0, right: 0 }
               : { top: 'calc(100% + 10px)', right: 0 }
           }
         >

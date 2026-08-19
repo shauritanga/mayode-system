@@ -47,7 +47,9 @@ export class LoansService {
     return this.prisma.loanRecord.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        farmer: { select: { firstName: true, lastName: true, controlNumber: true } },
+        farmer: {
+          select: { firstName: true, lastName: true, controlNumber: true },
+        },
       },
     });
   }

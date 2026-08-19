@@ -6,7 +6,6 @@ import {
   EmptyState,
   InsightPanel,
   MetricTile,
-  RoleHero,
   money,
 } from '@/components/role-dashboards/DashboardPrimitives';
 import { governanceApi, reportsApi } from '@/lib/api';
@@ -36,11 +35,6 @@ export default function LeadershipDashboardPage() {
   const latestIncome = impact?.farmerIncomeOverTime?.slice?.(-1)?.[0];
 
   return <div className="role-dashboard">
-    <RoleHero
-      eyebrow="Board and management"
-      title="Leadership Dashboard"
-      subtitle="Strategic view of farmer income, production, Fairtrade premium fund, membership growth and governance execution."
-    />
     {error && <EmptyState>{error}</EmptyState>}
 
     <div className="role-grid">

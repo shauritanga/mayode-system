@@ -76,7 +76,8 @@ export class ClickPesaService {
 
   constructor(private readonly config: ConfigService) {
     this.baseUrl =
-      this.config.get<string>('CLICKPESA_BASE_URL') || 'https://api.clickpesa.com';
+      this.config.get<string>('CLICKPESA_BASE_URL') ||
+      'https://api.clickpesa.com';
     this.clientId = this.config.get<string>('CLICKPESA_CLIENT_ID');
     this.apiKey = this.config.get<string>('CLICKPESA_API_KEY');
     this.checksumKey = this.config.get<string>('CLICKPESA_CHECKSUM_KEY');
@@ -134,7 +135,9 @@ export class ClickPesaService {
       },
     });
     if (!res.ok) {
-      throw new Error(`ClickPesa token request failed: ${res.status} ${await res.text()}`);
+      throw new Error(
+        `ClickPesa token request failed: ${res.status} ${await res.text()}`,
+      );
     }
     const body = (await res.json()) as { success?: boolean; token?: string };
     if (!body.token) throw new Error('ClickPesa token response missing token');
@@ -146,7 +149,10 @@ export class ClickPesaService {
     return this.cachedToken;
   }
 
-  private async authedFetch(path: string, init: RequestInit): Promise<Response> {
+  private async authedFetch(
+    path: string,
+    init: RequestInit,
+  ): Promise<Response> {
     const token = await this.getToken();
     return fetch(`${this.baseUrl}${path}`, {
       ...init,
@@ -191,7 +197,9 @@ export class ClickPesaService {
       { method: 'POST', body: JSON.stringify(payload) },
     );
     if (!res.ok) {
-      throw new Error(`ClickPesa preview failed: ${res.status} ${await res.text()}`);
+      throw new Error(
+        `ClickPesa preview failed: ${res.status} ${await res.text()}`,
+      );
     }
     return (await res.json()) as { activeMethods: ActiveMethod[] };
   }
@@ -216,7 +224,9 @@ export class ClickPesaService {
       { method: 'POST', body: JSON.stringify(payload) },
     );
     if (!res.ok) {
-      throw new Error(`ClickPesa initiate failed: ${res.status} ${await res.text()}`);
+      throw new Error(
+        `ClickPesa initiate failed: ${res.status} ${await res.text()}`,
+      );
     }
     return (await res.json()) as UssdPushResult;
   }
@@ -225,17 +235,23 @@ export class ClickPesaService {
    * Authoritative server-to-server status check. Use this (not the raw webhook
    * body) to decide whether to activate — it can't be spoofed.
    */
-  async queryPayment(orderReference: string): Promise<PaymentStatusResult | null> {
+  async queryPayment(
+    orderReference: string,
+  ): Promise<PaymentStatusResult | null> {
     const res = await this.authedFetch(
       `/third-parties/payments/${encodeURIComponent(orderReference)}`,
       { method: 'GET' },
     );
     if (res.status === 404) return null;
     if (!res.ok) {
-      throw new Error(`ClickPesa query failed: ${res.status} ${await res.text()}`);
+      throw new Error(
+        `ClickPesa query failed: ${res.status} ${await res.text()}`,
+      );
     }
     // The query endpoint may return a single object or a list; normalize.
-    const body = (await res.json()) as PaymentStatusResult | PaymentStatusResult[];
+    const body = (await res.json()) as
+      | PaymentStatusResult
+      | PaymentStatusResult[];
     const record = Array.isArray(body) ? body[0] : body;
     return record ?? null;
   }
@@ -255,9 +271,13 @@ export class ClickPesaService {
 
   /** Check available payout balance before disbursing (recommended pre-flight). */
   async getAccountBalance(): Promise<AccountBalance> {
-    const res = await this.authedFetch('/third-parties/accounts/balance', { method: 'GET' });
+    const res = await this.authedFetch('/third-parties/accounts/balance', {
+      method: 'GET',
+    });
     if (!res.ok) {
-      throw new Error(`ClickPesa balance check failed: ${res.status} ${await res.text()}`);
+      throw new Error(
+        `ClickPesa balance check failed: ${res.status} ${await res.text()}`,
+      );
     }
     return (await res.json()) as AccountBalance;
   }
@@ -277,12 +297,17 @@ export class ClickPesaService {
     const checksum = this.generateChecksum(payload);
     if (checksum) payload.checksum = checksum;
 
-    const res = await this.authedFetch('/third-parties/payouts/preview-mno-payout-request', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
+    const res = await this.authedFetch(
+      '/third-parties/payouts/preview-mno-payout-request',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    );
     if (!res.ok) {
-      throw new Error(`ClickPesa payout preview failed: ${res.status} ${await res.text()}`);
+      throw new Error(
+        `ClickPesa payout preview failed: ${res.status} ${await res.text()}`,
+      );
     }
     return (await res.json()) as { activeMethods: ActiveMethod[] };
   }
@@ -304,27 +329,38 @@ export class ClickPesaService {
     const checksum = this.generateChecksum(payload);
     if (checksum) payload.checksum = checksum;
 
-    const res = await this.authedFetch('/third-parties/payouts/initiate-mno-payout-request', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
+    const res = await this.authedFetch(
+      '/third-parties/payouts/initiate-mno-payout-request',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    );
     if (!res.ok) {
-      throw new Error(`ClickPesa payout initiate failed: ${res.status} ${await res.text()}`);
+      throw new Error(
+        `ClickPesa payout initiate failed: ${res.status} ${await res.text()}`,
+      );
     }
     return (await res.json()) as PayoutResult;
   }
 
   /** Authoritative server-to-server payout status check. */
-  async queryPayoutStatus(orderReference: string): Promise<PayoutStatusResult | null> {
+  async queryPayoutStatus(
+    orderReference: string,
+  ): Promise<PayoutStatusResult | null> {
     const res = await this.authedFetch(
       `/third-parties/payouts/${encodeURIComponent(orderReference)}`,
       { method: 'GET' },
     );
     if (res.status === 404) return null;
     if (!res.ok) {
-      throw new Error(`ClickPesa payout query failed: ${res.status} ${await res.text()}`);
+      throw new Error(
+        `ClickPesa payout query failed: ${res.status} ${await res.text()}`,
+      );
     }
-    const body = (await res.json()) as PayoutStatusResult | PayoutStatusResult[];
+    const body = (await res.json()) as
+      | PayoutStatusResult
+      | PayoutStatusResult[];
     const record = Array.isArray(body) ? body[0] : body;
     return record ?? null;
   }

@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateDistrictDto, CreateRegionDto, CreateWardDto, UpdateLocationNameDto } from './dto/location.dto';
+import {
+  CreateDistrictDto,
+  CreateRegionDto,
+  CreateWardDto,
+  UpdateLocationNameDto,
+} from './dto/location.dto';
 
 @Injectable()
 export class LocationsService {
@@ -24,27 +29,37 @@ export class LocationsService {
   }
 
   async createDistrict(dto: CreateDistrictDto) {
-    const region = await this.prisma.region.findUnique({ where: { id: dto.regionId } });
-    if (!region) throw new NotFoundException(`Region with ID ${dto.regionId} not found`);
+    const region = await this.prisma.region.findUnique({
+      where: { id: dto.regionId },
+    });
+    if (!region)
+      throw new NotFoundException(`Region with ID ${dto.regionId} not found`);
     return this.prisma.district.create({ data: dto });
   }
 
   async updateDistrict(id: string, dto: UpdateLocationNameDto) {
     const district = await this.prisma.district.findUnique({ where: { id } });
-    if (!district) throw new NotFoundException(`District with ID ${id} not found`);
+    if (!district)
+      throw new NotFoundException(`District with ID ${id} not found`);
     return this.prisma.district.update({ where: { id }, data: dto });
   }
 
   async deleteDistrict(id: string) {
     const district = await this.prisma.district.findUnique({ where: { id } });
-    if (!district) throw new NotFoundException(`District with ID ${id} not found`);
+    if (!district)
+      throw new NotFoundException(`District with ID ${id} not found`);
     await this.prisma.district.delete({ where: { id } });
     return { deleted: true };
   }
 
   async createWard(dto: CreateWardDto) {
-    const district = await this.prisma.district.findUnique({ where: { id: dto.districtId } });
-    if (!district) throw new NotFoundException(`District with ID ${dto.districtId} not found`);
+    const district = await this.prisma.district.findUnique({
+      where: { id: dto.districtId },
+    });
+    if (!district)
+      throw new NotFoundException(
+        `District with ID ${dto.districtId} not found`,
+      );
     return this.prisma.ward.create({ data: dto });
   }
 
@@ -71,7 +86,9 @@ export class LocationsService {
   }
 
   async findDistrictsByRegion(regionId: string) {
-    const region = await this.prisma.region.findUnique({ where: { id: regionId } });
+    const region = await this.prisma.region.findUnique({
+      where: { id: regionId },
+    });
     if (!region) {
       throw new NotFoundException(`Region with ID ${regionId} not found`);
     }
@@ -86,7 +103,9 @@ export class LocationsService {
   }
 
   async findWardsByDistrict(districtId: string) {
-    const district = await this.prisma.district.findUnique({ where: { id: districtId } });
+    const district = await this.prisma.district.findUnique({
+      where: { id: districtId },
+    });
     if (!district) {
       throw new NotFoundException(`District with ID ${districtId} not found`);
     }

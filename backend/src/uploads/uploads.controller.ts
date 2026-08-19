@@ -36,7 +36,8 @@ export class UploadsController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Upload a single file (photo, document, receipt). Returns a URL to reference elsewhere.',
+    summary:
+      'Upload a single file (photo, document, receipt). Returns a URL to reference elsewhere.',
   })
   @ApiBody({
     schema: {

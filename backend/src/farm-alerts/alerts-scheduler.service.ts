@@ -21,10 +21,14 @@ export class AlertsSchedulerService {
     try {
       const { farms, created } = await this.alerts.generateAll();
       if (created > 0) {
-        this.logger.log(`Scheduled alert generation: ${created} new alert(s) across ${farms} farm(s)`);
+        this.logger.log(
+          `Scheduled alert generation: ${created} new alert(s) across ${farms} farm(s)`,
+        );
       }
     } catch (e) {
-      this.logger.error(`Scheduled alert generation failed: ${e instanceof Error ? e.message : e}`);
+      this.logger.error(
+        `Scheduled alert generation failed: ${e instanceof Error ? e.message : e}`,
+      );
     }
   }
 }

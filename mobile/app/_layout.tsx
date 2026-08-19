@@ -1,21 +1,27 @@
+import 'react-native-gesture-handler';
 import React, { useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import * as Notifications from 'expo-notifications';
 import { useAuthStore } from '../src/store/auth.store';
-import { usersApi } from '../src/lib/data';
+import { farmersApi, usersApi } from '../src/lib/data';
+import { isMobileAllowedRole } from '../src/lib/mobile-roles';
 import { useI18n } from '../src/i18n';
 import {
   setNotificationHandler,
   registerForPushNotifications,
+  addNotificationReceivedListener,
+  addNotificationResponseReceivedListener,
+  isPushSupported,
 } from '../src/services/notifications.service';
 import { syncQueue } from '../src/services/sync-queue';
 
-// Configure foreground notification presentation globally
+// Configure foreground notification presentation globally (no-op in Expo Go).
 setNotificationHandler();
 
 export default function RootLayout() {
-  const { isAuthenticated, hasOnboarded, setPushToken, _hydrated } = useAuthStore();
+  const { isAuthenticated, hasOnboarded, setPushToken, _hydrated, user, clearAuth, farmerId, setFarmerId } =
+    useAuthStore();
   const { t } = useI18n();
   const segments = useSegments();
   const router = useRouter();
@@ -25,20 +31,34 @@ export default function RootLayout() {
   // use last-write-wins; the backend's updatedAt timestamp remains authoritative.
   useEffect(() => syncQueue.start(), []);
 
-  const notificationListener = useRef<Notifications.EventSubscription | null>(null);
-  const responseListener = useRef<Notifications.EventSubscription | null>(null);
+  // Backfill farmerId for sessions that logged in before /farmers/me was used
+  // (old flow hit a staff-only control-number endpoint and left farmerId null).
+  useEffect(() => {
+    if (!_hydrated || !isAuthenticated || user?.role !== 'FARMER' || farmerId) return;
+    let cancelled = false;
+    farmersApi
+      .me()
+      .then((res) => {
+        if (!cancelled && res.data?.id) setFarmerId(res.data.id);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [_hydrated, isAuthenticated, user?.role, farmerId, setFarmerId]);
+
+  const notificationListener = useRef<{ remove: () => void } | null>(null);
+  const responseListener = useRef<{ remove: () => void } | null>(null);
 
   // ──────────────────────────────────────────────────────────────
   // Register push token & set up notification listeners once authenticated
   // ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !isPushSupported()) return;
 
-    // Register for push notifications and store the token
     registerForPushNotifications().then(async (token) => {
       if (token) {
         setPushToken(token);
-        // Register push token on backend for server-side push delivery
         try {
           await usersApi.updatePushToken(token);
         } catch (e) {
@@ -47,21 +67,18 @@ export default function RootLayout() {
       }
     });
 
-    // Foreground: notification received while app is open
-    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
+    notificationListener.current = addNotificationReceivedListener((notification) => {
       console.log('[Notification Received]', notification);
     });
 
-    // Background/Quit: user tapped a notification
-    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+    responseListener.current = addNotificationResponseReceivedListener((response) => {
       console.log('[Notification Tapped]', response);
-      const data = response.notification.request.content.data as Record<string, unknown>;
+      const data = response.notification.request.content.data;
 
-      // Navigate based on notification payload (customise as needed)
       if (data?.screen === 'marketplace') {
-        router.push('/(tabs)/marketplace');
+        router.push('/marketplace');
       } else if (data?.screen === 'farms') {
-        router.push('/(tabs)/farms');
+        router.push('/farms');
       }
     });
 
@@ -69,7 +86,7 @@ export default function RootLayout() {
       notificationListener.current?.remove();
       responseListener.current?.remove();
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, setPushToken, router]);
 
   // ──────────────────────────────────────────────────────────────
   // Auth-based navigation guard
@@ -78,6 +95,13 @@ export default function RootLayout() {
     if (!rootNavigationState?.key) return;
     // Wait until persisted auth state has rehydrated to avoid a flash-logout.
     if (!_hydrated) return;
+
+    // Drop persisted sessions for roles that belong on the web dashboard.
+    if (isAuthenticated && user && !isMobileAllowedRole(user.role)) {
+      clearAuth();
+      Alert.alert(t('mobileAccessDeniedTitle'), t('mobileAccessDeniedMessage'));
+      return;
+    }
 
     const timer = setTimeout(() => {
       const inAuthGroup = segments[0] === 'login' || segments[0] === 'register';
@@ -88,19 +112,19 @@ export default function RootLayout() {
       } else if (hasOnboarded && !isAuthenticated && !inAuthGroup && !inOnboardingGroup) {
         router.replace('/login');
       } else if (isAuthenticated && (inAuthGroup || inOnboardingGroup)) {
-        router.replace('/(tabs)');
+        router.replace('/(drawer)/(tabs)');
       }
     }, 1);
 
     return () => clearTimeout(timer);
-  }, [isAuthenticated, hasOnboarded, segments, rootNavigationState?.key, _hydrated]);
+  }, [isAuthenticated, hasOnboarded, segments, rootNavigationState?.key, _hydrated, user, clearAuth, t, router]);
 
   return (
     <SafeAreaProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="splash" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="register" options={{ headerShown: false }} />
         <Stack.Screen
@@ -128,8 +152,24 @@ export default function RootLayout() {
           options={{ headerShown: true, title: t('notificationCenter'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '800' } }}
         />
         <Stack.Screen
+          name="finances"
+          options={{ headerShown: true, title: t('finances'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '800' } }}
+        />
+        <Stack.Screen
+          name="insurance"
+          options={{ headerShown: true, title: t('insurance'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '800' } }}
+        />
+        <Stack.Screen
+          name="inventory"
+          options={{ headerShown: true, title: t('warehouseStock'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '800' } }}
+        />
+        <Stack.Screen
           name="membership"
           options={{ headerShown: true, title: t('membership'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '800' } }}
+        />
+        <Stack.Screen
+          name="marketplace"
+          options={{ headerShown: true, title: t('marketplace'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '800' } }}
         />
         <Stack.Screen
           name="leases"

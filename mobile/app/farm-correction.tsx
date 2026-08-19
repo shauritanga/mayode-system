@@ -7,7 +7,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Camera01Icon } from '@hugeicons/core-free-icons';
-import { correctionsApi, uploadsApi } from '../src/lib/data';
+import { correctionsApi, uploadsApi, resolveMediaUrl } from '../src/lib/data';
 import { useI18n } from '../src/i18n';
 
 /** Farm fields a farmer/renter may propose a correction for — mirrors the
@@ -117,7 +117,7 @@ export default function FarmCorrectionScreen() {
 
           <Text style={styles.fieldLabel}>{t('correctionEvidence')}</Text>
           {photoUrl ? (
-            <Image source={{ uri: photoUrl }} style={styles.evidencePreview} />
+            <Image source={{ uri: resolveMediaUrl(photoUrl) ?? photoUrl }} style={styles.evidencePreview} />
           ) : (
             <TouchableOpacity style={styles.evidenceBtn} onPress={addEvidence} disabled={uploadingPhoto}>
               {uploadingPhoto ? <ActivityIndicator size="small" color="#10B981" /> : (

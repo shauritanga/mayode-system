@@ -1,8 +1,10 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertBuyerDto } from './dto/buyer.dto';
 
@@ -19,6 +21,70 @@ export class BuyersService {
       include: { _count: { select: { sales: true } } },
       orderBy: { name: 'asc' },
     });
+  }
+
+  /** Last 9 digits — matches TZ MSISDN regardless of +255 / 0 prefix. */
+  private phoneTail(phone?: string | null): string | null {
+    if (!phone) return null;
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 9) return null;
+    return digits.slice(-9);
+  }
+
+  /** Match a login user to a Buyer company via contact phone or email. */
+  async resolveForUser(user: {
+    phone?: string | null;
+    email?: string | null;
+  }) {
+    const phoneTail = this.phoneTail(user.phone);
+    const email = user.email?.trim().toLowerCase();
+    if (!phoneTail && !email) return null;
+
+    const buyers = await this.prisma.buyer.findMany({
+      orderBy: { name: 'asc' },
+    });
+    return (
+      buyers.find((buyer) => {
+        if (email && buyer.contactEmail?.trim().toLowerCase() === email) {
+          return true;
+        }
+        if (phoneTail && this.phoneTail(buyer.contactPhone) === phoneTail) {
+          return true;
+        }
+        return false;
+      }) ?? null
+    );
+  }
+
+  async requireMatchedBuyer(user: {
+    role: UserRole | string;
+    phone?: string | null;
+    email?: string | null;
+  }) {
+    const company = await this.resolveForUser(user);
+    if (!company) {
+      throw new ForbiddenException(
+        'No buyer company is linked to your account phone or email.',
+      );
+    }
+    return company;
+  }
+
+  async assertBuyerAccess(
+    user: {
+      role: UserRole | string;
+      phone?: string | null;
+      email?: string | null;
+    },
+    buyerId: string,
+  ) {
+    if (user.role !== UserRole.BUYER) return;
+    const company = await this.requireMatchedBuyer(user);
+    if (company.id !== buyerId) {
+      throw new ForbiddenException(
+        'You can only access data for your matched buyer company.',
+      );
+    }
   }
 
   async findOne(id: string) {

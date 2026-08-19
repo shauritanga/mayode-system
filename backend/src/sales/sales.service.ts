@@ -42,6 +42,51 @@ export class SalesService {
     return `${prefix}${String(sequence).padStart(4, '0')}`;
   }
 
+  /** Sorter / QR evidence attached to a lot for traceability. */
+  private async lotAiQuality(lotId: string) {
+    const sorterEvidence = await this.prisma.aiIntegrationRecord.findMany({
+      where: {
+        lotId,
+        sourceType: { in: ['RICE_SORTER', 'QR_TRACEABILITY'] },
+      },
+      orderBy: { capturedAt: 'desc' },
+      take: 8,
+      select: {
+        id: true,
+        sourceType: true,
+        externalReference: true,
+        payload: true,
+        recommendation: true,
+        capturedAt: true,
+      },
+    });
+    const latestSorter = sorterEvidence.find((r) => r.sourceType === 'RICE_SORTER');
+    const sorterRec =
+      latestSorter?.recommendation &&
+      typeof latestSorter.recommendation === 'object'
+        ? (latestSorter.recommendation as Record<string, unknown>)
+        : null;
+    const sorterPayload =
+      latestSorter?.payload && typeof latestSorter.payload === 'object'
+        ? (latestSorter.payload as Record<string, unknown>)
+        : null;
+    return {
+      sorterQuality: latestSorter
+        ? {
+            qualityGrade:
+              sorterRec?.qualityGrade ?? sorterPayload?.qualityGrade ?? null,
+            moisturePct:
+              sorterRec?.moisturePct ?? sorterPayload?.moisturePct ?? null,
+            summary: sorterRec?.summary ?? null,
+            severity: sorterRec?.severity ?? null,
+            recordId: latestSorter.id,
+            capturedAt: latestSorter.capturedAt,
+          }
+        : null,
+      aiEvents: sorterEvidence,
+    };
+  }
+
   async create(dto: CreateSaleDto) {
     const [lot, buyer] = await Promise.all([
       this.prisma.lot.findUnique({
@@ -152,13 +197,24 @@ export class SalesService {
         },
       });
       if (dto.buyerOrderId) {
-        const order = await tx.buyerOrder.findUnique({ where: { id: dto.buyerOrderId }, select: { quantityRequiredKg: true } });
+        const order = await tx.buyerOrder.findUnique({
+          where: { id: dto.buyerOrderId },
+          select: { quantityRequiredKg: true },
+        });
         if (order) {
-          const fulfilledKg = await tx.sale.aggregate({ where: { buyerOrderId: dto.buyerOrderId }, _sum: { quantityKg: true } });
+          const fulfilledKg = await tx.sale.aggregate({
+            where: { buyerOrderId: dto.buyerOrderId },
+            _sum: { quantityKg: true },
+          });
           const totalFulfilled = fulfilledKg._sum.quantityKg ?? 0;
           await tx.buyerOrder.update({
             where: { id: dto.buyerOrderId },
-            data: { status: totalFulfilled >= order.quantityRequiredKg ? 'FULFILLED' : 'PARTIALLY_FULFILLED' },
+            data: {
+              status:
+                totalFulfilled >= order.quantityRequiredKg
+                  ? 'FULFILLED'
+                  : 'PARTIALLY_FULFILLED',
+            },
           });
         }
       }
@@ -243,6 +299,10 @@ export class SalesService {
           });
         }
       }
+      await tx.inventoryRecord.updateMany({
+        where: { lotNumber: lot.lotNumber },
+        data: { status: 'SOLD' },
+      });
       return tx.sale.findUniqueOrThrow({
         where: { id: created.id },
         include: {
@@ -422,6 +482,7 @@ export class SalesService {
                 },
                 farm: {
                   select: {
+                    id: true,
                     farmCode: true,
                     village: true,
                     ward: true,
@@ -461,12 +522,18 @@ export class SalesService {
   }
 
   async traceability(reference: string) {
-    let sale;
+    const trimmed = reference.trim();
+    if (!trimmed) {
+      throw new NotFoundException('Traceability reference is required');
+    }
+
+    // Prefer a completed sale chain when the reference resolves to one.
+    let sale: Awaited<ReturnType<SalesService['findOne']>> | null = null;
     try {
-      sale = await this.findOne(reference);
+      sale = await this.findOne(trimmed);
     } catch {
       const record = await this.prisma.inventoryRecord.findUnique({
-        where: { trackingCode: reference },
+        where: { trackingCode: trimmed },
         include: {
           lot: {
             include: { sales: { orderBy: { saleDate: 'desc' }, take: 1 } },
@@ -476,32 +543,200 @@ export class SalesService {
       const lot =
         record?.lot ??
         (await this.prisma.lot.findFirst({
-          where: { OR: [{ id: reference }, { lotNumber: reference }] },
+          where: { OR: [{ id: trimmed }, { lotNumber: trimmed }] },
           include: { sales: { orderBy: { saleDate: 'desc' }, take: 1 } },
         }));
-      if (!lot?.sales[0])
+      if (lot?.sales[0]) {
+        sale = await this.findOne(lot.sales[0].id);
+      } else if (lot || record) {
+        // Pre-sale chain: lot and/or intake only.
+        const inventoryRecords =
+          lot?.id
+            ? await this.prisma.inventoryRecord.findMany({
+                where: { lotNumber: lot.lotNumber },
+                include: {
+                  farmer: {
+                    select: {
+                      id: true,
+                      controlNumber: true,
+                      firstName: true,
+                      lastName: true,
+                    },
+                  },
+                  farm: {
+                    select: {
+                      id: true,
+                      farmCode: true,
+                      village: true,
+                      ward: true,
+                      district: true,
+                      region: true,
+                    },
+                  },
+                  cropCycle: {
+                    select: {
+                      id: true,
+                      season: true,
+                      riceVariety: true,
+                      status: true,
+                      activities: {
+                        orderBy: { activityDate: 'desc' },
+                        take: 8,
+                        select: {
+                          id: true,
+                          activityType: true,
+                          activityDate: true,
+                          description: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              })
+            : record
+              ? [
+                  await this.prisma.inventoryRecord.findUniqueOrThrow({
+                    where: { id: record.id },
+                    include: {
+                      farmer: {
+                        select: {
+                          id: true,
+                          controlNumber: true,
+                          firstName: true,
+                          lastName: true,
+                        },
+                      },
+                      farm: {
+                        select: {
+                          id: true,
+                          farmCode: true,
+                          village: true,
+                          ward: true,
+                          district: true,
+                          region: true,
+                        },
+                      },
+                      cropCycle: {
+                        select: {
+                          id: true,
+                          season: true,
+                          riceVariety: true,
+                          status: true,
+                          activities: {
+                            orderBy: { activityDate: 'desc' },
+                            take: 8,
+                            select: {
+                              id: true,
+                              activityType: true,
+                              activityDate: true,
+                              description: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  }),
+                ]
+              : [];
+
+        const preSaleSorter = lot
+          ? await this.lotAiQuality(lot.id)
+          : null;
+
+        return {
+          invoiceNumber: null,
+          saleDate: null,
+          paymentReceived: false,
+          status: 'PRE_SALE',
+          buyer: null,
+          lot: lot
+            ? {
+                id: lot.id,
+                lotNumber: lot.lotNumber,
+                riceVariety: lot.riceVariety,
+                totalWeightKg: lot.totalWeightKg,
+                ...preSaleSorter,
+              }
+            : null,
+          sourceRecords: inventoryRecords.map((r) => ({
+            trackingCode: r.trackingCode,
+            receivedDate: r.receivedDate,
+            weightKg: r.weightKg,
+            qualityGrade: r.qualityGrade,
+            moistureContentPct: r.moistureContentPct,
+            status: r.status,
+            farm: r.farm,
+            farmer: r.farmer,
+            cropCycle: r.cropCycle,
+          })),
+          farmerAllocations: [],
+        };
+      } else {
         throw new NotFoundException(
-          `No sale found for traceability reference ${reference}`,
+          `No sale, lot, or inventory found for traceability reference ${trimmed}`,
         );
-      sale = await this.findOne(lot.sales[0].id);
+      }
     }
+
+    const cycleIds = Array.from(
+      new Set(
+        sale.lot.inventoryRecords
+          .map((r: any) => r.cropCycleId)
+          .filter(Boolean) as string[],
+      ),
+    );
+    const cycles =
+      cycleIds.length > 0
+        ? await this.prisma.cropCycle.findMany({
+            where: { id: { in: cycleIds } },
+            select: {
+              id: true,
+              season: true,
+              riceVariety: true,
+              status: true,
+              farmId: true,
+              farmerId: true,
+              activities: {
+                orderBy: { activityDate: 'desc' },
+                take: 8,
+                select: {
+                  id: true,
+                  activityType: true,
+                  activityDate: true,
+                  description: true,
+                },
+              },
+            },
+          })
+        : [];
+    const cycleById = new Map(cycles.map((c) => [c.id, c]));
+    const lotQuality = await this.lotAiQuality(sale.lot.id);
+
     return {
       invoiceNumber: sale.invoiceNumber,
       saleDate: sale.saleDate,
       paymentReceived: sale.paymentReceived,
+      status: sale.paymentReceived ? 'SETTLED' : 'SALE',
       buyer: sale.buyer,
       lot: {
+        id: sale.lot.id,
         lotNumber: sale.lot.lotNumber,
         riceVariety: sale.lot.riceVariety,
         totalWeightKg: sale.lot.totalWeightKg,
+        ...lotQuality,
       },
-      sourceRecords: sale.lot.inventoryRecords.map((record) => ({
+      sourceRecords: sale.lot.inventoryRecords.map((record: any) => ({
         trackingCode: record.trackingCode,
         receivedDate: record.receivedDate,
         weightKg: record.weightKg,
         qualityGrade: record.qualityGrade,
+        moistureContentPct: record.moistureContentPct,
+        status: record.status,
         farm: record.farm,
         farmer: record.farmer,
+        cropCycle: record.cropCycleId
+          ? cycleById.get(record.cropCycleId) ?? null
+          : null,
       })),
       farmerAllocations: sale.apportionments,
     };

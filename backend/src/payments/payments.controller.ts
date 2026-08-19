@@ -31,7 +31,10 @@ export class PaymentsController {
 
   @Post('webhook')
   @HttpCode(200)
-  @ApiOperation({ summary: 'ClickPesa payment webhook (public; status is re-verified server-side)' })
+  @ApiOperation({
+    summary:
+      'ClickPesa payment webhook (public; status is re-verified server-side)',
+  })
   async webhook(@Body() body: ClickPesaWebhookBody) {
     const orderReference = body?.data?.orderReference;
     this.logger.log(
@@ -61,7 +64,9 @@ export class PaymentsController {
         this.logger.debug(`Not a cooperative sale order: ${orderReference}`);
       }
       if (!matched) {
-        this.logger.error(`ClickPesa webhook: no record found for order ${orderReference}`);
+        this.logger.error(
+          `ClickPesa webhook: no record found for order ${orderReference}`,
+        );
       }
     }
     // Always acknowledge so ClickPesa stops retrying.

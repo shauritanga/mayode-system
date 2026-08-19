@@ -6,6 +6,8 @@ import Modal from '@/components/Modal';
 interface ForecastDay { date: string; maxTempC: number; minTempC: number; precipitationMm: number }
 interface Forecast {
   source: string;
+  provider?: string;
+  live?: boolean;
   days: ForecastDay[];
   totalPrecipitationMm: number;
   floodRisk: boolean;
@@ -81,13 +83,23 @@ export default function WeatherPage() {
   };
 
   return (
-    <div>
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-          <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--blue-500), var(--blue-300))', borderRadius: '9999px' }} />
-          <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Weather & Early Warning</h1>
+    <div className="page-shell">
+      <div className="page-heading">
+        <div>
+          <div className="page-kicker">Early warning</div>
+          <h1 className="page-title">Weather</h1>
+          <p className="page-subtitle">
+            Live 7-day forecast and farmer early-warning alerts.
+            {forecast?.provider || forecast?.source
+              ? ` Data from ${forecast.provider || forecast.source}.`
+              : ''}
+          </p>
         </div>
-        <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Live 7-day forecast (Open-Meteo) and farmer early-warning alerts</p>
+        {(forecast?.provider || forecast?.source) && (
+          <span className="badge badge-blue">
+            Live · {forecast.provider || forecast.source}
+          </span>
+        )}
       </div>
 
       <div className="glass-card" style={{ padding: '18px', marginBottom: '24px' }}>

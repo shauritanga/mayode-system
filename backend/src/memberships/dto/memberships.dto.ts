@@ -19,7 +19,9 @@ export class CreateMembershipPlanDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiPropertyOptional({ example: 'Full analytics and recommendations for one farming season' })
+  @ApiPropertyOptional({
+    example: 'Full analytics and recommendations for one farming season',
+  })
   @IsOptional()
   @IsString()
   description?: string;
@@ -29,12 +31,18 @@ export class CreateMembershipPlanDto {
   @Min(0)
   priceTzs: number;
 
-  @ApiPropertyOptional({ enum: MembershipDurationType, default: MembershipDurationType.SEASON })
+  @ApiPropertyOptional({
+    enum: MembershipDurationType,
+    default: MembershipDurationType.SEASON,
+  })
   @IsOptional()
   @IsEnum(MembershipDurationType)
   durationType?: MembershipDurationType;
 
-  @ApiPropertyOptional({ type: [String], example: ['Farm analytics', 'Yield forecasts'] })
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['Farm analytics', 'Yield forecasts'],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -58,16 +66,22 @@ export class StartMembershipDto {
 
   @ApiPropertyOptional({
     example: '+255712345678',
-    description: 'Mobile-money phone number to charge (defaults to the account phone)',
+    description:
+      'Mobile-money phone number to charge (defaults to the account phone)',
   })
   @IsOptional()
   @IsString()
-  @Matches(/^\+?[0-9]{9,15}$/, { message: 'phoneNumber must be a valid phone number' })
+  @Matches(/^\+?[0-9]{9,15}$/, {
+    message: 'phoneNumber must be a valid phone number',
+  })
   phoneNumber?: string;
 }
 
 export class ApproveMembershipDto {
-  @ApiPropertyOptional({ example: 'MPESA-QX12345', description: 'Mobile money / bank payment reference' })
+  @ApiPropertyOptional({
+    example: 'MPESA-QX12345',
+    description: 'Mobile money / bank payment reference',
+  })
   @IsOptional()
   @IsString()
   paymentReference?: string;

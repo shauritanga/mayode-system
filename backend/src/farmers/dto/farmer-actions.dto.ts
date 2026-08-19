@@ -13,12 +13,18 @@ import { DocumentType } from '@prisma/client';
 
 /** Field-officer approves a farmer after on-site review. */
 export class VerifyFarmerDto {
-  @ApiPropertyOptional({ example: true, description: 'GPS location confirmed on-site' })
+  @ApiPropertyOptional({
+    example: true,
+    description: 'GPS location confirmed on-site',
+  })
   @IsBoolean()
   @IsOptional()
   gpsVerified?: boolean;
 
-  @ApiPropertyOptional({ example: true, description: 'Identity documents reviewed' })
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Identity documents reviewed',
+  })
   @IsBoolean()
   @IsOptional()
   documentsReviewed?: boolean;
@@ -33,7 +39,9 @@ export class VerifyFarmerDto {
   @IsOptional()
   gpsLongitude?: number;
 
-  @ApiPropertyOptional({ example: 'Met farmer at residence; NIDA card matches; plot walked.' })
+  @ApiPropertyOptional({
+    example: 'Met farmer at residence; NIDA card matches; plot walked.',
+  })
   @IsString()
   @IsOptional()
   notes?: string;
@@ -41,7 +49,10 @@ export class VerifyFarmerDto {
 
 /** Staff assigns a field officer as responsible for this farmer's follow-up. */
 export class AssignOfficerDto {
-  @ApiProperty({ example: 'a1b2c3d4-...', description: 'MamcosStaff id of the field officer' })
+  @ApiProperty({
+    example: 'a1b2c3d4-...',
+    description: 'MamcosStaff id of the field officer',
+  })
   @IsString()
   @IsNotEmpty()
   officerId: string;
@@ -49,12 +60,16 @@ export class AssignOfficerDto {
 
 /** Field-officer rejects a farmer application. */
 export class RejectFarmerDto {
-  @ApiProperty({ example: 'National ID could not be verified against NIDA records.' })
+  @ApiProperty({
+    example: 'National ID could not be verified against NIDA records.',
+  })
   @IsString()
   @IsNotEmpty()
   rejectionReason: string;
 
-  @ApiPropertyOptional({ example: 'Advised farmer to re-apply with a valid ID.' })
+  @ApiPropertyOptional({
+    example: 'Advised farmer to re-apply with a valid ID.',
+  })
   @IsString()
   @IsOptional()
   notes?: string;
@@ -62,7 +77,9 @@ export class RejectFarmerDto {
 
 /** Suspend an already-registered farmer. */
 export class SuspendFarmerDto {
-  @ApiProperty({ example: 'Suspected duplicate registration under two control numbers.' })
+  @ApiProperty({
+    example: 'Suspected duplicate registration under two control numbers.',
+  })
   @IsString()
   @IsNotEmpty()
   reason: string;
@@ -142,22 +159,34 @@ export class SubmitIdentityDto {
   @IsEnum(DocumentType)
   idType: DocumentType;
 
-  @ApiProperty({ example: '19900101-12345-00001-23', description: 'ID document number' })
+  @ApiProperty({
+    example: '19900101-12345-00001-23',
+    description: 'ID document number',
+  })
   @IsString()
   @IsNotEmpty()
   idNumber: string;
 
-  @ApiProperty({ example: '/uploads/nida-front.jpg', description: 'Uploaded ID document photo URL' })
+  @ApiProperty({
+    example: '/uploads/nida-front.jpg',
+    description: 'Uploaded ID document photo URL',
+  })
   @IsString()
   @IsNotEmpty()
   idDocumentUrl: string;
 
-  @ApiProperty({ example: '/uploads/selfie.jpg', description: 'Recent photograph / guided face-capture URL' })
+  @ApiProperty({
+    example: '/uploads/selfie.jpg',
+    description: 'Recent photograph / guided face-capture URL',
+  })
   @IsString()
   @IsNotEmpty()
   faceCaptureUrl: string;
 
-  @ApiPropertyOptional({ example: '/uploads/profile.jpg', description: 'Optional profile photo URL' })
+  @ApiPropertyOptional({
+    example: '/uploads/profile.jpg',
+    description: 'Optional profile photo URL',
+  })
   @IsString()
   @IsOptional()
   profilePhotoUrl?: string;

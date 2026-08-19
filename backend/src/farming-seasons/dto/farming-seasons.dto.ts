@@ -15,7 +15,9 @@ export class CreateFarmingSeasonDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiPropertyOptional({ description: 'Cooperative (AMCOS) this season belongs to' })
+  @ApiPropertyOptional({
+    description: 'Cooperative (AMCOS) this season belongs to',
+  })
   @IsOptional()
   @IsUUID()
   mamcosId?: string;
@@ -53,10 +55,15 @@ export class CreateFarmingSeasonDto {
   @IsDateString()
   verificationDeadline?: string;
 
-  @ApiPropertyOptional({ enum: FarmingSeasonStatus, default: FarmingSeasonStatus.DRAFT })
+  @ApiPropertyOptional({
+    enum: FarmingSeasonStatus,
+    default: FarmingSeasonStatus.DRAFT,
+  })
   @IsOptional()
   @IsEnum(FarmingSeasonStatus)
   status?: FarmingSeasonStatus;
 }
 
-export class UpdateFarmingSeasonDto extends PartialType(CreateFarmingSeasonDto) {}
+export class UpdateFarmingSeasonDto extends PartialType(
+  CreateFarmingSeasonDto,
+) {}

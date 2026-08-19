@@ -1,18 +1,39 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsInt, IsEnum, IsArray, IsObject, Min, IsNotEmpty, ValidateIf } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsBoolean,
+  IsInt,
+  IsEnum,
+  IsArray,
+  IsObject,
+  Min,
+  IsNotEmpty,
+  ValidateIf,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FarmGrade, OwnershipType } from '@prisma/client';
 
 export class CreateFarmDto {
-  @ApiProperty({ example: 'farmer-uuid-1234', description: 'ID of the farmer owning the farm' })
+  @ApiProperty({
+    example: 'farmer-uuid-1234',
+    description: 'ID of the farmer owning the farm',
+  })
   @IsString()
   farmerId: string;
 
-  @ApiPropertyOptional({ example: 'mamcos-uuid-5678', description: 'MAMCOS scheme ID if applicable' })
+  @ApiPropertyOptional({
+    example: 'mamcos-uuid-5678',
+    description: 'MAMCOS scheme ID if applicable',
+  })
   @IsString()
   @IsOptional()
   mamcosId?: string;
 
-  @ApiProperty({ example: 'Plot No. 02, Block 5, South-West Section, Madibira AMCOS', description: 'Structured farm name' })
+  @ApiProperty({
+    example: 'Plot No. 02, Block 5, South-West Section, Madibira AMCOS',
+    description: 'Structured farm name',
+  })
   @IsString()
   @IsNotEmpty()
   name: string;
@@ -57,37 +78,58 @@ export class CreateFarmDto {
   @Min(0.1)
   socialHectares: number;
 
-  @ApiPropertyOptional({ example: 13.5, description: 'Actual measured land size in acres' })
+  @ApiPropertyOptional({
+    example: 13.5,
+    description: 'Actual measured land size in acres',
+  })
   @IsNumber()
   @IsOptional()
   actualAcres?: number;
 
-  @ApiPropertyOptional({ example: 'B', enum: FarmGrade, description: 'Initial farm grade assessment' })
+  @ApiPropertyOptional({
+    example: 'B',
+    enum: FarmGrade,
+    description: 'Initial farm grade assessment',
+  })
   @IsEnum(FarmGrade)
   @IsOptional()
   grade?: FarmGrade;
 
-  @ApiPropertyOptional({ example: 2, description: 'Number of anthills (vichuguu) on the farm' })
+  @ApiPropertyOptional({
+    example: 2,
+    description: 'Number of anthills (vichuguu) on the farm',
+  })
   @IsInt()
   @IsOptional()
   vichuguuCount?: number;
 
-  @ApiPropertyOptional({ example: true, description: 'Whether the farm has irrigation infrastructure' })
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Whether the farm has irrigation infrastructure',
+  })
   @IsBoolean()
   @IsOptional()
   irrigationStatus?: boolean;
 
-  @ApiPropertyOptional({ example: true, description: 'Whether the farm is easily accessible near a main road' })
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Whether the farm is easily accessible near a main road',
+  })
   @IsBoolean()
   @IsOptional()
   nearRoadStatus?: boolean;
 
-  @ApiPropertyOptional({ example: 'Fertile loamy soil with good moisture retention' })
+  @ApiPropertyOptional({
+    example: 'Fertile loamy soil with good moisture retention',
+  })
   @IsString()
   @IsOptional()
   soilCondition?: string;
 
-  @ApiPropertyOptional({ example: ['https://example.com/farm1.jpg'], description: 'List of photo URLs' })
+  @ApiPropertyOptional({
+    example: ['https://example.com/farm1.jpg'],
+    description: 'List of photo URLs',
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
@@ -98,14 +140,28 @@ export class CreateFarmDto {
   @IsOptional()
   ownershipType?: OwnershipType;
 
-  @ApiPropertyOptional({ example: 'Elisha Mayode', description: 'Required when ownershipType is RENTED or LEASED' })
-  @ValidateIf((o) => o.ownershipType === OwnershipType.RENTED || o.ownershipType === OwnershipType.LEASED)
+  @ApiPropertyOptional({
+    example: 'Elisha Mayode',
+    description: 'Required when ownershipType is RENTED or LEASED',
+  })
+  @ValidateIf(
+    (o) =>
+      o.ownershipType === OwnershipType.RENTED ||
+      o.ownershipType === OwnershipType.LEASED,
+  )
   @IsString()
   @IsNotEmpty()
   ownerName?: string;
 
-  @ApiPropertyOptional({ example: '+255712345678', description: 'Required when ownershipType is RENTED or LEASED' })
-  @ValidateIf((o) => o.ownershipType === OwnershipType.RENTED || o.ownershipType === OwnershipType.LEASED)
+  @ApiPropertyOptional({
+    example: '+255712345678',
+    description: 'Required when ownershipType is RENTED or LEASED',
+  })
+  @ValidateIf(
+    (o) =>
+      o.ownershipType === OwnershipType.RENTED ||
+      o.ownershipType === OwnershipType.LEASED,
+  )
   @IsString()
   @IsNotEmpty()
   ownerPhone?: string;
@@ -135,12 +191,17 @@ export class CreateFarmDto {
   @IsOptional()
   irrigationMethod?: string;
 
-  @ApiPropertyOptional({ example: 'Accessible by motorbike; 2km from feeder road' })
+  @ApiPropertyOptional({
+    example: 'Accessible by motorbike; 2km from feeder road',
+  })
   @IsString()
   @IsOptional()
   accessibility?: string;
 
-  @ApiPropertyOptional({ example: ['Rice', 'Maize'], description: 'Previous crops grown' })
+  @ApiPropertyOptional({
+    example: ['Rice', 'Maize'],
+    description: 'Previous crops grown',
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
@@ -217,12 +278,16 @@ export class UpdateFarmDto {
   @IsOptional()
   nearRoadStatus?: boolean;
 
-  @ApiPropertyOptional({ example: 'Excellent soil fertility after NPK fertilizer application' })
+  @ApiPropertyOptional({
+    example: 'Excellent soil fertility after NPK fertilizer application',
+  })
   @IsString()
   @IsOptional()
   soilCondition?: string;
 
-  @ApiPropertyOptional({ example: ['https://example.com/farm1.jpg', 'https://example.com/farm2.jpg'] })
+  @ApiPropertyOptional({
+    example: ['https://example.com/farm1.jpg', 'https://example.com/farm2.jpg'],
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

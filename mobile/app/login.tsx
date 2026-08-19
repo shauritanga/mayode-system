@@ -4,6 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { authApi, farmersApi } from '../src/lib/data';
+import { getApiErrorMessage } from '../src/lib/api-error';
+import { isMobileAllowedRole } from '../src/lib/mobile-roles';
+import { normalizePhone } from '../src/lib/phone';
 import { useAuthStore } from '../src/store/auth.store';
 import { PasswordInput } from '../src/components/PasswordInput';
 import { useI18n } from '../src/i18n';
@@ -33,22 +36,29 @@ export default function LoginRoute() {
 
     setLoading(true);
     try {
-      const res = await authApi.login(phone, password);
+      const res = await authApi.login(normalizePhone(phone), password);
       const { accessToken, refreshToken, user } = res.data;
+
+      // Credentials are valid, but this app is role-scoped.
+      if (!isMobileAllowedRole(user?.role)) {
+        Alert.alert(t('mobileAccessDeniedTitle'), t('mobileAccessDeniedMessage'));
+        return;
+      }
+
       setAuth(user, accessToken, refreshToken);
 
-      // Resolve the farmer profile id so farm/plot creation can reference it.
-      if (user.role === 'FARMER' && user.controlNumber) {
+      // Resolve farmer profile id via /farmers/me (control-number lookup is staff-only → 403 for FARMER).
+      if (user.role === 'FARMER') {
         try {
-          const f = await farmersApi.getByControlNumber(user.controlNumber);
+          const f = await farmersApi.me();
           setFarmerId(f.data?.id ?? null);
         } catch {
           setFarmerId(null);
         }
       }
-      router.replace('/(tabs)');
-    } catch (err: any) {
-      Alert.alert(t('loginFailed'), err.response?.data?.message || t('loginFailedMessage'));
+      router.replace('/(drawer)/(tabs)');
+    } catch (err: unknown) {
+      Alert.alert(t('loginFailed'), getApiErrorMessage(err, t('loginFailedMessage')));
     } finally {
       setLoading(false);
     }

@@ -20,7 +20,14 @@ import { DisputesModule } from '../disputes/disputes.module';
 @Module({
   imports: [PaymentsModule, UploadsModule, DisputesModule],
   controllers: [MarketplaceController],
-  providers: [MarketplaceService, PayoutSchedulerService, PricingService, FlashDealSchedulerService, LeaseDocumentService, MultiYearRentSchedulerService],
+  providers: [
+    MarketplaceService,
+    PayoutSchedulerService,
+    PricingService,
+    FlashDealSchedulerService,
+    LeaseDocumentService,
+    MultiYearRentSchedulerService,
+  ],
   exports: [MarketplaceService, PricingService],
 })
 export class MarketplaceModule {}

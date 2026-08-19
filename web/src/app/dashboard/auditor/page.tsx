@@ -5,7 +5,6 @@ import {
   EmptyState,
   InsightPanel,
   MetricTile,
-  RoleHero,
   money,
 } from '@/components/role-dashboards/DashboardPrimitives';
 import { reportsApi } from '@/lib/api';
@@ -24,11 +23,6 @@ export default function AuditorDashboardPage() {
   const evidence = pack?.trustEvidence || {};
 
   return <div className="role-dashboard">
-    <RoleHero
-      eyebrow="Independent assurance"
-      title="Auditor Dashboard"
-      subtitle="Evidence-first review of traceability, farmer payments, Fairtrade premium use, governance records and immutable audit logs."
-    />
     {error && <EmptyState>{error}</EmptyState>}
 
     <div className="role-grid">

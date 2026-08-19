@@ -33,7 +33,10 @@ function mulberry32(seed: number): () => number {
 
 /** Seeded Fisher–Yates shuffle — reproducible from the seed. */
 function seededShuffle<T>(items: T[], seedHex: string): T[] {
-  const seedInt = parseInt(createHash('sha256').update(seedHex).digest('hex').slice(0, 8), 16);
+  const seedInt = parseInt(
+    createHash('sha256').update(seedHex).digest('hex').slice(0, 8),
+    16,
+  );
   const rand = mulberry32(seedInt);
   const a = [...items];
   for (let i = a.length - 1; i > 0; i--) {
@@ -64,8 +67,12 @@ export class RewardsService {
         numberOfWinners: dto.numberOfWinners,
         farmingSeasonId: dto.farmingSeasonId,
         eligibleCooperatives: dto.eligibleCooperatives ?? [],
-        eligibilityStartDate: dto.eligibilityStartDate ? new Date(dto.eligibilityStartDate) : undefined,
-        eligibilityEndDate: dto.eligibilityEndDate ? new Date(dto.eligibilityEndDate) : undefined,
+        eligibilityStartDate: dto.eligibilityStartDate
+          ? new Date(dto.eligibilityStartDate)
+          : undefined,
+        eligibilityEndDate: dto.eligibilityEndDate
+          ? new Date(dto.eligibilityEndDate)
+          : undefined,
         selectionMethod: dto.selectionMethod ?? SelectionMethod.RANDOM,
         status: RewardCampaignStatus.ACTIVE,
         createdByUserId: user.id,
@@ -85,7 +92,16 @@ export class RewardsService {
       where: { id },
       include: {
         winners: {
-          include: { farmer: { select: { id: true, controlNumber: true, firstName: true, lastName: true } } },
+          include: {
+            farmer: {
+              select: {
+                id: true,
+                controlNumber: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
         },
       },
     });
@@ -114,7 +130,11 @@ export class RewardsService {
           ? { mamcosId: { in: campaign.eligibleCooperatives } }
           : {}),
         ...(campaign.farmingSeasonId
-          ? { seasonalAssignments: { some: { farmingSeasonId: campaign.farmingSeasonId } } }
+          ? {
+              seasonalAssignments: {
+                some: { farmingSeasonId: campaign.farmingSeasonId },
+              },
+            }
           : {}),
       },
       select: { id: true },
@@ -132,11 +152,18 @@ export class RewardsService {
    */
   async runSelection(campaignId: string) {
     const campaign = await this.getCampaign(campaignId);
-    if (campaign.status === RewardCampaignStatus.ANNOUNCED || campaign.status === RewardCampaignStatus.FULFILLED) {
-      throw new BadRequestException('Winners have already been announced for this campaign');
+    if (
+      campaign.status === RewardCampaignStatus.ANNOUNCED ||
+      campaign.status === RewardCampaignStatus.FULFILLED
+    ) {
+      throw new BadRequestException(
+        'Winners have already been announced for this campaign',
+      );
     }
     if (campaign.selectionMethod !== SelectionMethod.RANDOM) {
-      throw new BadRequestException('Only RANDOM selection is automated; others are manual');
+      throw new BadRequestException(
+        'Only RANDOM selection is automated; others are manual',
+      );
     }
 
     const eligible = await this.computeEligible(campaignId);
@@ -145,7 +172,10 @@ export class RewardsService {
     }
 
     const seed = randomBytes(16).toString('hex');
-    const winners = seededShuffle(eligible, seed).slice(0, campaign.numberOfWinners);
+    const winners = seededShuffle(eligible, seed).slice(
+      0,
+      campaign.numberOfWinners,
+    );
 
     // Pick a representative farm per winner for the award record.
     const created = await this.prisma.$transaction(async (tx) => {
@@ -197,10 +227,15 @@ export class RewardsService {
   async reproduceSelection(campaignId: string) {
     const campaign = await this.getCampaign(campaignId);
     if (!campaign.selectionSeed || !Array.isArray(campaign.eligibleSnapshot)) {
-      throw new BadRequestException('Campaign has no recorded selection to reproduce');
+      throw new BadRequestException(
+        'Campaign has no recorded selection to reproduce',
+      );
     }
     const eligible = campaign.eligibleSnapshot as string[];
-    const reproduced = seededShuffle(eligible, campaign.selectionSeed).slice(0, campaign.numberOfWinners);
+    const reproduced = seededShuffle(eligible, campaign.selectionSeed).slice(
+      0,
+      campaign.numberOfWinners,
+    );
     const actual = campaign.winners.map((w) => w.farmerId).sort();
     return {
       reproducedWinners: [...reproduced].sort(),
@@ -224,7 +259,11 @@ export class RewardsService {
     for (const winner of campaign.winners) {
       const farmer = await this.prisma.farmer.findUnique({
         where: { id: winner.farmerId },
-        select: { userId: true, user: { select: { phone: true } }, farms: { select: { farmCode: true }, take: 1 } },
+        select: {
+          userId: true,
+          user: { select: { phone: true } },
+          farms: { select: { farmCode: true }, take: 1 },
+        },
       });
       if (!farmer) continue;
 
@@ -239,7 +278,11 @@ export class RewardsService {
         data: { campaignId, winnerId: winner.id },
       });
       if (farmer.user?.phone) {
-        await this.sms.send(farmer.user.phone, `MAYOData: ${msg}`, 'reward_winner');
+        await this.sms.send(
+          farmer.user.phone,
+          `MAYOData: ${msg}`,
+          'reward_winner',
+        );
       }
     }
 
@@ -250,11 +293,18 @@ export class RewardsService {
       }),
       this.prisma.rewardCampaign.update({
         where: { id: campaignId },
-        data: { status: RewardCampaignStatus.ANNOUNCED, approvedByUserId: user.id },
+        data: {
+          status: RewardCampaignStatus.ANNOUNCED,
+          approvedByUserId: user.id,
+        },
       }),
     ]);
 
-    return { campaignId, notified: campaign.winners.length, status: RewardCampaignStatus.ANNOUNCED };
+    return {
+      campaignId,
+      notified: campaign.winners.length,
+      status: RewardCampaignStatus.ANNOUNCED,
+    };
   }
 
   // --------------------------------------------------------------- farmer
@@ -267,9 +317,14 @@ export class RewardsService {
     });
     if (!farmer) return [];
     return this.prisma.rewardWinner.findMany({
-      where: { farmerId: farmer.id, status: { not: RewardWinnerStatus.SELECTED } }, // announced only
+      where: {
+        farmerId: farmer.id,
+        status: { not: RewardWinnerStatus.SELECTED },
+      }, // announced only
       orderBy: { createdAt: 'desc' },
-      include: { campaign: { select: { id: true, name: true, sponsor: true } } },
+      include: {
+        campaign: { select: { id: true, name: true, sponsor: true } },
+      },
     });
   }
 

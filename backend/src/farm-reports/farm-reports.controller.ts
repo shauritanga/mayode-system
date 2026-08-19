@@ -28,35 +28,79 @@ export class FarmReportsController {
   // ---- Photos ----
 
   @Post(':id/photos')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
-  @ApiOperation({ summary: 'Add a farm photo (owner comment §2.5: 3–5 photos)' })
-  addPhoto(@Param('id') id: string, @Body() dto: AddFarmPhotoDto, @CurrentUser() user: RequestUser) {
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.FARMER,
+  )
+  @ApiOperation({
+    summary: 'Add a farm photo (owner comment §2.5: 3–5 photos)',
+  })
+  addPhoto(
+    @Param('id') id: string,
+    @Body() dto: AddFarmPhotoDto,
+    @CurrentUser() user: RequestUser,
+  ) {
     return this.reports.addPhoto(id, dto, user);
   }
 
   @Get(':id/photos')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
   @ApiOperation({ summary: 'List a farm’s photos' })
   listPhotos(@Param('id') id: string) {
     return this.reports.listPhotos(id);
   }
 
   @Delete('photos/:photoId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.FARMER,
+  )
   @ApiOperation({ summary: 'Delete a farm photo' })
-  deletePhoto(@Param('photoId') photoId: string, @CurrentUser() user: RequestUser) {
+  deletePhoto(
+    @Param('photoId') photoId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
     return this.reports.deletePhoto(photoId, user);
   }
 
   // ---- Field survey (MAYODE field data collection) ----
 
   @Post(':id/field-surveys')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY)
-  @ApiOperation({ summary: 'Record on-site field data — soil, road, water, physical (staff)' })
-  createSurvey(@Param('id') id: string, @Body() dto: CreateFieldSurveyDto, @CurrentUser() user: RequestUser) {
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+  )
+  @ApiOperation({
+    summary: 'Record on-site field data — soil, road, water, physical (staff)',
+  })
+  createSurvey(
+    @Param('id') id: string,
+    @Body() dto: CreateFieldSurveyDto,
+    @CurrentUser() user: RequestUser,
+  ) {
     return this.reports.createFieldSurvey(id, dto, user);
   }
 
   @Get(':id/field-surveys')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
   @ApiOperation({ summary: 'List a farm’s field surveys' })
   listSurveys(@Param('id') id: string) {
     return this.reports.listFieldSurveys(id);
@@ -65,6 +109,14 @@ export class FarmReportsController {
   // ---- Report ----
 
   @Get(':id/report')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
   @ApiOperation({
     summary:
       'Comprehensive farm analytics report. Premium — free users get a basic preview + membership CTA.',
@@ -74,8 +126,19 @@ export class FarmReportsController {
   }
 
   @Get(':id/report.html')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
   @Header('Content-Type', 'text/html')
-  @ApiOperation({ summary: 'Printable HTML version of the farm analytics report (same premium gate)' })
+  @ApiOperation({
+    summary:
+      'Printable HTML version of the farm analytics report (same premium gate)',
+  })
   reportHtml(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.reports.getReportHtml(id, user);
   }

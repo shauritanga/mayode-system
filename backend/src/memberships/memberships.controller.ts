@@ -41,14 +41,24 @@ export class MembershipsController {
   }
 
   @Get('me')
-  @ApiOperation({ summary: "Current user's membership status (active flag + latest membership)" })
+  @ApiOperation({
+    summary:
+      "Current user's membership status (active flag + latest membership)",
+  })
   myMembership(@CurrentUser() user: { id: string }) {
     return this.memberships.myMembership(user.id);
   }
 
   @Get()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR)
-  @ApiOperation({ summary: 'All memberships, optionally filtered by status (staff only)' })
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.AUDITOR,
+    UserRole.MAMCOS_SECRETARY,
+  )
+  @ApiOperation({
+    summary: 'All memberships, optionally filtered by status (staff only)',
+  })
   listAll(@Query('status') status?: MembershipStatus) {
     return this.memberships.listAll(status);
   }
@@ -67,15 +77,37 @@ export class MembershipsController {
 
   @Post('reconcile')
   @ApiOperation({
-    summary: "Re-check the current user's latest pending payment with ClickPesa (mobile poll)",
+    summary:
+      "Re-check the current user's latest pending payment with ClickPesa (mobile poll)",
   })
   reconcile(@CurrentUser() user: { id: string }) {
     return this.memberships.reconcileForUser(user.id);
   }
 
+  @Post('reconcile-pending')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({
+    summary:
+      'Staff: re-check ClickPesa for all pending memberships with an order reference',
+  })
+  reconcilePending() {
+    return this.memberships.reconcilePendingPayments();
+  }
+
+  @Post(':id/reconcile')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Staff: re-check ClickPesa for one membership by id',
+  })
+  reconcileOne(@Param('id') id: string) {
+    return this.memberships.reconcileById(id);
+  }
+
   @Post(':id/approve')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Confirm payment and activate a membership (Admin only)' })
+  @ApiOperation({
+    summary: 'Confirm payment and activate a membership (Admin only)',
+  })
   approve(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
@@ -86,7 +118,10 @@ export class MembershipsController {
 
   @Post('process-expiries')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Run expiry housekeeping: renewal reminders + auto-expire (Admin; also runs on a daily cron)' })
+  @ApiOperation({
+    summary:
+      'Run expiry housekeeping: renewal reminders + auto-expire (Admin; also runs on a daily cron)',
+  })
   processExpiries() {
     return this.memberships.processExpiries();
   }

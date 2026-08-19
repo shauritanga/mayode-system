@@ -13,7 +13,11 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Gender, EducationLevel } from '@prisma/client';
 
 export class UpdateFarmerDto {
-  @ApiPropertyOptional({ example: true, description: 'Consent to share credit-readiness data with financial partners' })
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Consent to share credit-readiness data with financial partners',
+  })
   @IsBoolean()
   @IsOptional()
   dataShareConsent?: boolean;
@@ -100,7 +104,10 @@ export class UpdateFarmerDto {
   @IsOptional()
   dependents?: number;
 
-  @ApiPropertyOptional({ example: 'mamcos-uuid', description: 'Cooperative (AMCOS) ID' })
+  @ApiPropertyOptional({
+    example: 'mamcos-uuid',
+    description: 'Cooperative (AMCOS) ID',
+  })
   @IsString()
   @IsOptional()
   mamcosId?: string;

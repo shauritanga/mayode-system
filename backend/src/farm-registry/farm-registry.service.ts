@@ -248,14 +248,20 @@ export class FarmRegistryService {
     return { ...updated, farm };
   }
 
-  async listAll(status?: FarmRegistryStatus, mamcosId?: string, user?: RequestUser) {
+  async listAll(
+    status?: FarmRegistryStatus,
+    mamcosId?: string,
+    user?: RequestUser,
+  ) {
     const where: Prisma.FarmRegistryRecordWhereInput = {};
     if (status) where.status = status;
     if (user?.role === 'MAMCOS_SECRETARY') {
       const secretary = await this.prisma.mamcosStaff.findFirst({
-        where: { userId: user.id, role: MamcosStaffRole.SECRETARY }, select: { mamcosId: true },
+        where: { userId: user.id, role: MamcosStaffRole.SECRETARY },
+        select: { mamcosId: true },
       });
-      if (!secretary) throw new ForbiddenException('AMCOS officer profile is missing');
+      if (!secretary)
+        throw new ForbiddenException('AMCOS officer profile is missing');
       // AMCOS officers may never widen their own registry scope via a query parameter.
       where.sourceMamcosId = secretary.mamcosId;
     } else if (mamcosId) where.sourceMamcosId = mamcosId;

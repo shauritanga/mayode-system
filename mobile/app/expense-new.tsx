@@ -8,8 +8,10 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Calendar01Icon, Camera01Icon } from '@hugeicons/core-free-icons';
-import { financeApi, uploadsApi } from '../src/lib/data';
+import { financeApi, suppliersApi, uploadsApi, resolveMediaUrl } from '../src/lib/data';
+import { SearchableSelect } from '../src/components/SearchableSelect';
 import { useI18n } from '../src/i18n';
+
 
 const CATEGORIES = [
   { key: 'SEEDS', labelKey: 'costSeeds', icon: '🌱' },
@@ -23,6 +25,8 @@ const CATEGORIES = [
   { key: 'MISCELLANEOUS', labelKey: 'costMiscellaneous', icon: '💵' },
 ] as const;
 
+const CATEGORY_KEYS = CATEGORIES.map((c) => c.key);
+
 function toDateInput(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -33,6 +37,17 @@ export default function ExpenseNew() {
   const router = useRouter();
   const { t } = useI18n();
 
+  useEffect(() => {
+    if (!cropCycleId) {
+      router.replace({ pathname: '/activity-select-cycle', params: { purpose: 'expense' } });
+    }
+  }, [cropCycleId, router]);
+
+  const formatCategory = (key: string) => {
+    const c = CATEGORIES.find((x) => x.key === key);
+    return c ? `${c.icon}  ${t(c.labelKey)}` : key;
+  };
+
   const [category, setCategory] = useState<string | null>(null);
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -40,12 +55,36 @@ export default function ExpenseNew() {
   const [unitPrice, setUnitPrice] = useState('');
   const [totalCost, setTotalCost] = useState('');
   const [totalEdited, setTotalEdited] = useState(false);
-  const [supplier, setSupplier] = useState('');
+  const OTHER_SUPPLIER = '__other__';
+  const [supplierChoice, setSupplierChoice] = useState<string | null>(null);
+  const [supplierNames, setSupplierNames] = useState<string[]>([]);
+  const [suppliersByName, setSuppliersByName] = useState<Record<string, string>>({});
+  const [supplierOther, setSupplierOther] = useState('');
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [date, setDate] = useState(toDateInput(new Date()));
   const [showPicker, setShowPicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    suppliersApi
+      .getAll()
+      .then((res) => {
+        const list = (res.data || []).filter((s: any) => s.isActive !== false);
+        const byName: Record<string, string> = {};
+        const names: string[] = [];
+        for (const s of list) {
+          names.push(s.name);
+          byName[s.name] = s.id;
+        }
+        setSupplierNames(names);
+        setSuppliersByName(byName);
+      })
+      .catch(() => {
+        setSupplierNames([]);
+        setSuppliersByName({});
+      });
+  }, []);
 
   // Auto-compute total from quantity × unit price, unless the user typed a total directly.
   useEffect(() => {
@@ -89,6 +128,10 @@ export default function ExpenseNew() {
     }
     setSubmitting(true);
     try {
+      const linkedId =
+        supplierChoice && supplierChoice !== OTHER_SUPPLIER
+          ? suppliersByName[supplierChoice]
+          : undefined;
       await financeApi.addCost({
         cropCycleId: cropCycleId!,
         category,
@@ -97,7 +140,10 @@ export default function ExpenseNew() {
         unit: unit.trim() || undefined,
         unitPrice: unitPrice ? Number(unitPrice) : undefined,
         totalCost: Number(totalCost),
-        supplier: supplier.trim() || undefined,
+        supplierId: linkedId,
+        supplier: linkedId
+          ? supplierChoice || undefined
+          : supplierOther.trim() || undefined,
         receiptUrl: receiptUrl || undefined,
         dateIncurred: date,
       });
@@ -117,19 +163,15 @@ export default function ExpenseNew() {
         {(!!farmCode || !!season) && <Text style={styles.contextLabel}>{[farmCode, season].filter(Boolean).join(' · ')}</Text>}
 
         <View style={styles.card}>
-          <Text style={styles.fieldLabel}>{t('expenseCategory')}</Text>
-          <View style={styles.chipsWrap}>
-            {CATEGORIES.map((c) => (
-              <TouchableOpacity
-                key={c.key}
-                style={[styles.chip, category === c.key && styles.chipActive]}
-                onPress={() => setCategory(c.key)}
-              >
-                <Text style={styles.chipEmoji}>{c.icon}</Text>
-                <Text style={[styles.chipText, category === c.key && styles.chipTextActive]}>{t(c.labelKey)}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <SearchableSelect
+            label={t('expenseCategory')}
+            value={category}
+            placeholder={t('selectExpenseCategory')}
+            options={CATEGORY_KEYS}
+            onSelect={setCategory}
+            searchable={false}
+            formatLabel={formatCategory}
+          />
 
           <Field label={t('itemName')} value={itemName} onChangeText={setItemName} />
 
@@ -149,7 +191,34 @@ export default function ExpenseNew() {
             onChangeText={(v: string) => { setTotalEdited(true); setTotalCost(v); }}
             keyboardType="decimal-pad"
           />
-          <Field label={t('supplierLabel')} value={supplier} onChangeText={setSupplier} />
+
+          {supplierNames.length > 0 ? (
+            <>
+              <SearchableSelect
+                label={t('supplierLabel')}
+                value={supplierChoice === OTHER_SUPPLIER ? t('supplierOther') : supplierChoice}
+                placeholder={t('selectSupplier')}
+                options={[...supplierNames, t('supplierOther')]}
+                onSelect={(name) => {
+                  if (name === t('supplierOther')) {
+                    setSupplierChoice(OTHER_SUPPLIER);
+                  } else {
+                    setSupplierChoice(name);
+                    setSupplierOther('');
+                  }
+                }}
+              />
+              {supplierChoice === OTHER_SUPPLIER && (
+                <Field
+                  label={t('supplierOther')}
+                  value={supplierOther}
+                  onChangeText={setSupplierOther}
+                />
+              )}
+            </>
+          ) : (
+            <Field label={t('supplierLabel')} value={supplierOther} onChangeText={setSupplierOther} />
+          )}
 
           <Text style={styles.fieldLabel}>{t('dateIncurred')}</Text>
           <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker(true)}>
@@ -168,7 +237,7 @@ export default function ExpenseNew() {
 
           <Text style={[styles.fieldLabel, { marginTop: 12 }]}>{t('addReceiptPhoto')}</Text>
           {receiptUrl ? (
-            <Image source={{ uri: receiptUrl }} style={styles.photoPreview} />
+            <Image source={{ uri: resolveMediaUrl(receiptUrl) ?? receiptUrl }} style={styles.photoPreview} />
           ) : (
             <TouchableOpacity style={styles.secondaryBtn} onPress={addReceipt} disabled={uploadingReceipt}>
               {uploadingReceipt ? <ActivityIndicator size="small" color="#10B981" /> : (
@@ -202,12 +271,6 @@ const styles = StyleSheet.create({
   contextLabel: { fontSize: 13, color: '#6B7280', marginBottom: 12, fontWeight: '600' },
   fieldLabel: { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 8 },
   input: { backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111827' },
-  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
-  chipActive: { backgroundColor: '#065F46', borderColor: '#065F46' },
-  chipEmoji: { fontSize: 14 },
-  chipText: { fontSize: 12, fontWeight: '600', color: '#374151' },
-  chipTextActive: { color: '#fff' },
   dateBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
   dateBtnText: { fontSize: 14, color: '#111827' },
   secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingVertical: 12 },

@@ -1,15 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Location01Icon, Notification03Icon, ArrowRight01Icon, BellIcon, Alert02Icon, SquareLock02Icon, Plant01Icon, Wallet01Icon, Calendar01Icon, Agreement01Icon } from '@hugeicons/core-free-icons';
-import { useAuthStore } from '../../src/store/auth.store';
-import { farmsApi, activitiesApi, alertsApi, registryApi } from '../../src/lib/data';
-import { fetchWeatherHere, WeatherData } from '../../src/services/weather.service';
-import { timeAgo, useI18n } from '../../src/i18n';
-import RoleWorkspaceDashboard from '../role-workspace';
+import {
+  Location01Icon,
+  ArrowRight01Icon,
+  BellIcon,
+  Alert02Icon,
+  SquareLock02Icon,
+  Plant01Icon,
+  TaskDaily01Icon,
+  Wallet01Icon,
+  CoinsDollarIcon,
+} from '@hugeicons/core-free-icons';
+import { useAuthStore } from '../../../src/store/auth.store';
+import { farmsApi, activitiesApi, alertsApi, registryApi } from '../../../src/lib/data';
+import { fetchWeatherHere, WeatherData } from '../../../src/services/weather.service';
+import { useI18n } from '../../../src/i18n';
+import ActivityFeedCard from '../../../src/components/ActivityFeedCard';
+import { DrawerMenuButton } from '../../../src/components/DrawerMenuButton';
+import { isFarmBoundaryMapped } from '../../../src/lib/farm-geo';
+import RoleWorkspaceDashboard from '../../role-workspace';
 
 export default function DashboardTab() {
   const { user } = useAuthStore();
@@ -73,10 +86,9 @@ function FarmerDashboardTab() {
   useEffect(() => {
     fetchData();
     loadWeather();
-  }, []);
+  }, [farmerId]);
 
   const name = user?.firstName ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` : t('farmerFallback');
-  const initial = (user?.firstName?.[0] || 'M').toUpperCase();
   const when = weather?.observedAt || new Date();
   const dateStr = when.toLocaleDateString(language === 'sw' ? 'sw-TZ' : 'en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const timeStr = when.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -100,7 +112,7 @@ function FarmerDashboardTab() {
         <View style={[styles.hero, { paddingTop: insets.top + 14 }]}>
           {/* Greeting */}
           <View style={styles.greetRow}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
+            <DrawerMenuButton light />
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={styles.hi}>{t('hiName', { name })}</Text>
               <Text style={styles.welcome}>{t('welcomeBack')}</Text>
@@ -148,22 +160,6 @@ function FarmerDashboardTab() {
 
         {/* ── Body ── */}
         <View style={styles.body}>
-          {/* Quick links to screens that no longer live in the bottom tab bar */}
-          <View style={styles.quickLinksRow}>
-            <TouchableOpacity style={styles.quickLink} onPress={() => router.push('/finances')}>
-              <HugeiconsIcon icon={Wallet01Icon} size={20} color="#065F46" strokeWidth={2} />
-              <Text style={styles.quickLinkText}>{t('finances')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickLink} onPress={() => router.push('/calendar')}>
-              <HugeiconsIcon icon={Calendar01Icon} size={20} color="#065F46" strokeWidth={2} />
-              <Text style={styles.quickLinkText}>{t('calendar')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickLink} onPress={() => router.push('/votes')}>
-              <HugeiconsIcon icon={Agreement01Icon} size={20} color="#065F46" strokeWidth={2} />
-              <Text style={styles.quickLinkText}>Voting</Text>
-            </TouchableOpacity>
-          </View>
-
           {/* AMCOS pre-registered farms awaiting the owner's confirmation */}
           {claimable.length > 0 && (
             <TouchableOpacity style={styles.claimBanner} onPress={() => router.push('/claim-farms')}>
@@ -204,6 +200,48 @@ function FarmerDashboardTab() {
                   {a.locked && <HugeiconsIcon icon={SquareLock02Icon} size={16} color="#B45309" strokeWidth={2} />}
                 </TouchableOpacity>
               ))}
+            </View>
+          )}
+
+          {/* Season shortcuts — ≤3 taps to activity / expense / sale */}
+          {farms.length > 0 && (
+            <View style={{ marginBottom: 22 }}>
+              <Text style={styles.sectionTitle}>{t('seasonRecords')}</Text>
+              <Text style={styles.quickHint}>{t('seasonHomeHint')}</Text>
+              <View style={styles.quickRow}>
+                <QuickAction
+                  label={t('logActivity')}
+                  icon={TaskDaily01Icon}
+                  onPress={() => router.push({ pathname: '/activity-select-cycle', params: { purpose: 'activity' } })}
+                />
+                <QuickAction
+                  label={t('addExpense')}
+                  icon={Wallet01Icon}
+                  onPress={() => router.push({ pathname: '/activity-select-cycle', params: { purpose: 'expense' } })}
+                />
+                <QuickAction
+                  label={t('recordSale')}
+                  icon={CoinsDollarIcon}
+                  onPress={() => router.push({ pathname: '/activity-select-cycle', params: { purpose: 'sale' } })}
+                />
+              </View>
+              {farms.length === 1 ? (
+                <TouchableOpacity
+                  style={styles.seasonLink}
+                  onPress={() => router.push({
+                    pathname: '/crop-cycles/[farmId]',
+                    params: { farmId: farms[0].id, farmCode: farms[0].farmCode },
+                  })}
+                >
+                  <Text style={styles.seasonLinkText}>{t('openSeasonRecords')}</Text>
+                  <HugeiconsIcon icon={ArrowRight01Icon} size={16} color="#065F46" strokeWidth={2} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.seasonLink} onPress={() => router.push('/farms')}>
+                  <Text style={styles.seasonLinkText}>{t('pickFarmForSeason')}</Text>
+                  <HugeiconsIcon icon={ArrowRight01Icon} size={16} color="#065F46" strokeWidth={2} />
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -265,21 +303,7 @@ function FarmerDashboardTab() {
               <Text style={styles.emptyText}>{t('noRecentActivity')}</Text>
             </View>
           ) : (
-            <View style={styles.activityCard}>
-              {activities.map((a, i) => (
-                <View
-                  key={a.id}
-                  style={[styles.activityRow, i === activities.length - 1 && { borderBottomWidth: 0 }]}
-                >
-                  <View style={styles.activityIcon}><Text style={{ fontSize: 18 }}>{a.icon || '•'}</Text></View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.activityTitle} numberOfLines={1}>{a.title}</Text>
-                    {!!a.subtitle && <Text style={styles.activitySubtitle} numberOfLines={1}>{a.subtitle}</Text>}
-                  </View>
-                  <Text style={styles.activityTime}>{timeAgo(a.createdAt, t)}</Text>
-                </View>
-              ))}
-            </View>
+            <ActivityFeedCard items={activities} />
           )}
         </View>
       </ScrollView>
@@ -297,7 +321,7 @@ function WStat({ label, value }: { label: string; value: string }) {
 }
 
 function FarmCard({ farm, width, onPress, t }: { farm: any; width: number; onPress: () => void; t: ReturnType<typeof useI18n>['t'] }) {
-  const hasGps = !!farm.centerLatitude;
+  const mapped = isFarmBoundaryMapped(farm);
   const size = farm.actualAcres
     ? `${farm.actualAcres} ac`
     : farm.socialHectares
@@ -321,7 +345,7 @@ function FarmCard({ farm, width, onPress, t }: { farm: any; width: number; onPre
         <FMini label={t('size')} value={size} />
         <FMini label={t('plots')} value={`${farm._count?.plots ?? 0}`} />
         <FMini label={t('grade')} value={farm.grade || '—'} />
-        <FMini label={t('gps')} value={hasGps ? t('mapped') : '—'} valueColor={hasGps ? '#10B981' : '#9CA3AF'} />
+        <FMini label={t('gps')} value={mapped ? t('mapped') : t('notMapped')} valueColor={mapped ? '#10B981' : '#9CA3AF'} />
       </View>
     </TouchableOpacity>
   );
@@ -333,6 +357,25 @@ function FMini({ label, value, valueColor }: { label: string; value: string; val
       <Text style={styles.fMiniLabel}>{label}</Text>
       <Text style={[styles.fMiniValue, valueColor ? { color: valueColor } : null]}>{value}</Text>
     </View>
+  );
+}
+
+function QuickAction({
+  label,
+  icon,
+  onPress,
+}: {
+  label: string;
+  icon: any;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.quickAction} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.quickIcon}>
+        <HugeiconsIcon icon={icon} size={18} color="#065F46" strokeWidth={2} />
+      </View>
+      <Text style={styles.quickLabel} numberOfLines={2}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -352,11 +395,6 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 28,
   },
   greetRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
-  avatar: {
-    width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarText: { color: '#fff', fontSize: 20, fontWeight: '800' },
   hi: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '500' },
   welcome: { color: '#fff', fontSize: 20, fontWeight: '800', marginTop: 1 },
   bell: {
@@ -405,12 +443,6 @@ const styles = StyleSheet.create({
   },
   alertTitle: { fontSize: 14, fontWeight: '800', color: '#92400E' },
   alertPreview: { fontSize: 12, color: '#B45309', marginTop: 2 },
-  quickLinksRow: { flexDirection: 'row', gap: 10, marginBottom: 22 },
-  quickLink: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#fff', borderRadius: 14, paddingVertical: 14, borderWidth: 1, borderColor: '#E5E7EB',
-  },
-  quickLinkText: { fontSize: 13, fontWeight: '700', color: '#065F46' },
   claimBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#D1FAE5',
     borderRadius: 14, padding: 14, marginBottom: 22, borderWidth: 1, borderColor: '#6EE7B7',
@@ -421,6 +453,39 @@ const styles = StyleSheet.create({
   },
   claimTitle: { fontSize: 14, fontWeight: '800', color: '#065F46' },
   claimSub: { fontSize: 12, color: '#047857', marginTop: 2 },
+  quickHint: { fontSize: 12, color: '#6B7280', lineHeight: 17, marginBottom: 12 },
+  quickRow: { flexDirection: 'row', gap: 10 },
+  quickAction: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  quickIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  quickLabel: { fontSize: 12, fontWeight: '700', color: '#065F46', textAlign: 'center', lineHeight: 16 },
+  seasonLink: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  seasonLinkText: { fontSize: 13, fontWeight: '800', color: '#065F46' },
   farmCard: {
     backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, marginRight: 12,
     borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
@@ -446,16 +511,7 @@ const styles = StyleSheet.create({
   registerBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
 
   // Recent Activities
-  activityCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 18, paddingHorizontal: 16, borderWidth: 1, borderColor: '#E5E7EB',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
-  },
-  activityRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  activityIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  activityTitle: { fontSize: 14, fontWeight: '700', color: '#111827' },
-  activitySubtitle: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  activityTime: { fontSize: 11, color: '#9CA3AF', marginLeft: 8 },
-  activityEmpty: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 24, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center' },
+  activityEmpty: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#E8ECF0', alignItems: 'center' },
 
   statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
   statCard: {

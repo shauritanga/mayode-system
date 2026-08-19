@@ -1,7 +1,16 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { MamcosStaffRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateMamcosDto, UpdateMamcosDto, AssignFarmerDto, CreateSecretaryDto } from './dto/mamcos.dto';
+import {
+  CreateMamcosDto,
+  UpdateMamcosDto,
+  AssignFarmerDto,
+  CreateSecretaryDto,
+} from './dto/mamcos.dto';
 
 @Injectable()
 export class MamcosService {
@@ -13,7 +22,9 @@ export class MamcosService {
     });
 
     if (existing) {
-      throw new ConflictException(`MAMCOS scheme with name ${createMamcosDto.name} already exists`);
+      throw new ConflictException(
+        `MAMCOS scheme with name ${createMamcosDto.name} already exists`,
+      );
     }
 
     return this.prisma.mamcos.create({
@@ -68,10 +79,22 @@ export class MamcosService {
           },
         },
         farmers: {
-          select: { id: true, controlNumber: true, firstName: true, lastName: true, creditScore: true },
+          select: {
+            id: true,
+            controlNumber: true,
+            firstName: true,
+            lastName: true,
+            creditScore: true,
+          },
         },
         farms: {
-          select: { id: true, farmCode: true, socialHectares: true, grade: true, isVerified: true },
+          select: {
+            id: true,
+            farmCode: true,
+            socialHectares: true,
+            grade: true,
+            isVerified: true,
+          },
         },
         irrigationSchemes: true,
         aggregationCentres: true,
@@ -91,8 +114,14 @@ export class MamcosService {
     // still has no backing field anywhere in the schema, so it stays omitted
     // rather than reporting a made-up number.
     const farmerIds = mamcos.farmers.map((f) => f.id);
-    const totalRegisteredHectares = mamcos.farms.reduce((sum, f) => sum + (f.socialHectares || 0), 0);
-    const totalAggregationCapacityKg = mamcos.aggregationCentres.reduce((sum, c) => sum + (c.capacityKg || 0), 0);
+    const totalRegisteredHectares = mamcos.farms.reduce(
+      (sum, f) => sum + (f.socialHectares || 0),
+      0,
+    );
+    const totalAggregationCapacityKg = mamcos.aggregationCentres.reduce(
+      (sum, c) => sum + (c.capacityKg || 0),
+      0,
+    );
     const [yieldAgg, inventoryAgg] = farmerIds.length
       ? await Promise.all([
           this.prisma.cropCycle.aggregate({
@@ -104,7 +133,10 @@ export class MamcosService {
             _sum: { weightKg: true },
           }),
         ])
-      : [{ _sum: { actualYieldKg: 0, estimatedYieldKg: 0 } }, { _sum: { weightKg: 0 } }];
+      : [
+          { _sum: { actualYieldKg: 0, estimatedYieldKg: 0 } },
+          { _sum: { weightKg: 0 } },
+        ];
     const productionSummary = {
       totalRegisteredHectares,
       totalActualYieldKg: yieldAgg._sum.actualYieldKg ?? 0,
@@ -114,7 +146,9 @@ export class MamcosService {
     };
 
     const { staff, ...rest } = mamcos;
-    const secretaryRow = staff.find((s) => s.role === MamcosStaffRole.SECRETARY);
+    const secretaryRow = staff.find(
+      (s) => s.role === MamcosStaffRole.SECRETARY,
+    );
     const secretary = secretaryRow
       ? {
           id: secretaryRow.id,
@@ -158,7 +192,9 @@ export class MamcosService {
     });
 
     if (!farmer) {
-      throw new NotFoundException(`Farmer with ID ${assignFarmerDto.farmerId} not found`);
+      throw new NotFoundException(
+        `Farmer with ID ${assignFarmerDto.farmerId} not found`,
+      );
     }
 
     return this.prisma.farmer.update({
@@ -170,7 +206,10 @@ export class MamcosService {
     });
   }
 
-  async createSecretary(mamcosId: string, createSecretaryDto: CreateSecretaryDto) {
+  async createSecretary(
+    mamcosId: string,
+    createSecretaryDto: CreateSecretaryDto,
+  ) {
     await this.findOne(mamcosId); // Verify MAMCOS exists
 
     const existingSecretary = await this.prisma.mamcosStaff.findFirst({
@@ -178,7 +217,9 @@ export class MamcosService {
     });
 
     if (existingSecretary) {
-      throw new ConflictException(`MAMCOS scheme with ID ${mamcosId} already has a designated secretary`);
+      throw new ConflictException(
+        `MAMCOS scheme with ID ${mamcosId} already has a designated secretary`,
+      );
     }
 
     return this.prisma.mamcosStaff.create({
@@ -201,15 +242,33 @@ export class MamcosService {
             staff: {
               where: { role: MamcosStaffRole.FIELD_OFFICER },
               select: {
-                id: true, employeeCode: true, firstName: true, lastName: true, assignedArea: true,
+                id: true,
+                employeeCode: true,
+                firstName: true,
+                lastName: true,
+                assignedArea: true,
                 user: { select: { phone: true, isActive: true } },
               },
             },
             farmers: {
-              select: { id: true, controlNumber: true, firstName: true, lastName: true, creditScore: true, isBlacklisted: true },
+              select: {
+                id: true,
+                controlNumber: true,
+                firstName: true,
+                lastName: true,
+                creditScore: true,
+                isBlacklisted: true,
+              },
             },
             farms: {
-              select: { id: true, farmCode: true, socialHectares: true, grade: true, isVerified: true, isLeased: true },
+              select: {
+                id: true,
+                farmCode: true,
+                socialHectares: true,
+                grade: true,
+                isVerified: true,
+                isLeased: true,
+              },
             },
           },
         },
@@ -217,13 +276,18 @@ export class MamcosService {
     });
 
     if (!secretary) {
-      throw new NotFoundException(`MAMCOS Secretary profile for user ID ${secretaryUserId} not found`);
+      throw new NotFoundException(
+        `MAMCOS Secretary profile for user ID ${secretaryUserId} not found`,
+      );
     }
 
     // Preserve the original response shape: `mamcos.fieldOfficers`, not
     // `mamcos.staff` (which is now filtered to officers only anyway).
     const { mamcos, ...secretaryRest } = secretary;
     const { staff, ...mamcosRest } = mamcos!;
-    return { ...secretaryRest, mamcos: { ...mamcosRest, fieldOfficers: staff } };
+    return {
+      ...secretaryRest,
+      mamcos: { ...mamcosRest, fieldOfficers: staff },
+    };
   }
 }

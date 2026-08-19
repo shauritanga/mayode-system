@@ -5,7 +5,9 @@ import { ClickPesaService } from './clickpesa.service';
 describe('ClickPesaService', () => {
   const CHECKSUM_KEY = 'test-checksum-key';
 
-  function makeService(env: Record<string, string | undefined>): ClickPesaService {
+  function makeService(
+    env: Record<string, string | undefined>,
+  ): ClickPesaService {
     const config = {
       get: (k: string) => env[k],
     } as unknown as ConfigService;
@@ -42,13 +44,24 @@ describe('ClickPesaService', () => {
     });
 
     it('is stable regardless of input key order', () => {
-      const a = svc.generateChecksum({ amount: '100', currency: 'TZS', orderReference: 'X' });
-      const b = svc.generateChecksum({ orderReference: 'X', currency: 'TZS', amount: '100' });
+      const a = svc.generateChecksum({
+        amount: '100',
+        currency: 'TZS',
+        orderReference: 'X',
+      });
+      const b = svc.generateChecksum({
+        orderReference: 'X',
+        currency: 'TZS',
+        amount: '100',
+      });
       expect(a).toBe(b);
     });
 
     it('excludes checksum and checksumMethod fields', () => {
-      const withoutMeta = svc.generateChecksum({ amount: '100', currency: 'TZS' });
+      const withoutMeta = svc.generateChecksum({
+        amount: '100',
+        currency: 'TZS',
+      });
       const withMeta = svc.generateChecksum({
         amount: '100',
         currency: 'TZS',
@@ -85,17 +98,26 @@ describe('ClickPesaService', () => {
     });
     it('is true when both credentials are present', () => {
       expect(
-        makeService({ CLICKPESA_CLIENT_ID: 'c', CLICKPESA_API_KEY: 'k' }).isConfigured(),
+        makeService({
+          CLICKPESA_CLIENT_ID: 'c',
+          CLICKPESA_API_KEY: 'k',
+        }).isConfigured(),
       ).toBe(true);
     });
   });
 
   describe('normalizePhone', () => {
     it('normalizes Tanzanian numbers to 2557XXXXXXXX (no plus)', () => {
-      expect(ClickPesaService.normalizePhone('+255712345678')).toBe('255712345678');
-      expect(ClickPesaService.normalizePhone('0712345678')).toBe('255712345678');
+      expect(ClickPesaService.normalizePhone('+255712345678')).toBe(
+        '255712345678',
+      );
+      expect(ClickPesaService.normalizePhone('0712345678')).toBe(
+        '255712345678',
+      );
       expect(ClickPesaService.normalizePhone('712345678')).toBe('255712345678');
-      expect(ClickPesaService.normalizePhone('255712345678')).toBe('255712345678');
+      expect(ClickPesaService.normalizePhone('255712345678')).toBe(
+        '255712345678',
+      );
     });
   });
 });

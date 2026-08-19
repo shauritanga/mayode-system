@@ -117,7 +117,7 @@ export default function RegisterFarmScreen() {
           text: t('walkGpsBoundary'),
           onPress: () => queued ? Alert.alert('Pending sync', 'Connect to the internet before mapping this farm boundary.') : router.replace({ pathname: '/boundary', params: { id: farm.id, label: t('farmContext', { code: farm.farmCode }) } }),
         },
-        { text: t('done'), style: 'cancel', onPress: () => router.replace('/(tabs)/farms') },
+        { text: t('done'), style: 'cancel', onPress: () => router.replace('/(drawer)/(tabs)/farms') },
       ]);
     } catch (e: any) {
       const msg = e?.response?.data?.message || t('farmRegisterFailed');

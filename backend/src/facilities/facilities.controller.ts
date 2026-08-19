@@ -22,12 +22,16 @@ import {
   UpsertIrrigationSchemeDto,
 } from './dto/facility.dto';
 
-const STAFF_ROLES = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY];
+const STAFF_ROLES = [
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+  UserRole.MAMCOS_SECRETARY,
+];
 
 @ApiTags('facilities')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Controller()
+@Controller('facilities')
 export class FacilitiesController {
   constructor(private readonly facilities: FacilitiesService) {}
 
@@ -38,13 +42,17 @@ export class FacilitiesController {
   }
 
   @Get('irrigation-schemes')
+  @Roles(...STAFF_ROLES)
   findIrrigationSchemes(@Query('mamcosId') mamcosId?: string) {
     return this.facilities.findIrrigationSchemes(mamcosId);
   }
 
   @Patch('irrigation-schemes/:id')
   @Roles(...STAFF_ROLES)
-  updateIrrigationScheme(@Param('id') id: string, @Body() dto: UpdateIrrigationSchemeDto) {
+  updateIrrigationScheme(
+    @Param('id') id: string,
+    @Body() dto: UpdateIrrigationSchemeDto,
+  ) {
     return this.facilities.updateIrrigationScheme(id, dto);
   }
 
@@ -61,13 +69,17 @@ export class FacilitiesController {
   }
 
   @Get('aggregation-centres')
+  @Roles(...STAFF_ROLES)
   findAggregationCentres(@Query('mamcosId') mamcosId?: string) {
     return this.facilities.findAggregationCentres(mamcosId);
   }
 
   @Patch('aggregation-centres/:id')
   @Roles(...STAFF_ROLES)
-  updateAggregationCentre(@Param('id') id: string, @Body() dto: UpdateAggregationCentreDto) {
+  updateAggregationCentre(
+    @Param('id') id: string,
+    @Body() dto: UpdateAggregationCentreDto,
+  ) {
     return this.facilities.updateAggregationCentre(id, dto);
   }
 

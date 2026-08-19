@@ -76,21 +76,38 @@ export class FarmLeasesService {
   async create(dto: CreateFarmLeaseDto, user: RequestUser) {
     const farm = await this.prisma.farm.findUnique({
       where: { id: dto.farmId },
-      select: { id: true, farmCode: true, name: true, farmerId: true, mamcosId: true, isVerified: true },
+      select: {
+        id: true,
+        farmCode: true,
+        name: true,
+        farmerId: true,
+        mamcosId: true,
+        isVerified: true,
+      },
     });
     if (!farm) throw new NotFoundException(`Farm ${dto.farmId} not found`);
-    if (!farm.farmerId) throw new ConflictException('Owner-operated assignments are not available for AMCOS-owned farms; assign a renter instead');
+    if (!farm.farmerId)
+      throw new ConflictException(
+        'Owner-operated assignments are not available for AMCOS-owned farms; assign a renter instead',
+      );
 
     if (!farm.isVerified) {
-      throw new ConflictException('AMCOS must approve the mapped farm boundary before assigning a renter');
+      throw new ConflictException(
+        'AMCOS must approve the mapped farm boundary before assigning a renter',
+      );
     }
 
     // Farms belong to AMCOS. Staff may assign only inside their AMCOS; farmers
     // never create leases for land they do not own.
     if (user.role === 'MAMCOS_SECRETARY') {
-      const secretary = await this.prisma.mamcosStaff.findFirst({ where: { userId: user.id, role: MamcosStaffRole.SECRETARY }, select: { mamcosId: true } });
+      const secretary = await this.prisma.mamcosStaff.findFirst({
+        where: { userId: user.id, role: MamcosStaffRole.SECRETARY },
+        select: { mamcosId: true },
+      });
       if (!secretary || secretary.mamcosId !== farm.mamcosId) {
-        throw new ForbiddenException('You can only assign renters for your own AMCOS farms');
+        throw new ForbiddenException(
+          'You can only assign renters for your own AMCOS farms',
+        );
       }
     }
 
@@ -220,8 +237,12 @@ export class FarmLeasesService {
   async findAllLeases(status?: LeaseStatus, user?: RequestUser) {
     const where: Prisma.FarmLeaseWhereInput = status ? { status } : {};
     if (user?.role === UserRole.MAMCOS_SECRETARY) {
-      const secretary = await this.prisma.mamcosStaff.findFirst({ where: { userId: user.id, role: MamcosStaffRole.SECRETARY }, select: { mamcosId: true } });
-      if (!secretary) throw new ForbiddenException('AMCOS officer profile is missing');
+      const secretary = await this.prisma.mamcosStaff.findFirst({
+        where: { userId: user.id, role: MamcosStaffRole.SECRETARY },
+        select: { mamcosId: true },
+      });
+      if (!secretary)
+        throw new ForbiddenException('AMCOS officer profile is missing');
       where.farm = { mamcosId: secretary.mamcosId };
     }
     return this.prisma.farmLease.findMany({
@@ -243,6 +264,26 @@ export class FarmLeasesService {
     });
     if (!lease) throw new NotFoundException(`Lease ${id} not found`);
     return lease;
+  }
+
+  /**
+   * Admin-only delete for leases that never went active (drafts, rejected or
+   * stuck pending requests). ACTIVE/COMPLETED leases are part of the seasonal
+   * audit trail and must be terminated, not deleted. Linked seasonal
+   * assignments keep their history — their leaseId is nullable (SetNull).
+   */
+  async remove(id: string) {
+    const lease = await this.findLeaseOrFail(id);
+    if (
+      lease.status === LeaseStatus.ACTIVE ||
+      lease.status === LeaseStatus.COMPLETED
+    ) {
+      throw new ConflictException(
+        `Cannot delete a ${lease.status.toLowerCase()} lease — it is part of the seasonal record`,
+      );
+    }
+    await this.prisma.farmLease.delete({ where: { id: lease.id } });
+    return { success: true, message: `Lease ${id} deleted` };
   }
 
   /** Assert that the requesting user is this lease's renter (by farmer id or phone). */
@@ -570,13 +611,21 @@ export class FarmLeasesService {
    * OWNER_OPERATED assignment for the owner's own farm.
    */
   async selfOperate(dto: SelfOperateDto, user: RequestUser) {
-    await this.ownership.assertFarmAccess(user, dto.farmId);
+    const ownFarmer = await this.farmerForUser(user.id);
     const farm = await this.prisma.farm.findUnique({
       where: { id: dto.farmId },
       select: { farmerId: true },
     });
     if (!farm) throw new NotFoundException(`Farm ${dto.farmId} not found`);
-    if (!farm.farmerId) throw new ConflictException('Owner-operated assignments are not available for AMCOS-owned farms; assign a renter instead');
+    if (!farm.farmerId)
+      throw new ConflictException(
+        'Owner-operated assignments are not available for AMCOS-owned farms; assign a renter instead',
+      );
+    // Do not call assertFarmAccess here — that requires an assignment, which is
+    // exactly what this endpoint creates for the legal owner.
+    if (!ownFarmer || farm.farmerId !== ownFarmer.id) {
+      throw new ForbiddenException('Only the farm owner can declare self-operate');
+    }
     const season = await this.prisma.farmingSeason.findUnique({
       where: { id: dto.farmingSeasonId },
       select: { id: true },
@@ -625,7 +674,8 @@ export class FarmLeasesService {
     });
   }
 
-  findAssignmentsForFarm(farmId: string) {
+  async findAssignmentsForFarm(farmId: string, user: RequestUser) {
+    await this.ownership.assertFarmAccess(user, farmId);
     return this.prisma.seasonalFarmAssignment.findMany({
       where: { farmId },
       orderBy: { createdAt: 'desc' },
@@ -700,7 +750,8 @@ export class FarmLeasesService {
     });
   }
 
-  findOwnershipForFarm(farmId: string) {
+  async findOwnershipForFarm(farmId: string, user: RequestUser) {
+    await this.ownership.assertFarmAccess(user, farmId);
     return this.prisma.farmOwnership.findMany({
       where: { farmId },
       orderBy: { createdAt: 'desc' },

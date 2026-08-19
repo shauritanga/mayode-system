@@ -6,7 +6,7 @@ import {
   EmptyState,
   InsightPanel,
   MetricTile,
-  RoleHero,
+  MetricTileSkeleton,
   money,
 } from '@/components/role-dashboards/DashboardPrimitives';
 import {
@@ -35,6 +35,7 @@ export default function AdminOverviewDashboard() {
   const [impact, setImpact] = useState<any>(null);
   const [integrations, setIntegrations] = useState<any[]>([]);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.allSettled([
@@ -70,6 +71,7 @@ export default function AdminOverviewDashboard() {
       if (impactResult.status === 'fulfilled') setImpact(impactResult.value.data);
       if (integrationResult.status === 'fulfilled') setIntegrations(integrationResult.value.data || []);
       if (userResult.status === 'rejected' && farmerResult.status === 'rejected') setError('Unable to load MAYOData administration data.');
+      setLoading(false);
     });
   }, []);
 
@@ -331,26 +333,27 @@ export default function AdminOverviewDashboard() {
   const activeSeasons = cropCycles.filter((cycle) => cycle.status === 'ACTIVE' || cycle.status === 'PLANNED').length;
 
   return <div className="role-dashboard">
-    <RoleHero
-      eyebrow="Platform administration"
-      title="Dashboard"
-      subtitle="System-wide control room for users, cooperatives, data quality, integrations, exports and operational health."
-    />
     {error && <EmptyState>{error}</EmptyState>}
 
     {/* Primary KPIs — the numbers a platform admin scans first, ordered by
         the scale of what they represent (people/land → institutions → money). */}
     <div className="role-grid">
-      <MetricTile label="Farmers" value={farmers.length || kpis?.totalFarmers || '—'} hint={`${unverifiedFarmers} pending verification`} />
-      <MetricTile label="Farms" value={farms.length} hint={`${unverifiedFarms} need verification`} tone="gold" />
-      <MetricTile label="Hectares under cultivation" value={kpis ? Math.round(kpis.totalHectares).toLocaleString() : '—'} hint="Total registered farm area" tone="green" />
-      <MetricTile label="AMCOS" value={mamcos.length} hint="Cooperative entities" tone="purple" />
-      <MetricTile label="Active crop seasons" value={activeSeasons} hint={`${cropCycles.length} total cycles recorded`} tone="green" />
-      <MetricTile label="Field officers" value={activeFieldOfficers} hint="Active extension staff" tone="blue" />
-      <MetricTile label="Rice aggregated" value={`${Math.round(totalRiceAggregatedKg).toLocaleString()} kg`} hint={`${inventoryRecords.length} warehouse records`} tone="gold" />
-      <MetricTile label="Farmers accessing finance" value={farmersWithFinance} hint={`${loans.length} loan records`} tone="purple" />
-      <MetricTile label="Farmers covered by insurance" value={insuranceCoverage?.farmersCovered ?? '—'} hint={`TZS ${Math.round(insuranceCoverage?.totalSumInsured || 0).toLocaleString()} sum insured`} tone="green" />
-      <MetricTile label="Revenue" value={money(kpis?.totalRevenue)} hint="Recorded cooperative revenue" />
+      {loading ? (
+        Array.from({ length: 10 }).map((_, i) => <MetricTileSkeleton key={i} />)
+      ) : (
+        <>
+          <MetricTile label="Farmers" value={farmers.length || kpis?.totalFarmers || '—'} hint={`${unverifiedFarmers} pending verification`} />
+          <MetricTile label="Farms" value={farms.length} hint={`${unverifiedFarms} need verification`} tone="gold" />
+          <MetricTile label="Hectares under cultivation" value={kpis ? Math.round(kpis.totalHectares).toLocaleString() : '—'} hint="Total registered farm area" tone="green" />
+          <MetricTile label="AMCOS" value={mamcos.length} hint="Cooperative entities" tone="purple" />
+          <MetricTile label="Active crop seasons" value={activeSeasons} hint={`${cropCycles.length} total cycles recorded`} tone="green" />
+          <MetricTile label="Field officers" value={activeFieldOfficers} hint="Active extension staff" tone="blue" />
+          <MetricTile label="Rice aggregated" value={`${Math.round(totalRiceAggregatedKg).toLocaleString()} kg`} hint={`${inventoryRecords.length} warehouse records`} tone="gold" />
+          <MetricTile label="Farmers accessing finance" value={farmersWithFinance} hint={`${loans.length} loan records`} tone="purple" />
+          <MetricTile label="Farmers covered by insurance" value={insuranceCoverage?.farmersCovered ?? '—'} hint={`TZS ${Math.round(insuranceCoverage?.totalSumInsured || 0).toLocaleString()} sum insured`} tone="green" />
+          <MetricTile label="Revenue" value={money(kpis?.totalRevenue)} hint="Recorded cooperative revenue" />
+        </>
+      )}
     </div>
 
     {/* Trends — how the platform is moving over time, given equal visual
@@ -494,6 +497,9 @@ export default function AdminOverviewDashboard() {
 
       <InsightPanel title="Admin actions" subtitle="Common MAYOData operations.">
         <div className="role-list">
+          <ActionLink href="/dashboard/ai" title="AI Insights" text="Generate field advisories and log soil/sorter intake." />
+          <ActionLink href="/dashboard/traceability" title="Traceability" text="Look up invoice, lot, or inventory tracking codes." />
+          <ActionLink href="/dashboard/grantor" title="Grantor impact" text="Export season KPIs and community project outcomes." />
           <ActionLink href="/dashboard/staff" title="Manage staff" text="Create field officer and cooperative accounts." />
           <ActionLink href="/dashboard/mamcos" title="Manage AMCOS" text="Create cooperatives and assign leadership." />
           <ActionLink href="/dashboard/compliance" title="Export compliance evidence" text="Review FLOCERT pack and reports." />

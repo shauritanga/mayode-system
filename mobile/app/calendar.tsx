@@ -8,11 +8,13 @@ import { cropCyclesApi } from '../src/lib/data';
 import { useI18n } from '../src/i18n';
 
 interface Entry {
-  type: 'ACTIVITY' | 'PLANTING' | 'HARVEST';
+  type: 'ACTIVITY' | 'PLANTING' | 'HARVEST' | 'RICE_TASK';
   date: string;
   id: string;
   cropCycleId: string;
   activityType?: string;
+  title?: string;
+  status?: string;
   farm?: { farmCode?: string; name?: string } | null;
 }
 
@@ -77,7 +79,7 @@ export default function FarmerCalendarScreen() {
       ) : sections.length === 0 ? (
         <View style={styles.center}>
           <HugeiconsIcon icon={Calendar01Icon} size={40} color="#D1D5DB" strokeWidth={1.5} />
-          <Text style={styles.emptyText}>{t('noVisitsYet')}</Text>
+          <Text style={styles.emptyText}>{t('calendarEmpty')}</Text>
         </View>
       ) : (
         <SectionList
@@ -87,25 +89,41 @@ export default function FarmerCalendarScreen() {
           renderSectionHeader={({ section }) => <Text style={styles.sectionHeader}>{section.title}</Text>}
           renderItem={({ item }) => {
             const isActivity = item.type === 'ACTIVITY';
+            const isRiceTask = item.type === 'RICE_TASK';
             const farmLabel = item.farm?.farmCode || item.farm?.name || '';
+            const title = isRiceTask
+              ? (item.title || t('riceCalendarTask'))
+              : isActivity
+                ? item.activityType?.replace(/_/g, ' ')
+                : t(item.type === 'PLANTING' ? 'plantingDue' : 'harvestDue', { farm: farmLabel });
             return (
               <TouchableOpacity
                 style={styles.entry}
-                onPress={() => router.push({ pathname: '/crop-cycle/[id]', params: { id: item.cropCycleId } })}
+                onPress={() => {
+                  if (isRiceTask) {
+                    router.push({
+                      pathname: '/calendar-task/[id]',
+                      params: { id: item.id, cropCycleId: item.cropCycleId },
+                    });
+                    return;
+                  }
+                  router.push({ pathname: '/crop-cycle/[id]', params: { id: item.cropCycleId } });
+                }}
               >
                 <HugeiconsIcon
-                  icon={isActivity ? TaskDaily01Icon : Plant01Icon}
+                  icon={isActivity || isRiceTask ? TaskDaily01Icon : Plant01Icon}
                   size={18}
-                  color={isActivity ? '#047857' : '#3B82F6'}
+                  color={isRiceTask ? '#B45309' : isActivity ? '#047857' : '#3B82F6'}
                   strokeWidth={2}
                 />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.entryTitle}>
-                    {isActivity
-                      ? item.activityType?.replace(/_/g, ' ')
-                      : t(item.type === 'PLANTING' ? 'plantingDue' : 'harvestDue', { farm: farmLabel })}
-                  </Text>
-                  {isActivity && !!farmLabel && <Text style={styles.entrySub}>{farmLabel}</Text>}
+                  <Text style={styles.entryTitle}>{title}</Text>
+                  {(isActivity || isRiceTask) && !!farmLabel && (
+                    <Text style={styles.entrySub}>
+                      {farmLabel}
+                      {isRiceTask && item.status === 'COMPLETED' ? ` · ${t('taskCompleted')}` : ''}
+                    </Text>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -118,18 +136,12 @@ export default function FarmerCalendarScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  emptyText: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginTop: 12 },
-  monthBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB',
-  },
-  monthLabel: { fontSize: 15, fontWeight: '800', color: '#111827' },
-  sectionHeader: { fontSize: 12, fontWeight: '800', color: '#6B7280', marginTop: 14, marginBottom: 8, textTransform: 'uppercase' },
-  entry: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff',
-    borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB',
-  },
-  entryTitle: { fontSize: 14, fontWeight: '700', color: '#111827', textTransform: 'capitalize' },
+  monthBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  monthLabel: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
+  emptyText: { fontSize: 14, color: '#9CA3AF', textAlign: 'center' },
+  sectionHeader: { fontSize: 12, fontWeight: '700', color: '#6B7280', marginBottom: 8, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
+  entry: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB' },
+  entryTitle: { fontSize: 14, fontWeight: '600', color: '#111827' },
   entrySub: { fontSize: 12, color: '#6B7280', marginTop: 2 },
 });

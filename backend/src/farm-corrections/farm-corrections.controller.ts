@@ -40,6 +40,12 @@ export class FarmCorrectionsController {
   // ---- Suggested updates ("Add More Details" / "Suggest Correction") ----
 
   @Post('suggested-updates')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.FARMER,
+  )
   @ApiOperation({
     summary: 'Suggest a correction to a farm field (owner/renter/officer)',
   })
@@ -52,6 +58,7 @@ export class FarmCorrectionsController {
   }
 
   @Get('suggested-updates')
+  @Roles(...STAFF_ROLES, UserRole.FARMER)
   @ApiOperation({ summary: "List a farm's suggested corrections" })
   listForFarm(
     @Param('farmId') farmId: string,
@@ -76,6 +83,7 @@ export class FarmCorrectionsController {
   }
 
   @Get('data-values')
+  @Roles(...STAFF_ROLES)
   @ApiOperation({ summary: "List a farm's source-tracked data values" })
   listValues(@Param('farmId') farmId: string) {
     return this.corrections.listValuesForFarm(farmId);

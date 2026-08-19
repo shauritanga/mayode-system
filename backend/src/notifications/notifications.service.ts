@@ -49,11 +49,14 @@ export class NotificationsService {
       data: users.map((u) => ({ ...payload, userId: u.id })),
     });
     void this.push
-      .sendToUsers(users.map((u) => u.id), {
-        title: payload.title,
-        body: payload.body,
-        data: (payload.data as Record<string, unknown>) ?? {},
-      })
+      .sendToUsers(
+        users.map((u) => u.id),
+        {
+          title: payload.title,
+          body: payload.body,
+          data: (payload.data as Record<string, unknown>) ?? {},
+        },
+      )
       .catch(() => undefined);
     return result;
   }

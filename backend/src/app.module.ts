@@ -77,7 +77,10 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
 
     // Serve uploaded files (photos, documents) at /uploads
     ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), process.env.UPLOAD_DIR?.replace(/^\.\//, '') || 'uploads'),
+      rootPath: join(
+        process.cwd(),
+        process.env.UPLOAD_DIR?.replace(/^\.\//, '') || 'uploads',
+      ),
       serveRoot: '/uploads',
     }),
 

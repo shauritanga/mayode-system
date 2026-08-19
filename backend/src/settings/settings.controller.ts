@@ -15,7 +15,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { SettingsService } from './settings.service';
-import { UpdateOrgSettingsDto, UpsertNotificationTemplateDto } from './dto/settings.dto';
+import {
+  UpdateOrgSettingsDto,
+  UpsertNotificationTemplateDto,
+} from './dto/settings.dto';
 
 @ApiTags('settings')
 @ApiBearerAuth()
@@ -50,7 +53,10 @@ export class SettingsController {
 
   @Patch('notification-templates/:id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  updateTemplate(@Param('id') id: string, @Body() dto: UpsertNotificationTemplateDto) {
+  updateTemplate(
+    @Param('id') id: string,
+    @Body() dto: UpsertNotificationTemplateDto,
+  ) {
     return this.settings.updateTemplate(id, dto);
   }
 

@@ -1,5 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsNumber, IsOptional, IsPositive, IsString, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class CreateSaleDto {
   @IsString() lotId: string;
@@ -14,11 +21,16 @@ export class CreateSaleDto {
 }
 
 export class SettleSaleDto {
-  @ApiPropertyOptional({ description: 'Confirmed buyer payment date; defaults to now.' })
-  @IsOptional() @IsDateString() paymentDate?: string;
+  @ApiPropertyOptional({
+    description: 'Confirmed buyer payment date; defaults to now.',
+  })
+  @IsOptional()
+  @IsDateString()
+  paymentDate?: string;
 }
 
 export class CollectBuyerPaymentDto {
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   phoneNumber?: string;
 }

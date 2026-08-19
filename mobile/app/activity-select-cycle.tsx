@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { WheatIcon, Tree02Icon } from '@hugeicons/core-free-icons';
 import { farmsApi, cropCyclesApi, workspaceApi } from '../src/lib/data';
@@ -15,18 +15,47 @@ interface Option {
   season: string;
 }
 
+type Purpose = 'activity' | 'expense' | 'sale';
+
 const ACTIVE_STATUSES = ['PLANNED', 'ACTIVE'];
 
+const DEST: Record<Purpose, '/activity-new' | '/expense-new' | '/revenue-new'> = {
+  activity: '/activity-new',
+  expense: '/expense-new',
+  sale: '/revenue-new',
+};
+
+/** Pick an active crop cycle, then continue to activity / expense / sale. */
 export default function ActivitySelectCycle() {
   const router = useRouter();
   const { t } = useI18n();
   const farmerId = useAuthStore((state) => state.farmerId);
+  const params = useLocalSearchParams<{ purpose?: string }>();
+  const purpose: Purpose =
+    params.purpose === 'expense' || params.purpose === 'sale' ? params.purpose : 'activity';
+
   const [options, setOptions] = useState<Option[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const goNext = (o: Option) => {
+    router.replace({
+      pathname: DEST[purpose],
+      params: {
+        cropCycleId: o.cropCycleId,
+        farmId: o.farmId,
+        farmCode: o.farmCode,
+        season: o.season,
+      },
+    });
+  };
+
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      if (!farmerId) { setLoading(false); return; }
+      if (!farmerId) {
+        setLoading(false);
+        return;
+      }
       try {
         const [ownedRes, assignmentsRes] = await Promise.all([
           farmsApi.getByFarmerId(farmerId),
@@ -40,28 +69,51 @@ export default function ActivitySelectCycle() {
 
         const perFarm = await Promise.all(
           Array.from(farmsById.values()).map((farm) =>
-            cropCyclesApi.getByFarmId(farm.id).then((res) => {
-              const cycles = res.data?.data || res.data || [];
-              return cycles
-                .filter((c: any) => ACTIVE_STATUSES.includes(c.status))
-                .map((c: any) => ({ cropCycleId: c.id, farmId: farm.id, farmCode: farm.farmCode, season: c.season }));
-            }).catch(() => []),
+            cropCyclesApi
+              .getByFarmId(farm.id)
+              .then((res) => {
+                const cycles = res.data?.data || res.data || [];
+                return cycles
+                  .filter((c: any) => ACTIVE_STATUSES.includes(c.status))
+                  .map((c: any) => ({
+                    cropCycleId: c.id,
+                    farmId: farm.id,
+                    farmCode: farm.farmCode,
+                    season: c.season,
+                  }));
+              })
+              .catch(() => []),
           ),
         );
         const flat = perFarm.flat();
+        if (cancelled) return;
         setOptions(flat);
 
         if (flat.length === 1) {
-          router.replace({
-            pathname: '/activity-new',
-            params: { cropCycleId: flat[0].cropCycleId, farmId: flat[0].farmId, farmCode: flat[0].farmCode, season: flat[0].season },
-          });
+          goNext(flat[0]);
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, [farmerId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [farmerId, purpose]);
+
+  const subtitleKey =
+    purpose === 'expense'
+      ? 'selectCropCycleExpenseSubtitle'
+      : purpose === 'sale'
+        ? 'selectCropCycleSaleSubtitle'
+        : 'selectCropCycleSubtitle';
+
+  const emptySubtitleKey =
+    purpose === 'expense'
+      ? 'noActiveCropCyclesExpenseSubtitle'
+      : purpose === 'sale'
+        ? 'noActiveCropCyclesSaleSubtitle'
+        : 'noActiveCropCyclesSubtitle';
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -72,23 +124,16 @@ export default function ActivitySelectCycle() {
         <View style={styles.center}>
           <HugeiconsIcon icon={Tree02Icon} size={56} color="#D1FAE5" strokeWidth={1.5} />
           <Text style={styles.emptyTitle}>{t('noActiveCropCyclesTitle')}</Text>
-          <Text style={styles.emptySubtitle}>{t('noActiveCropCyclesSubtitle')}</Text>
-          <TouchableOpacity style={styles.emptyBtn} onPress={() => router.replace('/(tabs)/farms')}>
+          <Text style={styles.emptySubtitle}>{t(emptySubtitleKey)}</Text>
+          <TouchableOpacity style={styles.emptyBtn} onPress={() => router.replace('/(drawer)/(tabs)/farms')}>
             <Text style={styles.emptyBtnText}>{t('goToFarms')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 16 }}>
-          <Text style={styles.subtitle}>{t('selectCropCycleSubtitle')}</Text>
+          <Text style={styles.subtitle}>{t(subtitleKey)}</Text>
           {options.map((o) => (
-            <TouchableOpacity
-              key={o.cropCycleId}
-              style={styles.row}
-              onPress={() => router.replace({
-                pathname: '/activity-new',
-                params: { cropCycleId: o.cropCycleId, farmId: o.farmId, farmCode: o.farmCode, season: o.season },
-              })}
-            >
+            <TouchableOpacity key={o.cropCycleId} style={styles.row} onPress={() => goNext(o)}>
               <View style={styles.icon}><HugeiconsIcon icon={WheatIcon} size={20} color="#10B981" strokeWidth={2} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.rowTitle}>{o.farmCode}</Text>

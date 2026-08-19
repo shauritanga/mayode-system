@@ -39,11 +39,16 @@ export class WeatherService {
     let data: OpenMeteoResponse;
     try {
       const response = await fetch(url);
-      if (!response.ok) throw new Error(`Open-Meteo responded ${response.status}`);
+      if (!response.ok)
+        throw new Error(`Open-Meteo responded ${response.status}`);
       data = (await response.json()) as OpenMeteoResponse;
     } catch (error) {
-      this.logger.error(`Weather forecast fetch failed: ${(error as Error).message}`);
-      throw new BadGatewayException('Unable to reach the weather forecast provider right now.');
+      this.logger.error(
+        `Weather forecast fetch failed: ${(error as Error).message}`,
+      );
+      throw new BadGatewayException(
+        'Unable to reach the weather forecast provider right now.',
+      );
     }
 
     const days = data.daily.time.map((date, i) => ({
@@ -53,13 +58,19 @@ export class WeatherService {
       precipitationMm: data.daily.precipitation_sum[i],
     }));
 
-    const totalPrecipitationMm = days.reduce((sum, d) => sum + (d.precipitationMm || 0), 0);
+    const totalPrecipitationMm = days.reduce(
+      (sum, d) => sum + (d.precipitationMm || 0),
+      0,
+    );
     let consecutiveDryDays = 0;
     let maxConsecutiveDryDays = 0;
     for (const d of days) {
       if ((d.precipitationMm || 0) < 1) {
         consecutiveDryDays += 1;
-        maxConsecutiveDryDays = Math.max(maxConsecutiveDryDays, consecutiveDryDays);
+        maxConsecutiveDryDays = Math.max(
+          maxConsecutiveDryDays,
+          consecutiveDryDays,
+        );
       } else {
         consecutiveDryDays = 0;
       }
@@ -69,12 +80,24 @@ export class WeatherService {
     const droughtRisk = maxConsecutiveDryDays >= DROUGHT_RISK_DAYS_DRY;
 
     const recommendations: string[] = [];
-    if (floodRisk) recommendations.push('High rainfall expected this week — inspect field drainage and delay fertilizer application.');
-    if (droughtRisk) recommendations.push('Extended dry spell expected — plan supplemental irrigation if available.');
-    if (!floodRisk && !droughtRisk) recommendations.push('Rainfall outlook is moderate — normal planting/irrigation schedule can proceed.');
+    if (floodRisk)
+      recommendations.push(
+        'High rainfall expected this week — inspect field drainage and delay fertilizer application.',
+      );
+    if (droughtRisk)
+      recommendations.push(
+        'Extended dry spell expected — plan supplemental irrigation if available.',
+      );
+    if (!floodRisk && !droughtRisk)
+      recommendations.push(
+        'Rainfall outlook is moderate — normal planting/irrigation schedule can proceed.',
+      );
 
     return {
-      source: 'open-meteo.com',
+      source: 'Open-Meteo',
+      provider: 'Open-Meteo',
+      providerUrl: 'https://open-meteo.com',
+      live: true,
       latitude: lat,
       longitude: lon,
       days,
@@ -107,7 +130,9 @@ export class WeatherService {
     // Templates) when one exists for the "weather_alert" key, falling back
     // to the original hardcoded format otherwise — proof-of-integration
     // without rewiring every other SMS call site in the codebase.
-    const template = await this.settings.findTemplateByKey(WEATHER_ALERT_TEMPLATE_KEY);
+    const template = await this.settings.findTemplateByKey(
+      WEATHER_ALERT_TEMPLATE_KEY,
+    );
     const messageBody = template
       ? template.body
           .replace('{alertType}', dto.alertType)
@@ -127,7 +152,11 @@ export class WeatherService {
     let sent = 0;
     for (const farmer of farmers) {
       if (!farmer.user?.phone) continue;
-      await this.sms.send(normalizeMsisdn(farmer.user.phone), messageBody, 'weather_alert');
+      await this.sms.send(
+        normalizeMsisdn(farmer.user.phone),
+        messageBody,
+        'weather_alert',
+      );
       sent += 1;
     }
 
@@ -138,6 +167,8 @@ export class WeatherService {
   }
 
   findAllAlerts() {
-    return this.prisma.weatherAlert.findMany({ orderBy: { validFrom: 'desc' } });
+    return this.prisma.weatherAlert.findMany({
+      orderBy: { validFrom: 'desc' },
+    });
   }
 }

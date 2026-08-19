@@ -30,11 +30,25 @@ export class BuyersController {
   }
 
   @Get()
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+    UserRole.FIELD_OFFICER,
+  )
   findAll() {
     return this.buyers.findAll();
   }
 
   @Get(':id')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
   findOne(@Param('id') id: string) {
     return this.buyers.findOne(id);
   }

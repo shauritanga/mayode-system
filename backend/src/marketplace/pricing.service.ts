@@ -67,7 +67,11 @@ export class PricingService {
    * sack-equivalent at today's rice price, and each year's amount is computed
    * live from the rice price current at payment time (see computeInstallmentAmount).
    */
-  async buildRentSchedule(askingPrice: number, years: number, pricingModel?: string | null): Promise<RentSchedule> {
+  async buildRentSchedule(
+    askingPrice: number,
+    years: number,
+    pricingModel?: string | null,
+  ): Promise<RentSchedule> {
     if (pricingModel === 'rice_linked') {
       const riceSackPrice = await this.getLatestRiceSackPrice();
       const sacksEquivalent = Math.round(askingPrice / riceSackPrice);
@@ -76,13 +80,19 @@ export class PricingService {
     const model = pricingModel === 'step_up' ? 'step_up' : 'fixed';
     const yearAmounts = Array.from({ length: years }, (_, i) => ({
       year: i + 1,
-      amount: model === 'step_up' ? Math.round(askingPrice * Math.pow(1 + STEP_UP_ANNUAL_INCREASE, i)) : askingPrice,
+      amount:
+        model === 'step_up'
+          ? Math.round(askingPrice * Math.pow(1 + STEP_UP_ANNUAL_INCREASE, i))
+          : askingPrice,
     }));
     return { model, years: yearAmounts };
   }
 
   /** Amount due for a specific lease year, reading the frozen schedule or computing rice-linked rent live. */
-  async computeInstallmentAmount(schedule: RentSchedule, yearNumber: number): Promise<number> {
+  async computeInstallmentAmount(
+    schedule: RentSchedule,
+    yearNumber: number,
+  ): Promise<number> {
     if (schedule.model === 'rice_linked') {
       const riceSackPrice = await this.getLatestRiceSackPrice();
       return Math.round(schedule.sacksEquivalent * riceSackPrice);
@@ -108,8 +118,12 @@ export class PricingService {
     const riceSackPrice = await this.getLatestRiceSackPrice();
     const referencePrice = riceSackPrice * RICE_TO_REFERENCE_RATIO;
     const gradeMultiplier = GRADE_MULTIPLIER[farm.grade];
-    const seasonMultiplier = this.isEmergencySeason() ? EMERGENCY_SEASON_MULTIPLIER : 1;
-    const suggestedPrice = Math.round(referencePrice * gradeMultiplier * seasonMultiplier);
+    const seasonMultiplier = this.isEmergencySeason()
+      ? EMERGENCY_SEASON_MULTIPLIER
+      : 1;
+    const suggestedPrice = Math.round(
+      referencePrice * gradeMultiplier * seasonMultiplier,
+    );
 
     const since = new Date(Date.now() - NINETY_DAYS_MS);
     const comparable = await this.prisma.landListing.findMany({
@@ -121,7 +135,8 @@ export class PricingService {
     });
     const comparableAvg =
       comparable.length > 0
-        ? comparable.reduce((sum, l) => sum + l.askingPrice, 0) / comparable.length
+        ? comparable.reduce((sum, l) => sum + l.askingPrice, 0) /
+          comparable.length
         : suggestedPrice;
 
     let marketGauge: MarketGauge = 'fair';

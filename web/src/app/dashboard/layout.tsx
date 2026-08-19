@@ -1,12 +1,15 @@
 'use client';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
+import PageTransition from '@/components/PageTransition';
 import { useAuthStore } from '@/store/auth.store';
+import { useUiStore } from '@/store/ui.store';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, _hasHydrated } = useAuthStore();
+  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const router = useRouter();
 
   useEffect(() => {
@@ -22,12 +25,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!_hasHydrated || !isAuthenticated) return null;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--background)' }}>
+    <div className={`shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <Sidebar />
-      <div style={{ marginLeft: '240px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <div className="shell-main">
         <Header />
-        <main style={{ flex: 1, padding: '32px' }}>
-          {children}
+        <main className="shell-content">
+          <PageTransition>{children}</PageTransition>
         </main>
       </div>
     </div>

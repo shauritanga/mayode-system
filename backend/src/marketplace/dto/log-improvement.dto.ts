@@ -12,7 +12,11 @@ export class LogImprovementDto {
   @IsNotEmpty()
   description: string;
 
-  @ApiProperty({ example: 300000, description: 'Amount spent in TZS, deducted from the next annual installment' })
+  @ApiProperty({
+    example: 300000,
+    description:
+      'Amount spent in TZS, deducted from the next annual installment',
+  })
   @IsNumber()
   @Min(0)
   amountTzs: number;

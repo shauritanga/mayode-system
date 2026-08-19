@@ -4,6 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { authApi, farmersApi } from '../src/lib/data';
+import { getApiErrorMessage } from '../src/lib/api-error';
+import { normalizePhone } from '../src/lib/phone';
 import { useAuthStore } from '../src/store/auth.store';
 import { PasswordInput } from '../src/components/PasswordInput';
 import { useI18n } from '../src/i18n';
@@ -43,7 +45,7 @@ export default function RegisterRoute() {
     setLoading(true);
     try {
       const res = await authApi.register({
-        phone,
+        phone: normalizePhone(phone),
         password,
         firstName,
         lastName,
@@ -53,19 +55,17 @@ export default function RegisterRoute() {
       const { accessToken, refreshToken, user } = res.data;
       setAuth(user, accessToken, refreshToken);
 
-      // Resolve the new farmer profile id so farm/plot creation can reference it.
-      if (user.controlNumber) {
-        try {
-          const f = await farmersApi.getByControlNumber(user.controlNumber);
-          setFarmerId(f.data?.id ?? null);
-        } catch {
-          setFarmerId(null);
-        }
+      // Resolve farmer profile id via /farmers/me (control-number lookup is staff-only → 403 for FARMER).
+      try {
+        const f = await farmersApi.me();
+        setFarmerId(f.data?.id ?? null);
+      } catch {
+        setFarmerId(null);
       }
       Alert.alert(t('success'), t('farmerCreated'));
-      router.replace('/(tabs)');
-    } catch (err: any) {
-      Alert.alert(t('registrationFailed'), err.response?.data?.message || t('registrationFailedMessage'));
+      router.replace('/(drawer)/(tabs)');
+    } catch (err: unknown) {
+      Alert.alert(t('registrationFailed'), getApiErrorMessage(err, t('registrationFailedMessage')));
     } finally {
       setLoading(false);
     }

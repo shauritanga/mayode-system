@@ -21,8 +21,11 @@ export class DocumentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createForFarmer(farmerId: string, input: CreateDocumentInput) {
-    const farmer = await this.prisma.farmer.findUnique({ where: { id: farmerId } });
-    if (!farmer) throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { id: farmerId },
+    });
+    if (!farmer)
+      throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
     return this.prisma.document.create({ data: { ...input, farmerId } });
   }
 

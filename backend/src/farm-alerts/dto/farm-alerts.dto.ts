@@ -29,7 +29,8 @@ export class CreateFarmAlertDto {
   title: string;
 
   @ApiProperty({
-    example: 'An important action may be required on this farm. Open to review the detected issue.',
+    example:
+      'An important action may be required on this farm. Open to review the detected issue.',
     description: 'Shown to everyone (free preview) — no diagnosis.',
   })
   @IsString()
@@ -46,7 +47,9 @@ export class CreateFarmAlertDto {
   @IsString()
   actionDetails?: string;
 
-  @ApiPropertyOptional({ description: 'Premium: when the action should be taken' })
+  @ApiPropertyOptional({
+    description: 'Premium: when the action should be taken',
+  })
   @IsOptional()
   @IsDateString()
   expectedActionDate?: string;

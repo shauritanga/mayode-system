@@ -9,7 +9,12 @@ import {
   IsDateString,
   IsNotEmpty,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional, PartialType, OmitType } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  PartialType,
+  OmitType,
+} from '@nestjs/swagger';
 import { CropCycleStatus, ActivityType } from '@prisma/client';
 
 export class CreateCropCycleDto {
@@ -174,17 +179,26 @@ export class CreateActivityLogDto {
   @IsOptional()
   laborHours?: number;
 
-  @ApiPropertyOptional({ example: 2, description: 'Family members who contributed labour' })
+  @ApiPropertyOptional({
+    example: 2,
+    description: 'Family members who contributed labour',
+  })
   @IsInt()
   @IsOptional()
   familyLaborCount?: number;
 
-  @ApiPropertyOptional({ example: 3, description: 'Paid workers who contributed labour' })
+  @ApiPropertyOptional({
+    example: 3,
+    description: 'Paid workers who contributed labour',
+  })
   @IsInt()
   @IsOptional()
   hiredLaborCount?: number;
 
-  @ApiPropertyOptional({ example: 90000, description: 'Total paid labour wage in TZS' })
+  @ApiPropertyOptional({
+    example: 90000,
+    description: 'Total paid labour wage in TZS',
+  })
   @IsNumber()
   @IsOptional()
   laborWageTotal?: number;
@@ -214,12 +228,18 @@ export class UpdateActivityLogDto extends PartialType(
 ) {}
 
 export class CalendarQueryDto {
-  @ApiPropertyOptional({ description: 'ISO date, inclusive lower bound; defaults to start of current month' })
+  @ApiPropertyOptional({
+    description:
+      'ISO date, inclusive lower bound; defaults to start of current month',
+  })
   @IsDateString()
   @IsOptional()
   from?: string;
 
-  @ApiPropertyOptional({ description: 'ISO date, inclusive upper bound; defaults to end of current month' })
+  @ApiPropertyOptional({
+    description:
+      'ISO date, inclusive upper bound; defaults to end of current month',
+  })
   @IsDateString()
   @IsOptional()
   to?: string;

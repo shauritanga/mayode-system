@@ -3,21 +3,50 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, Toucha
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Alert02Icon, ArrowRight01Icon, ClipboardIcon, MapsSearchIcon, Plant01Icon, TaskDaily01Icon, UserGroupIcon } from '@hugeicons/core-free-icons';
+import {
+  Alert02Icon, ArrowRight01Icon, Calendar01Icon, ClipboardIcon, FileAttachmentIcon,
+  MapsSearchIcon, Plant01Icon, TaskDaily01Icon, UserGroupIcon,
+} from '@hugeicons/core-free-icons';
 import { workspaceApi } from '../src/lib/data';
+import { useI18n } from '../src/i18n';
 
 type Props = { role: string };
 
 const COPY: Record<string, { title: string; subtitle: string; primary: string; route: string; icon: any }> = {
-  FIELD_OFFICER: { title: 'Field Officer Workspace', subtitle: 'Verify renters, capture field evidence, and complete assigned work.', primary: 'Open field surveys', route: '/field-survey', icon: MapsSearchIcon },
-  MAMCOS_SECRETARY: { title: 'AMCOS Officer Workspace', subtitle: 'Manage your AMCOS registry, renter assignments, and operational exceptions.', primary: 'Manage farms', route: '/farms', icon: ClipboardIcon },
-  ADMIN: { title: 'Management Workspace', subtitle: 'Use the MAYODE web dashboard for complete administration and reporting.', primary: 'Open web dashboard', route: '/profile', icon: UserGroupIcon },
-  SUPER_ADMIN: { title: 'Management Workspace', subtitle: 'Use the MAYODE web dashboard for complete administration and reporting.', primary: 'Open web dashboard', route: '/profile', icon: UserGroupIcon },
+  FIELD_OFFICER: {
+    title: 'Field Officer Workspace',
+    subtitle: 'Verify renters, capture field evidence, and complete assigned work.',
+    primary: 'Open field surveys',
+    route: '/field-survey',
+    icon: MapsSearchIcon,
+  },
+  MAMCOS_SECRETARY: {
+    title: 'AMCOS Officer Workspace',
+    subtitle: 'Manage your AMCOS registry, renter assignments, and operational exceptions.',
+    primary: 'Manage farms',
+    route: '/farms',
+    icon: ClipboardIcon,
+  },
+  ADMIN: {
+    title: 'Management Workspace',
+    subtitle: 'Use the MAYODE web dashboard for complete administration and reporting.',
+    primary: 'Open web dashboard',
+    route: '/profile',
+    icon: UserGroupIcon,
+  },
+  SUPER_ADMIN: {
+    title: 'Management Workspace',
+    subtitle: 'Use the MAYODE web dashboard for complete administration and reporting.',
+    primary: 'Open web dashboard',
+    route: '/profile',
+    icon: UserGroupIcon,
+  },
 };
 
 export default function RoleWorkspaceDashboard({ role }: Props) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const copy = COPY[role] ?? COPY.FIELD_OFFICER;
   const [context, setContext] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -45,34 +74,106 @@ export default function RoleWorkspaceDashboard({ role }: Props) {
       {loading ? <ActivityIndicator style={{ marginTop: 40 }} color="#059669" /> : <>
         <Text style={styles.section}>Today’s priorities</Text>
         <View style={styles.metrics}>
-          {Object.entries(metrics).map(([key, value]) => <View style={styles.metric} key={key}><Text style={styles.metricValue}>{String(value)}</Text><Text style={styles.metricLabel}>{label(key)}</Text></View>)}
+          {Object.entries(metrics).map(([key, value]) => (
+            <View style={styles.metric} key={key}>
+              <Text style={styles.metricValue}>{String(value)}</Text>
+              <Text style={styles.metricLabel}>{label(key)}</Text>
+            </View>
+          ))}
         </View>
+
+        {role === 'FIELD_OFFICER' && (
+          <>
+            <Text style={styles.section}>{t('officerToolkit')}</Text>
+            <View style={styles.toolkit}>
+              <ToolkitBtn
+                label={t('myFarmers')}
+                icon={UserGroupIcon}
+                onPress={() => router.push('/officer/farmers')}
+              />
+              <ToolkitBtn
+                label={t('calendar')}
+                icon={Calendar01Icon}
+                onPress={() => router.push('/officer/calendar')}
+              />
+              <ToolkitBtn
+                label={t('reports')}
+                icon={FileAttachmentIcon}
+                onPress={() => router.push('/officer/reports')}
+              />
+              <ToolkitBtn
+                label={t('fieldSurvey')}
+                icon={MapsSearchIcon}
+                onPress={() => router.push('/field-survey')}
+              />
+            </View>
+          </>
+        )}
+
         {queue.length > 0 && <>
           <Text style={styles.section}>Verification queue</Text>
-          {queue.slice(0, 5).map((item: any) => <TouchableOpacity key={item.id} style={styles.queue} onPress={() => router.push({
-            pathname: '/lease-verify',
-            params: {
-              leaseId: item.id,
-              farmCode: item.farm?.farmCode || item.farm?.name || '',
-              seasonName: item.farmingSeason?.name || '',
-              renterName: item.renterFarmer ? `${item.renterFarmer.firstName} ${item.renterFarmer.lastName}` : (item.renterName || item.renterPhone || ''),
-            },
-          })}>
-            <HugeiconsIcon icon={TaskDaily01Icon} size={20} color="#047857" strokeWidth={2} />
-            <View style={{ flex: 1 }}><Text style={styles.queueTitle}>{item.farm?.name || item.farm?.farmCode || 'Farm verification'}</Text><Text style={styles.queueSub}>{item.renterFarmer ? `${item.renterFarmer.firstName} ${item.renterFarmer.lastName}` : 'Renter confirmation accepted'}</Text></View>
-            <HugeiconsIcon icon={ArrowRight01Icon} size={18} color="#6B7280" strokeWidth={2} />
-          </TouchableOpacity>)}
+          {queue.slice(0, 5).map((item: any) => (
+            <TouchableOpacity
+              key={item.id}
+              style={styles.queue}
+              onPress={() => router.push({
+                pathname: '/lease-verify',
+                params: {
+                  leaseId: item.id,
+                  farmCode: item.farm?.farmCode || item.farm?.name || '',
+                  seasonName: item.farmingSeason?.name || '',
+                  renterName: item.renterFarmer
+                    ? `${item.renterFarmer.firstName} ${item.renterFarmer.lastName}`
+                    : (item.renterName || item.renterPhone || ''),
+                },
+              })}
+            >
+              <HugeiconsIcon icon={TaskDaily01Icon} size={20} color="#047857" strokeWidth={2} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.queueTitle}>{item.farm?.name || item.farm?.farmCode || 'Farm verification'}</Text>
+                <Text style={styles.queueSub}>
+                  {item.renterFarmer
+                    ? `${item.renterFarmer.firstName} ${item.renterFarmer.lastName}`
+                    : 'Renter confirmation accepted'}
+                </Text>
+              </View>
+              <HugeiconsIcon icon={ArrowRight01Icon} size={18} color="#6B7280" strokeWidth={2} />
+            </TouchableOpacity>
+          ))}
         </>}
-        {role === 'MAMCOS_SECRETARY' && <View style={styles.note}><HugeiconsIcon icon={Alert02Icon} size={20} color="#B45309" strokeWidth={2} /><Text style={styles.noteText}>Your workspace is restricted to your assigned AMCOS.</Text></View>}
+        {role === 'MAMCOS_SECRETARY' && (
+          <View style={styles.note}>
+            <HugeiconsIcon icon={Alert02Icon} size={20} color="#B45309" strokeWidth={2} />
+            <Text style={styles.noteText}>Your workspace is restricted to your assigned AMCOS.</Text>
+          </View>
+        )}
         {role === 'MAMCOS_SECRETARY' && (
           <TouchableOpacity style={styles.secondary} onPress={() => router.push('/officer-new')}>
             <HugeiconsIcon icon={UserGroupIcon} size={19} color="#065F46" strokeWidth={2} />
             <Text style={styles.secondaryText}>Create Field Officer</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={styles.primary} onPress={() => router.push(copy.route as any)}><HugeiconsIcon icon={Plant01Icon} size={19} color="#fff" strokeWidth={2} /><Text style={styles.primaryText}>{copy.primary}</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.primary} onPress={() => router.push(copy.route as any)}>
+          <HugeiconsIcon icon={Plant01Icon} size={19} color="#fff" strokeWidth={2} />
+          <Text style={styles.primaryText}>{copy.primary}</Text>
+        </TouchableOpacity>
       </>}
     </ScrollView>
+  );
+}
+
+function ToolkitBtn({
+  label, icon, onPress,
+}: {
+  label: string;
+  icon: any;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.toolBtn} onPress={onPress} activeOpacity={0.85}>
+      <HugeiconsIcon icon={icon} size={18} color="#065F46" strokeWidth={2} />
+      <Text style={styles.toolLabel}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -84,12 +185,44 @@ const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: '#F3F4F6', paddingHorizontal: 20 },
   hero: { backgroundColor: '#065F46', borderRadius: 22, padding: 20, flexDirection: 'row', gap: 14, alignItems: 'center' },
   heroIcon: { width: 54, height: 54, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  title: { color: '#fff', fontSize: 21, fontWeight: '800' }, subtitle: { color: '#D1FAE5', fontSize: 13, lineHeight: 19, marginTop: 5 },
+  title: { color: '#fff', fontSize: 21, fontWeight: '800' },
+  subtitle: { color: '#D1FAE5', fontSize: 13, lineHeight: 19, marginTop: 5 },
   section: { color: '#111827', fontSize: 17, fontWeight: '800', marginTop: 26, marginBottom: 12 },
-  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, metric: { backgroundColor: '#fff', borderRadius: 14, padding: 14, minWidth: '47%', flexGrow: 1 },
-  metricValue: { color: '#047857', fontSize: 25, fontWeight: '800' }, metricLabel: { color: '#6B7280', fontSize: 12, marginTop: 4 },
-  queue: { backgroundColor: '#fff', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 9 }, queueTitle: { color: '#111827', fontSize: 14, fontWeight: '700' }, queueSub: { color: '#6B7280', fontSize: 12, marginTop: 3 },
-  note: { marginTop: 18, backgroundColor: '#FFFBEB', borderRadius: 14, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'center' }, noteText: { flex: 1, color: '#92400E', fontSize: 13, lineHeight: 18 },
-  primary: { backgroundColor: '#059669', borderRadius: 14, padding: 16, marginTop: 24, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }, primaryText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  secondary: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#065F46', borderRadius: 14, padding: 15, marginTop: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }, secondaryText: { color: '#065F46', fontSize: 14, fontWeight: '800' },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  metric: { backgroundColor: '#fff', borderRadius: 14, padding: 14, minWidth: '47%', flexGrow: 1 },
+  metricValue: { color: '#047857', fontSize: 25, fontWeight: '800' },
+  metricLabel: { color: '#6B7280', fontSize: 12, marginTop: 4 },
+  toolkit: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  toolBtn: {
+    width: '47%',
+    flexGrow: 1,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 8,
+  },
+  toolLabel: { color: '#065F46', fontSize: 13, fontWeight: '800' },
+  queue: {
+    backgroundColor: '#fff', borderRadius: 14, padding: 14, flexDirection: 'row',
+    alignItems: 'center', gap: 12, marginBottom: 9,
+  },
+  queueTitle: { color: '#111827', fontSize: 14, fontWeight: '700' },
+  queueSub: { color: '#6B7280', fontSize: 12, marginTop: 3 },
+  note: {
+    marginTop: 18, backgroundColor: '#FFFBEB', borderRadius: 14, padding: 14,
+    flexDirection: 'row', gap: 10, alignItems: 'center',
+  },
+  noteText: { flex: 1, color: '#92400E', fontSize: 13, lineHeight: 18 },
+  primary: {
+    backgroundColor: '#059669', borderRadius: 14, padding: 16, marginTop: 24,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
+  },
+  primaryText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  secondary: {
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#065F46', borderRadius: 14,
+    padding: 15, marginTop: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
+  },
+  secondaryText: { color: '#065F46', fontSize: 14, fontWeight: '800' },
 });

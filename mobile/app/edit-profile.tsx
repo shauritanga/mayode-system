@@ -8,7 +8,7 @@ import { Stack, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Location01Icon, Add01Icon, File01Icon, Delete02Icon } from '@hugeicons/core-free-icons';
-import { farmersApi, uploadsApi } from '../src/lib/data';
+import { farmersApi, uploadsApi, resolveMediaUrl } from '../src/lib/data';
 import { useAuthStore } from '../src/store/auth.store';
 import { getCurrentPoint } from '../src/services/location.service';
 import { SearchableSelect } from '../src/components/SearchableSelect';
@@ -94,14 +94,20 @@ export default function EditProfile() {
     if (result.canceled || !result.assets?.length || !farmerId) return;
     const asset = result.assets[0];
     try {
-      const up = await uploadsApi.uploadFile({
+      const payload = {
         uri: asset.uri,
         name: asset.fileName || `document-${Date.now()}.jpg`,
         type: asset.mimeType || 'image/jpeg',
-      });
+      };
+      let up;
+      try {
+        up = await uploadsApi.uploadFile(payload);
+      } catch {
+        up = await uploadsApi.uploadFile(payload);
+      }
       await farmersApi.addDocument(farmerId, {
         type: docType,
-        fileUrl: up.data.url,
+        fileUrl: resolveMediaUrl(up.data.url) || up.data.url,
         fileName: up.data.fileName,
         mimeType: up.data.mimeType,
       });
@@ -159,11 +165,30 @@ export default function EditProfile() {
 
   const gpsSet = form.residenceLatitude != null;
 
+  const missing: string[] = [];
+  if (!form.firstName?.trim()) missing.push(t('firstName'));
+  if (!form.lastName?.trim()) missing.push(t('lastName'));
+  if (!form.gender) missing.push(t('gender'));
+  if (!form.region) missing.push(t('region'));
+  if (!form.district) missing.push(t('district'));
+  if (!form.ward) missing.push(t('ward'));
+  if (!form.village?.trim()) missing.push(t('village'));
+  if (documents.length === 0) missing.push(t('documents'));
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Stack.Screen options={{ headerShown: true, title: t('editProfile') }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+          <View style={[styles.completeness, missing.length ? styles.completenessWarn : styles.completenessOk]}>
+            <Text style={styles.completenessTitle}>{t('profileRequiredHint')}</Text>
+            <Text style={styles.completenessBody}>
+              {missing.length
+                ? t('profileMissingFields', { fields: missing.join(', ') })
+                : t('profileComplete')}
+            </Text>
+          </View>
+
           <Section title={t('personal')}>
             <Row><Field label={t('firstNameForm')} value={form.firstName} onChangeText={(v) => set('firstName', v)} /></Row>
             <Row><Field label={t('lastNameForm')} value={form.lastName} onChangeText={(v) => set('lastName', v)} /></Row>
@@ -291,6 +316,11 @@ function Field({ label, ...rest }: React.ComponentProps<typeof TextInput> & { la
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
+  completeness: { borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1 },
+  completenessWarn: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
+  completenessOk: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
+  completenessTitle: { fontSize: 13, fontWeight: '800', color: '#111827', marginBottom: 4 },
+  completenessBody: { fontSize: 12, color: '#6B7280', lineHeight: 18 },
   section: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E5E7EB' },
   sectionTitle: { fontSize: 15, fontWeight: '800', color: '#111827', marginBottom: 12 },
   field: { marginBottom: 14 },

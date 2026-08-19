@@ -1,5 +1,11 @@
 import { randomBytes } from 'crypto';
-import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClickPesaService } from '../payments/clickpesa.service';
 import { SmsService } from '../messaging/sms.service';
@@ -14,7 +20,16 @@ import { CreateTractorBookingDto } from './dto/create-tractor-booking.dto';
 import { CreateMarketPriceDto } from './dto/create-market-price.dto';
 import { RequestSubLeaseDto, ApproveSubLeaseDto } from './dto/sub-lease.dto';
 import { TransferOwnershipDto } from './dto/ownership-transfer.dto';
-import { DealType, LeaseStatus, PaymentStatus, PayoutStatus, SubLeaseStatus, BookingStatus, FarmGrade, DisputeType } from '@prisma/client';
+import {
+  DealType,
+  LeaseStatus,
+  PaymentStatus,
+  PayoutStatus,
+  SubLeaseStatus,
+  BookingStatus,
+  FarmGrade,
+  DisputeType,
+} from '@prisma/client';
 
 /** ClickPesa statuses that mean the money was collected. */
 const PAID_STATUSES = ['SUCCESS', 'SETTLED'];
@@ -56,9 +71,16 @@ export class MarketplaceService {
   }
 
   /** If this listing has an open approved sub-lease awaiting a new renter, record who took it. */
-  private async markSubLeaseRenterIfApplicable(listingId: string, renterId: string) {
+  private async markSubLeaseRenterIfApplicable(
+    listingId: string,
+    renterId: string,
+  ) {
     const openSubLease = await this.prisma.landListingSubLease.findFirst({
-      where: { originalListingId: listingId, status: 'APPROVED', newRenterId: null },
+      where: {
+        originalListingId: listingId,
+        status: 'APPROVED',
+        newRenterId: null,
+      },
     });
     if (openSubLease) {
       await this.prisma.landListingSubLease.update({
@@ -122,20 +144,30 @@ export class MarketplaceService {
     }
 
     if (farm.farmerId !== ownerId) {
-      throw new BadRequestException(`Farmer ID ${ownerId} is not the owner of Farm ID ${farmId}`);
+      throw new BadRequestException(
+        `Farmer ID ${ownerId} is not the owner of Farm ID ${farmId}`,
+      );
     }
 
-    const owner = await this.prisma.farmer.findUnique({ where: { id: ownerId } });
+    const owner = await this.prisma.farmer.findUnique({
+      where: { id: ownerId },
+    });
     if (owner?.isBlacklisted) {
-      throw new BadRequestException('This farmer is blacklisted from M-LAX and cannot list land');
+      throw new BadRequestException(
+        'This farmer is blacklisted from M-LAX and cannot list land',
+      );
     }
 
     if (!farm.isVerified) {
-      throw new BadRequestException(`Farm ID ${farmId} must be verified by a Field Officer before it can be listed on M-LAX`);
+      throw new BadRequestException(
+        `Farm ID ${farmId} must be verified by a Field Officer before it can be listed on M-LAX`,
+      );
     }
 
     if (farm.isLeased) {
-      throw new ConflictException(`Farm ID ${farmId} is currently actively leased and cannot be listed`);
+      throw new ConflictException(
+        `Farm ID ${farmId} is currently actively leased and cannot be listed`,
+      );
     }
 
     // "Digital Lock" — even if isLeased was somehow reset early, the plot
@@ -153,7 +185,9 @@ export class MarketplaceService {
     // supply one (the create-form can also call GET .../suggested-price to
     // preview this live before submitting).
     const computedSuggestedPrice =
-      suggestedPrice ?? (await this.pricing.computeSuggestedPrice(farmId, askingPrice)).suggestedPrice;
+      suggestedPrice ??
+      (await this.pricing.computeSuggestedPrice(farmId, askingPrice))
+        .suggestedPrice;
 
     // Loyalty tie-in: remember the most recent renter this farm had (if any)
     // so a returning renter gets relationship pricing at deposit time.
@@ -165,11 +199,21 @@ export class MarketplaceService {
 
     const resolvedIsMultiYear = isMultiYear ?? leaseDurationMonths > 12;
     const paymentPlan = createLandListingDto.paymentPlan ?? 'PREPAID';
-    if (resolvedIsMultiYear && pricingModel === 'rice_linked' && paymentPlan === 'PREPAID') {
-      throw new BadRequestException('Rice-linked pricing requires the ANNUAL payment plan — future years\' rice price is not known upfront.');
+    if (
+      resolvedIsMultiYear &&
+      pricingModel === 'rice_linked' &&
+      paymentPlan === 'PREPAID'
+    ) {
+      throw new BadRequestException(
+        "Rice-linked pricing requires the ANNUAL payment plan — future years' rice price is not known upfront.",
+      );
     }
     const rentSchedule = resolvedIsMultiYear
-      ? await this.pricing.buildRentSchedule(askingPrice, Math.ceil(leaseDurationMonths / 12), pricingModel)
+      ? await this.pricing.buildRentSchedule(
+          askingPrice,
+          Math.ceil(leaseDurationMonths / 12),
+          pricingModel,
+        )
       : null;
 
     const listing = await this.prisma.landListing.create({
@@ -241,7 +285,11 @@ export class MarketplaceService {
     return listing;
   }
 
-  async findAllLandListings(query?: { dealType?: DealType; maxPrice?: number; leaseStatus?: LeaseStatus }) {
+  async findAllLandListings(query?: {
+    dealType?: DealType;
+    maxPrice?: number;
+    leaseStatus?: LeaseStatus;
+  }) {
     const whereClause: any = {};
 
     if (query?.dealType) {
@@ -293,7 +341,9 @@ export class MarketplaceService {
       throw new NotFoundException(`Land Listing with ID ${id} not found`);
     }
     if (listing.leaseStatus !== LeaseStatus.DRAFT) {
-      throw new BadRequestException(`Cannot edit a listing in status ${listing.leaseStatus}. Only DRAFT listings can be edited.`);
+      throw new BadRequestException(
+        `Cannot edit a listing in status ${listing.leaseStatus}. Only DRAFT listings can be edited.`,
+      );
     }
 
     const askingPrice = dto.askingPrice ?? listing.askingPrice;
@@ -323,10 +373,14 @@ export class MarketplaceService {
       throw new NotFoundException(`Land Listing with ID ${id} not found`);
     }
     const hasActiveEscrow = listing.escrowPayments.some(
-      (p) => p.status === PaymentStatus.PENDING || p.status === PaymentStatus.IN_ESCROW,
+      (p) =>
+        p.status === PaymentStatus.PENDING ||
+        p.status === PaymentStatus.IN_ESCROW,
     );
     if (hasActiveEscrow || listing.leaseStatus === LeaseStatus.ACTIVE) {
-      throw new BadRequestException('Cannot cancel a listing with an active deposit or lease. Resolve the escrow first.');
+      throw new BadRequestException(
+        'Cannot cancel a listing with an active deposit or lease. Resolve the escrow first.',
+      );
     }
 
     const cancelled = await this.prisma.landListing.update({
@@ -357,7 +411,9 @@ export class MarketplaceService {
     });
 
     if (!listing) {
-      throw new NotFoundException(`Land Listing with ID ${listingId} not found`);
+      throw new NotFoundException(
+        `Land Listing with ID ${listingId} not found`,
+      );
     }
 
     if (listing.ownerId === renterId) {
@@ -369,10 +425,16 @@ export class MarketplaceService {
     // and a new renter hasn't stepped in yet.
     if (listing.leaseStatus === LeaseStatus.ACTIVE) {
       const openSubLease = await this.prisma.landListingSubLease.findFirst({
-        where: { originalListingId: listingId, status: 'APPROVED', newRenterId: null },
+        where: {
+          originalListingId: listingId,
+          status: 'APPROVED',
+          newRenterId: null,
+        },
       });
       if (!openSubLease) {
-        throw new ConflictException('This land listing is already actively leased');
+        throw new ConflictException(
+          'This land listing is already actively leased',
+        );
       }
     }
 
@@ -384,13 +446,19 @@ export class MarketplaceService {
       throw new NotFoundException(`Farmer with ID ${renterId} not found`);
     }
     if (renter.isBlacklisted) {
-      throw new BadRequestException('This farmer is blacklisted from M-LAX and cannot rent land');
+      throw new BadRequestException(
+        'This farmer is blacklisted from M-LAX and cannot rent land',
+      );
     }
 
     // Relationship deals lock the discounted price to one named renter
     // (the doc's "Closed Circle" feature) — the depositing renter's control
     // number must match the code the owner set when listing.
-    if (listing.preferredRenterCode && listing.preferredRenterCode.trim().toUpperCase() !== renter.controlNumber.trim().toUpperCase()) {
+    if (
+      listing.preferredRenterCode &&
+      listing.preferredRenterCode.trim().toUpperCase() !==
+        renter.controlNumber.trim().toUpperCase()
+    ) {
       throw new BadRequestException(
         `This listing is reserved for a specific renter (control number ${listing.preferredRenterCode}). Your control number does not match.`,
       );
@@ -403,7 +471,10 @@ export class MarketplaceService {
     if (listing.isMultiYear && listing.rentScheduleJson) {
       const schedule = listing.rentScheduleJson as unknown as RentSchedule;
       if (listing.paymentPlan === 'ANNUAL') {
-        depositAmount = await this.pricing.computeInstallmentAmount(schedule, 1);
+        depositAmount = await this.pricing.computeInstallmentAmount(
+          schedule,
+          1,
+        );
       } else if (schedule.model !== 'rice_linked') {
         depositAmount = schedule.years.reduce((sum, y) => sum + y.amount, 0);
       }
@@ -418,15 +489,25 @@ export class MarketplaceService {
 
     // Loyalty pricing: a renter returning to a farm they rented last season
     // gets the flat 5% "relationship" commission instead of the standard rate.
-    const isReturningRenter = listing.previousRenterId != null && listing.previousRenterId === renterId;
+    const isReturningRenter =
+      listing.previousRenterId != null && listing.previousRenterId === renterId;
     const loyaltyUpdate = isReturningRenter
-      ? { dealType: DealType.RELATIONSHIP, commissionRate: 0.05, commissionAmount: depositAmount * 0.05 }
+      ? {
+          dealType: DealType.RELATIONSHIP,
+          commissionRate: 0.05,
+          commissionAmount: depositAmount * 0.05,
+        }
       : {};
 
     // Reserve the listing for this renter while payment is pending.
     await this.prisma.landListing.update({
       where: { id: listingId },
-      data: { renterId, finalPrice: depositAmount, lastInstallmentYear: listing.isMultiYear ? 1 : undefined, ...loyaltyUpdate },
+      data: {
+        renterId,
+        finalPrice: depositAmount,
+        lastInstallmentYear: listing.isMultiYear ? 1 : undefined,
+        ...loyaltyUpdate,
+      },
     });
 
     if (!payViaClickPesa) {
@@ -444,8 +525,16 @@ export class MarketplaceService {
       });
       const updatedListing = await this.prisma.landListing.update({
         where: { id: listingId },
-        data: { leaseStatus: LeaseStatus.PENDING_VERIFICATION, mayodeProtected: true },
-        include: { farm: true, owner: true, renter: true, escrowPayments: true },
+        data: {
+          leaseStatus: LeaseStatus.PENDING_VERIFICATION,
+          mayodeProtected: true,
+        },
+        include: {
+          farm: true,
+          owner: true,
+          renter: true,
+          escrowPayments: true,
+        },
       });
       await this.markSubLeaseRenterIfApplicable(listingId, renterId);
       await this.notifyEscrowInEscrow(listingId);
@@ -453,7 +542,8 @@ export class MarketplaceService {
         updatedListing,
         escrowPayment,
         paymentProvider: 'manual' as const,
-        message: 'Deposit recorded. An administrator will confirm payment before the lease is verified.',
+        message:
+          'Deposit recorded. An administrator will confirm payment before the lease is verified.',
       };
     }
 
@@ -472,14 +562,15 @@ export class MarketplaceService {
       const push = await this.clickPesa.initiateUssdPush({
         amount: String(depositAmount),
         orderReference,
-        phoneNumber: payerPhone!,
+        phoneNumber: payerPhone,
       });
       return {
         escrowPayment,
         paymentProvider: 'clickpesa' as const,
         orderReference,
         pushStatus: push.status,
-        message: 'Check your phone and enter your mobile-money PIN to complete the deposit.',
+        message:
+          'Check your phone and enter your mobile-money PIN to complete the deposit.',
       };
     } catch (e) {
       throw new BadRequestException(
@@ -501,7 +592,9 @@ export class MarketplaceService {
       include: { listing: true },
     });
     if (!escrow) {
-      throw new NotFoundException(`No escrow payment for order ${orderReference}`);
+      throw new NotFoundException(
+        `No escrow payment for order ${orderReference}`,
+      );
     }
     if (escrow.status !== PaymentStatus.PENDING) {
       return { status: escrow.status, listingId: escrow.listingId };
@@ -524,16 +617,27 @@ export class MarketplaceService {
       // An annual installment (year 2+) on an already-ACTIVE multi-year lease
       // doesn't go through verification again — just settle it directly.
       if (escrow.installmentYear != null) {
-        await this.settleAnnualInstallment(escrow.id, escrow.listingId, escrow.installmentYear, escrow.amount);
+        await this.settleAnnualInstallment(
+          escrow.id,
+          escrow.listingId,
+          escrow.installmentYear,
+          escrow.amount,
+        );
         return { status: PaymentStatus.IN_ESCROW, listingId: escrow.listingId };
       }
 
       await this.prisma.landListing.update({
         where: { id: escrow.listingId },
-        data: { leaseStatus: LeaseStatus.PENDING_VERIFICATION, mayodeProtected: true },
+        data: {
+          leaseStatus: LeaseStatus.PENDING_VERIFICATION,
+          mayodeProtected: true,
+        },
       });
       if (escrow.listing.renterId) {
-        await this.markSubLeaseRenterIfApplicable(escrow.listingId, escrow.listing.renterId);
+        await this.markSubLeaseRenterIfApplicable(
+          escrow.listingId,
+          escrow.listing.renterId,
+        );
       }
       await this.notifyEscrowInEscrow(escrow.listingId);
       return { status: PaymentStatus.IN_ESCROW, listingId: escrow.listingId };
@@ -548,7 +652,11 @@ export class MarketplaceService {
     }
 
     // Still processing / pending.
-    return { status: escrow.status, listingId: escrow.listingId, providerStatus: payment?.status ?? 'PENDING' };
+    return {
+      status: escrow.status,
+      listingId: escrow.listingId,
+      providerStatus: payment?.status ?? 'PENDING',
+    };
   }
 
   /**
@@ -558,33 +666,55 @@ export class MarketplaceService {
    * Any unapplied "Right to Improve" development credits (see
    * logLandImprovement) are deducted from the amount due, floored at zero.
    */
-  async payAnnualInstallment(listingId: string, renterId: string, dto: { phoneNumber?: string; mpesaRef?: string }) {
-    const listing = await this.prisma.landListing.findUnique({ where: { id: listingId } });
+  async payAnnualInstallment(
+    listingId: string,
+    renterId: string,
+    dto: { phoneNumber?: string; mpesaRef?: string },
+  ) {
+    const listing = await this.prisma.landListing.findUnique({
+      where: { id: listingId },
+    });
     if (!listing) {
-      throw new NotFoundException(`Land Listing with ID ${listingId} not found`);
+      throw new NotFoundException(
+        `Land Listing with ID ${listingId} not found`,
+      );
     }
     if (!listing.isMultiYear || listing.paymentPlan !== 'ANNUAL') {
-      throw new BadRequestException('This listing is not on a multi-year annual payment plan');
+      throw new BadRequestException(
+        'This listing is not on a multi-year annual payment plan',
+      );
     }
     if (listing.leaseStatus !== LeaseStatus.ACTIVE) {
-      throw new BadRequestException(`Cannot pay an installment on a listing in status ${listing.leaseStatus}. Expected ACTIVE.`);
+      throw new BadRequestException(
+        `Cannot pay an installment on a listing in status ${listing.leaseStatus}. Expected ACTIVE.`,
+      );
     }
     if (listing.renterId !== renterId) {
-      throw new BadRequestException('Only the current renter can pay this lease\'s installments');
+      throw new BadRequestException(
+        "Only the current renter can pay this lease's installments",
+      );
     }
     const totalYears = Math.ceil(listing.leaseDurationMonths / 12);
     const nextYear = listing.lastInstallmentYear + 1;
     if (nextYear > totalYears) {
-      throw new BadRequestException('All installments for this lease have already been paid');
+      throw new BadRequestException(
+        'All installments for this lease have already been paid',
+      );
     }
 
     const schedule = listing.rentScheduleJson as unknown as RentSchedule;
-    let amountDue = await this.pricing.computeInstallmentAmount(schedule, nextYear);
+    let amountDue = await this.pricing.computeInstallmentAmount(
+      schedule,
+      nextYear,
+    );
 
     const unappliedCredits = await this.prisma.landListingImprovement.findMany({
       where: { listingId, appliedToYear: null },
     });
-    const creditTotal = unappliedCredits.reduce((sum, c) => sum + c.amountTzs, 0);
+    const creditTotal = unappliedCredits.reduce(
+      (sum, c) => sum + c.amountTzs,
+      0,
+    );
     if (creditTotal > 0) {
       amountDue = Math.max(0, amountDue - creditTotal);
       await this.prisma.landListingImprovement.updateMany({
@@ -593,7 +723,10 @@ export class MarketplaceService {
       });
     }
 
-    const renter = await this.prisma.farmer.findUnique({ where: { id: renterId }, include: { user: { select: { phone: true } } } });
+    const renter = await this.prisma.farmer.findUnique({
+      where: { id: renterId },
+      include: { user: { select: { phone: true } } },
+    });
     const payerPhone = dto.phoneNumber?.trim() || renter?.user?.phone;
     const payViaClickPesa = this.clickPesa.isConfigured();
     if (payViaClickPesa && !payerPhone) {
@@ -612,8 +745,18 @@ export class MarketplaceService {
           installmentYear: nextYear,
         },
       });
-      await this.settleAnnualInstallment(escrow.id, listingId, nextYear, amountDue);
-      return { escrowPayment: escrow, paymentProvider: 'manual' as const, year: nextYear, amountDue };
+      await this.settleAnnualInstallment(
+        escrow.id,
+        listingId,
+        nextYear,
+        amountDue,
+      );
+      return {
+        escrowPayment: escrow,
+        paymentProvider: 'manual' as const,
+        year: nextYear,
+        amountDue,
+      };
     }
 
     const orderReference = this.generateOrderReference();
@@ -628,19 +771,40 @@ export class MarketplaceService {
       },
     });
     try {
-      const push = await this.clickPesa.initiateUssdPush({ amount: String(amountDue), orderReference, phoneNumber: payerPhone! });
-      return { escrowPayment: escrow, paymentProvider: 'clickpesa' as const, orderReference, pushStatus: push.status, year: nextYear, amountDue };
+      const push = await this.clickPesa.initiateUssdPush({
+        amount: String(amountDue),
+        orderReference,
+        phoneNumber: payerPhone!,
+      });
+      return {
+        escrowPayment: escrow,
+        paymentProvider: 'clickpesa' as const,
+        orderReference,
+        pushStatus: push.status,
+        year: nextYear,
+        amountDue,
+      };
     } catch (e) {
-      throw new BadRequestException(`Could not start mobile-money payment: ${e instanceof Error ? e.message : e}`);
+      throw new BadRequestException(
+        `Could not start mobile-money payment: ${e instanceof Error ? e.message : e}`,
+      );
     }
   }
 
   /** Marks an annual installment paid, advances the lease year counter, disburses the owner's share, and notifies both parties. */
-  private async settleAnnualInstallment(escrowId: string, listingId: string, year: number, amount: number) {
+  private async settleAnnualInstallment(
+    escrowId: string,
+    listingId: string,
+    year: number,
+    amount: number,
+  ) {
     const listing = await this.prisma.landListing.update({
       where: { id: listingId },
       data: { lastInstallmentYear: year },
-      include: { farm: true, owner: { include: { user: { select: { phone: true } } } } },
+      include: {
+        farm: true,
+        owner: { include: { user: { select: { phone: true } } } },
+      },
     });
     // Installments don't carry their own commissionAmount column — compute
     // this year's MAYODE cut from the listing's stored commission rate.
@@ -663,25 +827,39 @@ export class MarketplaceService {
   async releaseEscrow(listingId: string) {
     const listing = await this.prisma.landListing.findUnique({
       where: { id: listingId },
-      include: { escrowPayments: true, farm: true, owner: { include: { user: true } } },
+      include: {
+        escrowPayments: true,
+        farm: true,
+        owner: { include: { user: true } },
+      },
     });
 
     if (!listing) {
-      throw new NotFoundException(`Land Listing with ID ${listingId} not found`);
+      throw new NotFoundException(
+        `Land Listing with ID ${listingId} not found`,
+      );
     }
 
     if (listing.leaseStatus !== LeaseStatus.PENDING_VERIFICATION) {
-      throw new BadRequestException(`Cannot release escrow for listing in status ${listing.leaseStatus}. Expected PENDING_VERIFICATION.`);
+      throw new BadRequestException(
+        `Cannot release escrow for listing in status ${listing.leaseStatus}. Expected PENDING_VERIFICATION.`,
+      );
     }
 
-    const pendingEscrow = listing.escrowPayments.find(p => p.status === PaymentStatus.IN_ESCROW);
+    const pendingEscrow = listing.escrowPayments.find(
+      (p) => p.status === PaymentStatus.IN_ESCROW,
+    );
     if (!pendingEscrow) {
-      throw new BadRequestException('No active IN_ESCROW payment found for this listing');
+      throw new BadRequestException(
+        'No active IN_ESCROW payment found for this listing',
+      );
     }
 
     const now = new Date();
     const leaseEndDate = new Date(now);
-    leaseEndDate.setMonth(leaseEndDate.getMonth() + listing.leaseDurationMonths);
+    leaseEndDate.setMonth(
+      leaseEndDate.getMonth() + listing.leaseDurationMonths,
+    );
 
     // Update escrow payment status to RELEASED
     await this.prisma.escrowPayment.update({
@@ -730,7 +908,11 @@ export class MarketplaceService {
     });
 
     if (settlingSubLease) {
-      await this.disburseSubLeasePayout(pendingEscrow.id, listing, settlingSubLease);
+      await this.disburseSubLeasePayout(
+        pendingEscrow.id,
+        listing,
+        settlingSubLease,
+      );
     } else {
       // Disburse the owner's share (deposit minus MAYODE's commission) now
       // that the money already sits in MAYODE's ClickPesa balance.
@@ -745,10 +927,12 @@ export class MarketplaceService {
       );
     }
     if (updatedListing.renter) {
-      const renterPhone = (await this.prisma.farmer.findUnique({
-        where: { id: updatedListing.renter.id },
-        include: { user: { select: { phone: true } } },
-      }))?.user?.phone;
+      const renterPhone = (
+        await this.prisma.farmer.findUnique({
+          where: { id: updatedListing.renter.id },
+          include: { user: { select: { phone: true } } },
+        })
+      )?.user?.phone;
       if (renterPhone) {
         await this.sms.send(
           renterPhone,
@@ -764,7 +948,9 @@ export class MarketplaceService {
     try {
       await this.leaseDocument.generateAgreement(listingId);
     } catch (e) {
-      this.logger.error(`Failed to generate lease agreement for ${listingId}: ${e instanceof Error ? e.message : e}`);
+      this.logger.error(
+        `Failed to generate lease agreement for ${listingId}: ${e instanceof Error ? e.message : e}`,
+      );
     }
 
     return updatedListing;
@@ -778,7 +964,13 @@ export class MarketplaceService {
    */
   private async disburseOwnerPayout(
     escrowPaymentId: string,
-    listing: { id: string; finalPrice: number | null; commissionAmount: number | null; ownerId: string; owner: { user?: { phone?: string } | null } },
+    listing: {
+      id: string;
+      finalPrice: number | null;
+      commissionAmount: number | null;
+      ownerId: string;
+      owner: { user?: { phone?: string } | null };
+    },
   ) {
     const grossAmount = listing.finalPrice ?? 0;
     const commission = listing.commissionAmount ?? 0;
@@ -787,12 +979,16 @@ export class MarketplaceService {
 
     // A pending ownership-transfer fee (fixed 10,000/-) is deducted from the
     // owner's very next payout after the transfer was recorded.
-    const unbilledTransfer = await this.prisma.landListingOwnershipTransfer.findFirst({
-      where: { listingId: listing.id, feeChargedAt: null },
-      orderBy: { createdAt: 'asc' },
-    });
+    const unbilledTransfer =
+      await this.prisma.landListingOwnershipTransfer.findFirst({
+        where: { listingId: listing.id, feeChargedAt: null },
+        orderBy: { createdAt: 'asc' },
+      });
     if (unbilledTransfer) {
-      payoutAmount = Math.max(0, payoutAmount - unbilledTransfer.transferFeeTzs);
+      payoutAmount = Math.max(
+        0,
+        payoutAmount - unbilledTransfer.transferFeeTzs,
+      );
       await this.prisma.landListingOwnershipTransfer.update({
         where: { id: unbilledTransfer.id },
         data: { feeChargedAt: new Date() },
@@ -805,7 +1001,10 @@ export class MarketplaceService {
       // Bookkeeping-only fallback — cash settles off-platform for now.
       await this.prisma.escrowPayment.update({
         where: { id: escrowPaymentId },
-        data: { payoutStatus: PayoutStatus.PENDING, payoutRecipientId: listing.ownerId },
+        data: {
+          payoutStatus: PayoutStatus.PENDING,
+          payoutRecipientId: listing.ownerId,
+        },
       });
       return;
     }
@@ -872,7 +1071,10 @@ export class MarketplaceService {
     if (!this.clickPesa.isConfigured()) {
       await this.prisma.escrowPayment.update({
         where: { id: escrowPaymentId },
-        data: { payoutStatus: PayoutStatus.PENDING, payoutRecipientId: subLease.originalRenterId },
+        data: {
+          payoutStatus: PayoutStatus.PENDING,
+          payoutRecipientId: subLease.originalRenterId,
+        },
       });
       return;
     }
@@ -911,7 +1113,9 @@ export class MarketplaceService {
   async reconcilePayoutStatus(escrowPaymentId: string) {
     const escrow = await this.prisma.escrowPayment.findUnique({
       where: { id: escrowPaymentId },
-      include: { payoutRecipient: { include: { user: { select: { phone: true } } } } },
+      include: {
+        payoutRecipient: { include: { user: { select: { phone: true } } } },
+      },
     });
     if (!escrow || !escrow.payoutOrderReference) return null;
     if (escrow.payoutStatus !== PayoutStatus.PROCESSING) return escrow;
@@ -938,7 +1142,10 @@ export class MarketplaceService {
     if (result && PAYOUT_FAILURE_STATUSES.includes(result.status)) {
       const updated = await this.prisma.escrowPayment.update({
         where: { id: escrow.id },
-        data: { payoutStatus: PayoutStatus.FAILED, payoutFailureReason: result.message ?? 'Payout failed' },
+        data: {
+          payoutStatus: PayoutStatus.FAILED,
+          payoutFailureReason: result.message ?? 'Payout failed',
+        },
       });
       if (recipientPhone) {
         await this.sms.send(
@@ -967,8 +1174,16 @@ export class MarketplaceService {
    */
   async sendDueAnnualReminders(): Promise<number> {
     const candidates = await this.prisma.landListing.findMany({
-      where: { isMultiYear: true, paymentPlan: 'ANNUAL', leaseStatus: LeaseStatus.ACTIVE, leaseStartDate: { not: null } },
-      include: { farm: { select: { farmCode: true } }, renter: { include: { user: { select: { phone: true } } } } },
+      where: {
+        isMultiYear: true,
+        paymentPlan: 'ANNUAL',
+        leaseStatus: LeaseStatus.ACTIVE,
+        leaseStartDate: { not: null },
+      },
+      include: {
+        farm: { select: { farmCode: true } },
+        renter: { include: { user: { select: { phone: true } } } },
+      },
     });
     const now = new Date();
     let sent = 0;
@@ -976,7 +1191,9 @@ export class MarketplaceService {
       const totalYears = Math.ceil(listing.leaseDurationMonths / 12);
       if (listing.lastInstallmentYear >= totalYears) continue;
       const nextAnniversary = new Date(listing.leaseStartDate!);
-      nextAnniversary.setFullYear(nextAnniversary.getFullYear() + listing.lastInstallmentYear);
+      nextAnniversary.setFullYear(
+        nextAnniversary.getFullYear() + listing.lastInstallmentYear,
+      );
       if (now < nextAnniversary) continue;
       if (!listing.renter?.user?.phone) continue;
       await this.sms.send(
@@ -997,23 +1214,36 @@ export class MarketplaceService {
   async submitOffer(listingId: string, farmerId: string, offerAmount: number) {
     const listing = await this.prisma.landListing.findUnique({
       where: { id: listingId },
-      include: { farm: true, owner: { include: { user: { select: { phone: true } } } } },
+      include: {
+        farm: true,
+        owner: { include: { user: { select: { phone: true } } } },
+      },
     });
     if (!listing) {
-      throw new NotFoundException(`Land Listing with ID ${listingId} not found`);
+      throw new NotFoundException(
+        `Land Listing with ID ${listingId} not found`,
+      );
     }
     if (listing.ownerId === farmerId) {
-      throw new BadRequestException('A land owner cannot make an offer on their own listing');
+      throw new BadRequestException(
+        'A land owner cannot make an offer on their own listing',
+      );
     }
     if (listing.leaseStatus !== LeaseStatus.DRAFT) {
-      throw new BadRequestException(`Cannot make an offer on a listing in status ${listing.leaseStatus}. Expected DRAFT.`);
+      throw new BadRequestException(
+        `Cannot make an offer on a listing in status ${listing.leaseStatus}. Expected DRAFT.`,
+      );
     }
-    const farmer = await this.prisma.farmer.findUnique({ where: { id: farmerId } });
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { id: farmerId },
+    });
     if (!farmer) {
       throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
     }
     if (farmer.isBlacklisted) {
-      throw new BadRequestException('This farmer is blacklisted from M-LAX and cannot make offers');
+      throw new BadRequestException(
+        'This farmer is blacklisted from M-LAX and cannot make offers',
+      );
     }
 
     const offer = await this.prisma.landListingOffer.create({
@@ -1031,32 +1261,57 @@ export class MarketplaceService {
   }
 
   /** Owner accepts, rejects, or counters a pending offer. */
-  async respondToOffer(listingId: string, offerId: string, ownerId: string, dto: { action: 'accept' | 'reject' | 'counter'; counterAmount?: number }) {
-    const listing = await this.prisma.landListing.findUnique({ where: { id: listingId } });
+  async respondToOffer(
+    listingId: string,
+    offerId: string,
+    ownerId: string,
+    dto: { action: 'accept' | 'reject' | 'counter'; counterAmount?: number },
+  ) {
+    const listing = await this.prisma.landListing.findUnique({
+      where: { id: listingId },
+    });
     if (!listing) {
-      throw new NotFoundException(`Land Listing with ID ${listingId} not found`);
+      throw new NotFoundException(
+        `Land Listing with ID ${listingId} not found`,
+      );
     }
     if (listing.ownerId !== ownerId) {
-      throw new BadRequestException('Only the listing owner can respond to offers');
+      throw new BadRequestException(
+        'Only the listing owner can respond to offers',
+      );
     }
     const offer = await this.prisma.landListingOffer.findUnique({
       where: { id: offerId },
       include: { farmer: { include: { user: { select: { phone: true } } } } },
     });
     if (!offer || offer.listingId !== listingId) {
-      throw new NotFoundException(`Offer with ID ${offerId} not found for this listing`);
+      throw new NotFoundException(
+        `Offer with ID ${offerId} not found for this listing`,
+      );
     }
     if (offer.status !== 'PENDING') {
-      throw new BadRequestException(`This offer has already been ${offer.status.toLowerCase()}`);
+      throw new BadRequestException(
+        `This offer has already been ${offer.status.toLowerCase()}`,
+      );
     }
     if (dto.action === 'counter' && !dto.counterAmount) {
-      throw new BadRequestException('counterAmount is required to counter an offer');
+      throw new BadRequestException(
+        'counterAmount is required to counter an offer',
+      );
     }
 
-    const status = dto.action === 'accept' ? 'ACCEPTED' : dto.action === 'reject' ? 'REJECTED' : 'COUNTERED';
+    const status =
+      dto.action === 'accept'
+        ? 'ACCEPTED'
+        : dto.action === 'reject'
+          ? 'REJECTED'
+          : 'COUNTERED';
     const updated = await this.prisma.landListingOffer.update({
       where: { id: offerId },
-      data: { status, counterAmount: dto.action === 'counter' ? dto.counterAmount : undefined },
+      data: {
+        status,
+        counterAmount: dto.action === 'counter' ? dto.counterAmount : undefined,
+      },
     });
 
     const farmerPhone = offer.farmer.user?.phone;
@@ -1073,27 +1328,44 @@ export class MarketplaceService {
   }
 
   /** Farmer accepts or declines the owner's counter-offer. */
-  async respondToCounterOffer(offerId: string, farmerId: string, accept: boolean) {
-    const offer = await this.prisma.landListingOffer.findUnique({ where: { id: offerId } });
+  async respondToCounterOffer(
+    offerId: string,
+    farmerId: string,
+    accept: boolean,
+  ) {
+    const offer = await this.prisma.landListingOffer.findUnique({
+      where: { id: offerId },
+    });
     if (!offer) {
       throw new NotFoundException(`Offer with ID ${offerId} not found`);
     }
     if (offer.farmerId !== farmerId) {
-      throw new BadRequestException('Only the farmer who made this offer can respond to the counter');
+      throw new BadRequestException(
+        'Only the farmer who made this offer can respond to the counter',
+      );
     }
     if (offer.status !== 'COUNTERED') {
-      throw new BadRequestException('This offer has no pending counter to respond to');
+      throw new BadRequestException(
+        'This offer has no pending counter to respond to',
+      );
     }
     return this.prisma.landListingOffer.update({
       where: { id: offerId },
-      data: { status: accept ? 'ACCEPTED' : 'REJECTED', offerAmount: accept ? offer.counterAmount! : offer.offerAmount },
+      data: {
+        status: accept ? 'ACCEPTED' : 'REJECTED',
+        offerAmount: accept ? offer.counterAmount! : offer.offerAmount,
+      },
     });
   }
 
   async findOffersForListing(listingId: string) {
     return this.prisma.landListingOffer.findMany({
       where: { listingId },
-      include: { farmer: { select: { firstName: true, lastName: true, controlNumber: true } } },
+      include: {
+        farmer: {
+          select: { firstName: true, lastName: true, controlNumber: true },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -1107,26 +1379,41 @@ export class MarketplaceService {
    * request re-listing the remainder to a new renter. Requires the owner's
    * approval before the listing accepts a new deposit (see depositEscrow).
    */
-  async requestSubLease(listingId: string, renterId: string, dto: RequestSubLeaseDto) {
+  async requestSubLease(
+    listingId: string,
+    renterId: string,
+    dto: RequestSubLeaseDto,
+  ) {
     const listing = await this.prisma.landListing.findUnique({
       where: { id: listingId },
-      include: { farm: true, owner: { include: { user: { select: { phone: true } } } } },
+      include: {
+        farm: true,
+        owner: { include: { user: { select: { phone: true } } } },
+      },
     });
     if (!listing) {
-      throw new NotFoundException(`Land Listing with ID ${listingId} not found`);
+      throw new NotFoundException(
+        `Land Listing with ID ${listingId} not found`,
+      );
     }
     if (listing.renterId !== renterId) {
-      throw new BadRequestException('Only the current renter can request a sub-lease');
+      throw new BadRequestException(
+        'Only the current renter can request a sub-lease',
+      );
     }
     if (listing.leaseStatus !== LeaseStatus.ACTIVE) {
-      throw new BadRequestException(`Cannot sub-lease a listing in status ${listing.leaseStatus}. Expected ACTIVE.`);
+      throw new BadRequestException(
+        `Cannot sub-lease a listing in status ${listing.leaseStatus}. Expected ACTIVE.`,
+      );
     }
 
     const existing = await this.prisma.landListingSubLease.findFirst({
       where: { originalListingId: listingId, status: SubLeaseStatus.PENDING },
     });
     if (existing) {
-      throw new ConflictException('A sub-lease request is already pending for this listing');
+      throw new ConflictException(
+        'A sub-lease request is already pending for this listing',
+      );
     }
 
     const subLease = await this.prisma.landListingSubLease.create({
@@ -1154,24 +1441,41 @@ export class MarketplaceService {
    * release, the payout is redirected to the original renter minus MAYODE's
    * 5% re-listing fee (see disburseSubLeasePayout).
    */
-  async approveSubLease(listingId: string, subLeaseId: string, ownerId: string, dto: ApproveSubLeaseDto) {
-    const listing = await this.prisma.landListing.findUnique({ where: { id: listingId } });
+  async approveSubLease(
+    listingId: string,
+    subLeaseId: string,
+    ownerId: string,
+    dto: ApproveSubLeaseDto,
+  ) {
+    const listing = await this.prisma.landListing.findUnique({
+      where: { id: listingId },
+    });
     if (!listing) {
-      throw new NotFoundException(`Land Listing with ID ${listingId} not found`);
+      throw new NotFoundException(
+        `Land Listing with ID ${listingId} not found`,
+      );
     }
     if (listing.ownerId !== ownerId) {
-      throw new BadRequestException('Only the listing owner can approve a sub-lease');
+      throw new BadRequestException(
+        'Only the listing owner can approve a sub-lease',
+      );
     }
 
     const subLease = await this.prisma.landListingSubLease.findUnique({
       where: { id: subLeaseId },
-      include: { originalRenter: { include: { user: { select: { phone: true } } } } },
+      include: {
+        originalRenter: { include: { user: { select: { phone: true } } } },
+      },
     });
     if (!subLease || subLease.originalListingId !== listingId) {
-      throw new NotFoundException(`Sub-lease request with ID ${subLeaseId} not found for this listing`);
+      throw new NotFoundException(
+        `Sub-lease request with ID ${subLeaseId} not found for this listing`,
+      );
     }
     if (subLease.status !== SubLeaseStatus.PENDING) {
-      throw new BadRequestException(`Sub-lease request already ${subLease.status}`);
+      throw new BadRequestException(
+        `Sub-lease request already ${subLease.status}`,
+      );
     }
 
     const updated = await this.prisma.landListingSubLease.update({
@@ -1204,16 +1508,24 @@ export class MarketplaceService {
    * until a transfer with a resolved Farmer exists. A fixed 10,000/- transfer
    * fee is deducted from the next payout (see disburseOwnerPayout).
    */
-  async transferOwnership(listingId: string, currentOwnerId: string, dto: TransferOwnershipDto) {
+  async transferOwnership(
+    listingId: string,
+    currentOwnerId: string,
+    dto: TransferOwnershipDto,
+  ) {
     const listing = await this.prisma.landListing.findUnique({
       where: { id: listingId },
       include: { farm: true },
     });
     if (!listing) {
-      throw new NotFoundException(`Land Listing with ID ${listingId} not found`);
+      throw new NotFoundException(
+        `Land Listing with ID ${listingId} not found`,
+      );
     }
     if (listing.ownerId !== currentOwnerId) {
-      throw new BadRequestException('Only the current owner can transfer this listing');
+      throw new BadRequestException(
+        'Only the current owner can transfer this listing',
+      );
     }
 
     // Phones aren't stored in a single normalized format, so match on the
@@ -1267,9 +1579,13 @@ export class MarketplaceService {
    * pipeline exists in this system.
    */
   async getProtectionStatus(listingId: string) {
-    const listing = await this.prisma.landListing.findUnique({ where: { id: listingId } });
+    const listing = await this.prisma.landListing.findUnique({
+      where: { id: listingId },
+    });
     if (!listing) {
-      throw new NotFoundException(`Land Listing with ID ${listingId} not found`);
+      throw new NotFoundException(
+        `Land Listing with ID ${listingId} not found`,
+      );
     }
     return {
       mayodeProtected: listing.mayodeProtected,
@@ -1285,8 +1601,12 @@ export class MarketplaceService {
    * "why renters come back every season" mechanisms. A farmer qualifies if
    * they have (or recently had) an ACTIVE or COMPLETED lease as a renter.
    */
-  private async checkMlaxActivityEligibility(farmerId: string): Promise<{ eligible: boolean; reason: string }> {
-    const farmer = await this.prisma.farmer.findUnique({ where: { id: farmerId } });
+  private async checkMlaxActivityEligibility(
+    farmerId: string,
+  ): Promise<{ eligible: boolean; reason: string }> {
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { id: farmerId },
+    });
     if (!farmer) {
       throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
     }
@@ -1294,12 +1614,22 @@ export class MarketplaceService {
       return { eligible: false, reason: 'Farmer is blacklisted from M-LAX' };
     }
     const activeLease = await this.prisma.landListing.findFirst({
-      where: { renterId: farmerId, leaseStatus: { in: [LeaseStatus.ACTIVE, LeaseStatus.COMPLETED] } },
+      where: {
+        renterId: farmerId,
+        leaseStatus: { in: [LeaseStatus.ACTIVE, LeaseStatus.COMPLETED] },
+      },
     });
     if (!activeLease) {
-      return { eligible: false, reason: 'Farmer has no active or completed M-LAX lease as a renter — rent through M-LAX first to unlock this benefit' };
+      return {
+        eligible: false,
+        reason:
+          'Farmer has no active or completed M-LAX lease as a renter — rent through M-LAX first to unlock this benefit',
+      };
     }
-    return { eligible: true, reason: `Eligible via M-LAX lease ${activeLease.id} (${activeLease.leaseStatus})` };
+    return {
+      eligible: true,
+      reason: `Eligible via M-LAX lease ${activeLease.id} (${activeLease.leaseStatus})`,
+    };
   }
 
   /**
@@ -1312,10 +1642,19 @@ export class MarketplaceService {
     return this.checkMlaxActivityEligibility(farmerId);
   }
 
-  async issueInputCredit(farmerId: string, dto: { amountTzs: number; repaymentSchedule?: string; autoDeductPercent?: number }) {
+  async issueInputCredit(
+    farmerId: string,
+    dto: {
+      amountTzs: number;
+      repaymentSchedule?: string;
+      autoDeductPercent?: number;
+    },
+  ) {
     const eligibility = await this.checkMlaxActivityEligibility(farmerId);
     if (!eligibility.eligible) {
-      throw new BadRequestException(`Not eligible for M-LAX input credit: ${eligibility.reason}`);
+      throw new BadRequestException(
+        `Not eligible for M-LAX input credit: ${eligibility.reason}`,
+      );
     }
     const loan = await this.prisma.loanRecord.create({
       data: {
@@ -1328,7 +1667,10 @@ export class MarketplaceService {
         isActive: true,
       },
     });
-    const farmer = await this.prisma.farmer.findUnique({ where: { id: farmerId }, include: { user: { select: { phone: true } } } });
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { id: farmerId },
+      include: { user: { select: { phone: true } } },
+    });
     if (farmer?.user?.phone) {
       await this.sms.send(
         farmer.user.phone,
@@ -1356,19 +1698,31 @@ export class MarketplaceService {
    * isn't happening in that MAMCOS.
    */
   async getMamcosStability(mamcosId: string) {
-    const mamcos = await this.prisma.mamcos.findUnique({ where: { id: mamcosId } });
+    const mamcos = await this.prisma.mamcos.findUnique({
+      where: { id: mamcosId },
+    });
     if (!mamcos) {
       throw new NotFoundException(`Mamcos with ID ${mamcosId} not found`);
     }
     const totalFarms = await this.prisma.farm.count({ where: { mamcosId } });
     const farmsOnMlax = await this.prisma.farm.count({
-      where: { mamcosId, OR: [{ isAvailableForRent: true }, { isLeased: true }, { landListings: { some: {} } }] },
+      where: {
+        mamcosId,
+        OR: [
+          { isAvailableForRent: true },
+          { isLeased: true },
+          { landListings: { some: {} } },
+        ],
+      },
     });
-    const secretary = await this.prisma.mamcosStaff.findFirst({ where: { mamcosId, role: 'SECRETARY' } });
+    const secretary = await this.prisma.mamcosStaff.findFirst({
+      where: { mamcosId, role: 'SECRETARY' },
+    });
     return {
       totalFarms,
       farmsOnMlax,
-      stabilityPercent: totalFarms > 0 ? Math.round((farmsOnMlax / totalFarms) * 100) : 0,
+      stabilityPercent:
+        totalFarms > 0 ? Math.round((farmsOnMlax / totalFarms) * 100) : 0,
       secretaryStabilityBonus: secretary?.stabilityBonus ?? 0,
     };
   }
@@ -1379,12 +1733,18 @@ export class MarketplaceService {
    * that isn't reflected as active on M-LAX can flag it — reusing the
    * existing (pre-built) disputes module rather than inventing a new one.
    */
-  async flagUnreportedActivity(farmId: string, officerUserId: string, description: string) {
+  async flagUnreportedActivity(
+    farmId: string,
+    officerUserId: string,
+    description: string,
+  ) {
     const farm = await this.prisma.farm.findUnique({ where: { id: farmId } });
     if (!farm) {
       throw new NotFoundException(`Farm with ID ${farmId} not found`);
     }
-    const officerUser = await this.prisma.user.findUnique({ where: { id: officerUserId } });
+    const officerUser = await this.prisma.user.findUnique({
+      where: { id: officerUserId },
+    });
     if (!officerUser) {
       throw new NotFoundException(`User with ID ${officerUserId} not found`);
     }
@@ -1401,9 +1761,13 @@ export class MarketplaceService {
 
   /** The stored (or live, for rice-linked) year-by-year rent schedule for a multi-year listing. */
   async getRentSchedule(listingId: string) {
-    const listing = await this.prisma.landListing.findUnique({ where: { id: listingId } });
+    const listing = await this.prisma.landListing.findUnique({
+      where: { id: listingId },
+    });
     if (!listing) {
-      throw new NotFoundException(`Land Listing with ID ${listingId} not found`);
+      throw new NotFoundException(
+        `Land Listing with ID ${listingId} not found`,
+      );
     }
     if (!listing.isMultiYear || !listing.rentScheduleJson) {
       throw new BadRequestException('This listing is not a multi-year lease');
@@ -1417,7 +1781,12 @@ export class MarketplaceService {
         paid: year <= listing.lastInstallmentYear,
       })),
     );
-    return { paymentPlan: listing.paymentPlan, model: schedule.model, lastInstallmentYear: listing.lastInstallmentYear, years };
+    return {
+      paymentPlan: listing.paymentPlan,
+      model: schedule.model,
+      lastInstallmentYear: listing.lastInstallmentYear,
+      years,
+    };
   }
 
   /**
@@ -1426,19 +1795,36 @@ export class MarketplaceService {
    * Only meaningful for multi-year ANNUAL leases — a PREPAID or single-season
    * lease has no future installment to apply the credit to.
    */
-  async logLandImprovement(listingId: string, renterId: string, dto: { description: string; amountTzs: number }) {
-    const listing = await this.prisma.landListing.findUnique({ where: { id: listingId } });
+  async logLandImprovement(
+    listingId: string,
+    renterId: string,
+    dto: { description: string; amountTzs: number },
+  ) {
+    const listing = await this.prisma.landListing.findUnique({
+      where: { id: listingId },
+    });
     if (!listing) {
-      throw new NotFoundException(`Land Listing with ID ${listingId} not found`);
+      throw new NotFoundException(
+        `Land Listing with ID ${listingId} not found`,
+      );
     }
     if (listing.renterId !== renterId) {
-      throw new BadRequestException('Only the current renter can log an improvement on this lease');
+      throw new BadRequestException(
+        'Only the current renter can log an improvement on this lease',
+      );
     }
     if (listing.leaseStatus !== LeaseStatus.ACTIVE) {
-      throw new BadRequestException('Improvements can only be logged on an active lease');
+      throw new BadRequestException(
+        'Improvements can only be logged on an active lease',
+      );
     }
     return this.prisma.landListingImprovement.create({
-      data: { listingId, renterId, description: dto.description, amountTzs: dto.amountTzs },
+      data: {
+        listingId,
+        renterId,
+        description: dto.description,
+        amountTzs: dto.amountTzs,
+      },
     });
   }
 
@@ -1446,7 +1832,9 @@ export class MarketplaceService {
   async regenerateAgreement(listingId: string) {
     const url = await this.leaseDocument.generateAgreement(listingId);
     if (!url) {
-      throw new BadRequestException('Cannot generate an agreement for a listing with no renter');
+      throw new BadRequestException(
+        'Cannot generate an agreement for a listing with no renter',
+      );
     }
     return { agreementPdfUrl: url };
   }
@@ -1466,18 +1854,25 @@ export class MarketplaceService {
         autoDropPrice: { not: null },
         autoDropDays: { not: null },
       },
-      include: { owner: { include: { user: { select: { phone: true } } } }, farm: { select: { farmCode: true } } },
+      include: {
+        owner: { include: { user: { select: { phone: true } } } },
+        farm: { select: { farmCode: true } },
+      },
     });
 
     let dropped = 0;
     for (const listing of candidates) {
       const since = listing.lastPriceDropAt ?? listing.createdAt;
-      const daysSince = (now.getTime() - since.getTime()) / (1000 * 60 * 60 * 24);
+      const daysSince =
+        (now.getTime() - since.getTime()) / (1000 * 60 * 60 * 24);
       if (daysSince < (listing.autoDropDays as number)) continue;
       if (listing.askingPrice <= (listing.autoDropPrice as number)) continue;
 
       const gap = listing.askingPrice - (listing.autoDropPrice as number);
-      const newPrice = Math.max(listing.autoDropPrice as number, Math.round(listing.askingPrice - gap * 0.2));
+      const newPrice = Math.max(
+        listing.autoDropPrice as number,
+        Math.round(listing.askingPrice - gap * 0.2),
+      );
       if (newPrice === listing.askingPrice) continue;
 
       await this.prisma.landListing.update({
@@ -1512,9 +1907,19 @@ export class MarketplaceService {
   }
 
   async createTractor(createTractorDto: CreateTractorDto) {
-    const { ownerId, registrationNo, model, horsePower, isAvailable, location, pricePerHectare } = createTractorDto;
+    const {
+      ownerId,
+      registrationNo,
+      model,
+      horsePower,
+      isAvailable,
+      location,
+      pricePerHectare,
+    } = createTractorDto;
 
-    const owner = await this.prisma.tractorOwner.findUnique({ where: { id: ownerId } });
+    const owner = await this.prisma.tractorOwner.findUnique({
+      where: { id: ownerId },
+    });
     if (!owner) {
       throw new NotFoundException(`TractorOwner with ID ${ownerId} not found`);
     }
@@ -1561,12 +1966,18 @@ export class MarketplaceService {
 
   /** Farmer cancels a booking before the tractor owner has confirmed it. */
   async cancelTractorBooking(bookingId: string) {
-    const booking = await this.prisma.tractorBooking.findUnique({ where: { id: bookingId } });
+    const booking = await this.prisma.tractorBooking.findUnique({
+      where: { id: bookingId },
+    });
     if (!booking) {
-      throw new NotFoundException(`Tractor Booking with ID ${bookingId} not found`);
+      throw new NotFoundException(
+        `Tractor Booking with ID ${bookingId} not found`,
+      );
     }
     if (booking.status !== BookingStatus.PENDING) {
-      throw new BadRequestException(`Cannot cancel a booking in status ${booking.status}. Expected PENDING.`);
+      throw new BadRequestException(
+        `Cannot cancel a booking in status ${booking.status}. Expected PENDING.`,
+      );
     }
     return this.prisma.tractorBooking.update({
       where: { id: bookingId },
@@ -1575,23 +1986,38 @@ export class MarketplaceService {
   }
 
   async bookTractor(createTractorBookingDto: CreateTractorBookingDto) {
-    const { tractorId, farmerId, hectares, terrainGrade, commissionRate, scheduledDate } = createTractorBookingDto;
+    const {
+      tractorId,
+      farmerId,
+      hectares,
+      terrainGrade,
+      commissionRate,
+      scheduledDate,
+    } = createTractorBookingDto;
 
-    const tractor = await this.prisma.tractor.findUnique({ where: { id: tractorId } });
+    const tractor = await this.prisma.tractor.findUnique({
+      where: { id: tractorId },
+    });
     if (!tractor) {
       throw new NotFoundException(`Tractor with ID ${tractorId} not found`);
     }
 
     if (!tractor.isAvailable) {
-      throw new BadRequestException(`Tractor ID ${tractorId} is currently unavailable for booking`);
+      throw new BadRequestException(
+        `Tractor ID ${tractorId} is currently unavailable for booking`,
+      );
     }
 
-    const farmer = await this.prisma.farmer.findUnique({ where: { id: farmerId } });
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { id: farmerId },
+    });
     if (!farmer) {
       throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
     }
     if (farmer.isBlacklisted) {
-      throw new BadRequestException('This farmer is blacklisted from M-LAX and cannot book tractor services');
+      throw new BadRequestException(
+        'This farmer is blacklisted from M-LAX and cannot book tractor services',
+      );
     }
 
     const basePricePerHectare = tractor.pricePerHectare || 50000;
@@ -1600,7 +2026,7 @@ export class MarketplaceService {
     // Terrain surcharge calculation based on farm grade/obstacles
     let surchargePercent = 0;
     if (terrainGrade === FarmGrade.B) {
-      surchargePercent = 0.10; // 10% surcharge for minor obstacles/anthills
+      surchargePercent = 0.1; // 10% surcharge for minor obstacles/anthills
     } else if (terrainGrade === FarmGrade.C) {
       surchargePercent = 0.25; // 25% surcharge for severe terrain/heavy anthills
     }
@@ -1634,13 +2060,19 @@ export class MarketplaceService {
   }
 
   async confirmTractorBooking(bookingId: string) {
-    const booking = await this.prisma.tractorBooking.findUnique({ where: { id: bookingId } });
+    const booking = await this.prisma.tractorBooking.findUnique({
+      where: { id: bookingId },
+    });
     if (!booking) {
-      throw new NotFoundException(`Tractor Booking with ID ${bookingId} not found`);
+      throw new NotFoundException(
+        `Tractor Booking with ID ${bookingId} not found`,
+      );
     }
 
     if (booking.status !== BookingStatus.PENDING) {
-      throw new BadRequestException(`Cannot confirm booking in status ${booking.status}. Expected PENDING.`);
+      throw new BadRequestException(
+        `Cannot confirm booking in status ${booking.status}. Expected PENDING.`,
+      );
     }
 
     const confirmed = await this.prisma.tractorBooking.update({
@@ -1662,13 +2094,22 @@ export class MarketplaceService {
   }
 
   async completeTractorBooking(bookingId: string) {
-    const booking = await this.prisma.tractorBooking.findUnique({ where: { id: bookingId } });
+    const booking = await this.prisma.tractorBooking.findUnique({
+      where: { id: bookingId },
+    });
     if (!booking) {
-      throw new NotFoundException(`Tractor Booking with ID ${bookingId} not found`);
+      throw new NotFoundException(
+        `Tractor Booking with ID ${bookingId} not found`,
+      );
     }
 
-    if (booking.status !== BookingStatus.CONFIRMED && booking.status !== BookingStatus.IN_PROGRESS) {
-      throw new BadRequestException(`Cannot complete booking in status ${booking.status}. Expected CONFIRMED or IN_PROGRESS.`);
+    if (
+      booking.status !== BookingStatus.CONFIRMED &&
+      booking.status !== BookingStatus.IN_PROGRESS
+    ) {
+      throw new BadRequestException(
+        `Cannot complete booking in status ${booking.status}. Expected CONFIRMED or IN_PROGRESS.`,
+      );
     }
 
     const completed = await this.prisma.tractorBooking.update({
@@ -1705,7 +2146,8 @@ export class MarketplaceService {
   // ==========================================
 
   async createMarketPrice(createMarketPriceDto: CreateMarketPriceDto) {
-    const { commodity, price, market, source, recordedAt } = createMarketPriceDto;
+    const { commodity, price, market, source, recordedAt } =
+      createMarketPriceDto;
 
     return this.prisma.marketPrice.create({
       data: {
@@ -1722,7 +2164,10 @@ export class MarketplaceService {
     const whereClause: any = {};
 
     if (query?.commodity) {
-      whereClause.commodity = { contains: query.commodity, mode: 'insensitive' };
+      whereClause.commodity = {
+        contains: query.commodity,
+        mode: 'insensitive',
+      };
     }
     if (query?.market) {
       whereClause.market = { contains: query.market, mode: 'insensitive' };

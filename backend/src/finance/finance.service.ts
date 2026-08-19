@@ -34,7 +34,9 @@ export class FinanceService {
       include: {
         cropCycle: {
           select: {
-            farmer: { select: { firstName: true, lastName: true, controlNumber: true } },
+            farmer: {
+              select: { firstName: true, lastName: true, controlNumber: true },
+            },
           },
         },
         supplierRecord: { select: { id: true, name: true } },
@@ -88,7 +90,16 @@ export class FinanceService {
       `TZS ${dto.totalCost.toLocaleString()} · ${cropCycle.farm.farmCode}`,
       CATEGORY_ICONS[dto.category] ?? '💵',
     );
-    await this.accounting.postToLedger('InputCost', cost.id, cost.dateIncurred, `Input cost: ${cost.itemName}`, [{ code: '5000', debit: cost.totalCost }, { code: '1000', credit: cost.totalCost }]);
+    await this.accounting.postToLedger(
+      'InputCost',
+      cost.id,
+      cost.dateIncurred,
+      `Input cost: ${cost.itemName}`,
+      [
+        { code: '5000', debit: cost.totalCost },
+        { code: '1000', credit: cost.totalCost },
+      ],
+    );
     return cost;
   }
 
@@ -130,7 +141,16 @@ export class FinanceService {
       `TZS ${dto.totalRevenue.toLocaleString()} · ${cropCycle.farm.farmCode}`,
       '💰',
     );
-    await this.accounting.postToLedger('Revenue', revenue.id, revenue.saleDate, 'Recorded crop revenue', [{ code: '1000', debit: revenue.totalRevenue }, { code: '4000', credit: revenue.totalRevenue }]);
+    await this.accounting.postToLedger(
+      'Revenue',
+      revenue.id,
+      revenue.saleDate,
+      'Recorded crop revenue',
+      [
+        { code: '1000', debit: revenue.totalRevenue },
+        { code: '4000', credit: revenue.totalRevenue },
+      ],
+    );
     return revenue;
   }
 

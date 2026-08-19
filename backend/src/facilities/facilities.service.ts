@@ -24,14 +24,20 @@ export class FacilitiesService {
   }
 
   async updateIrrigationScheme(id: string, dto: UpdateIrrigationSchemeDto) {
-    const existing = await this.prisma.irrigationScheme.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException(`Irrigation scheme with ID ${id} not found`);
+    const existing = await this.prisma.irrigationScheme.findUnique({
+      where: { id },
+    });
+    if (!existing)
+      throw new NotFoundException(`Irrigation scheme with ID ${id} not found`);
     return this.prisma.irrigationScheme.update({ where: { id }, data: dto });
   }
 
   async removeIrrigationScheme(id: string) {
-    const existing = await this.prisma.irrigationScheme.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException(`Irrigation scheme with ID ${id} not found`);
+    const existing = await this.prisma.irrigationScheme.findUnique({
+      where: { id },
+    });
+    if (!existing)
+      throw new NotFoundException(`Irrigation scheme with ID ${id} not found`);
     await this.prisma.irrigationScheme.delete({ where: { id } });
     return { deleted: true };
   }
@@ -49,14 +55,20 @@ export class FacilitiesService {
   }
 
   async updateAggregationCentre(id: string, dto: UpdateAggregationCentreDto) {
-    const existing = await this.prisma.aggregationCentre.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException(`Aggregation centre with ID ${id} not found`);
+    const existing = await this.prisma.aggregationCentre.findUnique({
+      where: { id },
+    });
+    if (!existing)
+      throw new NotFoundException(`Aggregation centre with ID ${id} not found`);
     return this.prisma.aggregationCentre.update({ where: { id }, data: dto });
   }
 
   async removeAggregationCentre(id: string) {
-    const existing = await this.prisma.aggregationCentre.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException(`Aggregation centre with ID ${id} not found`);
+    const existing = await this.prisma.aggregationCentre.findUnique({
+      where: { id },
+    });
+    if (!existing)
+      throw new NotFoundException(`Aggregation centre with ID ${id} not found`);
     await this.prisma.aggregationCentre.delete({ where: { id } });
     return { deleted: true };
   }
