@@ -18,6 +18,7 @@ const TAGLINE = 'The integrated platform for AMCOS and Cooperatives in Tanzania.
 const DESCRIPTION = `${TAGLINE} Traceability, Farmer records, crop cycles, Insurance, Credit and the M-LAX Marketplace all in one place.`;
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://admin.mayodegroup.com'),
   title: 'MAYODE GROUP — Integrated Management Platform',
   description: DESCRIPTION,
   keywords: 'MAYODE GROUP, MAYOData, M-LAX Marketplace, Tanzania rice farming, Mbarali, cooperative management, Fairtrade',
