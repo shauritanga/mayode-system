@@ -595,8 +595,8 @@ export default function AdminOverviewDashboard() {
                     x={peakYieldPoint.month}
                     y={peakYieldPoint.yield}
                     r={0}
-                    isFront
                     ifOverflow="visible"
+                    {...({ isFront: true } as Record<string, unknown>)}
                     label={(props: any) => {
                       const vb = props?.viewBox ?? {};
                       const cx = props?.cx ?? vb.cx ?? vb.x ?? 0;
