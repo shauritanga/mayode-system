@@ -14,10 +14,24 @@ const outfit = Outfit({
   display: 'swap',
 });
 
+const TAGLINE = 'The integrated platform for AMCOS and Cooperatives in Tanzania.';
+const DESCRIPTION = `${TAGLINE} Traceability, Farmer records, crop cycles, Insurance, Credit and the M-LAX Marketplace all in one place.`;
+
 export const metadata: Metadata = {
   title: 'MAYODE GROUP — Integrated Management Platform',
-  description: 'MAYOData Platform & M-LAX Marketplace — Integrated management system for MAYODE GROUP cooperative farmers, field officers, and administrators in Mbarali, Tanzania.',
+  description: DESCRIPTION,
   keywords: 'MAYODE GROUP, MAYOData, M-LAX Marketplace, Tanzania rice farming, Mbarali, cooperative management, Fairtrade',
+  openGraph: {
+    title: 'MAYODE GROUP — Integrated Management Platform',
+    description: DESCRIPTION,
+    siteName: 'MAYODE GROUP',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'MAYODE GROUP — Integrated Management Platform',
+    description: DESCRIPTION,
+  },
 };
 
 export default function RootLayout({
