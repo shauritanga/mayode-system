@@ -257,7 +257,7 @@ export default function FarmersPage() {
       </div>
 
       {/* Unified list workspace */}
-      <section className="glass-card farmers-workspace">
+      <section className="glass-card farmers-workspace farmers-workspace-tint">
         <div className="farmers-toolbar">
           <div className="farmers-toolbar-main">
             <div className="farmers-search">
@@ -374,7 +374,6 @@ export default function FarmersPage() {
             <table className="data-table farmers-table">
               <thead>
                 <tr>
-                  <th>Farmer ID</th>
                   <th>Full Name</th>
                   <th>Gender</th>
                   <th>District</th>
@@ -393,9 +392,6 @@ export default function FarmersPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.22, delay: Math.min(i * 0.03, 0.24), ease: [0.16, 1, 0.3, 1] }}
                   >
-                    <td>
-                      <span className="farmers-code">{farmer.controlNumber}</span>
-                    </td>
                     <td>
                       <div className="farmers-person">
                         <span className="avatar-circle farmers-avatar">
