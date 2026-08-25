@@ -1,13 +1,27 @@
 /**
- * Demo seed for Athanas / Athsnas Shauritanga (MYD-00006):
- * 2 farms × 2 seasons (2024/25 + 2025/26) with crop cycles,
- * field activities, expenses, sales, and activity-feed events.
+ * Demo seed for Athanas Shauritanga (MYD-00006):
+ * Ensures login matches production (+255629593331 / Athanas@2015),
+ * then seeds 2 farms × 2 seasons with crop cycles, activities,
+ * expenses, sales, and activity-feed events.
  *
  * Run: npx ts-node prisma/seed-athanas-demo.ts
  */
-import { PrismaClient, ActivityType, CostCategory, RevenueType, CropCycleStatus, FarmingSeasonStatus, OwnershipSource, VerificationStatus, InputPaymentStatus, AssignmentType } from '@prisma/client';
+import {
+  PrismaClient,
+  ActivityType,
+  CostCategory,
+  RevenueType,
+  CropCycleStatus,
+  FarmingSeasonStatus,
+  OwnershipSource,
+  VerificationStatus,
+  InputPaymentStatus,
+  AssignmentType,
+  UserRole,
+} from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
+import * as bcrypt from 'bcrypt';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -20,12 +34,122 @@ const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 const FARMER_CONTROL = 'MYD-00006';
 const DEMO_TAG = 'ATHANAS-DEMO';
+/** Same credentials as production farmer Athanas. */
+const LOGIN_PHONE = '+255629593331';
+const LOGIN_PASSWORD = 'Athanas@2015';
 
 function d(iso: string) {
   return new Date(iso);
 }
 
+async function ensureAthanasAccount() {
+  const passwordHash = await bcrypt.hash(LOGIN_PASSWORD, 10);
+
+  // Prefer existing Shauritanga farmer user; otherwise create by phone.
+  const existingFarmer = await prisma.farmer.findFirst({
+    where: {
+      OR: [
+        { controlNumber: FARMER_CONTROL },
+        {
+          AND: [
+            { lastName: { contains: 'Shauritanga', mode: 'insensitive' } },
+            {
+              OR: [
+                { firstName: { contains: 'Athanas', mode: 'insensitive' } },
+                { firstName: { contains: 'Athsnas', mode: 'insensitive' } },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  let user;
+  if (existingFarmer) {
+    user = await prisma.user.update({
+      where: { id: existingFarmer.userId },
+      data: {
+        phone: LOGIN_PHONE,
+        passwordHash,
+        firstName: 'Athanas',
+        lastName: 'Shauritanga',
+        role: UserRole.FARMER,
+        isActive: true,
+      },
+    });
+    // Keep existing control number on production (e.g. MYD-00001); only set default when missing.
+    await prisma.farmer.update({
+      where: { id: existingFarmer.id },
+      data: {
+        firstName: 'Athanas',
+        lastName: 'Shauritanga',
+        district: existingFarmer.district || 'Mbarali',
+        region: existingFarmer.region || 'Mbeya',
+        verificationStatus: VerificationStatus.VERIFIED,
+        verifiedAt: existingFarmer.verifiedAt ?? d('2024-10-10'),
+        dataShareConsent: true,
+        consentedAt: existingFarmer.consentedAt ?? d('2024-10-10'),
+      },
+    });
+  } else {
+    // Free the phone if another stub user owns it.
+    const phoneOwner = await prisma.user.findUnique({ where: { phone: LOGIN_PHONE } });
+    if (phoneOwner) {
+      user = await prisma.user.update({
+        where: { id: phoneOwner.id },
+        data: {
+          passwordHash,
+          firstName: 'Athanas',
+          lastName: 'Shauritanga',
+          role: UserRole.FARMER,
+          isActive: true,
+        },
+      });
+    } else {
+      user = await prisma.user.create({
+        data: {
+          phone: LOGIN_PHONE,
+          passwordHash,
+          firstName: 'Athanas',
+          lastName: 'Shauritanga',
+          role: UserRole.FARMER,
+          isActive: true,
+          language: 'en',
+        },
+      });
+    }
+
+    const linked = await prisma.farmer.findUnique({ where: { userId: user.id } });
+    if (!linked) {
+      // Avoid unique clash on MYD-00006 if orphaned.
+      const controlTaken = await prisma.farmer.findUnique({ where: { controlNumber: FARMER_CONTROL } });
+      if (controlTaken && controlTaken.userId !== user.id) {
+        throw new Error(`Control ${FARMER_CONTROL} already belongs to another farmer`);
+      }
+      await prisma.farmer.create({
+        data: {
+          userId: user.id,
+          controlNumber: FARMER_CONTROL,
+          firstName: 'Athanas',
+          lastName: 'Shauritanga',
+          district: 'Mbarali',
+          region: 'Mbeya',
+          verificationStatus: VerificationStatus.VERIFIED,
+          verifiedAt: d('2024-10-10'),
+          dataShareConsent: true,
+          consentedAt: d('2024-10-10'),
+        },
+      });
+    }
+  }
+
+  console.log(`Login ready: ${LOGIN_PHONE} / ${LOGIN_PASSWORD} (${user.firstName} ${user.lastName})`);
+}
+
 async function main() {
+  await ensureAthanasAccount();
+
   const farmer = await prisma.farmer.findFirst({
     where: {
       OR: [
@@ -46,10 +170,13 @@ async function main() {
   });
 
   if (!farmer) {
-    throw new Error('Farmer Athanas/Athsnas Shauritanga not found in database');
+    throw new Error('Farmer Athanas Shauritanga not found after ensureAthanasAccount()');
   }
 
-  console.log(`Found farmer ${farmer.firstName} ${farmer.lastName} (${farmer.controlNumber}) id=${farmer.id}`);
+  // Use the farmer's real control number for farm codes (prod: MYD-00001, local demo: MYD-00006).
+  const farmerControl = farmer.controlNumber || FARMER_CONTROL;
+
+  console.log(`Found farmer ${farmer.firstName} ${farmer.lastName} (${farmerControl}) id=${farmer.id}`);
 
   let mamcos = await prisma.mamcos.findFirst({
     where: { name: { contains: 'Madibira', mode: 'insensitive' } },
@@ -80,7 +207,7 @@ async function main() {
     where: {
       farmerId: farmer.id,
       OR: [
-        { farmCode: { in: [`${FARMER_CONTROL}-01`, `${FARMER_CONTROL}-02`] } },
+        { farmCode: { in: [`${farmerControl}-01`, `${farmerControl}-02`, `${FARMER_CONTROL}-01`, `${FARMER_CONTROL}-02`] } },
         { name: { contains: DEMO_TAG } },
       ],
     },
@@ -89,6 +216,19 @@ async function main() {
   if (existingDemo.length) {
     const ids = existingDemo.map((f) => f.id);
     console.log(`Removing ${ids.length} previous demo farm(s)...`);
+    const cycles = await prisma.cropCycle.findMany({
+      where: { farmId: { in: ids } },
+      select: { id: true },
+    });
+    const cycleIds = cycles.map((c) => c.id);
+    if (cycleIds.length) {
+      await prisma.activityLog.deleteMany({ where: { cropCycleId: { in: cycleIds } } });
+      await prisma.inputCost.deleteMany({ where: { cropCycleId: { in: cycleIds } } });
+      await prisma.revenue.deleteMany({ where: { cropCycleId: { in: cycleIds } } });
+      await prisma.cropCycle.deleteMany({ where: { id: { in: cycleIds } } });
+    }
+    await prisma.seasonalFarmAssignment.deleteMany({ where: { farmId: { in: ids } } });
+    await prisma.farmOwnership.deleteMany({ where: { farmId: { in: ids } } });
     await prisma.farm.deleteMany({ where: { id: { in: ids } } });
   }
 
@@ -135,7 +275,7 @@ async function main() {
   // No fake centerLatitude/centerLongitude — "Mapped" means a walked boundary only.
   const farmsSpec = [
     {
-      farmCode: `${FARMER_CONTROL}-01`,
+      farmCode: `${farmerControl}-01`,
       name: `Chimala North Block A (${DEMO_TAG})`,
       village: 'Chimala',
       ward: 'Chimala',
@@ -144,7 +284,7 @@ async function main() {
       grade: 'A' as const,
     },
     {
-      farmCode: `${FARMER_CONTROL}-02`,
+      farmCode: `${farmerControl}-02`,
       name: `Madibira Canal Plot (${DEMO_TAG})`,
       village: 'Madibira',
       ward: 'Madibira',
@@ -378,7 +518,7 @@ async function main() {
 
   console.log(`\nDone. Seeded ${farms.length} farms, ${seasons.length} seasons, ${cycleCount} crop cycles`);
   console.log(`Farmer: ${farmer.firstName} ${farmer.lastName} (${farmer.controlNumber})`);
-  console.log(`Login phone: check users table for user_id ${farmer.userId}`);
+  console.log(`Login: ${LOGIN_PHONE} / ${LOGIN_PASSWORD}`);
 }
 
 main()

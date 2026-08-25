@@ -1,165 +1,177 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { motion, useReducedMotion } from 'motion/react';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  ActionLink,
-  EmptyState,
-  InsightPanel,
-  MetricTile,
-  MetricTileSkeleton,
-  money,
-} from '@/components/role-dashboards/DashboardPrimitives';
+  Calendar01Icon,
+  Upload04Icon,
+  Globe02Icon,
+  ChartBarLineIcon,
+  ArrowRight01Icon,
+  ArrowDown01Icon,
+  MapsIcon,
+  WheatIcon,
+  Plant01Icon,
+} from '@hugeicons/core-free-icons';
 import {
-  ChartCard,
-  DonutBreakdown,
-  HorizontalBarChart,
-  LeaderboardTable,
-  TrendAreaChart,
-} from '@/components/role-dashboards/Charts';
-import { cropCyclesApi, farmersApi, farmsApi, farmVerificationsApi, fieldOfficerVisitsApi, financeApi, insuranceApi, integrationsApi, inventoryApi, loansApi, mamcosApi, reportsApi, usersApi } from '@/lib/api';
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ReferenceDot,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { CountUpValue } from '@/components/CountUpValue';
+import { EmptyState, money } from '@/components/role-dashboards/DashboardPrimitives';
+import { CHART_PALETTE } from '@/components/role-dashboards/Charts';
+import {
+  cropCyclesApi,
+  farmersApi,
+  farmsApi,
+  fieldOfficerVisitsApi,
+  inventoryApi,
+  reportsApi,
+  weatherApi,
+} from '@/lib/api';
+import { useAuthStore } from '@/store/auth.store';
+
+const WEATHER_HOME = { label: 'Mbarali', lat: -8.95, lon: 33.9 };
+
+const tooltipStyle = {
+  background: 'var(--surface-1)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 12,
+  color: 'var(--text-1)',
+  fontSize: 13,
+  boxShadow: 'var(--shadow-md)',
+};
+
+function greetingForHour(hour: number) {
+  if (hour < 12) return 'Good Morning!';
+  if (hour < 17) return 'Good Afternoon!';
+  return 'Good Evening!';
+}
+
+function formatLongDate(d: Date) {
+  return d.toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function WeatherGlyph({ condition, size = 46 }: { condition: 'Sunny' | 'Cloudy' | 'Rainy'; size?: number }) {
+  if (condition === 'Sunny') {
+    return (
+      <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden>
+        <circle cx="32" cy="32" r="13" fill="#FBBF24" />
+        <g stroke="#FBBF24" strokeWidth="3.5" strokeLinecap="round">
+          <line x1="32" y1="6" x2="32" y2="12" />
+          <line x1="32" y1="52" x2="32" y2="58" />
+          <line x1="58" y1="32" x2="52" y2="32" />
+          <line x1="12" y1="32" x2="6" y2="32" />
+          <line x1="50.5" y1="13.5" x2="46.2" y2="17.8" />
+          <line x1="17.8" y1="46.2" x2="13.5" y2="50.5" />
+          <line x1="50.5" y1="50.5" x2="46.2" y2="46.2" />
+          <line x1="17.8" y1="17.8" x2="13.5" y2="13.5" />
+        </g>
+      </svg>
+    );
+  }
+  if (condition === 'Rainy') {
+    return (
+      <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden>
+        <path
+          d="M18 40c-5.5 0-10-4.4-10-9.8 0-5 3.7-9.1 8.6-9.7C17.6 15 22.9 11 29 11c7.1 0 13 5.3 13.9 12.2 5 .6 8.8 4.7 8.8 9.7 0 5.4-4.5 9.8-10 9.8H18z"
+          fill="#CBD5E1"
+          stroke="#94A3B8"
+          strokeWidth="1.2"
+        />
+        <g stroke="#3B82F6" strokeWidth="3" strokeLinecap="round">
+          <line x1="22" y1="46" x2="19" y2="54" />
+          <line x1="32" y1="46" x2="29" y2="54" />
+          <line x1="42" y1="46" x2="39" y2="54" />
+        </g>
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden>
+      <circle cx="39" cy="21" r="11" fill="#FBBF24" />
+      <g stroke="#FBBF24" strokeWidth="3" strokeLinecap="round">
+        <line x1="39" y1="3" x2="39" y2="7" />
+        <line x1="57" y1="21" x2="53" y2="21" />
+        <line x1="51.5" y1="8.5" x2="48.5" y2="11.5" />
+        <line x1="51.5" y1="33.5" x2="48.5" y2="30.5" />
+        <line x1="26.5" y1="11.5" x2="23.5" y2="8.5" />
+      </g>
+      <path
+        d="M16 48c-5.5 0-10-4.4-10-9.8 0-5 3.7-9.1 8.6-9.7C15.7 22.9 21 19 27 19c7 0 12.8 5.2 13.8 11.9 5 .5 8.9 4.6 8.9 9.6 0 5.4-4.5 9.8-10 9.8H16z"
+        fill="#F1F5F9"
+        stroke="#CBD5E1"
+        strokeWidth="1.2"
+      />
+    </svg>
+  );
+}
+
+function statusBadge(status: string) {
+  const key = status.toLowerCase();
+  if (key.includes('progress') || key.includes('active')) return 'badge-blue';
+  if (key.includes('pending') || key.includes('verify')) return 'badge-gold';
+  if (key.includes('done') || key.includes('verified') || key.includes('complete')) return 'badge-green';
+  return 'badge-gray';
+}
 
 export default function AdminOverviewDashboard() {
-  const [users, setUsers] = useState<any[]>([]);
+  const user = useAuthStore((s) => s.user);
+  const reduce = useReducedMotion();
+
   const [farmers, setFarmers] = useState<any[]>([]);
   const [farms, setFarms] = useState<any[]>([]);
-  const [mamcos, setMamcos] = useState<any[]>([]);
   const [cropCycles, setCropCycles] = useState<any[]>([]);
   const [inventoryRecords, setInventoryRecords] = useState<any[]>([]);
-  const [loans, setLoans] = useState<any[]>([]);
-  const [inputCosts, setInputCosts] = useState<any[]>([]);
   const [officerVisits, setOfficerVisits] = useState<any[]>([]);
-  const [farmVerifications, setFarmVerifications] = useState<any[]>([]);
-  const [activityLogs, setActivityLogs] = useState<any[]>([]);
-  const [insuranceCoverage, setInsuranceCoverage] = useState<any>(null);
   const [kpis, setKpis] = useState<any>(null);
-  const [impact, setImpact] = useState<any>(null);
-  const [integrations, setIntegrations] = useState<any[]>([]);
+  const [weather, setWeather] = useState<any>(null);
+  const [unit, setUnit] = useState<'C' | 'F'>('C');
+  const [period, setPeriod] = useState('This Month');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.allSettled([
-      usersApi.getAll(),
       farmersApi.getAllUnpaginated(),
       farmsApi.getAll(),
-      mamcosApi.getAll(),
       cropCyclesApi.getAll(),
       inventoryApi.getAll(),
-      loansApi.getAll(),
-      financeApi.getAllCosts(),
       fieldOfficerVisitsApi.getAll(),
-      farmVerificationsApi.getAll(),
-      cropCyclesApi.activityLogs(),
-      insuranceApi.coverageSummary(),
       reportsApi.kpis(),
-      reportsApi.impact(),
-      integrationsApi.aiRecords(),
-    ]).then(([userResult, farmerResult, farmResult, mamcosResult, cropCycleResult, inventoryResult, loanResult, inputCostResult, visitResult, farmVerificationResult, activityLogResult, insuranceResult, kpiResult, impactResult, integrationResult]) => {
-      if (userResult.status === 'fulfilled') setUsers(userResult.value.data || []);
+      weatherApi.forecast(WEATHER_HOME.lat, WEATHER_HOME.lon),
+    ]).then(([farmerResult, farmResult, cropCycleResult, inventoryResult, visitResult, kpiResult, weatherResult]) => {
       if (farmerResult.status === 'fulfilled') setFarmers(farmerResult.value.data || []);
       if (farmResult.status === 'fulfilled') setFarms(farmResult.value.data?.data || farmResult.value.data || []);
-      if (mamcosResult.status === 'fulfilled') setMamcos(mamcosResult.value.data || []);
       if (cropCycleResult.status === 'fulfilled') setCropCycles(cropCycleResult.value.data || []);
       if (inventoryResult.status === 'fulfilled') setInventoryRecords(inventoryResult.value.data || []);
-      if (loanResult.status === 'fulfilled') setLoans(loanResult.value.data || []);
-      if (inputCostResult.status === 'fulfilled') setInputCosts(inputCostResult.value.data || []);
       if (visitResult.status === 'fulfilled') setOfficerVisits(visitResult.value.data || []);
-      if (farmVerificationResult.status === 'fulfilled') setFarmVerifications(farmVerificationResult.value.data || []);
-      if (activityLogResult.status === 'fulfilled') setActivityLogs(activityLogResult.value.data || []);
-      if (insuranceResult.status === 'fulfilled') setInsuranceCoverage(insuranceResult.value.data);
       if (kpiResult.status === 'fulfilled') setKpis(kpiResult.value.data);
-      if (impactResult.status === 'fulfilled') setImpact(impactResult.value.data);
-      if (integrationResult.status === 'fulfilled') setIntegrations(integrationResult.value.data || []);
-      if (userResult.status === 'rejected' && farmerResult.status === 'rejected') setError('Unable to load MAYOData administration data.');
+      if (weatherResult.status === 'fulfilled') setWeather(weatherResult.value.data);
+      if (farmerResult.status === 'rejected' && farmResult.status === 'rejected') {
+        setError('Unable to load MAYOData administration data.');
+      }
       setLoading(false);
     });
   }, []);
 
-  const roles = useMemo(() => {
-    return users.reduce<Record<string, number>>((acc, user) => {
-      acc[user.role] = (acc[user.role] || 0) + 1;
-      return acc;
-    }, {});
-  }, [users]);
+  const totalLandHa = Math.round(kpis?.totalHectares || farms.reduce((s, f) => s + (f.socialHectares || 0), 0));
+  const revenue = kpis?.totalRevenue ?? 0;
 
-  const roleChartData = useMemo(
-    () =>
-      Object.entries(roles)
-        .map(([name, value]) => ({ name: name.replace(/_/g, ' '), value }))
-        .sort((a, b) => b.value - a.value),
-    [roles],
-  );
-
-  const genderChartData = useMemo(() => {
-    const counts = farmers.reduce<Record<string, number>>((acc, farmer) => {
-      const label = farmer.gender ? String(farmer.gender) : 'Unspecified';
-      acc[label] = (acc[label] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [farmers]);
-
-  const districtChartData = useMemo(() => {
-    const counts = farmers.reduce<Record<string, number>>((acc, farmer) => {
-      const label = farmer.district || 'Unspecified';
-      acc[label] = (acc[label] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(counts)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
-  }, [farmers]);
-
-  // Tanzania's national youth definition caps at 35 years old.
-  const YOUTH_MAX_AGE = 35;
-  const ageChartData = useMemo(() => {
-    const counts = farmers.reduce<Record<string, number>>((acc, farmer) => {
-      if (!farmer.dateOfBirth) {
-        acc['Unspecified'] = (acc['Unspecified'] || 0) + 1;
-        return acc;
-      }
-      const age = Math.floor(
-        (Date.now() - new Date(farmer.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000),
-      );
-      const label = age <= YOUTH_MAX_AGE ? 'Youth (≤35)' : 'Adult (36+)';
-      acc[label] = (acc[label] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [farmers]);
-
-  const regionChartData = useMemo(() => {
-    const totals = farms.reduce<Record<string, number>>((acc, farm) => {
-      const label = farm.region || 'Unspecified';
-      acc[label] = (acc[label] || 0) + (farm.socialHectares || 0);
-      return acc;
-    }, {});
-    return Object.entries(totals)
-      .map(([name, value]) => ({ name, value: Math.round(value) }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
-  }, [farms]);
-
-  const incomeTrendData = useMemo(
-    () =>
-      (impact?.farmerIncomeOverTime || []).map((row: any) => ({
-        period: row.period,
-        totalIncome: Math.round(row.totalIncome),
-      })),
-    [impact],
-  );
-
-  const membershipTrendData = useMemo(
-    () =>
-      (impact?.membershipGrowth || []).map((row: any) => ({
-        period: row.period,
-        cumulativeMembers: row.cumulativeMembers,
-      })),
-    [impact],
-  );
-
-  const varietyChartData = useMemo(() => {
+  const productionByVariety = useMemo(() => {
     const totals = cropCycles.reduce<Record<string, number>>((acc, cycle) => {
       const label = cycle.riceVariety || 'Unspecified';
       acc[label] = (acc[label] || 0) + (cycle.actualYieldKg || cycle.estimatedYieldKg || 0);
@@ -168,344 +180,576 @@ export default function AdminOverviewDashboard() {
     return Object.entries(totals)
       .map(([name, value]) => ({ name, value: Math.round(value) }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
+      .slice(0, 4);
   }, [cropCycles]);
 
-  const seasonStatusChartData = useMemo(() => {
-    const counts = cropCycles.reduce<Record<string, number>>((acc, cycle) => {
-      const label = cycle.status || 'Unspecified';
-      acc[label] = (acc[label] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [cropCycles]);
-
-  const gradeChartData = useMemo(() => {
-    const totals = inventoryRecords.reduce<Record<string, number>>((acc, record) => {
-      const label = record.qualityGrade || 'Ungraded';
-      acc[label] = (acc[label] || 0) + (record.weightKg || 0);
-      return acc;
-    }, {});
-    return Object.entries(totals).map(([name, value]) => ({ name, value: Math.round(value) }));
-  }, [inventoryRecords]);
-
-  const warehouseStatusChartData = useMemo(() => {
-    const totals = inventoryRecords.reduce<Record<string, number>>((acc, record) => {
-      const label = record.status || 'Unspecified';
-      acc[label] = (acc[label] || 0) + (record.weightKg || 0);
-      return acc;
-    }, {});
-    return Object.entries(totals)
-      .map(([name, value]) => ({ name: name.replace(/_/g, ' '), value: Math.round(value) }))
-      .sort((a, b) => b.value - a.value);
-  }, [inventoryRecords]);
-
-  const totalRiceAggregatedKg = useMemo(
-    () => inventoryRecords.reduce((sum, record) => sum + (record.weightKg || 0), 0),
-    [inventoryRecords],
+  const totalProductionKg = useMemo(
+    () => productionByVariety.reduce((s, row) => s + row.value, 0),
+    [productionByVariety],
   );
 
-  const inputCategoryChartData = useMemo(() => {
-    const totals = inputCosts.reduce<Record<string, number>>((acc, cost) => {
-      const label = cost.category ? String(cost.category).replace(/_/g, ' ') : 'Unspecified';
-      acc[label] = (acc[label] || 0) + (cost.totalCost || 0);
-      return acc;
-    }, {});
-    return Object.entries(totals)
-      .map(([name, value]) => ({ name, value: Math.round(value) }))
-      .sort((a, b) => b.value - a.value);
-  }, [inputCosts]);
+  // Value-chain view: same grain, tracked as it moves from farm → cooperative intake → MAYODE-managed batching/export.
+  const MAYODE_STAGE_STATUSES = ['BATCHED', 'SHIPPED', 'SOLD'];
+  const productionLegend = useMemo(() => {
+    const farmersKg = cropCycles.reduce(
+      (s, c) => s + (c.actualYieldKg || c.estimatedYieldKg || 0),
+      0,
+    );
+    const cooperativeKg = inventoryRecords.reduce((s, r) => s + (r.weightKg || 0), 0);
+    const mayodeKg = inventoryRecords
+      .filter((r) => MAYODE_STAGE_STATUSES.includes(r.status))
+      .reduce((s, r) => s + (r.weightKg || 0), 0);
 
-  const loanRepaymentChartData = useMemo(() => {
-    const buckets = loans.reduce<Record<string, number>>((acc, loan) => {
-      const owed = loan.amountOwed ?? 0;
-      const original = loan.originalAmount ?? 0;
-      const label = owed <= 0 ? 'Fully repaid' : owed < original ? 'Partially repaid' : 'Not yet repaid';
-      acc[label] = (acc[label] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(buckets).map(([name, value]) => ({ name, value }));
-  }, [loans]);
-
-  const farmersWithFinance = useMemo(
-    () => new Set(loans.filter((loan) => loan.isActive).map((loan) => loan.farmerId)).size,
-    [loans],
-  );
-
-  const insuranceCoverageChartData = useMemo(() => {
-    if (!insuranceCoverage?.byStatus) return [];
-    return insuranceCoverage.byStatus.map((row: any) => ({ name: row.status, value: row._count }));
-  }, [insuranceCoverage]);
-
-  const claimsCoverageChartData = useMemo(() => {
-    if (!insuranceCoverage?.claimsByStatus) return [];
-    return insuranceCoverage.claimsByStatus.map((row: any) => ({ name: row.status, value: row._count }));
-  }, [insuranceCoverage]);
-
-  // Multi-metric officer leaderboard — ranks officers by farmers verified,
-  // farms mapped, visits completed, and crop records updated, using real
-  // per-officer foreign keys (FieldOfficerVisit.fieldOfficerId,
-  // FarmVerification.fieldOfficerId, ActivityLog.fieldOfficerId,
-  // Farmer.verifiedById). "Data completeness" is grounded in
-  // FarmVerification.gpsVerified; "last activity" is a proxy for the docx's
-  // "last mobile-app sync" since no sync-timestamp field exists in the
-  // schema. "Pending tasks" uses the new Farmer.assignedOfficerId field
-  // (added this pass) — farmers explicitly assigned to that officer who are
-  // still awaiting verification.
-  const officerLeaderboard = useMemo(() => {
-    const names = new Map<string, string>();
-    const visits = new Map<string, number>();
-    const farmsMapped = new Map<string, number>();
-    const gpsVerifiedCount = new Map<string, number>();
-    const activities = new Map<string, number>();
-    const farmersVerified = new Map<string, number>();
-    const pendingTasks = new Map<string, number>();
-    const lastActivity = new Map<string, number>();
-
-    const bump = (map: Map<string, number>, key: string, by = 1) => map.set(key, (map.get(key) || 0) + by);
-    const touchLast = (id: string, when?: string) => {
-      if (!when) return;
-      const t = new Date(when).getTime();
-      if (!lastActivity.has(id) || t > (lastActivity.get(id) || 0)) lastActivity.set(id, t);
+    const stageColors: Record<string, string> = {
+      Farmers: 'var(--green-500)',
+      Cooperative: 'var(--purple-500)',
+      MAYODE: 'var(--blue-500)',
     };
-    const nameFrom = (officer: any) => (officer ? `${officer.firstName} ${officer.lastName}` : undefined);
 
-    for (const visit of officerVisits) {
-      const id = visit.fieldOfficerId;
-      if (!id) continue;
-      if (!names.has(id) && nameFrom(visit.fieldOfficer)) names.set(id, nameFrom(visit.fieldOfficer)!);
-      bump(visits, id);
-      touchLast(id, visit.visitedAt);
+    const rows = [
+      { name: 'Farmers', value: Math.round(farmersKg) },
+      { name: 'Cooperative', value: Math.round(cooperativeKg) },
+      { name: 'MAYODE', value: Math.round(mayodeKg) },
+    ];
+
+    const total = rows.reduce((s, r) => s + r.value, 0) || 1;
+    return rows.map((row) => ({
+      ...row,
+      pct: Math.round((row.value / total) * 100),
+      color: stageColors[row.name],
+    }));
+  }, [cropCycles, inventoryRecords]);
+
+  const totalProductionTons =
+    Math.round((productionLegend.find((r) => r.name === 'Farmers')?.value ?? 0) / 1000) ||
+    Math.round(totalProductionKg / 1000) ||
+    Math.round(inventoryRecords.reduce((s, r) => s + (r.weightKg || 0), 0) / 1000);
+
+  const productionRays = useMemo(() => {
+    const active = productionLegend.filter((r) => r.pct > 0);
+    if (!active.length) return [];
+    const total = active.reduce((s, r) => s + r.value, 0) || 1;
+    let cum = 0;
+    const segments = active.map((row) => {
+      const start = cum;
+      cum += row.value / total;
+      return { color: row.color, start, end: cum };
+    });
+    const RAY_COUNT = 20;
+    const cx = 100;
+    const cy = 86;
+    const innerR = 44;
+    const outerR = 70;
+    return Array.from({ length: RAY_COUNT }, (_, i) => {
+      const t = i / (RAY_COUNT - 1);
+      const angleDeg = 180 - t * 180;
+      const angleRad = (angleDeg * Math.PI) / 180;
+      const seg = segments.find((s) => t <= s.end + 1e-9) || segments[segments.length - 1];
+      return {
+        x1: cx + innerR * Math.cos(angleRad),
+        y1: cy - innerR * Math.sin(angleRad),
+        x2: cx + outerR * Math.cos(angleRad),
+        y2: cy - outerR * Math.sin(angleRad),
+        color: seg.color,
+      };
+    });
+  }, [productionLegend]);
+
+  const yieldTrend = useMemo(() => {
+    const buckets = new Map<string, { label: string; sort: number; yield: number }>();
+    for (const cycle of cropCycles) {
+      const raw = cycle.harvestDate || cycle.endDate || cycle.createdAt;
+      if (!raw) continue;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) continue;
+      const sort = d.getFullYear() * 12 + d.getMonth();
+      const label = d.toLocaleDateString(undefined, { month: 'short' });
+      const prev = buckets.get(String(sort)) || { label, sort, yield: 0 };
+      prev.yield += cycle.actualYieldKg || cycle.estimatedYieldKg || 0;
+      buckets.set(String(sort), prev);
     }
-    for (const verification of farmVerifications) {
-      const id = verification.fieldOfficerId;
-      if (!id) continue;
-      if (!names.has(id) && nameFrom(verification.fieldOfficer)) names.set(id, nameFrom(verification.fieldOfficer)!);
-      bump(farmsMapped, id);
-      if (verification.gpsVerified) bump(gpsVerifiedCount, id);
-      touchLast(id, verification.verifiedAt);
-    }
-    for (const log of activityLogs) {
-      const id = log.fieldOfficerId;
-      if (!id) continue;
-      if (!names.has(id) && nameFrom(log.fieldOfficer)) names.set(id, nameFrom(log.fieldOfficer)!);
-      bump(activities, id);
-      touchLast(id, log.createdAt);
-    }
+    return [...buckets.values()]
+      .sort((a, b) => a.sort - b.sort)
+      .slice(-9)
+      .map((row) => ({ month: row.label, yield: Math.round(row.yield / 1000) }));
+  }, [cropCycles]);
+
+  const featuredFarm = useMemo(() => {
+    return (
+      farms.find((f) => f.isVerified) ||
+      farms[0] ||
+      null
+    );
+  }, [farms]);
+
+  const featuredCycle = useMemo(() => {
+    if (!featuredFarm) return null;
+    return (
+      cropCycles.find((c) => c.farmId === featuredFarm.id && (c.status === 'ACTIVE' || c.status === 'PLANNED')) ||
+      cropCycles.find((c) => c.farmId === featuredFarm.id) ||
+      null
+    );
+  }, [cropCycles, featuredFarm]);
+
+  const tasks = useMemo(() => {
+    const rows: { id: string; name: string; assignedTo: string; dueDate: string; status: string }[] = [];
+
     for (const farmer of farmers) {
-      if (farmer.verifiedById) bump(farmersVerified, farmer.verifiedById);
-      if (farmer.assignedOfficerId && farmer.verificationStatus === 'PENDING') {
-        bump(pendingTasks, farmer.assignedOfficerId);
+      if (farmer.verificationStatus && farmer.verificationStatus !== 'VERIFIED') {
+        const officer = farmer.assignedOfficer
+          ? `${farmer.assignedOfficer.firstName || ''} ${farmer.assignedOfficer.lastName || ''}`.trim()
+          : 'Unassigned';
+        rows.push({
+          id: `farmer-${farmer.id}`,
+          name: `Verify farmer ${farmer.firstName || ''} ${farmer.lastName || ''}`.trim(),
+          assignedTo: officer || 'Field Officer',
+          dueDate: farmer.updatedAt ? new Date(farmer.updatedAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: '2-digit' }) : '—',
+          status: 'Pending',
+        });
+      }
+      if (rows.length >= 6) break;
+    }
+
+    for (const farm of farms) {
+      if (rows.length >= 6) break;
+      if (!farm.isVerified) {
+        rows.push({
+          id: `farm-${farm.id}`,
+          name: `Verify farm ${farm.farmCode || farm.name || farm.id.slice(0, 8)}`,
+          assignedTo: 'Field Officer',
+          dueDate: farm.updatedAt ? new Date(farm.updatedAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: '2-digit' }) : '—',
+          status: 'Pending',
+        });
       }
     }
 
-    const officerIds = new Set([
-      ...visits.keys(),
-      ...farmsMapped.keys(),
-      ...activities.keys(),
-      ...farmersVerified.keys(),
-      ...pendingTasks.keys(),
-    ]);
+    for (const visit of officerVisits.slice(0, 4)) {
+      if (rows.length >= 8) break;
+      const officer = visit.fieldOfficer
+        ? `${visit.fieldOfficer.firstName || ''} ${visit.fieldOfficer.lastName || ''}`.trim()
+        : 'Field Officer';
+      rows.push({
+        id: `visit-${visit.id}`,
+        name: visit.purpose || visit.notes || 'Field visit follow-up',
+        assignedTo: officer || 'Field Officer',
+        dueDate: visit.visitedAt
+          ? new Date(visit.visitedAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: '2-digit' })
+          : '—',
+        status: visit.status === 'COMPLETED' ? 'Completed' : 'In Progress',
+      });
+    }
 
-    return [...officerIds].map((id) => {
-      const mapped = farmsMapped.get(id) || 0;
-      const gpsVerified = gpsVerifiedCount.get(id) || 0;
-      const totalScore = (visits.get(id) || 0) + mapped + (activities.get(id) || 0) + (farmersVerified.get(id) || 0);
-      const last = lastActivity.get(id);
-      return {
-        id,
-        name: names.get(id) || `Officer ${id.slice(0, 8)}`,
-        visits: visits.get(id) || 0,
-        farmsMapped: mapped,
-        farmersVerified: farmersVerified.get(id) || 0,
-        activitiesLogged: activities.get(id) || 0,
-        pendingTasks: pendingTasks.get(id) || 0,
-        gpsVerifiedPct: mapped ? `${Math.round((gpsVerified / mapped) * 100)}%` : '—',
-        lastActivity: last ? new Date(last).toLocaleDateString() : '—',
-        totalScore,
-      };
-    });
-  }, [officerVisits, farmVerifications, activityLogs, farmers]);
+    return rows.slice(0, 5);
+  }, [farmers, farms, officerVisits]);
 
-  const unverifiedFarmers = farmers.filter((farmer) => farmer.verificationStatus && farmer.verificationStatus !== 'VERIFIED').length;
-  const unverifiedFarms = farms.filter((farm) => !farm.isVerified).length;
-  const activeFieldOfficers = roles['FIELD_OFFICER'] || 0;
-  const activeSeasons = cropCycles.filter((cycle) => cycle.status === 'ACTIVE' || cycle.status === 'PLANNED').length;
+  const harvestSummary = useMemo(() => {
+    const totals = inventoryRecords.reduce<Record<string, number>>((acc, record) => {
+      const label = record.riceVariety || record.qualityGrade || record.commodity || 'Rice';
+      acc[label] = (acc[label] || 0) + (record.weightKg || 0);
+      return acc;
+    }, {});
+    const fromInventory = Object.entries(totals)
+      .map(([name, kg]) => ({ name, tons: Math.round(kg / 1000) || Math.round(kg) / 1000 }))
+      .sort((a, b) => b.tons - a.tons)
+      .slice(0, 5);
 
-  return <div className="role-dashboard">
-    {error && <EmptyState>{error}</EmptyState>}
+    if (fromInventory.length) return fromInventory;
 
-    {/* Primary KPIs — the numbers a platform admin scans first, ordered by
-        the scale of what they represent (people/land → institutions → money). */}
-    <div className="role-grid">
-      {loading ? (
-        Array.from({ length: 10 }).map((_, i) => <MetricTileSkeleton key={i} />)
-      ) : (
-        <>
-          <MetricTile label="Farmers" value={farmers.length || kpis?.totalFarmers || '—'} hint={`${unverifiedFarmers} pending verification`} />
-          <MetricTile label="Farms" value={farms.length} hint={`${unverifiedFarms} need verification`} tone="gold" />
-          <MetricTile label="Hectares under cultivation" value={kpis ? Math.round(kpis.totalHectares).toLocaleString() : '—'} hint="Total registered farm area" tone="green" />
-          <MetricTile label="AMCOS" value={mamcos.length} hint="Cooperative entities" tone="purple" />
-          <MetricTile label="Active crop seasons" value={activeSeasons} hint={`${cropCycles.length} total cycles recorded`} tone="green" />
-          <MetricTile label="Field officers" value={activeFieldOfficers} hint="Active extension staff" tone="blue" />
-          <MetricTile label="Rice aggregated" value={`${Math.round(totalRiceAggregatedKg).toLocaleString()} kg`} hint={`${inventoryRecords.length} warehouse records`} tone="gold" />
-          <MetricTile label="Farmers accessing finance" value={farmersWithFinance} hint={`${loans.length} loan records`} tone="purple" />
-          <MetricTile label="Farmers covered by insurance" value={insuranceCoverage?.farmersCovered ?? '—'} hint={`TZS ${Math.round(insuranceCoverage?.totalSumInsured || 0).toLocaleString()} sum insured`} tone="green" />
-          <MetricTile label="Revenue" value={money(kpis?.totalRevenue)} hint="Recorded cooperative revenue" />
-        </>
-      )}
-    </div>
+    return productionByVariety.slice(0, 5).map((row) => ({
+      name: row.name,
+      tons: Math.round(row.value / 1000) || Math.round(row.value) / 1000,
+    }));
+  }, [inventoryRecords, productionByVariety]);
 
-    {/* Trends — how the platform is moving over time, given equal visual
-        weight since income and membership growth matter equally to an admin. */}
-    <p className="role-section-label">Trends</p>
-    <div className="role-two-col-even">
-      <ChartCard title="Cooperative income" subtitle="Total revenue + Fairtrade premium recorded per month.">
-        <TrendAreaChart
-          data={incomeTrendData}
-          xKey="period"
-          series={[{ key: 'totalIncome', label: 'Income (TZS)', color: 'var(--green-500)' }]}
-        />
-      </ChartCard>
-      <ChartCard title="Membership growth" subtitle="Cumulative cooperative members over time.">
-        <TrendAreaChart
-          data={membershipTrendData}
-          xKey="period"
-          series={[{ key: 'cumulativeMembers', label: 'Members', color: 'var(--blue-500)' }]}
-        />
-      </ChartCard>
-    </div>
+  const today = new Date();
+  const greeting = greetingForHour(today.getHours());
+  const forecastDay = weather?.days?.[0];
+  const tempC = forecastDay?.maxTempC ?? 24;
+  const lowC = forecastDay?.minTempC ?? tempC - 4;
+  const highC = forecastDay?.maxTempC ?? tempC;
+  const displayTemp = unit === 'C' ? Math.round(tempC) : Math.round((tempC * 9) / 5 + 32);
+  const displayHigh = unit === 'C' ? Math.round(highC) : Math.round((highC * 9) / 5 + 32);
+  const displayLow = unit === 'C' ? Math.round(lowC) : Math.round((lowC * 9) / 5 + 32);
+  const feelsLike = unit === 'C' ? Math.round(tempC + 2) : Math.round(((tempC + 2) * 9) / 5 + 32);
+  const precip = forecastDay?.precipitationMm ?? 0;
+  const condition = precip > 5 ? 'Rainy' : precip > 0.5 ? 'Cloudy' : 'Sunny';
 
-    {/* Distribution — who the platform serves, paired so gender balance and
-        account-type balance can be read side by side. */}
-    <p className="role-section-label">Distribution</p>
-    <div className="role-two-col-even">
-      <ChartCard title="Farmer gender distribution" subtitle="Registered farmers by gender.">
-        <DonutBreakdown data={genderChartData} />
-      </ChartCard>
-      <ChartCard title="Account roles" subtitle="Platform accounts by role.">
-        <HorizontalBarChart data={roleChartData} color="var(--purple-500)" />
-      </ChartCard>
-    </div>
-    <div className="role-two-col-even">
-      <ChartCard title="Youth farmer breakdown" subtitle="Farmers 35 or younger vs. older, by date of birth on file.">
-        <DonutBreakdown data={ageChartData} />
-      </ChartCard>
-      <ChartCard title="Rice area by region" subtitle="Total registered farm area (ha) summed by region.">
-        <HorizontalBarChart data={regionChartData} color="var(--green-400)" />
-      </ChartCard>
-    </div>
+  const verifiedFarms = farms.filter((f) => f.isVerified).length;
+  const landDeltaPct = farms.length
+    ? ((verifiedFarms / farms.length) * 100).toFixed(2)
+    : '0.00';
+  const farmersDeltaPct = farmers.length
+    ? (((farmers.filter((f) => f.verificationStatus === 'VERIFIED').length / farmers.length) * 100)).toFixed(2)
+    : '0.00';
 
-    <ChartCard title="Farmers by district" subtitle="Top districts by registered farmer count.">
-      <HorizontalBarChart data={districtChartData} color="var(--gold-400)" height={Math.max(220, districtChartData.length * 34)} />
-    </ChartCard>
+  const peakYieldPoint = useMemo(() => {
+    if (!yieldTrend.length) return null;
+    const best = yieldTrend.reduce((b, row) => (row.yield > b.yield ? row : b), yieldTrend[0]);
+    const index = yieldTrend.indexOf(best);
+    return {
+      ...best,
+      align: index === 0 ? 'start' : index === yieldTrend.length - 1 ? 'end' : 'center',
+    } as typeof best & { align: 'start' | 'end' | 'center' };
+  }, [yieldTrend]);
 
-    {/* Production — season-level status and output, pulled from the same
-        crop-cycle records the Rice Seasons module manages. */}
-    <p className="role-section-label">Production</p>
-    <div className="role-two-col-even">
-      <ChartCard title="Rice production by variety" subtitle="Recorded yield (kg) summed by variety, actual where available.">
-        <HorizontalBarChart data={varietyChartData} color="var(--green-500)" />
-      </ChartCard>
-      <ChartCard title="Crop cycle status" subtitle="Season stage across all recorded crop cycles.">
-        <DonutBreakdown data={seasonStatusChartData} />
-      </ChartCard>
-    </div>
+  const enter = reduce
+    ? undefined
+    : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 } };
 
-    {/* Aggregation — warehouse-side view of the same rice once it leaves the
-        farm, kept as its own section since it's a different stage of the
-        value chain from crop production above. */}
-    <p className="role-section-label">Aggregation</p>
-    <div className="role-two-col-even">
-      <ChartCard title="Rice by quality grade" subtitle="Aggregated weight (kg) by quality grade.">
-        <DonutBreakdown data={gradeChartData} />
-      </ChartCard>
-      <ChartCard title="Warehouse status" subtitle="Aggregated weight (kg) by warehouse stage.">
-        <HorizontalBarChart data={warehouseStatusChartData} color="var(--blue-500)" />
-      </ChartCard>
-    </div>
+  return (
+    <div className="fv-dashboard">
+      {error && <EmptyState>{error}</EmptyState>}
 
-    {/* Finance — loan and input-cost health, the two things that determine
-        whether a farmer can actually act on the production plan above. */}
-    <p className="role-section-label">Finance</p>
-    <div className="role-two-col-even">
-      <ChartCard title="Loan repayment performance" subtitle="Active and past loans grouped by repayment status.">
-        <DonutBreakdown data={loanRepaymentChartData} />
-      </ChartCard>
-      <ChartCard title="Input distribution status" subtitle="Total input cost (TZS) by category, all crop cycles.">
-        <HorizontalBarChart data={inputCategoryChartData} color="var(--gold-400)" />
-      </ChartCard>
-    </div>
-
-    {/* Insurance — policy coverage and claim outcomes across the platform. */}
-    <p className="role-section-label">Insurance</p>
-    <div className="role-two-col-even">
-      <ChartCard title="Policy status" subtitle="Insurance policies by status, across all products.">
-        <DonutBreakdown data={insuranceCoverageChartData} />
-      </ChartCard>
-      <ChartCard title="Claims by status" subtitle="Insurance claims by outcome, from submission to payout.">
-        <DonutBreakdown data={claimsCoverageChartData} />
-      </ChartCard>
-    </div>
-
-    {/* Field officer activity — ranks staff across every metric the docx
-        asks for that has a real per-officer foreign key today. */}
-    <p className="role-section-label">Field Officers</p>
-    <ChartCard
-      title="Field officer ranking"
-      subtitle="Ranked by total recorded activity (visits + farms mapped + farmers verified + activities logged). Pending tasks = assigned farmers still awaiting verification. GPS-verified % is a data-completeness proxy; last activity is a proxy for mobile-app sync, since no sync timestamp exists in the system yet."
-    >
-      <LeaderboardTable
-        rows={officerLeaderboard}
-        rankBy="totalScore"
-        columns={[
-          { key: 'name', label: 'Officer' },
-          { key: 'visits', label: 'Visits' },
-          { key: 'farmsMapped', label: 'Farms Mapped' },
-          { key: 'farmersVerified', label: 'Farmers Verified' },
-          { key: 'activitiesLogged', label: 'Activities Logged' },
-          { key: 'pendingTasks', label: 'Pending Tasks' },
-          { key: 'gpsVerifiedPct', label: 'GPS-Verified %' },
-          { key: 'lastActivity', label: 'Last Activity' },
-        ]}
-      />
-    </ChartCard>
-
-    {/* Operations — data-quality and day-to-day admin work, kept below the
-        analytical charts since it's task-oriented, not headline data. */}
-    <p className="role-section-label">Operations</p>
-    <div className="role-three-col">
-      <InsightPanel title="Data quality queue" subtitle="Issues that reduce audit and analytics quality.">
-        <div className="role-list">
-          <div className="role-list-item"><strong>Farmers pending verification</strong><span className="badge badge-gold">{unverifiedFarmers}</span></div>
-          <div className="role-list-item"><strong>Farms pending verification</strong><span className="badge badge-gold">{unverifiedFarms}</span></div>
-          <div className="role-list-item"><strong>Integration payloads stored</strong><span className="badge badge-blue">{integrations.length}</span></div>
+      <motion.div
+        className="fv-hero"
+        {...(enter || {})}
+        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <div>
+          <h1 className="fv-greeting">{greeting}</h1>
+          <p className="fv-hero-sub">
+            Optimize your cooperative operations with real-time MAYOData insights
+            {user?.firstName ? `, ${user.firstName}` : ''}.
+          </p>
         </div>
-      </InsightPanel>
+        <div className="fv-hero-actions">
+          <label className="fv-period">
+            <HugeiconsIcon icon={Calendar01Icon} size={14} strokeWidth={1.8} />
+            <select value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="Period">
+              <option>This Month</option>
+              <option>This Season</option>
+              <option>This Year</option>
+            </select>
+          </label>
+          <Link href="/dashboard/reports" className="fv-export-btn">
+            <HugeiconsIcon icon={Upload04Icon} size={14} strokeWidth={1.8} />
+            Export
+          </Link>
+        </div>
+      </motion.div>
 
-      <InsightPanel title="Integration evidence" subtitle="Soil/drone/sorter/QR payloads arriving into MAYOData.">
-        {integrations.length ? <div className="role-list">
-          {integrations.slice(0, 4).map((record) => <div className="role-list-item" key={record.id}>
-            <div>
-              <strong>{record.sourceType}</strong>
-              <p>{record.externalReference || record.farm?.farmCode || record.cropCycle?.season || 'No external reference'}</p>
+      <div className="fv-row fv-row-top">
+        <motion.article
+          className="fv-card fv-weather"
+          {...(enter || {})}
+          transition={{ duration: 0.45, delay: 0.04, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="fv-weather-top">
+            <span className="fv-location-pill">{WEATHER_HOME.label}</span>
+            <div className="fv-unit-toggle" role="group" aria-label="Temperature unit">
+              <button type="button" className={unit === 'C' ? 'is-active' : ''} onClick={() => setUnit('C')}>C</button>
+              <button type="button" className={unit === 'F' ? 'is-active' : ''} onClick={() => setUnit('F')}>F</button>
             </div>
-            <small>{new Date(record.capturedAt).toLocaleDateString()}</small>
-          </div>)}
-        </div> : <EmptyState>No integration records yet.</EmptyState>}
-      </InsightPanel>
+          </div>
+          <p className="fv-weather-date">{formatLongDate(today)}</p>
+          <div className="fv-weather-body">
+            <div>
+              <div className="fv-temp">
+                {loading ? '—' : <CountUpValue value={displayTemp} />}
+                <span>° {unit}</span>
+              </div>
+              <div className="fv-temp-range">
+                <span>H: {loading ? '—' : displayHigh}°</span>
+                <span>L: {loading ? '—' : displayLow}°</span>
+              </div>
+            </div>
+            <div className="fv-weather-aside">
+              <span className="fv-weather-icon" aria-hidden>
+                <WeatherGlyph condition={condition} size={46} />
+              </span>
+              <strong>{condition}</strong>
+              <small>Feels Like {loading ? '—' : feelsLike}</small>
+            </div>
+          </div>
+        </motion.article>
 
-      <InsightPanel title="Admin actions" subtitle="Common MAYOData operations.">
-        <div className="role-list">
-          <ActionLink href="/dashboard/ai" title="AI Insights" text="Generate field advisories and log soil/sorter intake." />
-          <ActionLink href="/dashboard/traceability" title="Traceability" text="Look up invoice, lot, or inventory tracking codes." />
-          <ActionLink href="/dashboard/grantor" title="Grantor impact" text="Export season KPIs and community project outcomes." />
-          <ActionLink href="/dashboard/staff" title="Manage staff" text="Create field officer and cooperative accounts." />
-          <ActionLink href="/dashboard/mamcos" title="Manage AMCOS" text="Create cooperatives and assign leadership." />
-          <ActionLink href="/dashboard/compliance" title="Export compliance evidence" text="Review FLOCERT pack and reports." />
-          <ActionLink href="/dashboard/locations" title="Maintain locations" text="Administrative hierarchy for clean records." />
+        <div className="fv-top-aside">
+          <motion.article
+            className="fv-card fv-production"
+            {...(enter || {})}
+            transition={{ duration: 0.45, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="fv-card-head">
+              <h2>Production Overview</h2>
+              <span className="fv-chip">
+                Yearly
+                <HugeiconsIcon icon={ArrowDown01Icon} size={13} strokeWidth={2.4} />
+              </span>
+            </div>
+            <div className="fv-production-body">
+              <div className="fv-donut-wrap">
+                {loading ? (
+                  <div className="fv-chart-empty">Loading…</div>
+                ) : !productionLegend.some((r) => r.value > 0) ? (
+                  <div className="fv-chart-empty">No production yet</div>
+                ) : (
+                  <>
+                    <svg viewBox="0 0 200 112" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" className="fv-ray-chart">
+                      {productionRays.map((ray, i) => (
+                        <line
+                          key={i}
+                          x1={ray.x1}
+                          y1={ray.y1}
+                          x2={ray.x2}
+                          y2={ray.y2}
+                          stroke={ray.color}
+                          strokeWidth={7}
+                          strokeLinecap="round"
+                        />
+                      ))}
+                    </svg>
+                    <div className="fv-donut-center">
+                      <strong className="fv-prod-total" style={{ fontSize: '0.95rem' }}>
+                        {totalProductionTons.toLocaleString()} tons
+                      </strong>
+                      <small>Total Production</small>
+                    </div>
+                  </>
+                )}
+              </div>
+              <ul className="fv-prod-legend">
+                {productionLegend.map((row) => (
+                  <li key={row.name}>
+                    <span className="fv-legend-dot" style={{ background: row.color }} />
+                    <span>
+                      {row.name}: <em>{row.pct}%</em>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </motion.article>
+
+          <div className="fv-metric-stack">
+            <motion.article
+              className="fv-card fv-metric"
+              {...(enter || {})}
+              transition={{ duration: 0.45, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <div>
+                <span className="fv-metric-label">Total Land Area</span>
+                <strong className="fv-metric-value">
+                  {loading ? '—' : <CountUpValue value={`${totalLandHa.toLocaleString()} ha`} />}
+                </strong>
+                <small className="fv-metric-delta is-up">+{landDeltaPct}% farms verified</small>
+              </div>
+              <span className="fv-metric-icon is-green" aria-hidden>
+                <HugeiconsIcon icon={Globe02Icon} size={18} strokeWidth={1.8} />
+              </span>
+            </motion.article>
+
+            <motion.article
+              className="fv-card fv-metric"
+              {...(enter || {})}
+              transition={{ duration: 0.45, delay: 0.14, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <div>
+                <span className="fv-metric-label">Revenue</span>
+                <strong className="fv-metric-value">
+                  {loading ? '—' : <CountUpValue value={money(revenue)} />}
+                </strong>
+                <small className="fv-metric-delta is-purple">+{farmersDeltaPct}% farmers verified</small>
+              </div>
+              <span className="fv-metric-icon is-purple" aria-hidden>
+                <HugeiconsIcon icon={ChartBarLineIcon} size={18} strokeWidth={1.8} />
+              </span>
+            </motion.article>
+          </div>
         </div>
-      </InsightPanel>
+      </div>
+
+      <div className="fv-row fv-row-mid">
+        <motion.article
+          className="fv-card fv-yield"
+          {...(enter || {})}
+          transition={{ duration: 0.5, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="fv-card-head">
+            <h2>Monthly Yield Analysis</h2>
+            <div className="fv-filters">
+              <span className="fv-chip">Rice</span>
+              <span className="fv-chip">{today.getFullYear()}</span>
+            </div>
+          </div>
+          {loading || !yieldTrend.length ? (
+            <div className="fv-chart-empty">{loading ? 'Loading yield trend…' : 'No yield records yet.'}</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <AreaChart data={yieldTrend} margin={{ top: 46, right: 12, left: -8, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="fvYieldFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--green-500)" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="var(--green-500)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="4 6" vertical={false} />
+                <XAxis dataKey="month" tick={{ fill: 'var(--text-3)', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--text-3)', fontSize: 12 }} axisLine={false} tickLine={false} width={40} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(value) => [`${value}T`, 'Yield']}
+                  labelFormatter={(label) => String(label)}
+                />
+                {peakYieldPoint && (
+                  <ReferenceDot
+                    x={peakYieldPoint.month}
+                    y={peakYieldPoint.yield}
+                    r={0}
+                    isFront
+                    ifOverflow="visible"
+                    label={(props: any) => {
+                      const vb = props?.viewBox ?? {};
+                      const cx = props?.cx ?? vb.cx ?? vb.x ?? 0;
+                      const cy = props?.cy ?? vb.cy ?? vb.y ?? 0;
+                      const boxX =
+                        peakYieldPoint.align === 'start'
+                          ? cx + 4
+                          : peakYieldPoint.align === 'end'
+                            ? cx - 68
+                            : cx - 32;
+                      return (
+                        <g>
+                          <line x1={cx} y1={cy} x2={cx} y2={cy + 60} stroke="var(--green-500)" strokeDasharray="3 4" strokeWidth={1.5} />
+                          <foreignObject x={boxX} y={cy - 44} width={64} height={40}>
+                            <div className="fv-yield-badge">
+                              <span>Yield</span>
+                              <strong>{peakYieldPoint.yield}T</strong>
+                            </div>
+                          </foreignObject>
+                        </g>
+                      );
+                    }}
+                  />
+                )}
+                <Area
+                  type="monotone"
+                  dataKey="yield"
+                  stroke="var(--green-500)"
+                  strokeWidth={3}
+                  fill="url(#fvYieldFill)"
+                  dot={{ r: 5, fill: 'var(--green-500)', stroke: 'var(--surface-1)', strokeWidth: 2 }}
+                  activeDot={{ r: 7, fill: 'var(--green-600)', stroke: 'var(--surface-1)', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </motion.article>
+
+        <motion.article
+          className="fv-card fv-field"
+          {...(enter || {})}
+          transition={{ duration: 0.5, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="fv-field-media" style={{ backgroundImage: 'url(/login-rice-field.png)' }}>
+            <div className="fv-field-overlay">
+              <div className="fv-field-overlay-top">
+                <span className="fv-chip fv-chip-solid">
+                  {featuredFarm?.farmCode || featuredFarm?.name || 'Rice Field'}
+                </span>
+                <Link href={featuredFarm ? `/dashboard/farms/${featuredFarm.id}` : '/dashboard/farms'} className="fv-pill-btn">
+                  More Details
+                  <HugeiconsIcon icon={ArrowRight01Icon} size={12} strokeWidth={2} />
+                </Link>
+              </div>
+              <div className="fv-field-stats">
+                <div>
+                  <span>Crop Health</span>
+                  <strong>{featuredFarm?.isVerified ? 'Good' : 'Review'}</strong>
+                </div>
+                <div>
+                  <span>Planting Date</span>
+                  <strong>
+                    {featuredCycle?.plantingDate
+                      ? new Date(featuredCycle.plantingDate).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
+                      : '—'}
+                  </strong>
+                </div>
+                <div>
+                  <span>Harvest Window</span>
+                  <strong>{featuredCycle?.status?.replace(/_/g, ' ') || 'Season TBD'}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.article>
+      </div>
+
+      <div className="fv-row fv-row-bottom">
+        <motion.article
+          className="fv-card fv-tasks"
+          {...(enter || {})}
+          transition={{ duration: 0.5, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="fv-card-head">
+            <h2>Task Management</h2>
+            <div className="fv-task-actions">
+              <Link href="/dashboard/field-surveys" className="fv-pill-btn">
+                View All
+                <HugeiconsIcon icon={ArrowRight01Icon} size={12} strokeWidth={2} />
+              </Link>
+            </div>
+          </div>
+          <div className="fv-table-wrap">
+            <table className="fv-table">
+              <thead>
+                <tr>
+                  <th>Task Name</th>
+                  <th>Assigned To</th>
+                  <th>Due Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={4}>Loading tasks…</td></tr>
+                ) : tasks.length === 0 ? (
+                  <tr><td colSpan={4}>No open tasks right now.</td></tr>
+                ) : (
+                  tasks.map((task) => (
+                    <tr key={task.id}>
+                      <td>{task.name}</td>
+                      <td>{task.assignedTo}</td>
+                      <td>{task.dueDate}</td>
+                      <td><span className={`badge ${statusBadge(task.status)}`}>{task.status}</span></td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </motion.article>
+
+        <motion.article
+          className="fv-card fv-harvest"
+          {...(enter || {})}
+          transition={{ duration: 0.5, delay: 0.22, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="fv-card-head">
+            <h2>Harvest Summary</h2>
+          </div>
+          <ul className="fv-harvest-list">
+            {loading ? (
+              <li className="fv-harvest-empty">Loading harvest…</li>
+            ) : harvestSummary.length === 0 ? (
+              <li className="fv-harvest-empty">No harvest records yet.</li>
+            ) : (
+              harvestSummary.map((row, idx) => (
+                <li key={row.name}>
+                  <span className={`fv-harvest-icon tone-${idx % 3}`} aria-hidden>
+                    <HugeiconsIcon
+                      icon={idx % 3 === 0 ? WheatIcon : idx % 3 === 1 ? Plant01Icon : MapsIcon}
+                      size={16}
+                      strokeWidth={1.8}
+                    />
+                  </span>
+                  <span className="fv-harvest-name">{row.name}</span>
+                  <strong>{row.tons.toLocaleString()} tons</strong>
+                </li>
+              ))
+            )}
+          </ul>
+        </motion.article>
+      </div>
     </div>
-  </div>;
+  );
 }

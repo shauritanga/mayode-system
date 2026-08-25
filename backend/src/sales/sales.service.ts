@@ -13,6 +13,7 @@ import {
 import { ActivitiesService } from '../activities/activities.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSaleDto } from './dto/sales.dto';
+import { CreateDispatchDto } from './dto/dispatch.dto';
 import { LoansService } from '../loans/loans.service';
 import { AccountingService } from '../accounting/accounting.service';
 import { apportionSale } from './allocation';
@@ -503,11 +504,74 @@ export class SalesService {
           },
         },
         payments: true,
+        dispatch: {
+          include: {
+            releasedBy: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+        },
       },
     });
     if (!sale)
       throw new NotFoundException(`Sale or invoice ${idOrInvoice} not found`);
     return sale;
+  }
+
+  async dispatchLookup(reference: string) {
+    const sale = await this.findOne(reference);
+    return {
+      invoiceNumber: sale.invoiceNumber,
+      saleDate: sale.saleDate,
+      buyer: sale.buyer,
+      riceVariety: sale.riceVariety,
+      quantityKg: sale.quantityKg,
+      packaging: sale.packaging,
+      totalRevenue: sale.totalRevenue,
+      paymentReceived: sale.paymentReceived,
+      lot: { lotNumber: sale.lot.lotNumber },
+      dispatch: sale.dispatch,
+    };
+  }
+
+  async createDispatch(
+    reference: string,
+    dto: CreateDispatchDto,
+    releasedByUserId: string,
+  ) {
+    const sale = await this.findOne(reference);
+    if (sale.dispatch) {
+      throw new ConflictException('This sale has already been dispatched');
+    }
+
+    const recordIds = sale.lot.inventoryRecords.map((r) => r.id);
+
+    return this.prisma.$transaction(async (tx) => {
+      const dispatch = await tx.dispatch.create({
+        data: {
+          saleId: sale.id,
+          transportMode: dto.transportMode,
+          transportFee: dto.transportFee,
+          vehiclePlateNumber: dto.vehiclePlateNumber,
+          driverName: dto.driverName,
+          driverPhone: dto.driverPhone,
+          notes: dto.notes,
+          releasedByUserId,
+        },
+        include: {
+          releasedBy: { select: { firstName: true, lastName: true } },
+        },
+      });
+
+      if (recordIds.length) {
+        await tx.inventoryRecord.updateMany({
+          where: { id: { in: recordIds }, status: { not: 'SHIPPED' } },
+          data: { status: 'SHIPPED' },
+        });
+      }
+
+      return dispatch;
+    });
   }
 
   findAll() {

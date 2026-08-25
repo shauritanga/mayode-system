@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { cropCyclesApi, inventoryApi, riceProtocolsApi } from '@/lib/api';
 import { ChartCard, DonutBreakdown, HorizontalBarChart } from '@/components/role-dashboards/Charts';
+import WarehouseDispatchPanel from './WarehouseDispatchPanel';
 
 interface DashboardSummary {
   totalReceivedKg: number;
@@ -74,6 +75,7 @@ const formatMissing = (missing: string[] = []) =>
 const STEPS = ['Source cycle', 'Measures', 'Confirm'] as const;
 
 export default function InventoryPage() {
+  const [tab, setTab] = useState<'records' | 'dispatch'>('records');
   const [records, setRecords] = useState<InventoryRecord[]>([]);
   const [lots, setLots] = useState<LotRow[]>([]);
   const [cycles, setCycles] = useState<CropCycleOption[]>([]);
@@ -288,6 +290,23 @@ export default function InventoryPage() {
         </div>
       </div>
 
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        {(['records', 'dispatch'] as const).map((t) => (
+          <button
+            key={t}
+            className={tab === t ? 'btn-primary' : 'btn-secondary'}
+            style={{ fontSize: '13px', padding: '8px 16px' }}
+            onClick={() => setTab(t)}
+          >
+            {t === 'records' ? 'Records & Lots' : 'Warehouse Dispatch'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'dispatch' && <WarehouseDispatchPanel />}
+
+      {tab === 'records' && (
+      <>
       <form onSubmit={receive} className="action-panel">
         <div className="panel-header">
           <div>
@@ -822,6 +841,8 @@ export default function InventoryPage() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }
