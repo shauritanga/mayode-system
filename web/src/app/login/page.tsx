@@ -61,10 +61,10 @@ export default function LoginPage() {
           </div>
           <div className="auth-brand-bottom">
             <p className="auth-brand-tagline">
-              The integrated platform for cooperative farming in Tanzania.
+              The integrated platform for AMCOS and Cooperatives in Tanzania.
             </p>
             <p className="auth-brand-sub">
-              Farmer records, crop cycles, finance and the M-LAX marketplace, in one place.
+              Traceability, Farmer records, crop cycles, Insurance, Credit and the M-LAX Marketplace all in one place.
             </p>
           </div>
         </div>
