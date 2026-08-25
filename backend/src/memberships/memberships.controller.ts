@@ -11,8 +11,11 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MembershipStatus, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { RequestUser } from '../common/ownership.service';
 import { MembershipsService } from './memberships.service';
 import {
   ApproveMembershipDto,
@@ -22,7 +25,7 @@ import {
 
 @ApiTags('memberships')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('memberships')
 export class MembershipsController {
   constructor(private readonly memberships: MembershipsService) {}
@@ -35,6 +38,7 @@ export class MembershipsController {
 
   @Post('plans')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('memberships', 'CREATE')
   @ApiOperation({ summary: 'Create a membership plan (Admin only)' })
   createPlan(@Body() dto: CreateMembershipPlanDto) {
     return this.memberships.createPlan(dto);
@@ -56,11 +60,12 @@ export class MembershipsController {
     UserRole.AUDITOR,
     UserRole.MAMCOS_SECRETARY,
   )
+  @RequirePermission('memberships', 'VIEW')
   @ApiOperation({
     summary: 'All memberships, optionally filtered by status (staff only)',
   })
-  listAll(@Query('status') status?: MembershipStatus) {
-    return this.memberships.listAll(status);
+  listAll(@Query('status') status: MembershipStatus | undefined, @CurrentUser() user: RequestUser) {
+    return this.memberships.listAll(status, user);
   }
 
   @Post('start')
@@ -105,6 +110,7 @@ export class MembershipsController {
 
   @Post(':id/approve')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('memberships', 'EDIT')
   @ApiOperation({
     summary: 'Confirm payment and activate a membership (Admin only)',
   })

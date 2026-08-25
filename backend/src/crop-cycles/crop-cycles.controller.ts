@@ -22,7 +22,9 @@ import {
 } from './dto/crop-cycles.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { UserRole } from '@prisma/client';
@@ -39,7 +41,7 @@ const STAFF_ROLES = [
 
 @ApiTags('crop-cycles')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('crop-cycles')
 export class CropCyclesController {
   constructor(
@@ -49,6 +51,7 @@ export class CropCyclesController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  @RequirePermission('crop_cycles', 'CREATE')
   @ApiOperation({ summary: 'Initiate a new seasonal crop cycle for a farm' })
   create(@Body() dto: CreateCropCycleDto, @CurrentUser() user: RequestUser) {
     return this.cropCyclesService.create(dto, user);
@@ -56,6 +59,7 @@ export class CropCyclesController {
 
   @Get()
   @Roles(...STAFF_ROLES)
+  @RequirePermission('crop_cycles', 'VIEW')
   @ApiOperation({
     summary: 'Get all crop cycles across the system (staff only)',
   })
@@ -154,6 +158,7 @@ export class CropCyclesController {
 
   @Get(':id')
   @Roles(...STAFF_ROLES, UserRole.FARMER)
+  @RequirePermission('crop_cycles', 'VIEW')
   @ApiOperation({
     summary:
       'Get crop cycle details by ID (with activity logs, costs, revenues)',
@@ -184,6 +189,7 @@ export class CropCyclesController {
 
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  @RequirePermission('crop_cycles', 'EDIT')
   @ApiOperation({
     summary: 'Update crop cycle status, harvest dates, or actual yields',
   })

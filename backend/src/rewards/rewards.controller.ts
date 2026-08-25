@@ -11,7 +11,9 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { RewardsService } from './rewards.service';
@@ -19,7 +21,7 @@ import { CreateRewardCampaignDto } from './dto/rewards.dto';
 
 @ApiTags('rewards')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('rewards')
 export class RewardsController {
   constructor(private readonly rewards: RewardsService) {}
@@ -42,6 +44,7 @@ export class RewardsController {
 
   @Post('campaigns')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('rewards', 'CREATE')
   @ApiOperation({ summary: 'Create a reward campaign (admin)' })
   createCampaign(
     @Body() dto: CreateRewardCampaignDto,
@@ -52,6 +55,7 @@ export class RewardsController {
 
   @Get('campaigns')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR)
+  @RequirePermission('rewards', 'VIEW')
   @ApiOperation({ summary: 'List reward campaigns' })
   listCampaigns() {
     return this.rewards.listCampaigns();
@@ -59,6 +63,7 @@ export class RewardsController {
 
   @Get('campaigns/:id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR)
+  @RequirePermission('rewards', 'VIEW')
   @ApiOperation({ summary: 'Campaign detail with winners' })
   getCampaign(@Param('id') id: string) {
     return this.rewards.getCampaign(id);

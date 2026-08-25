@@ -91,8 +91,80 @@ async function seedLocations() {
   console.log(`Seeded ${wardInserts.length} wards.`);
 }
 
+/**
+ * Seeds the 8 legacy UserRole values as informational `Role` rows (isSystem:
+ * true) purely for display in the Roles & Permissions UI, and the initial
+ * catalog of `Resource`s the first batch of custom-role enforcement covers.
+ * Existing users' `roleId` is intentionally left untouched (NULL) — they
+ * keep working entirely through the legacy `role` enum column.
+ */
+async function seedRolesAndPermissions() {
+  console.log('Seeding system roles...');
+  const systemRoles: { name: string; systemRole: 'SUPER_ADMIN' | 'ADMIN' | 'FIELD_OFFICER' | 'FARMER' | 'MAMCOS_SECRETARY' | 'AUDITOR' | 'BUYER' | 'FINANCIAL_PROVIDER' }[] = [
+    { name: 'Super Admin', systemRole: 'SUPER_ADMIN' },
+    { name: 'Admin', systemRole: 'ADMIN' },
+    { name: 'Field Officer', systemRole: 'FIELD_OFFICER' },
+    { name: 'Farmer', systemRole: 'FARMER' },
+    { name: 'AMCOS Secretary', systemRole: 'MAMCOS_SECRETARY' },
+    { name: 'Auditor', systemRole: 'AUDITOR' },
+    { name: 'Buyer', systemRole: 'BUYER' },
+    { name: 'Financial Provider', systemRole: 'FINANCIAL_PROVIDER' },
+  ];
+  for (const role of systemRoles) {
+    await prisma.role.upsert({
+      where: { name: role.name },
+      update: { isSystem: true, systemRole: role.systemRole },
+      create: { name: role.name, isSystem: true, systemRole: role.systemRole },
+    });
+  }
+
+  console.log('Seeding permission resources...');
+  const resources = [
+    { key: 'farmers', label: 'Farmers' },
+    { key: 'mamcos', label: 'AMCOS' },
+    { key: 'memberships', label: 'Memberships' },
+    { key: 'farms', label: 'Farms' },
+    { key: 'inventory', label: 'Inventory' },
+    { key: 'marketplace', label: 'MLAX Marketplace' },
+    { key: 'finance', label: 'Finance and Accounting' },
+    { key: 'reports', label: 'Reports' },
+    { key: 'insurance', label: 'Insurance' },
+    { key: 'governance', label: 'Governance' },
+    { key: 'buyer_orders', label: 'Buyer Orders' },
+    { key: 'suppliers', label: 'Suppliers' },
+    { key: 'disputes', label: 'Disputes' },
+    { key: 'farm_corrections', label: 'Farm Corrections' },
+    { key: 'crop_cycles', label: 'Crop Cycles' },
+    { key: 'farm_leases', label: 'Farm Leases' },
+    { key: 'farming_seasons', label: 'Farming Seasons' },
+    { key: 'facilities', label: 'Facilities' },
+    { key: 'field_surveys', label: 'Field Surveys' },
+    { key: 'sales', label: 'Sales' },
+    { key: 'activities', label: 'Activities' },
+    { key: 'weather', label: 'Weather' },
+    { key: 'rewards', label: 'Rewards' },
+    { key: 'farm_registry', label: 'Farm Registry' },
+    { key: 'plots', label: 'Plots' },
+    { key: 'farm_verifications', label: 'Farm Verifications' },
+    { key: 'accounting', label: 'Accounting' },
+    { key: 'loans', label: 'Loans' },
+    { key: 'buyers', label: 'Buyers' },
+    { key: 'users', label: 'User Accounts' },
+    { key: 'settings', label: 'Settings' },
+    { key: 'locations', label: 'Locations' },
+  ];
+  for (const resource of resources) {
+    await prisma.resource.upsert({
+      where: { key: resource.key },
+      update: { label: resource.label },
+      create: resource,
+    });
+  }
+}
+
 async function main() {
   await seedLocations();
+  await seedRolesAndPermissions();
 
   console.log('Seeding AMCOS reference records...');
   await prisma.mamcos.createMany({

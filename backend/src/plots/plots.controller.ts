@@ -23,14 +23,16 @@ import {
 } from './dto/plots.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 import type { RequestUser } from '../common/ownership.service';
 
 @ApiTags('plots')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('plots')
 export class PlotsController {
   constructor(private readonly plotsService: PlotsService) {}
@@ -42,6 +44,7 @@ export class PlotsController {
     UserRole.FIELD_OFFICER,
     UserRole.FARMER,
   )
+  @RequirePermission('plots', 'CREATE')
   @ApiOperation({
     summary: 'Create a plot under a farm (auto plot code, e.g. FP-JD-01-P1)',
   })
@@ -75,6 +78,7 @@ export class PlotsController {
     UserRole.FIELD_OFFICER,
     UserRole.FARMER,
   )
+  @RequirePermission('plots', 'EDIT')
   @ApiOperation({ summary: 'Update plot details' })
   update(
     @Param('id') id: string,
@@ -104,6 +108,7 @@ export class PlotsController {
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FARMER)
+  @RequirePermission('plots', 'DELETE')
   @ApiOperation({ summary: 'Delete a plot' })
   remove(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.plotsService.remove(id, user);

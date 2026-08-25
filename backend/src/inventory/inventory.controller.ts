@@ -18,14 +18,16 @@ import {
 } from './dto/inventory.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { UserRole } from '@prisma/client';
 
 @ApiTags('inventory')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('inventory')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
@@ -36,6 +38,7 @@ export class InventoryController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.FIELD_OFFICER,
   )
+  @RequirePermission('inventory', 'CREATE')
   @ApiOperation({
     summary:
       'Receive harvest inventory at warehouse with auto-generated tracking code (INV-YYYY-XXXX)',
@@ -82,6 +85,7 @@ export class InventoryController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('inventory', 'VIEW')
   @ApiOperation({ summary: 'Get all received harvest inventory records' })
   findAllRecords() {
     return this.inventoryService.findAllRecords();
@@ -111,6 +115,7 @@ export class InventoryController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('inventory', 'VIEW')
   @ApiOperation({ summary: 'Get inventory record details by ID' })
   findRecordById(@Param('id') id: string) {
     return this.inventoryService.findRecordById(id);

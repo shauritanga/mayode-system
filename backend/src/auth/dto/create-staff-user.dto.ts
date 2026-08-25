@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsEmail,
   IsEnum,
+  IsUUID,
   MinLength,
   Matches,
 } from 'class-validator';
@@ -38,6 +39,13 @@ export class CreateStaffUserDto {
   @ApiProperty({ example: 'ADMIN', enum: UserRole })
   @IsEnum(UserRole)
   role: UserRole;
+
+  @ApiPropertyOptional({
+    description: 'Optional custom Role (from Role Management) to assign alongside the system role, for finer-grained resource permissions',
+  })
+  @IsUUID()
+  @IsOptional()
+  roleId?: string;
 
   @ApiProperty({ example: 'Jane' })
   @IsString()

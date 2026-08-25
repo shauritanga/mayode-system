@@ -12,7 +12,6 @@ import {
   MamcosStaffRole,
   OwnershipSource,
   Prisma,
-  UserRole,
   VerificationStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -236,14 +235,11 @@ export class FarmLeasesService {
   /** Admin/staff: leases, scoped to the officer's AMCOS when applicable. */
   async findAllLeases(status?: LeaseStatus, user?: RequestUser) {
     const where: Prisma.FarmLeaseWhereInput = status ? { status } : {};
-    if (user?.role === UserRole.MAMCOS_SECRETARY) {
-      const secretary = await this.prisma.mamcosStaff.findFirst({
-        where: { userId: user.id, role: MamcosStaffRole.SECRETARY },
-        select: { mamcosId: true },
-      });
-      if (!secretary)
-        throw new ForbiddenException('AMCOS officer profile is missing');
-      where.farm = { mamcosId: secretary.mamcosId };
+    // Cooperative staff (any role, legacy or custom) only see leases on
+    // their own AMCOS's farms; SUPER_ADMIN/ADMIN stay unscoped.
+    const tenantId = user ? this.ownership.resolveTenantMamcosId(user) : null;
+    if (tenantId) {
+      where.farm = { mamcosId: tenantId };
     }
     return this.prisma.farmLease.findMany({
       where,

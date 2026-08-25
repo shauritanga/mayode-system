@@ -35,6 +35,8 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
+  roleId       String?   @map("role_id")
+
   // Relations
   farmer        Farmer?
   mamcosStaff   MamcosStaff?
@@ -42,6 +44,8 @@ model User {
   auditLogs     AuditLog[]
   notifications Notification[]
   memberships   Membership[]
+  dispatches    Dispatch[]
+  customRole    Role?          @relation(fields: [roleId], references: [id], onDelete: SetNull)
 
   @@map("users")
 }
@@ -748,6 +752,7 @@ model Sale {
   apportionments     SaleApportionment[]
   premiumFundEntries PremiumFundEntry[]
   invoice            Invoice?
+  dispatch           Dispatch?
 
   @@map("sales")
 }
@@ -774,6 +779,34 @@ model SaleApportionment {
   @@unique([saleId, farmerId])
   @@index([farmerId])
   @@map("sale_apportionments")
+}
+
+enum DispatchTransportMode {
+  BUYER_OWN_VEHICLE
+  MAYODE_ARRANGED
+}
+
+// Warehouse gate-pass: recorded when a buyer collects goods for a Sale.
+// One dispatch per sale today; if partial/staged pickups are ever needed,
+// drop the @unique on saleId (additive migration, not a rewrite).
+model Dispatch {
+  id                 String                @id @default(uuid())
+  saleId             String                @unique @map("sale_id")
+  transportMode      DispatchTransportMode @map("transport_mode")
+  transportFee       Float?                @map("transport_fee")
+  vehiclePlateNumber String                @map("vehicle_plate_number")
+  driverName         String                @map("driver_name")
+  driverPhone        String                @map("driver_phone")
+  releasedByUserId   String                @map("released_by_user_id")
+  releasedAt         DateTime              @default(now()) @map("released_at")
+  notes              String?
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+
+  sale       Sale @relation(fields: [saleId], references: [id])
+  releasedBy User @relation(fields: [releasedByUserId], references: [id])
+
+  @@map("dispatches")
 }
 
 // Fairtrade premium is deliberately tracked outside ordinary crop revenue so
@@ -2074,6 +2107,58 @@ enum UserRole {
   AUDITOR
   BUYER
   FINANCIAL_PROVIDER
+}
+
+// ============================================================
+// DYNAMIC ROLES & PERMISSIONS
+// ============================================================
+
+enum PermissionAction {
+  VIEW
+  CREATE
+  EDIT
+  DELETE
+}
+
+model Role {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  isSystem    Boolean   @default(false) @map("is_system")
+  systemRole  UserRole? @map("system_role")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  permissions RolePermission[]
+  users       User[]
+
+  @@map("roles")
+}
+
+model Resource {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  label     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  permissions RolePermission[]
+
+  @@map("resources")
+}
+
+model RolePermission {
+  id         String           @id @default(uuid())
+  roleId     String           @map("role_id")
+  resourceId String           @map("resource_id")
+  action     PermissionAction
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  role     Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, resourceId, action])
+  @@map("role_permissions")
 }
 
 enum Gender {

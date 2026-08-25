@@ -266,6 +266,31 @@ export class AuthService {
         throw new ForbiddenException('AMCOS secretary profile not found');
       }
       dto.mamcosId = secretary.mamcosId;
+
+      // Custom roles are an admin-only concern in phase 1 — a secretary's
+      // Field Officer creation flow never opens that surface.
+      if (dto.roleId) {
+        throw new ForbiddenException(
+          'AMCOS secretaries cannot assign custom roles',
+        );
+      }
+    }
+
+    if (dto.roleId) {
+      const customRole = await this.prisma.role.findUnique({
+        where: { id: dto.roleId },
+      });
+      if (!customRole || !customRole.isActive) {
+        throw new NotFoundException('Role not found or inactive');
+      }
+      if (
+        customRole.isSystem &&
+        customRole.systemRole &&
+        SUPER_ADMIN_ONLY_ROLES.includes(customRole.systemRole) &&
+        creatorRole !== UserRole.SUPER_ADMIN
+      ) {
+        throw new ForbiddenException('Only a SUPER_ADMIN can assign this role');
+      }
     }
 
     const existingUser = await this.prisma.user.findFirst({
@@ -289,6 +314,7 @@ export class AuthService {
           firstName: dto.firstName,
           lastName: dto.lastName,
           role: dto.role,
+          roleId: dto.roleId,
           language: dto.language || 'sw',
         },
         select: {
@@ -298,6 +324,7 @@ export class AuthService {
           firstName: true,
           lastName: true,
           role: true,
+          roleId: true,
           createdAt: true,
         },
       });

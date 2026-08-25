@@ -17,19 +17,23 @@ import {
 } from './dto/mamcos.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { RequestUser } from '../common/ownership.service';
 import { UserRole } from '@prisma/client';
 
 @ApiTags('mamcos')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('mamcos')
 export class MamcosController {
   constructor(private readonly mamcosService: MamcosService) {}
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('mamcos', 'CREATE')
   @ApiOperation({
     summary: 'Create a new MAMCOS cooperative scheme (Admin only)',
   })
@@ -45,9 +49,10 @@ export class MamcosController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('mamcos', 'VIEW')
   @ApiOperation({ summary: 'Get all MAMCOS cooperative schemes' })
-  findAll() {
-    return this.mamcosService.findAll();
+  findAll(@CurrentUser() user: RequestUser) {
+    return this.mamcosService.findAll(user);
   }
 
   @Get('secretary-dashboard')
@@ -79,13 +84,15 @@ export class MamcosController {
     UserRole.AUDITOR,
     UserRole.FARMER,
   )
+  @RequirePermission('mamcos', 'VIEW')
   @ApiOperation({ summary: 'Get MAMCOS details by ID' })
-  findOne(@Param('id') id: string) {
-    return this.mamcosService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.mamcosService.findOne(id, user);
   }
 
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('mamcos', 'EDIT')
   @ApiOperation({ summary: 'Update MAMCOS scheme details' })
   update(@Param('id') id: string, @Body() updateMamcosDto: UpdateMamcosDto) {
     return this.mamcosService.update(id, updateMamcosDto);

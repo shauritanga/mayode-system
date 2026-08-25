@@ -4,18 +4,21 @@ import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CreateLoanDto } from './dto/loans.dto';
 import { LoansService } from './loans.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 @ApiTags('loans')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('loans')
 export class LoansController {
   constructor(private readonly loans: LoansService) {}
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('loans', 'CREATE')
   create(@Body() dto: CreateLoanDto) {
     return this.loans.create(dto);
   }
@@ -38,6 +41,7 @@ export class LoansController {
     UserRole.AUDITOR,
     UserRole.FINANCIAL_PROVIDER,
   )
+  @RequirePermission('loans', 'VIEW')
   findAll() {
     return this.loans.findAll();
   }

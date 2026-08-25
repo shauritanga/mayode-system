@@ -14,19 +14,22 @@ import { CreateVisitDto } from './dto/create-visit.dto';
 import { CalendarQueryDto, QueryVisitsDto } from './dto/query-visits.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 
 @ApiTags('field-officer-visits')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('field-officer-visits')
 export class FieldOfficerVisitsController {
   constructor(private readonly visits: FieldOfficerVisitsService) {}
 
   @Post()
   @Roles(UserRole.FIELD_OFFICER)
+  @RequirePermission('field_surveys', 'CREATE')
   @ApiOperation({
     summary:
       'Log a timestamped visit to a farmer (Field Officer only, own AMCOS only)',
@@ -37,6 +40,7 @@ export class FieldOfficerVisitsController {
 
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('field_surveys', 'VIEW')
   @ApiOperation({
     summary: 'Get all field officer visits across the system (staff only)',
   })

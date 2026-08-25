@@ -4,13 +4,15 @@ import { FarmVerificationsService } from './farm-verifications.service';
 import { VerifyFarmDto } from './dto/verify-farm.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 
 @ApiTags('farm-verifications')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('farm-verifications')
 export class FarmVerificationsController {
   constructor(
@@ -19,6 +21,7 @@ export class FarmVerificationsController {
 
   @Post()
   @Roles(UserRole.FIELD_OFFICER, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('farm_verifications', 'CREATE')
   @ApiOperation({
     summary:
       'Submit farm verification proof & neighbor details (Field Officer / Admin only)',
@@ -38,6 +41,7 @@ export class FarmVerificationsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('farm_verifications', 'VIEW')
   @ApiOperation({
     summary: 'Get all farm verification records across the system',
   })
@@ -53,6 +57,7 @@ export class FarmVerificationsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('farm_verifications', 'VIEW')
   @ApiOperation({
     summary: 'Get farm verification details by verification record ID',
   })

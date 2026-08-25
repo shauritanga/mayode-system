@@ -21,20 +21,23 @@ import { UsersService } from './users.service';
 import { UpdateProfileDto, UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 import type { RequestUser } from '../common/ownership.service';
 
 @ApiTags('users')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('users', 'VIEW')
   @ApiOperation({ summary: 'Get all users (Super Admin / Admin only)' })
   findAll() {
     return this.usersService.findAll();
@@ -61,6 +64,7 @@ export class UsersController {
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN)
+  @RequirePermission('users', 'DELETE')
   @ApiOperation({ summary: 'Delete user account (Super Admin only)' })
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);

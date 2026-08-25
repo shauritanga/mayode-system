@@ -12,7 +12,9 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { LocationsService } from './locations.service';
 import {
   CreateDistrictDto,
@@ -49,72 +51,81 @@ export class LocationsController {
   // Writes require ADMIN — this is the "Settings > Locations" admin-hierarchy CRUD.
   @Post('regions')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('locations', 'CREATE')
   createRegion(@Body() dto: CreateRegionDto) {
     return this.locationsService.createRegion(dto);
   }
 
   @Patch('regions/:id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('locations', 'EDIT')
   updateRegion(@Param('id') id: string, @Body() dto: UpdateLocationNameDto) {
     return this.locationsService.updateRegion(id, dto);
   }
 
   @Delete('regions/:id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('locations', 'DELETE')
   deleteRegion(@Param('id') id: string) {
     return this.locationsService.deleteRegion(id);
   }
 
   @Post('districts')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('locations', 'CREATE')
   createDistrict(@Body() dto: CreateDistrictDto) {
     return this.locationsService.createDistrict(dto);
   }
 
   @Patch('districts/:id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('locations', 'EDIT')
   updateDistrict(@Param('id') id: string, @Body() dto: UpdateLocationNameDto) {
     return this.locationsService.updateDistrict(id, dto);
   }
 
   @Delete('districts/:id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('locations', 'DELETE')
   deleteDistrict(@Param('id') id: string) {
     return this.locationsService.deleteDistrict(id);
   }
 
   @Post('wards')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('locations', 'CREATE')
   createWard(@Body() dto: CreateWardDto) {
     return this.locationsService.createWard(dto);
   }
 
   @Patch('wards/:id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('locations', 'EDIT')
   updateWard(@Param('id') id: string, @Body() dto: UpdateLocationNameDto) {
     return this.locationsService.updateWard(id, dto);
   }
 
   @Delete('wards/:id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('locations', 'DELETE')
   deleteWard(@Param('id') id: string) {
     return this.locationsService.deleteWard(id);
   }

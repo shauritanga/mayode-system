@@ -101,6 +101,16 @@ export const usersApi = {
   update: (id: string, data: object) => api.patch(`/users/${id}`, data),
   updateProfile: (data: object) => api.put('/users/profile', data),
 };
+export const rolesApi = {
+  getAll: () => api.get('/roles'),
+  getOne: (id: string) => api.get(`/roles/${id}`),
+  create: (data: object) => api.post('/roles', data),
+  update: (id: string, data: object) => api.patch(`/roles/${id}`, data),
+  remove: (id: string) => api.delete(`/roles/${id}`),
+  getPermissions: (id: string) => api.get(`/roles/${id}/permissions`),
+  setPermissions: (id: string, data: object) => api.put(`/roles/${id}/permissions`, data),
+  getResources: () => api.get('/roles/resources'),
+};
 
 // ── Farmers ──
 export const farmersApi = {
@@ -310,6 +320,10 @@ export const salesApi = {
   reconcilePayouts: (id: string) => api.post(`/loans/sales/${id}/reconcile-payouts`),
   traceability: (reference: string) =>
     api.get(`/sales/traceability/${encodeURIComponent(reference)}`),
+  dispatchLookup: (reference: string) =>
+    api.get(`/sales/${encodeURIComponent(reference)}/dispatch-lookup`),
+  createDispatch: (reference: string, data: object) =>
+    api.post(`/sales/${encodeURIComponent(reference)}/dispatch`, data),
 };
 export const buyersApi = { list: () => api.get('/buyers') };
 export const buyerOrdersApi = {

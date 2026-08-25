@@ -9,6 +9,7 @@ import { UserRole, VerificationStatus } from '@prisma/client';
 export interface RequestUser {
   id: string;
   role: UserRole;
+  mamcosId?: string | null;
 }
 
 /** Roles that may act on any farmer/farm/plot regardless of ownership. */
@@ -30,6 +31,22 @@ const PRIVILEGED_ROLES: UserRole[] = [
 @Injectable()
 export class OwnershipService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Resolves which single AMCOS a user's data access should be confined to.
+   * SUPER_ADMIN/ADMIN are platform-wide (null = unscoped, no filter applied).
+   * Everyone else is scoped to their own cooperative via `user.mamcosId`
+   * (resolved once per request in JwtStrategy from their staff/farmer
+   * profile) — null there too if they have no cooperative attached (e.g. an
+   * AUDITOR/BUYER account), which preserves today's unscoped behavior for
+   * those roles rather than silently hiding everything from them.
+   */
+  resolveTenantMamcosId(user: RequestUser): string | null {
+    if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN) {
+      return null;
+    }
+    return user.mamcosId ?? null;
+  }
 
   private isPrivileged(user: RequestUser): boolean {
     return PRIVILEGED_ROLES.includes(user.role);

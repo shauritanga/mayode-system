@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { MamcosStaffRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { OwnershipService, RequestUser } from '../common/ownership.service';
 import {
   CreateMamcosDto,
   UpdateMamcosDto,
@@ -14,7 +15,10 @@ import {
 
 @Injectable()
 export class MamcosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ownership: OwnershipService,
+  ) {}
 
   async create(createMamcosDto: CreateMamcosDto) {
     const existing = await this.prisma.mamcos.findUnique({
@@ -32,8 +36,12 @@ export class MamcosService {
     });
   }
 
-  async findAll() {
+  async findAll(user?: RequestUser) {
+    // A scoped cooperative user only ever sees their own AMCOS in this list,
+    // never the full cooperative directory.
+    const tenantId = user ? this.ownership.resolveTenantMamcosId(user) : null;
     const mamcosList = await this.prisma.mamcos.findMany({
+      where: tenantId ? { id: tenantId } : undefined,
       include: {
         staff: {
           where: { role: MamcosStaffRole.SECRETARY },
@@ -69,7 +77,11 @@ export class MamcosService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: RequestUser) {
+    const tenantId = user ? this.ownership.resolveTenantMamcosId(user) : null;
+    if (tenantId && tenantId !== id) {
+      throw new NotFoundException(`MAMCOS with ID ${id} not found`);
+    }
     const mamcos = await this.prisma.mamcos.findUnique({
       where: { id },
       include: {

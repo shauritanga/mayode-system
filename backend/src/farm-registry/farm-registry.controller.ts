@@ -16,7 +16,9 @@ import {
 import { FarmRegistryStatus, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { FarmRegistryService } from './farm-registry.service';
@@ -24,7 +26,7 @@ import { PreRegisterFarmDto } from './dto/farm-registry.dto';
 
 @ApiTags('farm-registry')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('farm-registry')
 export class FarmRegistryController {
   constructor(private readonly registry: FarmRegistryService) {}
@@ -35,6 +37,7 @@ export class FarmRegistryController {
     UserRole.FIELD_OFFICER,
     UserRole.MAMCOS_SECRETARY,
   )
+  @RequirePermission('farm_registry', 'CREATE')
   @ApiOperation({
     summary: 'AMCOS/officer pre-registers a farm under a known owner',
   })
@@ -52,6 +55,7 @@ export class FarmRegistryController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('farm_registry', 'VIEW')
   @ApiOperation({ summary: 'List pre-registered farms (staff)' })
   @ApiQuery({ name: 'status', required: false, enum: FarmRegistryStatus })
   @ApiQuery({ name: 'mamcosId', required: false })

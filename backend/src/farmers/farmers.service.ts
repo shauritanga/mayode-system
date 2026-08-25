@@ -122,7 +122,7 @@ export class FarmersService {
   // Reads
   // --------------------------------------------------------------------------
 
-  async findAll(query: QueryFarmersDto) {
+  async findAll(query: QueryFarmersDto, user?: RequestUser) {
     const {
       search,
       region,
@@ -135,12 +135,19 @@ export class FarmersService {
     const page = query.page && query.page > 0 ? query.page : 1;
     const pageSize = query.pageSize && query.pageSize > 0 ? query.pageSize : 20;
 
+    // Cooperative staff (any role, legacy or custom) are confined to their
+    // own AMCOS regardless of what mamcosId the client asks for; SUPER_ADMIN
+    // /ADMIN (and roles with no cooperative attached) stay unscoped and keep
+    // using the client-supplied filter as before.
+    const tenantId = user ? this.ownership.resolveTenantMamcosId(user) : null;
+    const scopedMamcosId = tenantId ?? mamcosId;
+
     const where: Prisma.FarmerWhereInput = {
       ...(region ? { region } : {}),
       ...(district ? { district } : {}),
       ...(ward ? { ward } : {}),
       ...(village ? { village } : {}),
-      ...(mamcosId ? { mamcosId } : {}),
+      ...(scopedMamcosId ? { mamcosId: scopedMamcosId } : {}),
       ...(verificationStatus ? { verificationStatus } : {}),
       ...(search
         ? {
@@ -206,7 +213,7 @@ export class FarmersService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: RequestUser) {
     const farmer = await this.prisma.farmer.findUnique({
       where: { id },
       include: {
@@ -231,6 +238,12 @@ export class FarmersService {
       },
     });
     if (!farmer) throw new NotFoundException(`Farmer with ID ${id} not found`);
+    // A scoped cooperative user reaching for another AMCOS's farmer gets the
+    // same 404 as a nonexistent id — no leak of cross-tenant existence.
+    const tenantId = user ? this.ownership.resolveTenantMamcosId(user) : null;
+    if (tenantId && farmer.mamcosId !== tenantId) {
+      throw new NotFoundException(`Farmer with ID ${id} not found`);
+    }
     return farmer;
   }
 

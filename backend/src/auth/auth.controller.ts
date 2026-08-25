@@ -58,7 +58,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({
     summary:
-      'Create a staff account. SUPER_ADMIN/ADMIN can create any role (a plain ADMIN cannot create SUPER_ADMIN or ADMIN accounts). An AMCOS Secretary can only create Field Officer accounts, scoped to their own AMCOS.',
+      'Create a staff account. SUPER_ADMIN/ADMIN can create any role (a plain ADMIN cannot create SUPER_ADMIN or ADMIN accounts) and may optionally assign a custom Role (from Role Management) via roleId for finer-grained resource permissions. An AMCOS Secretary can only create Field Officer accounts, scoped to their own AMCOS, and cannot assign custom roles.',
   })
   @ApiResponse({
     status: HttpStatus.CREATED,

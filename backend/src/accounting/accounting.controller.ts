@@ -12,6 +12,7 @@ import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { AccountingService } from './accounting.service';
 import {
   CreateBillDto,
@@ -20,7 +21,7 @@ import {
 } from './dto/accounting.dto';
 @ApiTags('accounting')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR)
 @Controller('accounting')
 export class AccountingController {

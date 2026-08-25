@@ -11,14 +11,16 @@ import {
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { GovernanceService } from './governance.service';
 import type { RequestUser } from '../common/ownership.service';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
 import { CreateVoteDto } from './dto/create-vote.dto';
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('governance')
 export class GovernanceController {
   constructor(private readonly service: GovernanceService) {}
@@ -28,18 +30,20 @@ export class GovernanceController {
   @Get('projects/:id') project(@Param('id') id: string) {
     return this.service.project(id);
   }
-  @Post('projects') @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN) createProject(
+  @Post('projects') @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN) @RequirePermission('governance', 'CREATE') createProject(
     @Body() body: any,
   ) {
     return this.service.createProject(body);
   }
   @Patch('projects/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @RequirePermission('governance', 'EDIT')
   updateProject(@Param('id') id: string, @Body() dto: UpdateProjectDto) {
     return this.service.updateProject(id, dto);
   }
   @Delete('projects/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @RequirePermission('governance', 'DELETE')
   removeProject(@Param('id') id: string) {
     return this.service.removeProject(id);
   }

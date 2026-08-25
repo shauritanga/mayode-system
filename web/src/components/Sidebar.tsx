@@ -22,7 +22,6 @@ import {
   File01Icon,
   DashboardSquare01Icon,
   ShoppingCart02Icon,
-  Location01Icon,
   AlertCircleIcon,
   FileEditIcon,
   MapsSearchIcon,
@@ -53,9 +52,27 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
+    label: '',
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: Home01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/farmers', label: 'Farmers', icon: UserGroupIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/mamcos', label: 'AMCOS', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/memberships', label: 'Membership', icon: StarIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/farms', label: 'Farms', icon: Plant01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/inventory', label: 'Inventory', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/marketplace', label: 'MLAX', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/finance', label: 'Finance and Accounting', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/reports', label: 'Reports', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/users', label: 'User Accounts', icon: UserAdd01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/roles', label: 'Roles & Permissions', icon: Shield01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/staff-management', label: 'Create Staff', icon: UserAdd01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/ai', label: 'AI Insights', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+    ],
+  },
+  {
     label: 'Overview',
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: Home01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
+      { href: '/dashboard', label: 'Dashboard', icon: Home01Icon, roles: ['MAMCOS_SECRETARY'] },
       { href: '/dashboard/farmer', label: 'Overview', icon: Home01Icon, roles: ['FARMER'] },
       { href: '/dashboard/field-officer', label: 'Field Dashboard', icon: MapsSearchIcon, roles: ['FIELD_OFFICER'] },
       { href: '/dashboard/auditor', label: 'Auditor Dashboard', icon: File01Icon, roles: ['AUDITOR'] },
@@ -66,61 +83,48 @@ const navGroups: NavGroup[] = [
   {
     label: 'People',
     items: [
-      { href: '/dashboard/leadership', label: 'Leadership', icon: DashboardSquare01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-      { href: '/dashboard/staff', label: 'Staff', icon: UserAdd01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-      { href: '/dashboard/users', label: 'Users & Roles', icon: UserAdd01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
-      { href: '/dashboard/farmers', label: 'Farmers', icon: UserGroupIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER'] },
-      { href: '/dashboard/memberships', label: 'Memberships', icon: StarIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-      { href: '/dashboard/mamcos', label: 'AMCOS', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/leadership', label: 'Leadership', icon: DashboardSquare01Icon, roles: ['MAMCOS_SECRETARY'] },
+      { href: '/dashboard/staff', label: 'Staff', icon: UserAdd01Icon, roles: ['MAMCOS_SECRETARY'] },
+      { href: '/dashboard/farmers', label: 'Farmers', icon: UserGroupIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER'] },
+      { href: '/dashboard/memberships', label: 'Memberships', icon: StarIcon, roles: ['MAMCOS_SECRETARY'] },
     ],
   },
   {
     label: 'Field Operations',
     items: [
-      { href: '/dashboard/farms', label: 'Farms', icon: Plant01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'] },
-      { href: '/dashboard/farm-registry', label: 'Farm Registry', icon: ClipboardIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER'] },
-      { href: '/dashboard/field-surveys', label: 'Field Surveys', icon: MapsSearchIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER'] },
-      { href: '/dashboard/crop-cycles', label: 'Crop Cycles', icon: WheatIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'] },
-      { href: '/dashboard/activities', label: 'Crop Activities', icon: ClipboardIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'] },
+      { href: '/dashboard/farms', label: 'Farms', icon: Plant01Icon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'] },
+      { href: '/dashboard/farm-registry', label: 'Farm Registry', icon: ClipboardIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER'] },
+      { href: '/dashboard/field-surveys', label: 'Field Surveys', icon: MapsSearchIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER'] },
+      { href: '/dashboard/crop-cycles', label: 'Crop Cycles', icon: WheatIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'] },
+      { href: '/dashboard/activities', label: 'Crop Activities', icon: ClipboardIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'] },
       { href: '/dashboard/rice-calendar', label: 'Rice Calendar', icon: BookOpen01Icon, roles: ['MAMCOS_SECRETARY'] },
-      { href: '/dashboard/seasons', label: 'Seasons', icon: Calendar01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-      { href: '/dashboard/leases', label: 'Renter Assignments', icon: HandshakeIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-      { href: '/dashboard/weather', label: 'Weather', icon: CloudSunRainIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER'] },
+      { href: '/dashboard/seasons', label: 'Seasons', icon: Calendar01Icon, roles: ['MAMCOS_SECRETARY'] },
+      { href: '/dashboard/leases', label: 'Renter Assignments', icon: HandshakeIcon, roles: ['MAMCOS_SECRETARY'] },
+      { href: '/dashboard/weather', label: 'Weather', icon: CloudSunRainIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER'] },
     ],
   },
   {
     label: 'Business',
     items: [
-      { href: '/dashboard/inventory', label: 'Inventory', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-      { href: '/dashboard/traceability', label: 'Traceability', icon: MapsSearchIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'AUDITOR'] },
-      { href: '/dashboard/suppliers', label: 'Suppliers', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-      { href: '/dashboard/sales', label: 'Cooperative Sales', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-      { href: '/dashboard/finance', label: 'Finance', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
-      { href: '/dashboard/insurance', label: 'Insurance', icon: Shield01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'AUDITOR'] },
-      { href: '/dashboard/marketplace', label: 'M-LAX Marketplace', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
-      { href: '/dashboard/buyer-orders', label: 'Buyer Orders', icon: Store01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
+      { href: '/dashboard/inventory', label: 'Inventory', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'] },
+      { href: '/dashboard/traceability', label: 'Traceability', icon: MapsSearchIcon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'] },
+      { href: '/dashboard/suppliers', label: 'Suppliers', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'] },
+      { href: '/dashboard/sales', label: 'Cooperative Sales', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'] },
+      { href: '/dashboard/insurance', label: 'Insurance', icon: Shield01Icon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'] },
+      { href: '/dashboard/buyer-orders', label: 'Buyer Orders', icon: Store01Icon, roles: ['MAMCOS_SECRETARY'] },
     ],
   },
   {
     label: 'Governance & Insights',
     items: [
-      { href: '/dashboard/disputes', label: 'Disputes', icon: AlertCircleIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-      { href: '/dashboard/corrections', label: 'Corrections', icon: FileEditIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-      { href: '/dashboard/compliance', label: 'Compliance', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'AUDITOR'] },
-      { href: '/dashboard/reports', label: 'Reports', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'AUDITOR'] },
-      { href: '/dashboard/grantor', label: 'Grantor Impact', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'AUDITOR', 'BUYER'] },
-      { href: '/dashboard/ai', label: 'AI Insights', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'] },
-      { href: '/dashboard/governance', label: 'Governance', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-      { href: '/dashboard/projects', label: 'Community Projects', icon: GiftIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'] },
-      { href: '/dashboard/rewards', label: 'Rewards', icon: GiftIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
-      { href: '/dashboard/alerts', label: 'Alerts', icon: BellIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
-      { href: '/dashboard/locations', label: 'Locations', icon: Location01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
-      { href: '/dashboard/settings', label: 'Settings', icon: DashboardSquare01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+      { href: '/dashboard/disputes', label: 'Disputes', icon: AlertCircleIcon, roles: ['MAMCOS_SECRETARY'] },
+      { href: '/dashboard/corrections', label: 'Corrections', icon: FileEditIcon, roles: ['MAMCOS_SECRETARY'] },
+      { href: '/dashboard/compliance', label: 'Compliance', icon: File01Icon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'] },
+      { href: '/dashboard/reports', label: 'Reports', icon: ChartBarLineIcon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'] },
+      { href: '/dashboard/grantor', label: 'Grantor Impact', icon: ChartBarLineIcon, roles: ['AUDITOR', 'BUYER'] },
+      { href: '/dashboard/ai', label: 'AI Insights', icon: ChartBarLineIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'] },
+      { href: '/dashboard/governance', label: 'Governance', icon: File01Icon, roles: ['MAMCOS_SECRETARY'] },
+      { href: '/dashboard/projects', label: 'Community Projects', icon: GiftIcon, roles: ['MAMCOS_SECRETARY'] },
     ],
   },
   {
@@ -160,8 +164,8 @@ function NavList({ onNavigate, collapsed = false }: { onNavigate?: () => void; c
   return (
     <nav className="sidebar-nav">
       {visibleGroups.map((group) => (
-        <div key={group.label} className="sidebar-group">
-          <div className="sidebar-group-label">{group.label}</div>
+        <div key={group.label || 'admin-flat'} className="sidebar-group">
+          {group.label && <div className="sidebar-group-label">{group.label}</div>}
           {group.items.map((item) => {
             // Landing pages that sit at the same path prefix as their own sibling
             // routes must match exactly, not by prefix — otherwise the landing

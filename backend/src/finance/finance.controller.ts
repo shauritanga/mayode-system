@@ -4,14 +4,16 @@ import { FinanceService } from './finance.service';
 import { CreateInputCostDto, CreateRevenueDto } from './dto/finance.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { UserRole } from '@prisma/client';
 
 @ApiTags('finance')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('finance')
 export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}
@@ -23,6 +25,7 @@ export class FinanceController {
     UserRole.FIELD_OFFICER,
     UserRole.FARMER,
   )
+  @RequirePermission('finance', 'CREATE')
   @ApiOperation({
     summary:
       'Log a production input cost (Seeds, fertilizer, labor, tractor tillage, etc.)',
@@ -42,6 +45,7 @@ export class FinanceController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.FARMER,
   )
+  @RequirePermission('finance', 'CREATE')
   @ApiOperation({
     summary:
       'Log harvest sales revenue & Fairtrade premium (farmer self-report or staff-recorded)',
@@ -52,6 +56,7 @@ export class FinanceController {
 
   @Get('costs')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR)
+  @RequirePermission('finance', 'VIEW')
   @ApiOperation({
     summary: 'Get all input costs across the system (staff only)',
   })

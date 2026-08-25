@@ -12,7 +12,9 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DisputeStatus, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { DisputesService } from './disputes.service';
@@ -28,13 +30,14 @@ const STAFF_ROLES = [
 
 @ApiTags('disputes')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('disputes')
 export class DisputesController {
   constructor(private readonly disputes: DisputesService) {}
 
   @Post()
   @Roles(...STAFF_ROLES)
+  @RequirePermission('disputes', 'CREATE')
   @ApiOperation({
     summary:
       'Open a dispute (ownership conflict, duplicate claim, boundary overlap, etc.)',
@@ -45,6 +48,7 @@ export class DisputesController {
 
   @Get()
   @Roles(...STAFF_ROLES)
+  @RequirePermission('disputes', 'VIEW')
   @ApiOperation({
     summary: 'All disputes, optionally filtered by status (staff only)',
   })

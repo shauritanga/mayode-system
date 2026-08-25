@@ -16,6 +16,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { SmsService } from '../messaging/sms.service';
 import { ClickPesaService } from '../payments/clickpesa.service';
 import { AccountingService } from '../accounting/accounting.service';
+import { OwnershipService, RequestUser } from '../common/ownership.service';
 import {
   ApproveMembershipDto,
   CreateMembershipPlanDto,
@@ -49,6 +50,7 @@ export class MembershipsService {
     private readonly clickPesa: ClickPesaService,
     private readonly sms: SmsService,
     private readonly accounting: AccountingService,
+    private readonly ownership: OwnershipService,
   ) {}
 
   // ---------------------------------------------------------------- plans
@@ -76,9 +78,16 @@ export class MembershipsService {
   // ----------------------------------------------------------- membership
 
   /** Admin/staff: all memberships, optionally filtered by status. */
-  listAll(status?: MembershipStatus) {
+  listAll(status?: MembershipStatus, user?: RequestUser) {
+    // Indirect scoping via the linked farmer's own AMCOS — a membership
+    // with no farmer attached is invisible to a scoped cooperative user
+    // (safe default: nothing to attribute it to).
+    const tenantId = user ? this.ownership.resolveTenantMamcosId(user) : null;
     return this.prisma.membership.findMany({
-      where: status ? { status } : undefined,
+      where: {
+        ...(status ? { status } : {}),
+        ...(tenantId ? { farmer: { mamcosId: tenantId } } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         user: { select: { id: true, phone: true } },

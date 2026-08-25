@@ -9,6 +9,7 @@ import { CommonModule } from './common/common.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { RolesModule } from './roles/roles.module';
 import { FarmersModule } from './farmers/farmers.module';
 import { MamcosModule } from './mamcos/mamcos.module';
 import { FarmsModule } from './farms/farms.module';
@@ -87,6 +88,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     // Core Modules — Phase 1
     AuthModule,
     UsersModule,
+    RolesModule,
     FarmersModule,
 
     // Core Entity Management & Farm Verification — Phase 2

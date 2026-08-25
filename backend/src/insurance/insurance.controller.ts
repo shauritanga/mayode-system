@@ -11,7 +11,9 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { InsuranceService } from './insurance.service';
@@ -35,25 +37,28 @@ const STAFF_ROLES = [
 
 @ApiTags('insurance')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('insurance')
 export class InsuranceController {
   constructor(private readonly insurance: InsuranceService) {}
 
   @Post('providers')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('insurance', 'CREATE')
   createProvider(@Body() dto: UpsertInsuranceProviderDto) {
     return this.insurance.createProvider(dto);
   }
 
   @Get('providers')
   @Roles(...STAFF_ROLES)
+  @RequirePermission('insurance', 'VIEW')
   findAllProviders() {
     return this.insurance.findAllProviders();
   }
 
   @Patch('providers/:id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('insurance', 'EDIT')
   updateProvider(
     @Param('id') id: string,
     @Body() dto: UpsertInsuranceProviderDto,
@@ -63,6 +68,7 @@ export class InsuranceController {
 
   @Post('policies')
   @Roles(...STAFF_ROLES)
+  @RequirePermission('insurance', 'CREATE')
   @ApiOperation({
     summary: 'Register a new crop insurance policy for a farmer',
   })
@@ -72,6 +78,7 @@ export class InsuranceController {
 
   @Get('policies')
   @Roles(...STAFF_ROLES)
+  @RequirePermission('insurance', 'VIEW')
   @ApiOperation({
     summary: 'Get all insurance policies across the system (staff only)',
   })

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { MamcosStaffRole, Prisma, UserRole } from '@prisma/client';
+import { MamcosStaffRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { MembershipsService } from '../memberships/memberships.service';
@@ -97,16 +97,12 @@ export class FarmsService {
 
   async findAll(query: QueryFarmsDto = {}, user?: RequestUser) {
     const { search, mamcosId, farmerId, village, grade, isVerified } = query;
-    let scopedMamcosId = mamcosId;
-    if (user?.role === UserRole.MAMCOS_SECRETARY) {
-      const secretary = await this.prisma.mamcosStaff.findFirst({
-        where: { userId: user.id, role: MamcosStaffRole.SECRETARY },
-        select: { mamcosId: true },
-      });
-      if (!secretary)
-        throw new NotFoundException('AMCOS officer profile is missing');
-      scopedMamcosId = secretary.mamcosId ?? undefined;
-    }
+    // Cooperative staff (any role, legacy or custom) are confined to their
+    // own AMCOS regardless of what mamcosId the client asks for; SUPER_ADMIN
+    // /ADMIN (and roles with no cooperative attached, e.g. AUDITOR) remain
+    // unscoped and keep using the client-supplied filter as before.
+    const tenantId = user ? this.ownership.resolveTenantMamcosId(user) : null;
+    const scopedMamcosId = tenantId ?? mamcosId;
     const where: Prisma.FarmWhereInput = {
       ...(scopedMamcosId ? { mamcosId: scopedMamcosId } : {}),
       ...(farmerId ? { farmerId } : {}),

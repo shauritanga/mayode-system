@@ -32,7 +32,9 @@ import {
 } from './dto/trust-layer.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 import type { RequestUser } from '../common/ownership.service';
@@ -40,7 +42,7 @@ import { ExportService } from '../common/export.service';
 
 @ApiTags('farmers')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('farmers')
 export class FarmersController {
   constructor(
@@ -50,6 +52,7 @@ export class FarmersController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER)
+  @RequirePermission('farmers', 'CREATE')
   @ApiOperation({
     summary: 'Register a new farmer (provisions login + profile)',
   })
@@ -65,6 +68,7 @@ export class FarmersController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('farmers', 'VIEW')
   @ApiOperation({
     summary:
       'List farmers (search, filter by location/cooperative/status, paginated) — Admin read-only for reporting/Finance farmer lookup',
@@ -72,8 +76,9 @@ export class FarmersController {
   async findAll(
     @Query() query: QueryFarmersDto,
     @Res({ passthrough: true }) response: Response,
+    @CurrentUser() user: RequestUser,
   ) {
-    const result = await this.farmersService.findAll(query);
+    const result = await this.farmersService.findAll(query, user);
     if (!query.format || query.format === 'json') return result;
     const rows = result.data.map((farmer: any) => ({
       farmerId: farmer.controlNumber,
@@ -178,12 +183,13 @@ export class FarmersController {
     UserRole.AUDITOR,
     UserRole.FARMER,
   )
+  @RequirePermission('farmers', 'VIEW')
   @ApiOperation({
     summary:
       'Get farmer profile by ID (household, documents, verifications, farms)',
   })
-  findOne(@Param('id') id: string) {
-    return this.farmersService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.farmersService.findOne(id, user);
   }
 
   @Get(':id/credit-score')
@@ -369,6 +375,7 @@ export class FarmersController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.FARMER,
   )
+  @RequirePermission('farmers', 'EDIT')
   @ApiOperation({
     summary: 'Update farmer profile (own profile for farmers, any for staff)',
   })

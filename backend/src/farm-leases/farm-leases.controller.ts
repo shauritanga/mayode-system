@@ -13,7 +13,9 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { LeaseStatus, UserRole, VerificationStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { FarmLeasesService } from './farm-leases.service';
@@ -33,7 +35,7 @@ const STAFF_ROLES = [
 
 @ApiTags('farm-leases')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('farm-leases')
 export class FarmLeasesController {
   constructor(private readonly leases: FarmLeasesService) {}
@@ -44,6 +46,7 @@ export class FarmLeasesController {
     UserRole.FIELD_OFFICER,
     UserRole.MAMCOS_SECRETARY,
   )
+  @RequirePermission('farm_leases', 'CREATE')
   @ApiOperation({
     summary:
       'Owner adds a lease: names the renter for a farm and season (Add Lease)',
@@ -60,6 +63,7 @@ export class FarmLeasesController {
 
   @Get()
   @Roles(...STAFF_ROLES)
+  @RequirePermission('farm_leases', 'VIEW')
   @ApiOperation({
     summary: 'All leases, optionally filtered by status (staff only)',
   })
@@ -122,6 +126,7 @@ export class FarmLeasesController {
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('farm_leases', 'DELETE')
   @ApiOperation({
     summary:
       'Delete a lease that never went active (Admin only). ACTIVE/COMPLETED leases are kept for the audit trail',
@@ -133,7 +138,7 @@ export class FarmLeasesController {
 
 @ApiTags('seasonal-assignments')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('seasonal-assignments')
 export class SeasonalAssignmentsController {
   constructor(private readonly leases: FarmLeasesService) {}
@@ -168,6 +173,7 @@ export class SeasonalAssignmentsController {
 
   @Get()
   @Roles(...STAFF_ROLES)
+  @RequirePermission('farm_leases', 'VIEW')
   @ApiOperation({ summary: 'All seasonal assignments (staff only)' })
   findAll() {
     return this.leases.findAllAssignments();
@@ -176,7 +182,7 @@ export class SeasonalAssignmentsController {
 
 @ApiTags('farm-ownerships')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('farm-ownerships')
 export class FarmOwnershipsController {
   constructor(private readonly leases: FarmLeasesService) {}
@@ -207,6 +213,7 @@ export class FarmOwnershipsController {
 
   @Get()
   @Roles(...STAFF_ROLES)
+  @RequirePermission('farm_leases', 'VIEW')
   @ApiOperation({
     summary:
       'All ownership records, optionally filtered by status (staff only)',

@@ -12,7 +12,9 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SuggestedUpdateStatus, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { FarmCorrectionsService } from './farm-corrections.service';
@@ -32,7 +34,7 @@ const STAFF_ROLES = [
 
 @ApiTags('farm-corrections')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('farms/:farmId')
 export class FarmCorrectionsController {
   constructor(private readonly corrections: FarmCorrectionsService) {}
@@ -110,13 +112,14 @@ export class FarmCorrectionsController {
 
 @ApiTags('farm-corrections')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('suggested-updates')
 export class SuggestedUpdatesController {
   constructor(private readonly corrections: FarmCorrectionsService) {}
 
   @Get()
   @Roles(...STAFF_ROLES)
+  @RequirePermission('farm_corrections', 'VIEW')
   @ApiOperation({
     summary:
       'All suggested farm corrections, optionally filtered by status (staff review queue)',
@@ -141,13 +144,14 @@ export class SuggestedUpdatesController {
 
 @ApiTags('farm-corrections')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('farm-data-conflicts')
 export class FarmDataConflictsController {
   constructor(private readonly corrections: FarmCorrectionsService) {}
 
   @Get()
   @Roles(...STAFF_ROLES)
+  @RequirePermission('farm_corrections', 'VIEW')
   @ApiOperation({
     summary:
       'All unresolved conflicting farm data values across farms (staff only)',

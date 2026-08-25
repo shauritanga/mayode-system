@@ -12,7 +12,9 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { BuyersService } from '../buyers/buyers.service';
 import { BuyerOrdersService } from './buyer-orders.service';
@@ -29,7 +31,7 @@ const STAFF_ROLES = [
 
 @ApiTags('buyer-orders')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('buyer-orders')
 export class BuyerOrdersController {
   constructor(
@@ -39,6 +41,7 @@ export class BuyerOrdersController {
 
   @Post()
   @Roles(...STAFF_ROLES, UserRole.BUYER)
+  @RequirePermission('buyer_orders', 'CREATE')
   async create(@Body() dto: CreateBuyerOrderDto, @CurrentUser() user: any) {
     if (user.role === UserRole.BUYER) {
       const company = await this.buyers.requireMatchedBuyer(user);
@@ -49,6 +52,7 @@ export class BuyerOrdersController {
 
   @Get()
   @Roles(...STAFF_ROLES)
+  @RequirePermission('buyer_orders', 'VIEW')
   findAll() {
     return this.buyerOrders.findAll();
   }
@@ -65,6 +69,7 @@ export class BuyerOrdersController {
 
   @Get(':id')
   @Roles(...STAFF_ROLES, UserRole.BUYER)
+  @RequirePermission('buyer_orders', 'VIEW')
   async findOne(@Param('id') id: string, @CurrentUser() user: any) {
     const order = await this.buyerOrders.findOne(id);
     await this.buyers.assertBuyerAccess(user, order.buyerId);
@@ -82,6 +87,7 @@ export class BuyerOrdersController {
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('buyer_orders', 'DELETE')
   remove(@Param('id') id: string) {
     return this.buyerOrders.remove(id);
   }

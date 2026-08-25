@@ -24,6 +24,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       where: { id: payload.sub },
       include: {
         farmer: true,
+        customRole: {
+          include: { permissions: { include: { resource: true } } },
+        },
+        mamcosStaff: { select: { mamcosId: true } },
       },
     });
 
@@ -36,11 +40,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       controlNumber = user.farmer.controlNumber;
     }
 
+    // A user's own cooperative — from their staff assignment, or their
+    // farmer profile — used to scope data access to that AMCOS alone. See
+    // OwnershipService.resolveTenantMamcosId for how this is applied.
+    const mamcosId = user.mamcosStaff?.mamcosId ?? user.farmer?.mamcosId ?? null;
+
     return {
       id: user.id,
       phone: user.phone,
       email: user.email,
       role: user.role,
+      roleId: user.roleId,
+      customRole: user.customRole,
+      mamcosId,
       language: user.language,
       controlNumber,
     };
