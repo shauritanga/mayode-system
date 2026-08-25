@@ -6,11 +6,14 @@ import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { useIdleLogout } from '@/hooks/useIdleLogout';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, _hasHydrated } = useAuthStore();
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const router = useRouter();
+
+  useIdleLogout();
 
   useEffect(() => {
     // Wait for the persisted auth state to load from localStorage before

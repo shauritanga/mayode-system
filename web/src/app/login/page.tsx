@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion, useReducedMotion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
@@ -9,7 +9,16 @@ import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setAuth } = useAuthStore();
   const reduce = useReducedMotion();
   const [phone, setPhone] = useState('');
@@ -17,6 +26,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const idleLogout = searchParams.get('reason') === 'idle';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +95,12 @@ export default function LoginPage() {
           </div>
           <h1 className="auth-title">Welcome back</h1>
           <p className="auth-subtitle">Sign in to your MAYODE GROUP workspace.</p>
+
+          {idleLogout && !error && (
+            <div className="alert-box alert-warning" role="status" style={{ marginBottom: '18px' }}>
+              You were signed out after 15 minutes of inactivity. Please sign in again.
+            </div>
+          )}
 
           {error && (
             <div className="alert-box alert-danger" role="alert" style={{ marginBottom: '18px' }}>
