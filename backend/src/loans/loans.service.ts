@@ -22,7 +22,22 @@ export class LoansService {
   ) {}
 
   async create(dto: CreateLoanDto) {
-    const loan = await this.prisma.loanRecord.create({ data: dto });
+    let lenderPayoutPhone = dto.lenderPayoutPhone;
+    let lenderPayoutName = dto.lenderPayoutName;
+    let lenderName = dto.lenderName;
+    if (dto.lenderId) {
+      const lender = await this.prisma.lender.findUnique({
+        where: { id: dto.lenderId },
+      });
+      if (lender) {
+        lenderName = lender.name;
+        lenderPayoutPhone = lenderPayoutPhone ?? lender.payoutPhone ?? undefined;
+        lenderPayoutName = lenderPayoutName ?? lender.payoutName ?? undefined;
+      }
+    }
+    const loan = await this.prisma.loanRecord.create({
+      data: { ...dto, lenderName, lenderPayoutPhone, lenderPayoutName },
+    });
     await this.accounting.postToLedger(
       'LoanDisbursement',
       loan.id,
@@ -50,7 +65,41 @@ export class LoansService {
         farmer: {
           select: { firstName: true, lastName: true, controlNumber: true },
         },
+        lender: true,
       },
+    });
+  }
+
+  /**
+   * A downloadable list of pending/successful lender payouts (loan
+   * deductions), for cooperatives whose lenders want bank-transfer
+   * settlement instead of mobile money — the report-based alternative
+   * explicitly offered by the spec when direct bank API integration isn't
+   * available.
+   */
+  async lenderPayoutReport(from?: string, to?: string) {
+    return this.prisma.loanDeduction.findMany({
+      where: {
+        ...(from || to
+          ? {
+              createdAt: {
+                ...(from ? { gte: new Date(from) } : {}),
+                ...(to ? { lte: new Date(to) } : {}),
+              },
+            }
+          : {}),
+      },
+      include: {
+        loanRecord: {
+          include: {
+            farmer: {
+              select: { firstName: true, lastName: true, controlNumber: true },
+            },
+            lender: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 

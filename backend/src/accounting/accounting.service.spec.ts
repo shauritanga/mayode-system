@@ -41,9 +41,14 @@ describe('AccountingService', () => {
       calculateFinancialRatios({
         assets: 200,
         liabilities: 100,
+        cash: 150,
         income: 500,
         netProfit: 75,
       }),
-    ).toEqual({ liquidity: 2, profitability: 0.15, solvency: 0.5 });
+    ).toEqual({
+      liquidity: { currentRatio: 2, quickRatio: 1.5 },
+      profitability: { netProfitMargin: 0.15, returnOnAssets: 0.375 },
+      solvency: { debtToEquityRatio: 1 },
+    });
   });
 });

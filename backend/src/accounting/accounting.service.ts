@@ -208,15 +208,17 @@ export class AccountingService {
     };
   }
   async ratios(from?: string, to?: string) {
-    const [balance, pnl] = await Promise.all([
+    const [balance, pnl, cashFlow] = await Promise.all([
       this.balanceSheet(to),
       this.profitAndLoss(from, to),
+      this.cashFlow(undefined, to),
     ]);
     return {
       period: { from: from ?? null, to: to ?? null },
       ...calculateFinancialRatios({
         assets: balance.assets,
         liabilities: balance.liabilities,
+        cash: cashFlow.netCashFlow,
         income: pnl.income,
         netProfit: pnl.netProfit,
       }),
@@ -259,8 +261,20 @@ export class AccountingService {
     });
   }
   async createBill(dto: CreateBillDto) {
+    let supplierName = dto.supplier;
+    if (dto.supplierId) {
+      const supplierRecord = await this.prisma.supplier.findUnique({
+        where: { id: dto.supplierId },
+        select: { name: true },
+      });
+      if (supplierRecord) supplierName = supplierRecord.name;
+    }
     const bill = await this.prisma.bill.create({
-      data: { ...dto, dueDate: new Date(dto.dueDate) },
+      data: {
+        ...dto,
+        supplier: supplierName,
+        dueDate: new Date(dto.dueDate),
+      },
     });
     await this.postToLedger(
       'Bill',
@@ -311,7 +325,23 @@ export class AccountingService {
     });
     return this.prisma.bill.findMany({
       where: { status: { in: ['OPEN', 'OVERDUE'] } },
+      include: { supplierRef: true },
       orderBy: { dueDate: 'asc' },
+    });
+  }
+  async listAccounts() {
+    return this.accounts();
+  }
+  findAllBudgets() {
+    return this.prisma.budget.findMany({
+      include: { lines: true },
+      orderBy: { startDate: 'desc' },
+    });
+  }
+  findBudget(id: string) {
+    return this.prisma.budget.findUniqueOrThrow({
+      where: { id },
+      include: { lines: { include: { account: true } } },
     });
   }
   createBudget(dto: CreateBudgetDto) {

@@ -13,6 +13,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { AccountingService } from './accounting.service';
 import {
   CreateBillDto,
@@ -74,10 +75,27 @@ export class AccountingController {
   @Get('payables') payables() {
     return this.accounting.payables();
   }
-  @Post('budgets') budget(@Body() dto: CreateBudgetDto) {
+  @Get('accounts') accounts() {
+    return this.accounting.listAccounts();
+  }
+  @Post('budgets')
+  @RequirePermission('accounting', 'CREATE')
+  budget(@Body() dto: CreateBudgetDto) {
     return this.accounting.createBudget(dto);
   }
-  @Get('budgets/:id/actual') actual(@Param('id') id: string) {
+  @Get('budgets')
+  @RequirePermission('accounting', 'VIEW')
+  budgets() {
+    return this.accounting.findAllBudgets();
+  }
+  @Get('budgets/:id')
+  @RequirePermission('accounting', 'VIEW')
+  budgetDetail(@Param('id') id: string) {
+    return this.accounting.findBudget(id);
+  }
+  @Get('budgets/:id/actual')
+  @RequirePermission('accounting', 'VIEW')
+  actual(@Param('id') id: string) {
     return this.accounting.budgetActual(id);
   }
 }

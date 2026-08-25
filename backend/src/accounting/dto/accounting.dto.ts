@@ -18,6 +18,7 @@ export class CreateInvoiceDto {
 export class CreateBillDto {
   @IsString() billNumber: string;
   @IsString() supplier: string;
+  @IsOptional() @IsString() supplierId?: string;
   @IsNumber() @Min(0.01) amount: number;
   @IsDateString() dueDate: string;
   @IsOptional() @IsString() description?: string;

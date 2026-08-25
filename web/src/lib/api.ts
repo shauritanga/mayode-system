@@ -236,6 +236,15 @@ export const loansApi = {
   getForFarmer: (farmerId: string) => api.get(`/loans/farmer/${farmerId}`),
   getAll: () => api.get('/loans'),
   create: (data: object) => api.post('/loans', data),
+  payoutReport: (params?: { from?: string; to?: string; format?: 'csv' | 'pdf' | 'xlsx' }) =>
+    api.get('/loans/lender-payout-report', { params, responseType: 'blob' }),
+  lenders: {
+    getAll: () => api.get('/lenders'),
+    getOne: (id: string) => api.get(`/lenders/${id}`),
+    create: (data: object) => api.post('/lenders', data),
+    update: (id: string, data: object) => api.patch(`/lenders/${id}`, data),
+    remove: (id: string) => api.delete(`/lenders/${id}`),
+  },
 };
 export const accountingApi = {
   statements: (params?: object) => api.get('/accounting/statements', { params }),
@@ -244,6 +253,16 @@ export const accountingApi = {
   cashFlow: (params?: object) => api.get('/accounting/cash-flow', { params }),
   trialBalance: (params?: object) => api.get('/accounting/trial-balance', { params }),
   ratios: (params?: object) => api.get('/accounting/ratios', { params }),
+  accounts: () => api.get('/accounting/accounts'),
+  createInvoice: (data: object) => api.post('/accounting/invoices', data),
+  createBill: (data: object) => api.post('/accounting/bills', data),
+  payBill: (id: string) => api.post(`/accounting/bills/${id}/pay`),
+  receivables: () => api.get('/accounting/receivables'),
+  payables: () => api.get('/accounting/payables'),
+  createBudget: (data: object) => api.post('/accounting/budgets', data),
+  listBudgets: () => api.get('/accounting/budgets'),
+  getBudget: (id: string) => api.get(`/accounting/budgets/${id}`),
+  budgetActual: (id: string) => api.get(`/accounting/budgets/${id}/actual`),
 };
 
 export const insuranceApi = {

@@ -35,7 +35,7 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  roleId       String?   @map("role_id")
+  roleId String? @map("role_id")
 
   // Relations
   farmer        Farmer?
@@ -545,6 +545,7 @@ model Supplier {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   inputCosts InputCost[]
+  bills      Bill[]
 
   @@map("suppliers")
 }
@@ -604,6 +605,7 @@ model Payment {
 model LoanRecord {
   id                String   @id @default(uuid())
   farmerId          String   @map("farmer_id")
+  lenderId          String?  @map("lender_id")
   lenderName        String   @map("lender_name")
   originalAmount    Float    @map("original_amount")
   amountOwed        Float    @map("amount_owed")
@@ -616,10 +618,29 @@ model LoanRecord {
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   farmer           Farmer          @relation(fields: [farmerId], references: [id])
+  lender           Lender?         @relation(fields: [lenderId], references: [id])
   deductions       LoanDeduction[]
   linkedInputCosts InputCost[]
 
   @@map("loan_records")
+}
+
+model Lender {
+  id                  String   @id @default(uuid())
+  name                String   @unique
+  contactPerson       String?  @map("contact_person")
+  contactPhone        String?  @map("contact_phone")
+  contactEmail        String?  @map("contact_email")
+  payoutPhone         String?  @map("payout_phone")
+  payoutName          String?  @map("payout_name")
+  interestRatePercent Float?   @map("interest_rate_percent")
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  loans LoanRecord[]
+
+  @@map("lenders")
 }
 
 model LoanDeduction {
@@ -859,17 +880,19 @@ model LedgerEntry {
 }
 
 model Invoice {
-  id            String        @id @default(uuid())
-  invoiceNumber String        @unique @map("invoice_number")
-  saleId        String?       @unique @map("sale_id")
-  buyerId       String?       @map("buyer_id")
-  amount        Float
-  dueDate       DateTime      @map("due_date")
-  status        InvoiceStatus @default(OPEN)
-  paidAt        DateTime?     @map("paid_at")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  sale          Sale?         @relation(fields: [saleId], references: [id])
-  buyer         Buyer?        @relation(fields: [buyerId], references: [id])
+  id             String        @id @default(uuid())
+  invoiceNumber  String        @unique @map("invoice_number")
+  saleId         String?       @unique @map("sale_id")
+  buyerId        String?       @map("buyer_id")
+  amount         Float
+  dueDate        DateTime      @map("due_date")
+  status         InvoiceStatus @default(OPEN)
+  paidAt         DateTime?     @map("paid_at")
+  lastReminderAt DateTime?     @map("last_reminder_at")
+  reminderCount  Int           @default(0) @map("reminder_count")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  sale           Sale?         @relation(fields: [saleId], references: [id])
+  buyer          Buyer?        @relation(fields: [buyerId], references: [id])
 
   @@index([dueDate, status])
   @@map("invoices")
@@ -879,12 +902,15 @@ model Bill {
   id          String        @id @default(uuid())
   billNumber  String        @unique @map("bill_number")
   supplier    String
+  supplierId  String?       @map("supplier_id")
   amount      Float
   dueDate     DateTime      @map("due_date")
   status      InvoiceStatus @default(OPEN)
   paidAt      DateTime?     @map("paid_at")
   description String?
   createdAt   DateTime      @default(now()) @map("created_at")
+
+  supplierRef Supplier? @relation(fields: [supplierId], references: [id])
 
   @@index([dueDate, status])
   @@map("bills")
