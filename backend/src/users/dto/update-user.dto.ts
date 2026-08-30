@@ -86,4 +86,9 @@ export class UpdateProfileDto {
   @IsIn(['sw', 'en'])
   @IsOptional()
   language?: string;
+
+  @ApiPropertyOptional({ example: '/uploads/profile-abc.jpg' })
+  @IsString()
+  @IsOptional()
+  profilePhotoUrl?: string;
 }

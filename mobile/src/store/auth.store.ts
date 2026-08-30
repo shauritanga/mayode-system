@@ -12,6 +12,7 @@ interface User {
   controlNumber?: string;
   firstName?: string;
   lastName?: string;
+  profilePhotoUrl?: string;
 }
 
 interface AuthState {
@@ -24,6 +25,7 @@ interface AuthState {
   pushToken: string | null;
   _hydrated: boolean;
   setAuth: (user: User, accessToken: string, refreshToken?: string) => void;
+  updateUser: (patch: Partial<User>) => void;
   setFarmerId: (id: string | null) => void;
   clearAuth: () => void;
   setOnboarded: () => void;
@@ -52,6 +54,9 @@ export const useAuthStore = create<AuthState>()(
           farmerId: null,
         });
       },
+      updateUser: (patch) => set((state) => ({
+        user: state.user ? { ...state.user, ...patch } : null,
+      })),
       setFarmerId: (farmerId) => set({ farmerId }),
       clearAuth: () => {
         setApiToken(null);

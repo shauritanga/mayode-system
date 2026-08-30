@@ -93,6 +93,7 @@ export class AuthService {
       email?: string | null;
       firstName?: string | null;
       lastName?: string | null;
+      profilePhotoUrl?: string | null;
     },
     controlNumber?: string,
   ): Promise<AuthResponseDto> {
@@ -148,6 +149,7 @@ export class AuthService {
         lastName: user.lastName || undefined,
         role: user.role,
         controlNumber,
+        profilePhotoUrl: user.profilePhotoUrl || undefined,
       },
     };
   }

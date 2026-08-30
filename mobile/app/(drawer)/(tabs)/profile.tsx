@@ -8,17 +8,28 @@ import { useAuthStore } from '../../../src/store/auth.store';
 import { authApi, farmersApi } from '../../../src/lib/data';
 import { StatusBar } from 'expo-status-bar';
 import { Language, useI18n } from '../../../src/i18n';
+import { UserAvatar } from '../../../src/components/UserAvatar';
+import { refreshUserProfile, useProfilePhotoUpload } from '../../../src/hooks/useProfilePhoto';
 
 export default function ProfileTab() {
   const { user, farmerId, clearAuth } = useAuthStore();
   const { language, setLanguage, t } = useI18n();
   const router = useRouter();
   const [farmer, setFarmer] = useState<any>(null);
+  const { photoUrl, uploading, pickAndUpload, displayName } = useProfilePhotoUpload();
+  const isFieldOfficer = user?.role === 'FIELD_OFFICER';
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       (async () => {
+        if (user?.id) {
+          try {
+            await refreshUserProfile(user.id);
+          } catch {
+            /* keep cached auth user */
+          }
+        }
         if (!farmerId) return;
         try {
           const res = await farmersApi.getOne(farmerId);
@@ -30,7 +41,7 @@ export default function ProfileTab() {
       return () => {
         active = false;
       };
-    }, [farmerId]),
+    }, [farmerId, user?.id]),
   );
 
   const status = farmer?.verificationStatus || 'PENDING';
@@ -67,9 +78,21 @@ export default function ProfileTab() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Avatar Section */}
         <View style={styles.avatarContainer}>
-          <View style={styles.avatarBox}>
-            <Text style={styles.avatarText}>{user?.firstName?.[0] || 'M'}</Text>
-          </View>
+          <UserAvatar
+            size={88}
+            photoUrl={photoUrl}
+            name={displayName}
+            uploading={uploading}
+            editable={isFieldOfficer || !farmerId}
+            onPress={isFieldOfficer || !farmerId ? pickAndUpload : undefined}
+            fallbackColor="#10B981"
+            borderColor="#E5E7EB"
+          />
+          {(isFieldOfficer || !farmerId) ? (
+            <TouchableOpacity onPress={pickAndUpload} disabled={uploading} activeOpacity={0.75}>
+              <Text style={styles.changePhotoText}>{t('changeProfilePhoto')}</Text>
+            </TouchableOpacity>
+          ) : null}
           <View style={styles.userNameRow}>
             <Text style={styles.userName}>{user?.firstName ? `${user.firstName} ${user.lastName || ''}` : t('farmerAccount')}</Text>
             {status === 'VERIFIED' && <Text style={styles.verifiedBadge}>✓</Text>}
@@ -244,6 +267,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+  },
+  changePhotoText: {
+    marginTop: 10,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#047857',
   },
   avatarBox: {
     width: 80,

@@ -39,6 +39,8 @@ import {
 import type { TrendRange } from '../src/lib/finance-trend';
 import { useI18n } from '../src/i18n';
 import { useAuthStore } from '../src/store/auth.store';
+import { UserAvatar } from '../src/components/UserAvatar';
+import { refreshUserProfile } from '../src/hooks/useProfilePhoto';
 import { NotificationBell } from './(drawer)/(tabs)/_layout';
 
 type Props = { role: string };
@@ -90,6 +92,13 @@ export default function RoleWorkspaceDashboard({ role }: Props) {
   const initial = (user?.firstName?.[0] || 'O').toUpperCase();
 
   const load = useCallback(async () => {
+    if (user?.id) {
+      try {
+        await refreshUserProfile(user.id);
+      } catch {
+        /* keep cached photo */
+      }
+    }
     setLoading(true);
     try {
       const ctxRes = await workspaceApi.context();
@@ -113,7 +122,7 @@ export default function RoleWorkspaceDashboard({ role }: Props) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -133,9 +142,14 @@ export default function RoleWorkspaceDashboard({ role }: Props) {
             <View style={[styles.hero, { paddingTop: insets.top + 14 }]}>
               <View style={styles.greetRow}>
                 <TouchableOpacity style={styles.greetLeft} onPress={() => router.push('/profile')} activeOpacity={0.8}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{initial}</Text>
-                  </View>
+                  <UserAvatar
+                    size={48}
+                    photoUrl={user?.profilePhotoUrl}
+                    name={user?.firstName || initial}
+                    fallbackColor="rgba(255,255,255,0.2)"
+                    borderColor="rgba(255,255,255,0.45)"
+                    textStyle={styles.avatarText}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.greet} numberOfLines={1}>{t('welcomeBack')}</Text>
                     <Text style={styles.userName} numberOfLines={1}>{name}</Text>
@@ -539,10 +553,10 @@ function OfficerChartsSection({
                   <Text style={styles.chartsSubTitle}>{t('farmerVerificationMix')}</Text>
                   <PieChart data={pieData} donut radius={42} innerRadius={22} isAnimated={false} />
                   <View style={styles.chartsLegend}>
-                    <ChartLegendDot color="#10B981" label={t('farmersVerified')} value={farmerStats.verified} />
-                    <ChartLegendDot color="#F59E0B" label={t('farmersPending')} value={farmerStats.pending} />
+                    <ChartLegendDot color="#10B981" label={t('farmersVerified')} />
+                    <ChartLegendDot color="#F59E0B" label={t('farmersPending')} />
                     {farmerStats.other > 0 ? (
-                      <ChartLegendDot color="#9CA3AF" label={t('farmersOther')} value={farmerStats.other} />
+                      <ChartLegendDot color="#9CA3AF" label={t('farmersOther')} />
                     ) : null}
                   </View>
                 </>
@@ -833,10 +847,18 @@ const styles = StyleSheet.create({
   chartsPieCol: { flex: 1, alignItems: 'center' },
   chartsBarCol: { flex: 1.1, minWidth: 0 },
   chartsSubTitle: { fontSize: 11, fontWeight: '700', color: '#6B7280', marginBottom: 6, alignSelf: 'flex-start' },
-  chartsLegend: { marginTop: 8, alignSelf: 'stretch', gap: 4 },
-  chartLegendRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  chartsLegend: {
+    marginTop: 8,
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chartLegendRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   chartLegendSwatch: { width: 8, height: 8, borderRadius: 4 },
-  chartLegendText: { fontSize: 11, color: '#4B5563', flex: 1 },
+  chartLegendText: { fontSize: 10, color: '#4B5563' },
   chartsEmpty: { fontSize: 13, color: '#6B7280', textAlign: 'center', paddingVertical: 16 },
   chartsEmptySmall: { fontSize: 12, color: '#9CA3AF', textAlign: 'center', paddingVertical: 24 },
   trendHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10 },

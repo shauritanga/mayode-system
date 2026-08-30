@@ -180,6 +180,14 @@ export const authApi = {
 // ── Users ──
 export const usersApi = {
   getMe: (id: string) => api.get(`/users/${id}`),
+  updateProfile: (data: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    language?: string;
+    profilePhotoUrl?: string;
+  }) => api.put('/users/profile', data),
   updatePushToken: (token: string) => api.put('/users/push-token', { token }),
 };
 

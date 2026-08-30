@@ -31,6 +31,7 @@ model User {
   isActive     Boolean   @default(true) @map("is_active")
   language     String    @default("sw") // sw = Swahili, en = English
   pushToken    String?   @map("push_token") // Expo Push Notification Token
+  profilePhotoUrl String? @map("profile_photo_url")
   lastLoginAt  DateTime? @map("last_login_at")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")

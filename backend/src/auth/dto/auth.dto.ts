@@ -114,5 +114,6 @@ export class AuthResponseDto {
     lastName?: string;
     role: string;
     controlNumber?: string;
+    profilePhotoUrl?: string;
   };
 }

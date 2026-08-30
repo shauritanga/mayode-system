@@ -24,6 +24,7 @@ export class UsersService {
         role: true,
         isActive: true,
         language: true,
+        profilePhotoUrl: true,
         lastLoginAt: true,
         createdAt: true,
       },
@@ -42,6 +43,7 @@ export class UsersService {
         role: true,
         isActive: true,
         language: true,
+        profilePhotoUrl: true,
         lastLoginAt: true,
         createdAt: true,
         farmer: true,
@@ -135,6 +137,7 @@ export class UsersService {
         role: true,
         isActive: true,
         language: true,
+        profilePhotoUrl: true,
         updatedAt: true,
       },
     });
