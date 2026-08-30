@@ -45,13 +45,16 @@ export function NotificationBell({ light = false }: { light?: boolean }) {
 // Custom Top App Bar
 function CustomTopAppBar({ options }: any) {
   const { t } = useI18n();
+  const role = useAuthStore((state) => state.user?.role);
+  const showDrawer = role !== 'FIELD_OFFICER';
+
   return (
     <SafeAreaView edges={['top']} style={styles.appBarContainer}>
       <StatusBar style="light" />
       <View style={styles.appBar}>
         <View style={styles.appBarLeft}>
-          <DrawerMenuButton light />
-          <Text style={styles.appBarTitle} numberOfLines={1}>{options.title || t('dashboard')}</Text>
+          {showDrawer ? <DrawerMenuButton light /> : null}
+          <Text style={[styles.appBarTitle, !showDrawer && styles.appBarTitleFlush]} numberOfLines={1}>{options.title || t('dashboard')}</Text>
         </View>
         <NotificationBell light />
       </View>
@@ -70,11 +73,11 @@ function CustomBottomNav() {
     return (
       <SafeAreaView edges={['bottom']} style={styles.bottomNavContainer}>
         <View style={styles.bottomNav}>
-          <NavButton icon={Home01Icon} label="Workspace" active={pathname === '/' || pathname === '/(tabs)'} onPress={() => router.push('/')} />
-          <NavButton icon={UserGroupIcon} label={t('myFarmers')} active={pathname.includes('/officer/farmer')} onPress={() => router.push('/officer/farmers')} />
-          <NavButton icon={Calendar01Icon} label={t('calendar')} active={pathname.includes('/officer/calendar')} onPress={() => router.push('/officer/calendar')} />
-          <NavButton icon={TaskDaily01Icon} label={t('reports')} active={pathname.includes('/officer/reports')} onPress={() => router.push('/officer/reports')} />
-          <NavButton icon={UserCircleIcon} label={t('profile')} active={pathname === '/profile' || pathname === '/(tabs)/profile'} onPress={() => router.push('/profile')} />
+          <NavButton icon={Home01Icon} label="Workspace" active={pathname === '/' || pathname === '/(tabs)'} onPress={() => router.navigate('/')} />
+          <NavButton icon={UserGroupIcon} label={t('myFarmers')} active={pathname.includes('officer-farmers')} onPress={() => router.navigate('/officer-farmers')} />
+          <NavButton icon={Calendar01Icon} label={t('calendar')} active={pathname.includes('officer-calendar')} onPress={() => router.navigate('/officer-calendar')} />
+          <NavButton icon={TaskDaily01Icon} label={t('reports')} active={pathname.includes('officer-reports')} onPress={() => router.navigate('/officer-reports')} />
+          <NavButton icon={UserCircleIcon} label={t('profile')} active={pathname === '/profile' || pathname === '/(tabs)/profile'} onPress={() => router.navigate('/profile')} />
         </View>
       </SafeAreaView>
     );
@@ -188,6 +191,9 @@ export default function TabsLayout() {
       {/* Farms tab has its own Stack (farms/_layout) that renders headers per screen */}
       <Tabs.Screen name="farms" options={{ title: t('manageFarms'), headerShown: false }} />
       <Tabs.Screen name="activities" options={{ title: t('recentActivities') }} />
+      <Tabs.Screen name="officer-farmers" options={{ title: t('myFarmers') }} />
+      <Tabs.Screen name="officer-calendar" options={{ title: t('calendar') }} />
+      <Tabs.Screen name="officer-reports" options={{ title: t('reports') }} />
       <Tabs.Screen name="profile" options={{ title: t('myProfile') }} />
     </Tabs>
   );
@@ -219,6 +225,9 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  appBarTitleFlush: {
+    marginLeft: 4,
   },
   notificationBtn: {
     padding: 8,

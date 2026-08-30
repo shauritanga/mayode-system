@@ -248,6 +248,8 @@ export class CropCyclesService {
         farmer: {
           select: { controlNumber: true, firstName: true, lastName: true },
         },
+        costs: { orderBy: { dateIncurred: 'desc' } },
+        revenues: { orderBy: { saleDate: 'desc' } },
         _count: { select: { activities: true, costs: true, revenues: true } },
       },
     });
@@ -260,6 +262,8 @@ export class CropCyclesService {
       orderBy: { createdAt: 'desc' },
       include: {
         farm: { select: { farmCode: true, socialHectares: true } },
+        costs: { orderBy: { dateIncurred: 'desc' } },
+        revenues: { orderBy: { saleDate: 'desc' } },
       },
     });
   }

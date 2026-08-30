@@ -131,7 +131,8 @@ export class WorkspaceService {
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
 
-    const [pendingLeases, myFarmersCount, visitsThisWeek] = await Promise.all([
+    const [pendingLeases, myFarmersCount, visitsThisWeek, farmerStatusGroups] =
+      await Promise.all([
       this.prisma.farmLease.findMany({
         where: {
           renterConfirmationStatus: VerificationStatus.VERIFIED,
@@ -161,7 +162,25 @@ export class WorkspaceService {
       this.prisma.fieldOfficerVisit.count({
         where: { fieldOfficerId: officer.id, visitedAt: { gte: startOfWeek } },
       }),
+      officer.mamcosId
+        ? this.prisma.farmer.groupBy({
+            by: ['verificationStatus'],
+            where: { mamcosId: officer.mamcosId },
+            _count: true,
+          })
+        : Promise.resolve([]),
     ]);
+
+    const farmerVerification = { verified: 0, pending: 0, other: 0 };
+    for (const row of farmerStatusGroups) {
+      if (row.verificationStatus === VerificationStatus.VERIFIED) {
+        farmerVerification.verified = row._count;
+      } else if (row.verificationStatus === VerificationStatus.PENDING) {
+        farmerVerification.pending = row._count;
+      } else {
+        farmerVerification.other += row._count;
+      }
+    }
 
     return {
       workspace: 'FIELD_OFFICER',
@@ -174,6 +193,7 @@ export class WorkspaceService {
         pendingVerifications: pendingLeases.length,
         myFarmersCount,
         visitsThisWeek,
+        farmerVerification,
       },
     };
   }

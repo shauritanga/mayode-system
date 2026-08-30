@@ -55,6 +55,8 @@ export default function LoginRoute() {
         } catch {
           setFarmerId(null);
         }
+      } else {
+        setFarmerId(null);
       }
       router.replace('/(drawer)/(tabs)');
     } catch (err: unknown) {

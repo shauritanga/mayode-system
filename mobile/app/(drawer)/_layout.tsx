@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   Drawer,
   DrawerContentScrollView,
@@ -22,6 +22,7 @@ import {
   Logout01Icon,
   ShoppingCart02Icon,
   TaskDaily01Icon,
+  MapsSearchIcon,
   CoinsDollarIcon,
   Package01Icon,
   Shield01Icon,
@@ -145,17 +146,74 @@ function FarmerDrawerContent(props: DrawerContentComponentProps) {
   );
 }
 
+function OfficerDrawerContent(props: DrawerContentComponentProps) {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { user } = useAuthStore();
+  const { t } = useI18n();
+
+  const name = user?.firstName
+    ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ''}`
+    : t('farmerOfficerPortal');
+  const initial = (user?.firstName?.[0] || 'O').toUpperCase();
+
+  const go = (href: string) => {
+    props.navigation.closeDrawer();
+    router.push(href as never);
+  };
+
+  const items: DrawerNavItem[] = [
+    { key: 'field-survey', label: t('fieldSurvey'), icon: MapsSearchIcon, color: '#065F46', onPress: () => go('/field-survey') },
+    { key: 'support', label: t('helpSupport'), icon: QuestionIcon, color: '#6B7280', onPress: () => go('/support') },
+  ];
+
+  return (
+    <DrawerContentScrollView
+      {...props}
+      contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 }}
+    >
+      <TouchableOpacity style={styles.header} onPress={() => go('/profile')} activeOpacity={0.85}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{initial}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.name} numberOfLines={1}>{name}</Text>
+          <Text style={styles.phone} numberOfLines={1}>{user?.phone || '—'}</Text>
+        </View>
+      </TouchableOpacity>
+
+      {items.map((item) => (
+        <DrawerItem
+          key={item.key}
+          label={item.label}
+          onPress={item.onPress}
+          icon={() => (
+            <View style={[styles.itemIcon, { backgroundColor: `${item.color}18` }]}>
+              <HugeiconsIcon icon={item.icon} size={18} color={item.color} strokeWidth={2} />
+            </View>
+          )}
+          labelStyle={styles.itemLabel}
+          style={styles.item}
+        />
+      ))}
+
+      <Text style={styles.footer}>MAYODE Group App v1.0.0</Text>
+    </DrawerContentScrollView>
+  );
+}
+
 export default function DrawerLayout() {
   const role = useAuthStore((state) => state.user?.role);
   const isFarmer = !role || role === 'FARMER';
+  const isFieldOfficer = role === 'FIELD_OFFICER';
 
   return (
     <Drawer
-      drawerContent={(props) => (isFarmer ? <FarmerDrawerContent {...props} /> : null)}
+      drawerContent={(props) => (isFarmer ? <FarmerDrawerContent {...props} /> : <OfficerDrawerContent {...props} />)}
       screenOptions={{
         headerShown: false,
         drawerType: 'front',
-        swipeEnabled: isFarmer,
+        swipeEnabled: !isFieldOfficer,
         overlayColor: 'rgba(17,24,39,0.45)',
         drawerStyle: { width: 300 },
       }}

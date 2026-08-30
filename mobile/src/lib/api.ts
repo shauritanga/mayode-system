@@ -265,6 +265,7 @@ export const cropCyclesApi = {
   getAll: (params?: object) => api.get('/crop-cycles', { params }),
   getOne: (id: string) => api.get(`/crop-cycles/${id}`),
   getByFarmId: (farmId: string) => api.get(`/crop-cycles/farm/${farmId}`),
+  getByFarmerId: (farmerId: string) => api.get(`/crop-cycles/farmer/${farmerId}`),
   create: (data: {
     farmId: string;
     season: string;

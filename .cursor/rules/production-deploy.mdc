@@ -1,0 +1,35 @@
+---
+description: Production deployment must go through GitHub — never copy files directly to the server
+alwaysApply: true
+---
+
+# Production deployment
+
+Production server: `139.59.139.30` — project path `/var/www/mayode-system`.
+
+## Required workflow
+
+1. **Commit and push** all changes to GitHub (`origin/main` or the agreed branch).
+2. **On production**, pull from GitHub, then build/restart services as needed.
+
+```bash
+# On production (SSH)
+cd /var/www/mayode-system
+git pull origin main
+cd backend && npm install && npx nest build && pm2 restart mayode-api
+# web/mobile only if those changed on production
+```
+
+## Never do this
+
+- Do **not** use `scp`, `rsync`, or manual file copies to deploy code to production.
+- Do **not** edit source files directly on the production server (except `.env` and runtime config).
+- Do **not** run seed scripts on production unless the user explicitly asks.
+
+## Database seeds
+
+Seed scripts (`backend/prisma/seed-*.ts`) run on production only when the user requests it, still via git pull — not by copying a single file with `scp`.
+
+## Mobile / Expo
+
+Mobile dev uses Metro locally; production API is `http://139.59.139.30:3002/api/v1`. Backend deploys follow the GitHub pull workflow above.

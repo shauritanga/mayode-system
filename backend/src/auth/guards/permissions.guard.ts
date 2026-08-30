@@ -36,19 +36,27 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('User is not authenticated');
     }
 
-    // The two "god" system roles always pass, matching their behavior
-    // everywhere else in the app.
+    // God roles always pass. Other system enum roles (FIELD_OFFICER, FARMER,
+    // MAMCOS_SECRETARY, …) are already authorized by @Roles — permission
+    // catalog rows only apply to non-system custom roles from Role Management.
     if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN) {
       return true;
     }
 
     const customRole = user.customRole as
-      | { isActive: boolean; permissions: { action: string; resource: { key: string } }[] }
+      | {
+          isActive: boolean;
+          isSystem?: boolean;
+          permissions: { action: string; resource: { key: string } }[];
+        }
       | null
       | undefined;
 
+    if (!customRole || customRole.isSystem) {
+      return true;
+    }
+
     const granted =
-      !!customRole &&
       customRole.isActive &&
       customRole.permissions.some(
         (p) => p.resource.key === required.resource && p.action === required.action,

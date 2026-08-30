@@ -44,7 +44,13 @@ export const useAuthStore = create<AuthState>()(
       setAuth: (user, accessToken, refreshToken) => {
         setApiToken(accessToken);
         setApiRefreshToken(refreshToken ?? null);
-        set({ user, accessToken, refreshToken: refreshToken ?? null, isAuthenticated: true });
+        set({
+          user,
+          accessToken,
+          refreshToken: refreshToken ?? null,
+          isAuthenticated: true,
+          farmerId: null,
+        });
       },
       setFarmerId: (farmerId) => set({ farmerId }),
       clearAuth: () => {

@@ -26,6 +26,8 @@ export default function Activities() {
     try {
       const res = await activitiesApi.listForFarmer(farmerId);
       setItems(res.data || []);
+    } catch {
+      setItems([]);
     } finally {
       setLoading(false);
       setRefreshing(false);

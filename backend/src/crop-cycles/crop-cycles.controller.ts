@@ -156,17 +156,6 @@ export class CropCyclesController {
     return this.cropCyclesService.deleteActivityLog(id);
   }
 
-  @Get(':id')
-  @Roles(...STAFF_ROLES, UserRole.FARMER)
-  @RequirePermission('crop_cycles', 'VIEW')
-  @ApiOperation({
-    summary:
-      'Get crop cycle details by ID (with activity logs, costs, revenues)',
-  })
-  findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
-    return this.cropCyclesService.findOne(id, user);
-  }
-
   @Get('farm/:farmId')
   @Roles(...STAFF_ROLES, UserRole.FARMER)
   @ApiOperation({ summary: 'Get all crop cycles for a specific farm' })
@@ -185,6 +174,16 @@ export class CropCyclesController {
     @CurrentUser() user: RequestUser,
   ) {
     return this.cropCyclesService.findByFarmerId(farmerId, user);
+  }
+
+  @Get(':id')
+  @Roles(...STAFF_ROLES, UserRole.FARMER)
+  @ApiOperation({
+    summary:
+      'Get crop cycle details by ID (with activity logs, costs, revenues)',
+  })
+  findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.cropCyclesService.findOne(id, user);
   }
 
   @Patch(':id')
