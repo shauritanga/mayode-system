@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -23,17 +25,18 @@ import {
   Tick02Icon,
   UserGroupIcon,
 } from '@hugeicons/core-free-icons';
-import { BarChart, LineChart, PieChart } from 'react-native-gifted-charts';
+import { BarChart, PieChart } from 'react-native-gifted-charts';
+import Svg, { Defs, Line, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
 import { officerVisitsApi, workspaceApi } from '../src/lib/data';
 import {
   breakdownFarmerStats,
+  buildVisitTrend,
   normalizeVisits,
   visitsByPurpose,
-  weeklyVisitTrend,
   type FarmerVerificationStats,
   type PurposeBar,
-  type WeeklyVisitPoint,
 } from '../src/lib/officer-stats';
+import type { TrendRange } from '../src/lib/finance-trend';
 import { useI18n } from '../src/i18n';
 import { useAuthStore } from '../src/store/auth.store';
 import { NotificationBell } from './(drawer)/(tabs)/_layout';
@@ -67,7 +70,7 @@ type WorkspaceContext = {
 
 type OfficerChartData = {
   farmerStats: FarmerVerificationStats;
-  weeklyVisits: WeeklyVisitPoint[];
+  visits: any[];
   purposeBars: PurposeBar[];
 };
 
@@ -94,14 +97,14 @@ export default function RoleWorkspaceDashboard({ role }: Props) {
       setContext(ctx);
 
       const from = new Date();
-      from.setDate(from.getDate() - 42);
+      from.setDate(from.getDate() - 365);
 
       const visitsRes = await officerVisitsApi.mine({ from: from.toISOString(), pageSize: 100 });
       const visits = normalizeVisits(visitsRes);
 
       setChartData({
         farmerStats: breakdownFarmerStats(ctx?.metrics?.farmerVerification),
-        weeklyVisits: weeklyVisitTrend(visits),
+        visits,
         purposeBars: visitsByPurpose(visits),
       });
     } catch {
@@ -317,6 +320,189 @@ function FieldOfficerBody({
   );
 }
 
+function compactVisitCount(n: number) {
+  if (n >= 1000) return `${Math.round(n / 1000)}k`;
+  return String(Math.round(n));
+}
+
+function visitYLabels(maxValue: number) {
+  if (maxValue <= 1) return ['1', '', '', '0'];
+  return [3, 2, 1, 0].map((step) => compactVisitCount((maxValue * step) / 3));
+}
+
+function visitLinePath(points: { value: number }[], xAt: (i: number) => number, yAt: (v: number) => number) {
+  return points
+    .map((point, i) => `${i === 0 ? 'M' : 'L'}${xAt(i).toFixed(1)} ${yAt(point.value).toFixed(1)}`)
+    .join(' ');
+}
+
+function visitAreaPath(points: { value: number }[], xAt: (i: number) => number, yAt: (v: number) => number) {
+  if (!points.length) return '';
+  const last = points.length - 1;
+  const base = yAt(0).toFixed(1);
+  return `${visitLinePath(points, xAt, yAt)} L${xAt(last).toFixed(1)} ${base} L${xAt(0).toFixed(1)} ${base} Z`;
+}
+
+function VisitTrendPlot({
+  points,
+  width,
+  height = 176,
+}: {
+  points: { value: number; label: string }[];
+  width: number;
+  height?: number;
+}) {
+  const padT = 6;
+  const padB = 22;
+  const padL = 4;
+  const padR = 6;
+  const plotW = Math.max(width - padL - padR, 1);
+  const plotH = height - padT - padB;
+  const maxValue = Math.max(1, ...points.map((p) => p.value));
+  const count = Math.max(points.length, 1);
+  const xAt = (i: number) => padL + (count <= 1 ? plotW / 2 : (plotW * i) / (count - 1));
+  const yAt = (value: number) => padT + plotH * (1 - value / maxValue);
+
+  return (
+    <Svg width={width} height={height}>
+      <Defs>
+        <LinearGradient id="visitArea" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={HERO_GREEN} stopOpacity="0.38" />
+          <Stop offset="1" stopColor={HERO_GREEN} stopOpacity="0.04" />
+        </LinearGradient>
+      </Defs>
+      {[0, 1, 2, 3].map((step) => {
+        const y = padT + (plotH * step) / 3;
+        return <Line key={step} x1={padL} y1={y} x2={width - padR} y2={y} stroke="#F3F4F6" strokeWidth={1} />;
+      })}
+      <Line x1={padL} y1={padT + plotH} x2={width - padR} y2={padT + plotH} stroke="#E5E7EB" strokeWidth={1} />
+      {points.length ? (
+        <>
+          <Path d={visitAreaPath(points, xAt, yAt)} fill="url(#visitArea)" stroke="none" />
+          <Path
+            d={visitLinePath(points, xAt, yAt)}
+            stroke={HERO_GREEN}
+            strokeWidth={2}
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        </>
+      ) : null}
+      {points.map((point, i) => (
+        <SvgText
+          key={`${point.label}-${i}`}
+          x={xAt(i)}
+          y={height - 5}
+          fontSize={10}
+          fill="#6B7280"
+          textAnchor={i === 0 ? 'start' : i === count - 1 ? 'end' : 'middle'}
+        >
+          {point.label}
+        </SvgText>
+      ))}
+    </Svg>
+  );
+}
+
+function VisitTrendCard({
+  visits,
+  t,
+  width,
+  cardStyle,
+}: {
+  visits: any[];
+  t: ReturnType<typeof useI18n>['t'];
+  width: number;
+  cardStyle?: object;
+}) {
+  const [range, setRange] = useState<TrendRange>('monthly');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0, w: 148 });
+  const triggerRef = useRef<View>(null);
+  const series = buildVisitTrend(visits, range);
+  const hasData = visits.length > 0;
+  const ranges: { id: TrendRange; label: string }[] = [
+    { id: 'weekly', label: t('rangeWeekly') },
+    { id: 'monthly', label: t('rangeMonthly') },
+    { id: 'yearly', label: t('rangeYearly') },
+  ];
+  const currentLabel = ranges.find((item) => item.id === range)?.label ?? t('rangeMonthly');
+  const maxValue = Math.max(1, ...series.map((p) => p.value));
+  const yLabels = visitYLabels(maxValue);
+  const yAxisW = 36;
+  const plotWidth = Math.max(width - 28 - yAxisW, 200);
+
+  const openMenu = () => {
+    triggerRef.current?.measureInWindow((x, y, _w, h) => {
+      const menuW = 148;
+      const screenW = width + 40;
+      setMenuPos({
+        x: Math.min(Math.max(12, x), screenW - menuW - 12),
+        y: y + h + 6,
+        w: menuW,
+      });
+      setMenuOpen(true);
+    });
+  };
+
+  return (
+    <View style={[styles.chartsCard, cardStyle]}>
+      <View style={styles.trendHead}>
+        <View style={styles.trendLegend}>
+          <ChartLegendDot color={HERO_GREEN} label={t('officerVisitTrend')} />
+        </View>
+        <View ref={triggerRef} collapsable={false}>
+          <TouchableOpacity style={styles.rangeDropdown} onPress={openMenu} activeOpacity={0.75}>
+            <Text style={styles.rangeDropdownText}>{currentLabel}</Text>
+            <Text style={styles.rangeDropdownCaret}>▾</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable style={styles.rangeMenuBackdrop} onPress={() => setMenuOpen(false)}>
+          <View
+            style={[styles.rangeMenu, { top: menuPos.y, left: menuPos.x, width: menuPos.w }]}
+            onStartShouldSetResponder={() => true}
+          >
+            {ranges.map((item) => {
+              const on = item.id === range;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.rangeMenuItem, on && styles.rangeMenuItemOn]}
+                  onPress={() => {
+                    setRange(item.id);
+                    setMenuOpen(false);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.rangeMenuText, on && styles.rangeMenuTextOn]}>{item.label}</Text>
+                  {on ? <HugeiconsIcon icon={Tick02Icon} size={16} color="#065F46" strokeWidth={2} /> : null}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
+      {!hasData ? (
+        <Text style={styles.chartsEmpty}>{t('noOfficerStats')}</Text>
+      ) : (
+        <View style={styles.trendPlotRow}>
+          <View style={[styles.trendYAxis, { width: yAxisW }]}>
+            {yLabels.map((label, i) => (
+              <Text key={`${label}-${i}`} style={styles.trendYLabel}>{label}</Text>
+            ))}
+          </View>
+          <View style={[styles.trendPlot, { width: plotWidth }]}>
+            <VisitTrendPlot points={series} width={plotWidth} />
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
 function OfficerChartsSection({
   chartData,
   t,
@@ -328,20 +514,9 @@ function OfficerChartsSection({
 }) {
   if (!chartData) return null;
 
-  const { farmerStats, weeklyVisits, purposeBars } = chartData;
+  const { farmerStats, visits, purposeBars } = chartData;
   const farmerTotal = farmerStats.verified + farmerStats.pending + farmerStats.other;
-  const visitTotal = weeklyVisits.reduce((sum, point) => sum + point.value, 0);
   const hasOverview = farmerTotal > 0 || purposeBars.length > 0;
-  const hasTrend = visitTotal > 0;
-
-  if (!hasOverview && !hasTrend) {
-    return (
-      <View style={styles.chartsCard}>
-        <Text style={styles.sectionTitle}>{t('officerWorkOverview')}</Text>
-        <Text style={styles.chartsEmpty}>{t('noOfficerStats')}</Text>
-      </View>
-    );
-  }
 
   const pieData = [
     { value: farmerStats.verified, color: '#10B981' },
@@ -406,35 +581,12 @@ function OfficerChartsSection({
         </View>
       ) : null}
 
-      {hasTrend ? (
-        <View style={[styles.chartsCard, { marginTop: 14 }]}>
-          <Text style={styles.sectionTitle}>{t('officerVisitTrend')}</Text>
-          <LineChart
-            data={weeklyVisits.map((point) => ({ value: point.value, label: point.label }))}
-            areaChart
-            curved
-            color={HERO_GREEN}
-            startFillColor="rgba(6,95,70,0.28)"
-            endFillColor="rgba(6,95,70,0.02)"
-            startOpacity={0.9}
-            endOpacity={0.1}
-            thickness={2}
-            height={150}
-            width={width - 28}
-            maxValue={Math.max(...weeklyVisits.map((p) => p.value), 1)}
-            noOfSections={3}
-            hideRules
-            yAxisTextStyle={{ fontSize: 9, color: '#9CA3AF' }}
-            xAxisLabelTextStyle={{ fontSize: 9, color: '#6B7280' }}
-            xAxisColor="#E5E7EB"
-            spacing={Math.max(28, Math.floor((width - 60) / weeklyVisits.length))}
-            initialSpacing={8}
-            endSpacing={8}
-            isAnimated={false}
-            disableScroll
-          />
-        </View>
-      ) : null}
+      <VisitTrendCard
+        visits={visits}
+        t={t}
+        width={width}
+        cardStyle={hasOverview ? { marginTop: 14 } : null}
+      />
     </>
   );
 }
@@ -687,6 +839,49 @@ const styles = StyleSheet.create({
   chartLegendText: { fontSize: 11, color: '#4B5563', flex: 1 },
   chartsEmpty: { fontSize: 13, color: '#6B7280', textAlign: 'center', paddingVertical: 16 },
   chartsEmptySmall: { fontSize: 12, color: '#9CA3AF', textAlign: 'center', paddingVertical: 24 },
+  trendHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10 },
+  trendLegend: { flexDirection: 'row', flexShrink: 1, gap: 14 },
+  trendPlotRow: { flexDirection: 'row', alignItems: 'stretch' },
+  trendYAxis: { height: 176, justifyContent: 'space-between', paddingBottom: 20, paddingTop: 4, paddingRight: 6 },
+  trendYLabel: { fontSize: 9, color: '#9CA3AF', textAlign: 'right' },
+  trendPlot: { height: 176, flex: 1, minWidth: 0 },
+  rangeDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  rangeDropdownText: { fontSize: 12, fontWeight: '700', color: '#065F46' },
+  rangeDropdownCaret: { fontSize: 11, color: '#065F46', marginTop: -1 },
+  rangeMenuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.12)' },
+  rangeMenu: {
+    position: 'absolute',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  rangeMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  rangeMenuItemOn: { backgroundColor: '#F0FDF4' },
+  rangeMenuText: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  rangeMenuTextOn: { color: '#065F46', fontWeight: '700' },
   statStrip: { flexDirection: 'row', gap: 10, marginBottom: 6 },
   statTile: {
     flex: 1,

@@ -2,6 +2,9 @@
  * Seeds field-officer workspace demo data: farmer verification mix,
  * weekly visits (charts), and pending lease verifications (today's work).
  *
+ * Visit dates are relative to seed run time: clustered field days, quiet weekends,
+ * and 0–4 visits per active day (not one artificial visit every day).
+ *
  * Run: npx ts-node prisma/seed-officer-workspace.ts
  */
 import {
@@ -33,11 +36,103 @@ function d(iso: string) {
   return new Date(iso);
 }
 
-function daysAgo(days: number, hour = 10) {
+function daysAgo(days: number, hour = 10, minute = 0) {
   const dt = new Date();
   dt.setDate(dt.getDate() - days);
-  dt.setHours(hour, 0, 0, 0);
+  dt.setHours(hour, minute, 0, 0);
   return dt;
+}
+
+type VisitSeed = {
+  daysAgo: number;
+  hour: number;
+  purpose: FieldOfficerVisitPurpose;
+  farmerIdx: number;
+  farmIdx: number;
+};
+
+/** Realistic visit mix: clustered field days, quiet weekends, 0–4 visits/day. */
+function buildVisitPlan(): VisitSeed[] {
+  const R = FieldOfficerVisitPurpose.ROUTINE_CHECK;
+  const A = FieldOfficerVisitPurpose.FARMING_ASSISTANCE;
+  const V = FieldOfficerVisitPurpose.VERIFICATION;
+  const T = FieldOfficerVisitPurpose.TRAINING;
+  const D = FieldOfficerVisitPurpose.DISPUTE_FOLLOWUP;
+
+  return [
+    // Last 7 days — uneven week an officer actually has
+    { daysAgo: 6, hour: 8, purpose: R, farmerIdx: 0, farmIdx: 0 },
+    { daysAgo: 6, hour: 14, purpose: V, farmerIdx: 2, farmIdx: 2 },
+    { daysAgo: 5, hour: 7, purpose: A, farmerIdx: 1, farmIdx: 1 },
+    { daysAgo: 5, hour: 10, purpose: R, farmerIdx: 3, farmIdx: 3 },
+    { daysAgo: 5, hour: 15, purpose: T, farmerIdx: 5, farmIdx: 1 },
+    // day 4: no visits (AMCOS meeting / travel)
+    { daysAgo: 3, hour: 8, purpose: V, farmerIdx: 6, farmIdx: 2 },
+    { daysAgo: 3, hour: 9, purpose: R, farmerIdx: 7, farmIdx: 3 },
+    { daysAgo: 3, hour: 11, purpose: A, farmerIdx: 4, farmIdx: 0 },
+    { daysAgo: 3, hour: 14, purpose: R, farmerIdx: 0, farmIdx: 0 },
+    { daysAgo: 2, hour: 10, purpose: D, farmerIdx: 1, farmIdx: 1 },
+    // day 1: no visits (Saturday)
+    { daysAgo: 0, hour: 9, purpose: R, farmerIdx: 2, farmIdx: 2 },
+    { daysAgo: 0, hour: 11, purpose: V, farmerIdx: 8, farmIdx: 3 },
+
+    // Prior weeks — busier mid-month, lighter edges
+    { daysAgo: 8, hour: 9, purpose: R, farmerIdx: 3, farmIdx: 3 },
+    { daysAgo: 8, hour: 13, purpose: A, farmerIdx: 5, farmIdx: 1 },
+    { daysAgo: 10, hour: 8, purpose: R, farmerIdx: 0, farmIdx: 0 },
+    { daysAgo: 10, hour: 10, purpose: V, farmerIdx: 6, farmIdx: 2 },
+    { daysAgo: 10, hour: 14, purpose: T, farmerIdx: 4, farmIdx: 0 },
+    { daysAgo: 12, hour: 9, purpose: A, farmerIdx: 7, farmIdx: 3 },
+    { daysAgo: 14, hour: 8, purpose: R, farmerIdx: 1, farmIdx: 1 },
+    { daysAgo: 14, hour: 11, purpose: R, farmerIdx: 2, farmIdx: 2 },
+    { daysAgo: 14, hour: 15, purpose: V, farmerIdx: 9, farmIdx: 0 },
+    { daysAgo: 17, hour: 10, purpose: T, farmerIdx: 5, farmIdx: 1 },
+    { daysAgo: 19, hour: 9, purpose: R, farmerIdx: 3, farmIdx: 3 },
+    { daysAgo: 19, hour: 14, purpose: A, farmerIdx: 0, farmIdx: 0 },
+    { daysAgo: 21, hour: 8, purpose: D, farmerIdx: 1, farmIdx: 1 },
+    { daysAgo: 24, hour: 10, purpose: R, farmerIdx: 4, farmIdx: 0 },
+    { daysAgo: 24, hour: 13, purpose: V, farmerIdx: 6, farmIdx: 2 },
+    { daysAgo: 27, hour: 9, purpose: A, farmerIdx: 2, farmIdx: 2 },
+    { daysAgo: 27, hour: 11, purpose: R, farmerIdx: 7, farmIdx: 3 },
+    { daysAgo: 27, hour: 15, purpose: T, farmerIdx: 8, farmIdx: 3 },
+
+    // ~1–2 months back — moderate activity
+    { daysAgo: 32, hour: 9, purpose: R, farmerIdx: 0, farmIdx: 0 },
+    { daysAgo: 35, hour: 10, purpose: V, farmerIdx: 3, farmIdx: 3 },
+    { daysAgo: 38, hour: 8, purpose: A, farmerIdx: 1, farmIdx: 1 },
+    { daysAgo: 38, hour: 14, purpose: R, farmerIdx: 5, farmIdx: 1 },
+    { daysAgo: 42, hour: 9, purpose: T, farmerIdx: 4, farmIdx: 0 },
+    { daysAgo: 45, hour: 10, purpose: R, farmerIdx: 2, farmIdx: 2 },
+    { daysAgo: 48, hour: 11, purpose: A, farmerIdx: 6, farmIdx: 2 },
+    { daysAgo: 52, hour: 9, purpose: V, farmerIdx: 7, farmIdx: 3 },
+    { daysAgo: 55, hour: 8, purpose: R, farmerIdx: 0, farmIdx: 0 },
+    { daysAgo: 55, hour: 13, purpose: R, farmerIdx: 1, farmIdx: 1 },
+    { daysAgo: 60, hour: 10, purpose: A, farmerIdx: 3, farmIdx: 3 },
+    { daysAgo: 65, hour: 9, purpose: R, farmerIdx: 5, farmIdx: 1 },
+    { daysAgo: 70, hour: 14, purpose: T, farmerIdx: 4, farmIdx: 0 },
+    { daysAgo: 75, hour: 10, purpose: V, farmerIdx: 2, farmIdx: 2 },
+    { daysAgo: 80, hour: 9, purpose: R, farmerIdx: 6, farmIdx: 2 },
+
+    // Quieter stretch 3–5 months ago
+    { daysAgo: 95, hour: 10, purpose: R, farmerIdx: 1, farmIdx: 1 },
+    { daysAgo: 102, hour: 9, purpose: A, farmerIdx: 3, farmIdx: 3 },
+    { daysAgo: 110, hour: 11, purpose: R, farmerIdx: 0, farmIdx: 0 },
+    { daysAgo: 118, hour: 10, purpose: V, farmerIdx: 4, farmIdx: 0 },
+    { daysAgo: 125, hour: 9, purpose: R, farmerIdx: 2, farmIdx: 2 },
+    { daysAgo: 135, hour: 14, purpose: T, farmerIdx: 5, farmIdx: 1 },
+    { daysAgo: 148, hour: 10, purpose: R, farmerIdx: 7, farmIdx: 3 },
+    { daysAgo: 160, hour: 9, purpose: A, farmerIdx: 1, farmIdx: 1 },
+
+    // Early season ramp-up 6–10 months ago
+    { daysAgo: 185, hour: 10, purpose: R, farmerIdx: 0, farmIdx: 0 },
+    { daysAgo: 195, hour: 9, purpose: V, farmerIdx: 2, farmIdx: 2 },
+    { daysAgo: 210, hour: 11, purpose: A, farmerIdx: 4, farmIdx: 0 },
+    { daysAgo: 225, hour: 8, purpose: R, farmerIdx: 3, farmIdx: 3 },
+    { daysAgo: 225, hour: 13, purpose: T, farmerIdx: 6, farmIdx: 2 },
+    { daysAgo: 250, hour: 10, purpose: R, farmerIdx: 1, farmIdx: 1 },
+    { daysAgo: 275, hour: 9, purpose: A, farmerIdx: 5, farmIdx: 1 },
+    { daysAgo: 300, hour: 10, purpose: R, farmerIdx: 0, farmIdx: 0 },
+  ];
 }
 
 async function nextControl(prefix = 'MYD-DEMO') {
@@ -199,33 +294,7 @@ async function main() {
     (farm, idx, arr) => arr.findIndex((f) => f.id === farm.id) === idx,
   );
 
-  const visitPlan: Array<{ daysAgo: number; purpose: FieldOfficerVisitPurpose; farmerIdx: number; farmIdx: number }> = [
-    { daysAgo: 39, purpose: FieldOfficerVisitPurpose.ROUTINE_CHECK, farmerIdx: 0, farmIdx: 0 },
-    { daysAgo: 38, purpose: FieldOfficerVisitPurpose.FARMING_ASSISTANCE, farmerIdx: 1, farmIdx: 1 },
-    { daysAgo: 35, purpose: FieldOfficerVisitPurpose.VERIFICATION, farmerIdx: 2, farmIdx: 2 },
-    { daysAgo: 33, purpose: FieldOfficerVisitPurpose.TRAINING, farmerIdx: 3, farmIdx: 3 },
-    { daysAgo: 32, purpose: FieldOfficerVisitPurpose.ROUTINE_CHECK, farmerIdx: 4, farmIdx: 0 },
-    { daysAgo: 28, purpose: FieldOfficerVisitPurpose.FARMING_ASSISTANCE, farmerIdx: 5, farmIdx: 1 },
-    { daysAgo: 27, purpose: FieldOfficerVisitPurpose.VERIFICATION, farmerIdx: 6, farmIdx: 2 },
-    { daysAgo: 25, purpose: FieldOfficerVisitPurpose.ROUTINE_CHECK, farmerIdx: 7, farmIdx: 3 },
-    { daysAgo: 24, purpose: FieldOfficerVisitPurpose.TRAINING, farmerIdx: 0, farmIdx: 0 },
-    { daysAgo: 21, purpose: FieldOfficerVisitPurpose.DISPUTE_FOLLOWUP, farmerIdx: 1, farmIdx: 1 },
-    { daysAgo: 20, purpose: FieldOfficerVisitPurpose.ROUTINE_CHECK, farmerIdx: 2, farmIdx: 2 },
-    { daysAgo: 18, purpose: FieldOfficerVisitPurpose.FARMING_ASSISTANCE, farmerIdx: 3, farmIdx: 3 },
-    { daysAgo: 17, purpose: FieldOfficerVisitPurpose.VERIFICATION, farmerIdx: 4, farmIdx: 0 },
-    { daysAgo: 14, purpose: FieldOfficerVisitPurpose.ROUTINE_CHECK, farmerIdx: 5, farmIdx: 1 },
-    { daysAgo: 13, purpose: FieldOfficerVisitPurpose.TRAINING, farmerIdx: 6, farmIdx: 2 },
-    { daysAgo: 11, purpose: FieldOfficerVisitPurpose.FARMING_ASSISTANCE, farmerIdx: 7, farmIdx: 3 },
-    { daysAgo: 10, purpose: FieldOfficerVisitPurpose.ROUTINE_CHECK, farmerIdx: 0, farmIdx: 0 },
-    { daysAgo: 7, purpose: FieldOfficerVisitPurpose.VERIFICATION, farmerIdx: 1, farmIdx: 1 },
-    { daysAgo: 6, purpose: FieldOfficerVisitPurpose.ROUTINE_CHECK, farmerIdx: 2, farmIdx: 2 },
-    { daysAgo: 5, purpose: FieldOfficerVisitPurpose.FARMING_ASSISTANCE, farmerIdx: 3, farmIdx: 3 },
-    { daysAgo: 4, purpose: FieldOfficerVisitPurpose.TRAINING, farmerIdx: 4, farmIdx: 0 },
-    { daysAgo: 3, purpose: FieldOfficerVisitPurpose.VERIFICATION, farmerIdx: 5, farmIdx: 1 },
-    { daysAgo: 2, purpose: FieldOfficerVisitPurpose.ROUTINE_CHECK, farmerIdx: 6, farmIdx: 2 },
-    { daysAgo: 1, purpose: FieldOfficerVisitPurpose.FARMING_ASSISTANCE, farmerIdx: 7, farmIdx: 3 },
-    { daysAgo: 0, purpose: FieldOfficerVisitPurpose.ROUTINE_CHECK, farmerIdx: 0, farmIdx: 0 },
-  ];
+  const visitPlan = buildVisitPlan();
 
   let visitCount = 0;
   for (const plan of visitPlan) {
@@ -239,7 +308,7 @@ async function main() {
         farmId: farm?.id,
         purpose: plan.purpose,
         notes: `${DEMO_TAG} ${plan.purpose}`,
-        visitedAt: daysAgo(plan.daysAgo),
+        visitedAt: daysAgo(plan.daysAgo, plan.hour),
         photoUrls: [],
       },
     });

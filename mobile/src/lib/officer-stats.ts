@@ -1,10 +1,12 @@
+import type { TrendRange } from './finance-trend';
+
 export type FarmerVerificationStats = {
   verified: number;
   pending: number;
   other: number;
 };
 
-export type WeeklyVisitPoint = {
+export type VisitTrendPoint = {
   label: string;
   value: number;
 };
@@ -28,6 +30,30 @@ function unwrapList(res: any): any[] {
   return Array.isArray(raw) ? raw : [];
 }
 
+function startOfDay(d: Date) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function addDays(d: Date, n: number) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function countVisitsInRange(visits: any[], from: Date, to: Date) {
+  let total = 0;
+  for (const visit of visits) {
+    const raw = visit?.visitedAt ?? visit?.date;
+    if (!raw) continue;
+    const when = new Date(raw);
+    if (Number.isNaN(when.getTime())) continue;
+    if (when >= from && when < to) total += 1;
+  }
+  return total;
+}
+
 export function breakdownFarmerStats(
   breakdown?: { verified?: number; pending?: number; other?: number } | null,
 ): FarmerVerificationStats {
@@ -49,26 +75,40 @@ export function summarizeFarmerVerification(farmers: any[]): FarmerVerificationS
   return stats;
 }
 
-export function weeklyVisitTrend(visits: any[], weeks = 6, now = new Date()): WeeklyVisitPoint[] {
-  const points: WeeklyVisitPoint[] = [];
-  for (let i = weeks - 1; i >= 0; i -= 1) {
-    const weekEnd = new Date(now);
-    weekEnd.setDate(weekEnd.getDate() - i * 7);
-    const weekStart = new Date(weekEnd);
-    weekStart.setDate(weekStart.getDate() - 6);
-    weekStart.setHours(0, 0, 0, 0);
-    weekEnd.setHours(23, 59, 59, 999);
+export function buildVisitTrend(visits: any[], range: TrendRange, now = new Date()): VisitTrendPoint[] {
+  const today = startOfDay(now);
+  const points: VisitTrendPoint[] = [];
 
-    const count = visits.filter((visit) => {
-      const raw = visit?.visitedAt ?? visit?.date;
-      if (!raw) return false;
-      const d = new Date(raw);
-      return !Number.isNaN(d.getTime()) && d >= weekStart && d <= weekEnd;
-    }).length;
+  if (range === 'weekly') {
+    for (let i = 6; i >= 0; i -= 1) {
+      const from = addDays(today, -i);
+      const to = addDays(from, 1);
+      points.push({
+        value: countVisitsInRange(visits, from, to),
+        label: from.toLocaleDateString(undefined, { weekday: 'short' }),
+      });
+    }
+    return points;
+  }
 
+  if (range === 'monthly') {
+    for (let i = 3; i >= 0; i -= 1) {
+      const from = addDays(today, -(i + 1) * 7);
+      const to = i === 0 ? addDays(today, 1) : addDays(today, -i * 7);
+      points.push({
+        value: countVisitsInRange(visits, from, to),
+        label: `W${4 - i}`,
+      });
+    }
+    return points;
+  }
+
+  for (let i = 11; i >= 0; i -= 1) {
+    const from = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const to = new Date(today.getFullYear(), today.getMonth() - i + 1, 1);
     points.push({
-      label: weekEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-      value: count,
+      value: countVisitsInRange(visits, from, to),
+      label: from.toLocaleDateString(undefined, { month: 'short' }),
     });
   }
   return points;
