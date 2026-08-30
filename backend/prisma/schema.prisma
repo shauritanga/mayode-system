@@ -1630,9 +1630,7 @@ model Activity {
 
 // A field officer's timestamped record of visiting a farmer (routine check,
 // helping with a farming activity, in-person verification, etc.). visitedAt
-// is always server-set at submission time — never client-supplied — so it
-// stays a trustworthy audit trail even though the officer's own draft may be
-// composed earlier (e.g. offline in the field).
+// may be supplied by the officer (visit date) or defaults to submission time.
 enum FieldOfficerVisitPurpose {
   ROUTINE_CHECK
   FARMING_ASSISTANCE
@@ -1642,19 +1640,51 @@ enum FieldOfficerVisitPurpose {
   OTHER
 }
 
+enum RiceGrowthStage {
+  LAND_PREPARATION
+  PLANTING
+  GERMINATION
+  TILLERING
+  PANICLE_INITIATION
+  FLOWERING
+  GRAIN_FILLING
+  MATURITY
+  HARVEST
+}
+
+enum FieldConditionStatus {
+  GOOD
+  FAIR
+  POOR
+  NONE
+}
+
 model FieldOfficerVisit {
-  id             String                   @id @default(uuid())
-  fieldOfficerId String                   @map("field_officer_id")
-  farmerId       String                   @map("farmer_id")
-  farmId         String?                  @map("farm_id")
-  cropCycleId    String?                  @map("crop_cycle_id")
-  purpose        FieldOfficerVisitPurpose @default(ROUTINE_CHECK)
-  notes          String?
-  photoUrls      String[]                 @map("photo_urls")
-  gpsLatitude    Float?                   @map("gps_latitude")
-  gpsLongitude   Float?                   @map("gps_longitude")
-  visitedAt      DateTime                 @map("visited_at")
-  createdAt      DateTime                 @default(now()) @map("created_at")
+  id                 String                   @id @default(uuid())
+  fieldOfficerId     String                   @map("field_officer_id")
+  farmerId           String                   @map("farmer_id")
+  farmId             String?                  @map("farm_id")
+  cropCycleId        String?                  @map("crop_cycle_id")
+  purpose            FieldOfficerVisitPurpose @default(ROUTINE_CHECK)
+  notes              String?
+  growthStage        RiceGrowthStage?         @map("growth_stage")
+  riceVariety        String?                  @map("rice_variety")
+  cropCondition      FieldConditionStatus?    @map("crop_condition")
+  waterStatus        FieldConditionStatus?    @map("water_status")
+  weedStatus         FieldConditionStatus?    @map("weed_status")
+  pestStatus         FieldConditionStatus?    @map("pest_status")
+  diseaseStatus      FieldConditionStatus?    @map("disease_status")
+  fertilizerApplied  Boolean?                 @map("fertilizer_applied")
+  inputUsed          String?                  @map("input_used")
+  inputQuantity      String?                  @map("input_quantity")
+  observations       String?
+  recommendations    String?
+  nextVisitDate      DateTime?                @map("next_visit_date")
+  photoUrls          String[]                 @map("photo_urls")
+  gpsLatitude        Float?                   @map("gps_latitude")
+  gpsLongitude       Float?                   @map("gps_longitude")
+  visitedAt          DateTime                 @map("visited_at")
+  createdAt          DateTime                 @default(now()) @map("created_at")
 
   fieldOfficer MamcosStaff @relation(fields: [fieldOfficerId], references: [id], onDelete: Cascade)
   farmer       Farmer      @relation(fields: [farmerId], references: [id], onDelete: Cascade)
@@ -1663,6 +1693,7 @@ model FieldOfficerVisit {
 
   @@index([fieldOfficerId, visitedAt])
   @@index([farmerId, visitedAt])
+  @@index([fieldOfficerId, nextVisitDate])
   @@map("field_officer_visits")
 }
 

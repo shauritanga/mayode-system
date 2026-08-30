@@ -495,16 +495,7 @@ export const workspaceApi = {
 
 // ── Field officer visits (timestamped farmer visits, own-AMCOS scoped) ──
 export const officerVisitsApi = {
-  create: (data: {
-    farmerId: string;
-    farmId?: string;
-    cropCycleId?: string;
-    purpose: 'ROUTINE_CHECK' | 'FARMING_ASSISTANCE' | 'VERIFICATION' | 'DISPUTE_FOLLOWUP' | 'TRAINING' | 'OTHER';
-    notes?: string;
-    photoUrls?: string[];
-    gpsLatitude?: number;
-    gpsLongitude?: number;
-  }) => api.post('/field-officer-visits', data),
+  create: (data: import('./field-visit').FieldVisitPayload) => api.post('/field-officer-visits', data),
   mine: (params?: { farmerId?: string; from?: string; to?: string; page?: number; pageSize?: number }) =>
     api.get('/field-officer-visits/mine', { params }),
   forFarmer: (farmerId: string) => api.get(`/field-officer-visits/farmer/${farmerId}`),

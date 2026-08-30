@@ -2,8 +2,9 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
-import { MamcosStaffRole, UserRole } from '@prisma/client';
+import { CropCycleStatus, MamcosStaffRole, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ActivitiesService } from '../activities/activities.service';
 import type { RequestUser } from '../common/ownership.service';
@@ -53,18 +54,76 @@ export class FieldOfficerVisitsService {
       throw new ForbiddenException('This farmer is not in your AMCOS');
     }
 
+    const farm = await this.prisma.farm.findUnique({
+      where: { id: dto.farmId },
+      select: { id: true, farmerId: true, mamcosId: true },
+    });
+    if (!farm) {
+      throw new NotFoundException(`Farm with ID ${dto.farmId} not found`);
+    }
+    if (farm.mamcosId !== officer.mamcosId) {
+      throw new ForbiddenException('This farm is not in your AMCOS');
+    }
+    if (farm.farmerId !== dto.farmerId) {
+      throw new BadRequestException('This farm does not belong to the selected farmer');
+    }
+
+    let cropCycleId = dto.cropCycleId;
+    if (cropCycleId) {
+      const cycle = await this.prisma.cropCycle.findFirst({
+        where: { id: cropCycleId, farmId: dto.farmId },
+        select: { id: true },
+      });
+      if (!cycle) {
+        throw new BadRequestException('Crop cycle not found for this farm');
+      }
+    } else {
+      const active = await this.prisma.cropCycle.findFirst({
+        where: {
+          farmId: dto.farmId,
+          status: { in: [CropCycleStatus.ACTIVE, CropCycleStatus.PLANNED] },
+        },
+        orderBy: { plantingDate: 'desc' },
+        select: { id: true, riceVariety: true },
+      });
+      if (active) cropCycleId = active.id;
+    }
+
+    const visitedAt = dto.visitedAt ? new Date(dto.visitedAt) : new Date();
+    const observations = dto.observations?.trim() || dto.notes?.trim() || undefined;
+    const nextVisitDate = dto.nextVisitDate ? new Date(dto.nextVisitDate) : undefined;
+
     const visit = await this.prisma.fieldOfficerVisit.create({
       data: {
         fieldOfficerId: officer.id,
         farmerId: dto.farmerId,
         farmId: dto.farmId,
-        cropCycleId: dto.cropCycleId,
-        purpose: dto.purpose,
-        notes: dto.notes,
+        cropCycleId,
+        purpose: dto.purpose ?? 'ROUTINE_CHECK',
+        notes: observations,
+        growthStage: dto.growthStage,
+        riceVariety: dto.riceVariety?.trim() || undefined,
+        cropCondition: dto.cropCondition,
+        waterStatus: dto.waterStatus,
+        weedStatus: dto.weedStatus,
+        pestStatus: dto.pestStatus,
+        diseaseStatus: dto.diseaseStatus,
+        fertilizerApplied: dto.fertilizerApplied,
+        inputUsed: dto.inputUsed?.trim() || undefined,
+        inputQuantity: dto.inputQuantity?.trim() || undefined,
+        observations,
+        recommendations: dto.recommendations?.trim() || undefined,
+        nextVisitDate,
         photoUrls: dto.photoUrls ?? [],
         gpsLatitude: dto.gpsLatitude,
         gpsLongitude: dto.gpsLongitude,
-        visitedAt: new Date(),
+        visitedAt,
+      },
+      include: {
+        farmer: {
+          select: { id: true, firstName: true, lastName: true, controlNumber: true },
+        },
+        farm: { select: { id: true, farmCode: true, name: true } },
       },
     });
 
@@ -72,7 +131,7 @@ export class FieldOfficerVisitsService {
       dto.farmerId,
       'officer.visit',
       'Field officer visited you',
-      visit.notes ?? undefined,
+      visit.recommendations ?? visit.observations ?? undefined,
       'user-check',
     );
 
@@ -183,11 +242,21 @@ export class FieldOfficerVisitsService {
       ? new Date(query.to)
       : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const [visits, cropCycles] = await Promise.all([
+    const [visits, followUps, cropCycles] = await Promise.all([
       this.prisma.fieldOfficerVisit.findMany({
         where: {
           fieldOfficerId: officer.id,
           visitedAt: { gte: from, lte: to },
+        },
+        include: {
+          farmer: { select: { id: true, firstName: true, lastName: true } },
+          farm: { select: { id: true, farmCode: true, name: true } },
+        },
+      }),
+      this.prisma.fieldOfficerVisit.findMany({
+        where: {
+          fieldOfficerId: officer.id,
+          nextVisitDate: { gte: from, lte: to },
         },
         include: {
           farmer: { select: { id: true, firstName: true, lastName: true } },
@@ -215,6 +284,16 @@ export class FieldOfficerVisitsService {
         date: v.visitedAt,
         id: v.id,
         purpose: v.purpose,
+        growthStage: v.growthStage,
+        farmer: v.farmer,
+        farm: v.farm,
+      })),
+      ...followUps.map((v) => ({
+        type: 'FOLLOW_UP' as const,
+        date: v.nextVisitDate as Date,
+        id: `${v.id}-followup`,
+        visitId: v.id,
+        growthStage: v.growthStage,
         farmer: v.farmer,
         farm: v.farm,
       })),

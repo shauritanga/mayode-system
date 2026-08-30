@@ -5,13 +5,15 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, ArrowRight01Icon, TaskDaily01Icon, Plant01Icon, Calendar01Icon } from '@hugeicons/core-free-icons';
 import { officerVisitsApi } from '../../../src/lib/data';
 import { useI18n } from '../../../src/i18n';
+import { growthStageLabel, RiceGrowthStage } from '../../../src/lib/field-visit';
 
 interface Entry {
-  type: 'VISIT' | 'PLANTING' | 'HARVEST';
+  type: 'VISIT' | 'PLANTING' | 'HARVEST' | 'FOLLOW_UP';
   date: string;
   id: string;
   purpose?: string;
-  farmer?: { firstName: string; lastName: string };
+  growthStage?: string;
+  farmer?: { id?: string; firstName: string; lastName: string };
   farm?: { farmCode?: string; name?: string } | null;
 }
 
@@ -29,6 +31,8 @@ export default function OfficerCalendarScreen() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const labelT = (key: string) => t(key as Parameters<typeof t>[0]);
 
   const load = useCallback(async (offset: number) => {
     setLoading(true);
@@ -87,24 +91,38 @@ export default function OfficerCalendarScreen() {
           renderSectionHeader={({ section }) => <Text style={styles.sectionHeader}>{section.title}</Text>}
           renderItem={({ item }) => {
             const isVisit = item.type === 'VISIT';
+            const isFollowUp = item.type === 'FOLLOW_UP';
             const farmLabel = item.farm?.farmCode || item.farm?.name || '';
             const farmerName = item.farmer ? `${item.farmer.firstName} ${item.farmer.lastName}` : '';
+            const stageLabel = item.growthStage
+              ? growthStageLabel(item.growthStage as RiceGrowthStage, labelT)
+              : '';
             return (
               <TouchableOpacity
                 style={styles.entry}
-                onPress={() => item.farmer && router.push(`/officer/farmer/${(item.farmer as any).id}`)}
+                onPress={() => item.farmer?.id && router.push(`/officer/farmer/${item.farmer.id}`)}
               >
                 <HugeiconsIcon
-                  icon={isVisit ? TaskDaily01Icon : Plant01Icon}
+                  icon={isFollowUp ? Calendar01Icon : isVisit ? TaskDaily01Icon : Plant01Icon}
                   size={18}
-                  color={isVisit ? '#047857' : '#3B82F6'}
+                  color={isFollowUp ? '#B45309' : isVisit ? '#047857' : '#3B82F6'}
                   strokeWidth={2}
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.entryTitle}>
-                    {isVisit ? farmerName : t(item.type === 'PLANTING' ? 'plantingDue' : 'harvestDue', { farm: farmLabel })}
+                    {isFollowUp
+                      ? t('followUpVisit')
+                      : isVisit
+                        ? farmerName
+                        : t(item.type === 'PLANTING' ? 'plantingDue' : 'harvestDue', { farm: farmLabel })}
                   </Text>
-                  {isVisit && <Text style={styles.entrySub}>{item.purpose?.replace(/_/g, ' ')}</Text>}
+                  <Text style={styles.entrySub} numberOfLines={2}>
+                    {isVisit
+                      ? [item.purpose?.replace(/_/g, ' '), farmLabel, stageLabel].filter(Boolean).join(' · ')
+                      : isFollowUp
+                        ? [farmerName, farmLabel, stageLabel].filter(Boolean).join(' · ')
+                        : farmLabel}
+                  </Text>
                 </View>
               </TouchableOpacity>
             );

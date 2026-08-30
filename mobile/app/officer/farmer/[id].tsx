@@ -8,6 +8,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { CheckmarkCircle02Icon, Cancel01Icon, Location01Icon, TaskDaily01Icon } from '@hugeicons/core-free-icons';
 import { farmersApi, farmsApi, officerVisitsApi } from '../../../src/lib/data';
 import { useI18n } from '../../../src/i18n';
+import { growthStageLabel, RiceGrowthStage } from '../../../src/lib/field-visit';
 
 export default function OfficerFarmerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -19,6 +20,8 @@ export default function OfficerFarmerDetailScreen() {
   const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+
+  const labelT = (key: string) => t(key as Parameters<typeof t>[0]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,7 +65,7 @@ export default function OfficerFarmerDetailScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Stack.Screen options={{ headerShown: true, title: farmer ? `${farmer.firstName} ${farmer.lastName}` : t('myFarmers') }} />
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96 }}>
         <View style={styles.card}>
           <Text style={styles.name}>{farmer?.firstName} {farmer?.lastName}</Text>
           <Text style={styles.sub}>{farmer?.controlNumber}</Text>
@@ -82,17 +85,6 @@ export default function OfficerFarmerDetailScreen() {
             </TouchableOpacity>
           )}
         </View>
-
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={() => router.push({
-            pathname: '/officer/visit-new',
-            params: { farmerId: id, farmerName: `${farmer?.firstName ?? ''} ${farmer?.lastName ?? ''}`.trim() },
-          })}
-        >
-          <HugeiconsIcon icon={Location01Icon} size={18} color="#fff" strokeWidth={2} />
-          <Text style={styles.primaryBtnText}>{t('logVisit')}</Text>
-        </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>{t('farms')}</Text>
         {farms.length === 0 ? (
@@ -137,13 +129,36 @@ export default function OfficerFarmerDetailScreen() {
           <View key={v.id} style={styles.row}>
             <View style={styles.rowHeader}>
               <HugeiconsIcon icon={TaskDaily01Icon} size={16} color="#047857" strokeWidth={2} />
-              <Text style={styles.rowTitle}>{v.purpose.replace(/_/g, ' ')}</Text>
+              <Text style={styles.rowTitle}>
+                {v.growthStage ? growthStageLabel(v.growthStage as RiceGrowthStage, labelT) : v.purpose.replace(/_/g, ' ')}
+              </Text>
             </View>
-            <Text style={styles.rowSub}>{t('visitedOn', { date: new Date(v.visitedAt).toLocaleDateString() })}</Text>
-            {!!v.notes && <Text style={styles.rowSub}>{v.notes}</Text>}
+            <Text style={styles.rowSub}>
+              {t('visitedOn', { date: new Date(v.visitedAt).toLocaleDateString() })}
+              {v.farm?.farmCode ? ` · ${v.farm.farmCode}` : ''}
+            </Text>
+            {!!v.cropCondition && <Text style={styles.rowSub}>{t('cropCondition')}: {v.cropCondition}</Text>}
+            {!!v.observations && <Text style={styles.rowSub}>{v.observations}</Text>}
+            {!!v.recommendations && <Text style={styles.rowSub}>{t('recommendationsLabel')}: {v.recommendations}</Text>}
+            {!!v.nextVisitDate && (
+              <Text style={styles.rowSub}>{t('nextVisitDate')}: {new Date(v.nextVisitDate).toLocaleDateString()}</Text>
+            )}
           </View>
         ))}
       </ScrollView>
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push({
+          pathname: '/officer/visit-new',
+          params: { farmerId: id, farmerName: `${farmer?.firstName ?? ''} ${farmer?.lastName ?? ''}`.trim() },
+        })}
+        activeOpacity={0.9}
+        accessibilityRole="button"
+        accessibilityLabel={t('fieldVisitTitle')}
+      >
+        <HugeiconsIcon icon={Location01Icon} size={24} color="#fff" strokeWidth={2} />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -162,8 +177,23 @@ const styles = StyleSheet.create({
   badgeTextGold: { color: '#F59E0B' },
   verifyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#10B981', borderRadius: 10, paddingVertical: 10, marginTop: 12 },
   verifyBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#065F46', borderRadius: 14, paddingVertical: 15, marginBottom: 20 },
-  primaryBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 10,
+  },
   sectionTitle: { fontSize: 15, fontWeight: '800', color: '#111827', marginBottom: 10, marginTop: 4 },
   emptyText: { fontSize: 13, color: '#9CA3AF', marginBottom: 16 },
   row: { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' },

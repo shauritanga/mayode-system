@@ -37,11 +37,20 @@ const EMPTY_DRAFT: Draft = {
  * draft to the device so a poor-connectivity visit isn't lost mid-form.
  */
 export default function FieldSurveyScreen() {
-  const { farmId, farmCode } = useLocalSearchParams<{ farmId: string; farmCode?: string }>();
+  const { farmId: farmIdParam, farmCode: farmCodeParam } = useLocalSearchParams<{ farmId?: string; farmCode?: string }>();
   const router = useRouter();
   const { t } = useI18n();
   const { user } = useAuthStore();
-  const draftKey = `mayode-field-survey-draft-${farmId}`;
+  const [selectedFarmId, setSelectedFarmId] = useState<string | undefined>(
+    typeof farmIdParam === 'string' ? farmIdParam : undefined,
+  );
+  const [selectedFarmCode, setSelectedFarmCode] = useState<string | undefined>(
+    typeof farmCodeParam === 'string' ? farmCodeParam : undefined,
+  );
+  const [farms, setFarms] = useState<{ id: string; farmCode: string; name?: string; village?: string }[]>([]);
+  const [loadingFarms, setLoadingFarms] = useState(!farmIdParam);
+
+  const draftKey = `mayode-field-survey-draft-${selectedFarmId ?? 'none'}`;
 
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [capturingGps, setCapturingGps] = useState(false);
@@ -51,16 +60,50 @@ export default function FieldSurveyScreen() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
+    if (typeof farmIdParam === 'string') {
+      setSelectedFarmId(farmIdParam);
+      setSelectedFarmCode(typeof farmCodeParam === 'string' ? farmCodeParam : undefined);
+      setLoadingFarms(false);
+      return;
+    }
+    let active = true;
+    (async () => {
+      setLoadingFarms(true);
+      try {
+        const res = await farmsApi.getAll();
+        const list = res.data?.data || res.data || [];
+        if (active) setFarms(Array.isArray(list) ? list : []);
+      } catch {
+        if (active) setFarms([]);
+      } finally {
+        if (active) setLoadingFarms(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [farmIdParam, farmCodeParam]);
+
+  useEffect(() => {
+    if (!selectedFarmId) {
+      setDraft(EMPTY_DRAFT);
+      setDraftLoaded(false);
+      setPhotoUrls([]);
+      return;
+    }
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(draftKey);
         if (raw) {
           setDraft(JSON.parse(raw));
           setDraftLoaded(true);
+        } else {
+          setDraft(EMPTY_DRAFT);
+          setDraftLoaded(false);
         }
       } catch {}
     })();
-  }, [draftKey]);
+  }, [draftKey, selectedFarmId]);
 
   const set = useCallback(<K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -108,9 +151,13 @@ export default function FieldSurveyScreen() {
   };
 
   const submit = async () => {
+    if (!selectedFarmId) {
+      Alert.alert(t('fieldSurvey'), t('selectFarmForSurvey'));
+      return;
+    }
     setSubmitting(true);
     try {
-      await fieldSurveysApi.create(farmId!, {
+      await fieldSurveysApi.create(selectedFarmId, {
         soilPh: draft.soilPh ? Number(draft.soilPh) : undefined,
         soilTexture: draft.soilTexture || undefined,
         soilOrganicMatter: draft.soilOrganicMatter ? Number(draft.soilOrganicMatter) : undefined,
@@ -126,7 +173,7 @@ export default function FieldSurveyScreen() {
         latitude: draft.latitude ?? undefined,
         longitude: draft.longitude ?? undefined,
       });
-      await Promise.all(photoUrls.map((url) => farmsApi.addPhoto(farmId!, {
+      await Promise.all(photoUrls.map((url) => farmsApi.addPhoto(selectedFarmId, {
         url,
         caption: t('fieldSurveyPhotoCaption'),
         latitude: draft.latitude ?? undefined,
@@ -151,11 +198,42 @@ export default function FieldSurveyScreen() {
     );
   }
 
+  if (!selectedFarmId) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <Stack.Screen options={{ headerShown: true, title: t('fieldSurvey') }} />
+        <ScrollView contentContainerStyle={{ padding: 16 }}>
+          <Text style={styles.hint}>{t('selectFarmForSurvey')}</Text>
+          {loadingFarms ? (
+            <ActivityIndicator color="#10B981" style={{ marginTop: 24 }} />
+          ) : farms.length === 0 ? (
+            <Text style={styles.staffOnly}>{t('noFarmsYetTitle')}</Text>
+          ) : (
+            farms.map((farm) => (
+              <TouchableOpacity
+                key={farm.id}
+                style={styles.farmPickCard}
+                onPress={() => {
+                  setSelectedFarmId(farm.id);
+                  setSelectedFarmCode(farm.farmCode);
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.farmPickCode}>{farm.farmCode}</Text>
+                <Text style={styles.farmPickName}>{farm.name || farm.village || t('farm')}</Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Stack.Screen options={{ headerShown: true, title: t('fieldSurvey') }} />
       <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-        {!!farmCode && <Text style={styles.farmLabel}>{farmCode}</Text>}
+        {!!selectedFarmCode && <Text style={styles.farmLabel}>{selectedFarmCode}</Text>}
         {draftLoaded && <Text style={styles.hint}>{t('draftLoaded')}</Text>}
 
         <View style={styles.card}>
@@ -245,6 +323,16 @@ const styles = StyleSheet.create({
   staffOnly: { fontSize: 14, color: '#6B7280', textAlign: 'center' },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E5E7EB' },
   farmLabel: { fontSize: 18, fontWeight: '900', color: '#10B981', marginBottom: 6 },
+  farmPickCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  farmPickCode: { fontSize: 15, fontWeight: '800', color: '#065F46' },
+  farmPickName: { fontSize: 13, color: '#6B7280', marginTop: 4 },
   hint: { fontSize: 12, color: '#9CA3AF', marginBottom: 10 },
   sectionTitle: { fontSize: 14, fontWeight: '800', color: '#111827', marginBottom: 10 },
   fieldLabel: { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 6 },

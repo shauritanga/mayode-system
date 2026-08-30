@@ -20,3 +20,7 @@ export function isMobileAllowedRole(
     (MOBILE_ALLOWED_ROLES as readonly string[]).includes(role)
   );
 }
+
+export function isStaffRole(role: string | null | undefined) {
+  return !!role && role !== 'FARMER' && isMobileAllowedRole(role);
+}
