@@ -150,12 +150,13 @@ export class InventoryService {
     return record;
   }
 
-  /** Farmer reports a delivery for a crop cycle they operate. */
+  /**
+   * Report a warehouse delivery for a crop cycle. Farmers self-report their
+   * own cycles; grant-holding staff (inventory CREATE) may record on a
+   * farmer's behalf — e.g. at the AMCOS weighbridge — attributed to the
+   * cycle's farmer. Tenancy still applies via assertFarmAccess either way.
+   */
   async reportMyDelivery(user: RequestUser, dto: FarmerReportDeliveryDto) {
-    if (user.role !== UserRole.FARMER) {
-      throw new ForbiddenException('Only farmers can self-report warehouse deliveries.');
-    }
-    const farmerId = await this.farmerIdForUser(user);
     const cycle = await this.prisma.cropCycle.findUnique({
       where: { id: dto.cropCycleId },
       include: {
@@ -166,10 +167,30 @@ export class InventoryService {
       throw new NotFoundException(`Crop cycle with ID ${dto.cropCycleId} not found`);
     }
     await this.ownership.assertFarmAccess(user, cycle.farmId);
-    if (cycle.farmerId !== farmerId) {
-      throw new ForbiddenException(
-        'You can only report deliveries for crop cycles assigned to you.',
-      );
+
+    let farmerId: string;
+    let warehouseNote: string;
+    if (user.role === UserRole.FARMER) {
+      farmerId = await this.farmerIdForUser(user);
+      if (cycle.farmerId !== farmerId) {
+        throw new ForbiddenException(
+          'You can only report deliveries for crop cycles assigned to you.',
+        );
+      }
+      warehouseNote = 'Farmer-reported delivery (confirm at AMCOS weighbridge)';
+    } else {
+      // Staff on-behalf flow: matrix grant required (the route guard checks
+      // first; this is defense in depth for direct service use).
+      if (!this.ownership.passesMatrix(user, 'inventory', 'CREATE')) {
+        throw new ForbiddenException('Missing permission: CREATE on inventory');
+      }
+      if (!cycle.farmerId) {
+        throw new ForbiddenException(
+          'This crop cycle has no farmer assigned; only the assigned farmer can report it.',
+        );
+      }
+      farmerId = cycle.farmerId;
+      warehouseNote = 'Staff-recorded delivery (confirm at AMCOS weighbridge)';
     }
 
     return this.receiveInventory({
@@ -179,9 +200,7 @@ export class InventoryService {
       weightKg: dto.weightKg,
       qualityGrade: dto.qualityGrade,
       moistureContentPct: dto.moistureContentPct,
-      warehouseLocation:
-        dto.warehouseLocation ||
-        'Farmer-reported delivery (confirm at AMCOS weighbridge)',
+      warehouseLocation: dto.warehouseLocation || warehouseNote,
       receivedDate: dto.receivedDate || new Date().toISOString(),
     });
   }

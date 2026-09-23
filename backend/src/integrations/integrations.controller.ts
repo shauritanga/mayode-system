@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -11,6 +12,8 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
@@ -27,13 +30,15 @@ const STAFF = [
 
 @ApiTags('integrations')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('ai_insights')
 @Controller('integrations')
 export class IntegrationsController {
   constructor(private readonly integrations: IntegrationsService) {}
 
   @Get('ai-catalog')
   @Roles(...STAFF, UserRole.FARMER, UserRole.BUYER)
+  @RequirePermission('ai_insights', 'VIEW')
   @ApiOperation({
     summary:
       'AI product catalog — primary Field Advisory MVP plus equipment intake types',
@@ -49,6 +54,7 @@ export class IntegrationsController {
     UserRole.FIELD_OFFICER,
     UserRole.MAMCOS_SECRETARY,
   )
+  @RequirePermission('ai_insights', 'CREATE')
   @ApiOperation({
     summary:
       'Store AI/equipment evidence (soil tests, drone reports, sorter, QR, logistics)',
@@ -69,6 +75,7 @@ export class IntegrationsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.FARMER,
   )
+  @RequirePermission('ai_insights', 'CREATE')
   @ApiOperation({
     summary:
       'Generate mayode.field-advisory.v1 for a crop cycle and store as FIELD_ADVISORY',
@@ -82,6 +89,7 @@ export class IntegrationsController {
 
   @Get('ai-records/mine')
   @Roles(UserRole.FARMER, ...STAFF)
+  @RequirePermission('ai_insights', 'VIEW')
   @ApiOperation({
     summary:
       'List AI records visible to the caller (farmers: own farms; membership gates full recommendation)',
@@ -101,6 +109,7 @@ export class IntegrationsController {
 
   @Get('ai-records/lot/:lotId/quality')
   @Roles(...STAFF, UserRole.BUYER)
+  @RequirePermission('ai_insights', 'VIEW')
   @ApiOperation({
     summary: 'Sorter / QR quality evidence for a lot (sales & traceability)',
   })
@@ -110,6 +119,7 @@ export class IntegrationsController {
 
   @Get('ai-records')
   @Roles(...STAFF)
+  @RequirePermission('ai_insights', 'VIEW')
   @ApiOperation({ summary: 'List stored AI/equipment integration evidence' })
   listAiRecords(
     @Query('sourceType') sourceType?: string,

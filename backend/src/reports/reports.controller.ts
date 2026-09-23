@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -14,6 +15,8 @@ import { ExportService } from '../common/export.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import {
   CreatePremiumFundEntryDto,
   ReportFormatDto,
@@ -31,7 +34,8 @@ const REPORT_ROLES = [
 
 @ApiTags('reports')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('reports')
 @Controller('reports')
 export class ReportsController {
   constructor(
@@ -81,6 +85,7 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('reports', 'VIEW')
   async farmerPayments(
     @Query() query: ReportFormatDto,
     @Res({ passthrough: true }) response: Response,
@@ -100,6 +105,7 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('reports', 'VIEW')
   async premiumFund(
     @Query() query: ReportFormatDto,
     @Res({ passthrough: true }) response: Response,
@@ -119,6 +125,7 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('reports', 'VIEW')
   async farmers(
     @Query() query: ReportFormatDto,
     @Res({ passthrough: true }) response: Response,
@@ -138,6 +145,7 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('reports', 'VIEW')
   async cropCycles(
     @Query() query: ReportFormatDto,
     @Res({ passthrough: true }) response: Response,
@@ -157,6 +165,7 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('reports', 'VIEW')
   @ApiOperation({
     summary:
       'Field-officer performance: visits, farms mapped, farmers verified, activities logged',
@@ -180,6 +189,7 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('reports', 'VIEW')
   @ApiOperation({
     summary:
       'Insurance coverage report: policies and claims by status/product type, exportable',
@@ -203,6 +213,7 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('reports', 'VIEW')
   @ApiOperation({
     summary: 'Gender / youth inclusion breakdown across registered farmers',
   })
@@ -225,6 +236,7 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('reports', 'VIEW')
   kpis() {
     return this.reports.kpis();
   }
@@ -236,6 +248,7 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('reports', 'VIEW')
   async complianceSummary() {
     const [kpis, membershipGrowth] = await Promise.all([
       this.reports.kpis(),
@@ -258,6 +271,7 @@ export class ReportsController {
     UserRole.AUDITOR,
     UserRole.BUYER,
   )
+  @RequirePermission('reports', 'VIEW')
   @ApiOperation({
     summary:
       'Grantor/partner impact pack: KPIs, season yields, membership growth, community projects',
@@ -273,6 +287,7 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('reports', 'VIEW')
   @ApiOperation({
     summary:
       'FLOCERT/Fairtrade audit pack: payments, premium fund, traceability, governance and evidence gaps',
@@ -288,6 +303,7 @@ export class ReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('reports', 'VIEW')
   exportInfo() {
     return {
       supportedFormats: ['json', 'csv', 'xlsx', 'pdf'],
@@ -298,6 +314,7 @@ export class ReportsController {
 
   @Get('builder/schema')
   @Roles(...REPORT_ROLES)
+  @RequirePermission('reports', 'VIEW')
   @ApiOperation({
     summary:
       'Report-builder catalog: entities and their selectable columns (for the report-builder UI)',
@@ -308,6 +325,7 @@ export class ReportsController {
 
   @Post('builder')
   @Roles(...REPORT_ROLES)
+  @RequirePermission('reports', 'CREATE')
   @ApiOperation({
     summary:
       'Run a custom report — pick an entity and columns; preview as JSON (default) or export as CSV/XLSX/PDF',
@@ -335,6 +353,7 @@ export class ReportsController {
   }
 
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('reports', 'VIEW')
   @Get('premium-fund-balance')
   async premiumFundBalance() {
     const entries = await this.reports.premiumFund({});
@@ -346,6 +365,7 @@ export class ReportsController {
   // Premium income is automatic from a Sale. This route is intentionally for
   // expenses/corrections only, so staff cannot inflate the fund manually.
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('reports', 'VIEW')
   @Get('premium-fund-entry-policy')
   premiumFundEntryPolicy() {
     return {
@@ -356,6 +376,7 @@ export class ReportsController {
 
   @Post('premium-fund/entries')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('reports', 'CREATE')
   createPremiumFundEntry(@Body() dto: CreatePremiumFundEntryDto) {
     return this.reports.createPremiumExpense(dto);
   }

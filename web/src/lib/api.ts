@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// NOTE: the Nest backend mounts every route under the `api/v1` global
+// prefix (see backend/src/main.ts), so NEXT_PUBLIC_API_URL must include it,
+// e.g. http://localhost:3001/api/v1 — bare-host values 404 every call.
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -95,6 +99,8 @@ export const authApi = {
   register: (data: object) => api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
   createStaff: (data: object) => api.post('/auth/staff', data),
+  /** Current-session profile: role, custom role, flattened permissions. */
+  me: () => api.get('/auth/me'),
 };
 export const usersApi = {
   getAll: () => api.get('/users'),
@@ -458,6 +464,10 @@ export const registryApi = {
   mine: () => api.get('/farm-registry/mine'),
   claim: (id: string) => api.post(`/farm-registry/${id}/claim`),
   reject: (id: string) => api.post(`/farm-registry/${id}/reject`),
+  importSpreadsheet: (formData: FormData) =>
+    api.post('/farm-registry/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 // ── Farming seasons ──

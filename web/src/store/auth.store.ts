@@ -2,6 +2,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export interface PermissionGrant {
+  resource: string;
+  action: string;
+}
+
 interface User {
   id: string;
   phone: string;
@@ -9,6 +14,11 @@ interface User {
   firstName?: string;
   lastName?: string;
   language?: string;
+  /** Custom Role Management id — when set, the permission matrix below narrows access. */
+  roleId?: string;
+  customRoleName?: string;
+  /** Flattened resource+action grants from GET /auth/me (mirrors the backend matrix). */
+  permissions?: PermissionGrant[];
 }
 
 interface AuthState {

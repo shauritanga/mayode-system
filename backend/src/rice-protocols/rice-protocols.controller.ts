@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -14,6 +15,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import {
   CompleteRiceCalendarTaskDto,
@@ -24,12 +27,14 @@ import { RiceProtocolsService } from './rice-protocols.service';
 
 @ApiTags('rice-protocols')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('rice_protocols')
 @Controller('rice-protocols')
 export class RiceProtocolsController {
   constructor(private readonly protocols: RiceProtocolsService) {}
   @Post('mamcos/:mamcosId/bootstrap')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('rice_protocols', 'CREATE')
   @ApiOperation({
     summary: 'Create the default Mbalari rice calendar for a cooperative',
   })
@@ -41,6 +46,7 @@ export class RiceProtocolsController {
   }
   @Get('mamcos/:mamcosId')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('rice_protocols', 'VIEW')
   protocolsForMamcos(
     @Param('mamcosId') mamcosId: string,
     @CurrentUser() user: RequestUser,
@@ -49,6 +55,7 @@ export class RiceProtocolsController {
   }
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('rice_protocols', 'EDIT')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateRiceProtocolDto,
@@ -65,6 +72,7 @@ export class RiceProtocolsController {
     UserRole.AUDITOR,
     UserRole.FARMER,
   )
+  @RequirePermission('rice_protocols', 'VIEW')
   tasks(
     @Param('cropCycleId') cropCycleId: string,
     @CurrentUser() user: RequestUser,
@@ -80,6 +88,7 @@ export class RiceProtocolsController {
     UserRole.AUDITOR,
     UserRole.FARMER,
   )
+  @RequirePermission('rice_protocols', 'VIEW')
   readiness(
     @Param('cropCycleId') cropCycleId: string,
     @Query('includeWarehouse') includeWarehouse: string | undefined,
@@ -98,6 +107,7 @@ export class RiceProtocolsController {
     UserRole.FIELD_OFFICER,
     UserRole.MAMCOS_SECRETARY,
   )
+  @RequirePermission('rice_protocols', 'EDIT')
   reschedule(
     @Param('id') id: string,
     @Body() dto: RescheduleRiceCalendarTaskDto,
@@ -107,6 +117,7 @@ export class RiceProtocolsController {
   }
   @Post('tasks/:id/complete')
   @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  @RequirePermission('rice_protocols', 'CREATE')
   complete(
     @Param('id') id: string,
     @Body() dto: CompleteRiceCalendarTaskDto,

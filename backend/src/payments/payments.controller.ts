@@ -1,8 +1,24 @@
-import { Body, Controller, HttpCode, Logger, Post } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Logger,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MembershipsService } from '../memberships/memberships.service';
 import { MarketplaceService } from '../marketplace/marketplace.service';
 import { SalesService } from '../sales/sales.service';
+import { PaymentsService } from './payments.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { RequestUser } from '../common/ownership.service';
+import { UserRole } from '@prisma/client';
 
 interface ClickPesaWebhookBody {
   event?: string; // "PAYMENT RECEIVED" | "PAYMENT FAILED"
@@ -14,12 +30,10 @@ interface ClickPesaWebhookBody {
 }
 
 /**
- * ClickPesa webhook receiver. Public (no JWT) — ClickPesa posts here. The body
- * is NOT trusted for activation: we take only the orderReference and re-query
- * ClickPesa server-side for the authoritative status before doing anything.
+ * ClickPesa webhook receiver & Farmer payments ledger.
  */
 @ApiTags('payments')
-@Controller('payments/clickpesa')
+@Controller('payments')
 export class PaymentsController {
   private readonly logger = new Logger(PaymentsController.name);
 
@@ -27,9 +41,22 @@ export class PaymentsController {
     private readonly memberships: MembershipsService,
     private readonly marketplace: MarketplaceService,
     private readonly sales: SalesService,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
-  @Post('webhook')
+  @Get('mine')
+  @RequirePermission('finance', 'VIEW')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.FARMER, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Get unified payments and transactions ledger for the logged-in farmer',
+  })
+  findMyPayments(@CurrentUser() user: RequestUser) {
+    return this.paymentsService.findMyPayments(user);
+  }
+
+  @Post('clickpesa/webhook')
   @HttpCode(200)
   @ApiOperation({
     summary:

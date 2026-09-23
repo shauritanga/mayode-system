@@ -10,6 +10,7 @@ import { notificationsApi } from '../../../src/lib/data';
 import { useI18n } from '../../../src/i18n';
 import { useAuthStore } from '../../../src/store/auth.store';
 import { DrawerMenuButton } from '../../../src/components/DrawerMenuButton';
+import { SyncStatusBanner } from '../../../src/components/SyncStatusBanner';
 
 /** Bell button with live unread badge; opens the notification center. */
 export function NotificationBell({ light = false }: { light?: boolean }) {
@@ -58,6 +59,7 @@ function CustomTopAppBar({ options }: any) {
         </View>
         <NotificationBell light />
       </View>
+      <SyncStatusBanner />
     </SafeAreaView>
   );
 }

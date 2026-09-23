@@ -37,7 +37,7 @@ const TYPE_OPTIONS = [
   { value: 'system', label: 'System roles' },
 ];
 
-const EMPTY_FORM = { name: '', description: '' };
+const EMPTY_FORM = { name: '', description: '', profileType: 'CUSTOM' };
 
 export default function RolesPage() {
   const reduce = useReducedMotion();
@@ -106,7 +106,7 @@ export default function RolesPage() {
     setCreating(true);
     setError('');
     try {
-      await rolesApi.create({ name: form.name, description: form.description || undefined });
+      await rolesApi.create({ name: form.name, description: form.description || undefined, profileType: form.profileType });
       setForm({ ...EMPTY_FORM });
       setShowCreate(false);
       load();
@@ -186,7 +186,7 @@ export default function RolesPage() {
             <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--accent), var(--green-400))', borderRadius: '9999px' }} />
             <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Roles &amp; Permissions</h1>
           </div>
-          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Define custom roles and their exact access to each resource</p>
+          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Super Admin is the only built-in role. Create all other roles and grant their permissions here.</p>
         </div>
         <button className="btn-primary" onClick={() => setShowCreate(true)}>+ New role</button>
       </div>
@@ -208,6 +208,18 @@ export default function RolesPage() {
             <input className="input-field" placeholder="Role name (e.g. Regional Auditor)" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <input className="input-field" placeholder="Description (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </form>
+            <label style={{ display: 'grid', gap: '6px' }}>Operational profile
+              <select className="input-field" value={form.profileType} onChange={(e) => setForm({ ...form, profileType: e.target.value })}>
+                <option value="CUSTOM">General</option>
+                <option value="FARMER">Farmer records</option>
+                <option value="FIELD_OFFICER">Field officer records</option>
+                <option value="MAMCOS_SECRETARY">AMCOS leadership records</option>
+                <option value="AUDITOR">Audit work</option>
+                <option value="BUYER">Buyer records</option>
+                <option value="FINANCIAL_PROVIDER">Financial provider records</option>
+              </select>
+              <small>Sets up related records for new accounts. Access comes only from the permissions you grant.</small>
+            </label>
           {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
         </Modal>
       )}
@@ -270,8 +282,8 @@ export default function RolesPage() {
         ) : (
           <>
             <MetricTile label="Total roles" value={totalRoles} hint="System + custom" tone="green" />
-            <MetricTile label="Custom roles" value={customRoles} hint="Admin-defined" tone="blue" />
-            <MetricTile label="System roles" value={systemRoles} hint="Built-in tiers" tone="gold" />
+            <MetricTile label="Custom roles" value={customRoles} hint="Created by Super Admin" tone="blue" />
+            <MetricTile label="System roles" value={systemRoles} hint="Super Admin only" tone="gold" />
             <MetricTile label="Staff assigned" value={staffAssigned} hint="Accounts using a custom role" tone="red" />
           </>
         )}

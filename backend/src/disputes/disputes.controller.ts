@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -31,6 +32,7 @@ const STAFF_ROLES = [
 @ApiTags('disputes')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('disputes')
 @Controller('disputes')
 export class DisputesController {
   constructor(private readonly disputes: DisputesService) {}

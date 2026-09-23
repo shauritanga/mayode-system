@@ -22,6 +22,7 @@ import { SmsService, normalizeMsisdn } from '../messaging/sms.service';
 import { RequestUser } from '../common/ownership.service';
 import { DisputesService } from '../disputes/disputes.service';
 import { PreRegisterFarmDto } from './dto/farm-registry.dto';
+import * as XLSX from 'xlsx';
 
 const REQUEST_TTL_HOURS = 72;
 const RESEND_COOLDOWN_MINUTES = 15;
@@ -234,7 +235,7 @@ export class FarmRegistryService {
         district: record.district,
         region: record.region,
         socialHectares: record.farmSizeHectares || 0.1,
-        grade: FarmGrade.C,
+        grade: dto.grade ?? FarmGrade.C,
         ownershipType: 'LEASED',
         ownerName: 'AMCOS',
         photoUrls: [],
@@ -531,5 +532,111 @@ export class FarmRegistryService {
     await this.finalizeRejection(record);
     await this.respondToActiveRequest(record.id, 'NO');
     return { ok: true as const, name: record.name };
+  }
+
+  /**
+   * Bulk spreadsheet import (CSV / XLSX) for AMCOS farm pre-registration (prompt2 §3).
+   * Reads rows, parses column variants, runs preRegister per row, and returns results.
+   */
+  async importSpreadsheet(
+    fileBuffer: Buffer,
+    defaultMamcosId: string | undefined,
+    user: RequestUser,
+  ) {
+    if (!fileBuffer || fileBuffer.length === 0) {
+      throw new BadRequestException('Uploaded spreadsheet file is empty.');
+    }
+
+    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) {
+      throw new BadRequestException('Spreadsheet does not contain any sheets.');
+    }
+
+    const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(
+      workbook.Sheets[sheetName],
+    );
+    if (!rawRows.length) {
+      throw new BadRequestException('Spreadsheet has no rows to import.');
+    }
+
+    let importedCount = 0;
+    let skippedCount = 0;
+    const errors: string[] = [];
+
+    const findVal = (row: Record<string, any>, keys: string[]) => {
+      const lowerMap: Record<string, any> = {};
+      for (const [k, v] of Object.entries(row)) {
+        lowerMap[k.trim().toLowerCase().replace(/[\s_-]+/g, '')] = v;
+      }
+      for (const k of keys) {
+        const norm = k.toLowerCase().replace(/[\s_-]+/g, '');
+        if (lowerMap[norm] !== undefined && lowerMap[norm] !== null && String(lowerMap[norm]).trim() !== '') {
+          return String(lowerMap[norm]).trim();
+        }
+      }
+      return undefined;
+    };
+
+    for (let i = 0; i < rawRows.length; i++) {
+      const row = rawRows[i];
+      const rowIdx = i + 2;
+
+      const ownerPhoneRaw = findVal(row, ['ownerPhone', 'phone', 'owner_phone', 'simu', 'nambayasimu']);
+      const ownerName = findVal(row, ['ownerName', 'owner', 'owner_name', 'jina', 'jinalammiliki']);
+      const plotNumber = findVal(row, ['plotNumber', 'plot', 'plot_no', 'plotno', 'kiwanja']);
+      const block = findVal(row, ['block', 'blockNumber', 'block_no', 'bloki']);
+      const section = findVal(row, ['section', 'sehemu']);
+      const village = findVal(row, ['village', 'kijiji']);
+      const ward = findVal(row, ['ward', 'kata']);
+      const district = findVal(row, ['district', 'wilaya']) || 'Mbarali';
+      const region = findVal(row, ['region', 'mkoa']) || 'Mbeya';
+      const scheme = findVal(row, ['scheme', 'skimu']);
+      const canal = findVal(row, ['canal', 'mfereji']);
+      const sizeRaw = findVal(row, ['farmSizeHectares', 'hectares', 'size', 'ukubwa', 'ekari', 'socialHectares']);
+      const gradeRaw = findVal(row, ['grade', 'farmGrade', 'daraja'])?.toUpperCase();
+
+      if (!ownerPhoneRaw || !ownerName) {
+        skippedCount++;
+        errors.push(`Row ${rowIdx}: Missing Owner Name or Phone number.`);
+        continue;
+      }
+
+      const farmSizeHectares = sizeRaw ? parseFloat(sizeRaw) : 1.0;
+      const grade = gradeRaw === 'A' || gradeRaw === 'B' || gradeRaw === 'C' ? (gradeRaw as FarmGrade) : FarmGrade.B;
+
+      try {
+        await this.preRegister(
+          {
+            sourceMamcosId: defaultMamcosId,
+            ownerName,
+            ownerPhone: ownerPhoneRaw,
+            plotNumber,
+            block,
+            section,
+            village,
+            ward,
+            district,
+            region,
+            scheme,
+            canal,
+            farmSizeHectares: isNaN(farmSizeHectares) || farmSizeHectares <= 0 ? 1.0 : farmSizeHectares,
+            grade,
+          },
+          user,
+        );
+        importedCount++;
+      } catch (err: any) {
+        skippedCount++;
+        errors.push(`Row ${rowIdx} (${ownerName}): ${err?.message || 'Failed to import'}`);
+      }
+    }
+
+    return {
+      totalRows: rawRows.length,
+      importedCount,
+      skippedCount,
+      errors: errors.slice(0, 20),
+    };
   }
 }

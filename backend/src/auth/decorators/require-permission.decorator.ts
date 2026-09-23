@@ -8,11 +8,9 @@ export interface RequiredPermission {
   action: PermissionAction;
 }
 
-/**
- * Layers a resource+action permission check on top of the existing
- * @Roles() check via PermissionsGuard. SUPER_ADMIN/ADMIN always bypass this
- * (see PermissionsGuard); any other user must carry a custom Role with a
- * matching RolePermission grant.
- */
+/** Requires an explicit custom-role grant. Only Super Admin bypasses grants. */
 export const RequirePermission = (resource: string, action: PermissionAction) =>
-  SetMetadata(PERMISSION_KEY, { resource, action } satisfies RequiredPermission);
+  SetMetadata(PERMISSION_KEY, {
+    resource,
+    action,
+  } satisfies RequiredPermission);

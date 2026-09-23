@@ -4,20 +4,29 @@ import {
   IsEmail,
   IsBoolean,
   IsIn,
-  IsEnum,
+  IsUUID,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 
 export class UpdateUserDto {
   @ApiPropertyOptional({
-    example: 'ADMIN',
-    enum: UserRole,
+    example: 'SUPER_ADMIN',
+    enum: [UserRole.SUPER_ADMIN],
     description: 'Role change — restricted to SUPER_ADMIN callers',
   })
-  @IsEnum(UserRole)
+  @IsIn([UserRole.SUPER_ADMIN])
   @IsOptional()
   role?: UserRole;
+
+  @ApiPropertyOptional({
+    example: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    description:
+      'Custom Role (from Role Management) to assign for authorization. A replacement role is required. Restricted to SUPER_ADMIN callers; must reference an active, non-system role.',
+  })
+  @IsUUID()
+  @IsOptional()
+  roleId?: string | null;
 
   @ApiPropertyOptional({ example: 'newemail@example.com' })
   @IsEmail()

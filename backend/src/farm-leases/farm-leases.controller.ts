@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -36,6 +37,7 @@ const STAFF_ROLES = [
 @ApiTags('farm-leases')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('farm_leases')
 @Controller('farm-leases')
 export class FarmLeasesController {
   constructor(private readonly leases: FarmLeasesService) {}
@@ -139,6 +141,7 @@ export class FarmLeasesController {
 @ApiTags('seasonal-assignments')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('farm_leases')
 @Controller('seasonal-assignments')
 export class SeasonalAssignmentsController {
   constructor(private readonly leases: FarmLeasesService) {}
@@ -183,6 +186,7 @@ export class SeasonalAssignmentsController {
 @ApiTags('farm-ownerships')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('farm_leases')
 @Controller('farm-ownerships')
 export class FarmOwnershipsController {
   constructor(private readonly leases: FarmLeasesService) {}

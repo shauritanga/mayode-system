@@ -5,8 +5,9 @@ import {
   IsEnum,
   IsDateString,
   Min,
+  IsOptional,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FarmGrade } from '@prisma/client';
 
 export class CreateTractorBookingDto {
@@ -40,13 +41,14 @@ export class CreateTractorBookingDto {
   @IsEnum(FarmGrade)
   terrainGrade: FarmGrade;
 
-  @ApiProperty({
-    example: 0.05,
-    description: 'M-LAX platform commission rate (e.g., 0.05 for 5%)',
+  @ApiPropertyOptional({
+    example: 0.1,
+    description: 'M-LAX platform commission rate (server-derived if omitted)',
   })
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  commissionRate: number;
+  commissionRate?: number;
 
   @ApiProperty({
     example: '2026-12-15T08:00:00Z',

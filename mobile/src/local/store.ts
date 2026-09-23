@@ -115,4 +115,6 @@ export const COLLECTIONS = {
   farmerVerifications: 'farmerVerifications',
   documents: 'documents',
   activities: 'activities',
+  fieldSurveys: 'fieldSurveys',
+  riceProtocols: 'riceProtocols',
 } as const;

@@ -22,7 +22,7 @@ import { SetRolePermissionsDto } from './dto/set-role-permissions.dto';
 @ApiTags('roles')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+@Roles(UserRole.SUPER_ADMIN)
 @Controller('roles')
 export class RolesController {
   constructor(private readonly roles: RolesService) {}

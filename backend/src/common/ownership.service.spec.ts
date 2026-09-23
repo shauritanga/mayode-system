@@ -58,10 +58,70 @@ describe('OwnershipService.assertFarmAccess', () => {
 
     await expect(
       service.assertFarmAccess(
-        { id: 'staff-1', role: UserRole.FIELD_OFFICER },
+        { id: 'staff-1', role: UserRole.FIELD_OFFICER, customRole: { isActive: true, permissions: [{ action: 'VIEW', resource: { key: 'farms' } }] } },
         farmId,
       ),
     ).resolves.toBeUndefined();
     expect(prisma.farmer.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('OwnershipService.passesMatrix', () => {
+  const service = new OwnershipService({} as any);
+
+  it('passes Super Admin without consulting grants', () => {
+    for (const role of [UserRole.SUPER_ADMIN]) {
+      expect(
+        service.passesMatrix({ id: 'u', role }, 'inventory', 'CREATE'),
+      ).toBe(true);
+    }
+  });
+
+  it('requires a matching grant for custom-role users', () => {
+    const granted = {
+      id: 'u',
+      role: UserRole.FIELD_OFFICER,
+      customRole: {
+        isActive: true,
+        permissions: [
+          { action: 'CREATE', resource: { key: 'inventory' } },
+        ],
+      },
+    };
+    expect(service.passesMatrix(granted, 'inventory', 'CREATE')).toBe(true);
+    expect(service.passesMatrix(granted, 'inventory', 'DELETE')).toBe(false);
+    expect(service.passesMatrix(granted, 'reports', 'VIEW')).toBe(false);
+  });
+
+  it('denies inactive custom roles', () => {
+    expect(
+      service.passesMatrix(
+        {
+          id: 'u',
+          role: UserRole.FIELD_OFFICER,
+          customRole: {
+            isActive: false,
+            permissions: [
+              { action: 'CREATE', resource: { key: 'inventory' } },
+            ],
+          },
+        },
+        'inventory',
+        'CREATE',
+      ),
+    ).toBe(false);
+  });
+
+  it('denies plain enum users without grants', () => {
+    expect(
+      service.passesMatrix(
+        { id: 'u', role: UserRole.FIELD_OFFICER, customRole: null },
+        'inventory',
+        'CREATE',
+      ),
+    ).toBe(false);
+    expect(
+      service.passesMatrix({ id: 'u', role: UserRole.FARMER }, 'anything', 'DELETE'),
+    ).toBe(false);
   });
 });

@@ -7,7 +7,9 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://mayode:Mayode%402026@localhost:5432/mayode_db?schema=public';
+const connectionString =
+  process.env.DATABASE_URL ||
+  'postgresql://mayode:Mayode%402026@localhost:5432/mayode_db?schema=public';
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
@@ -26,7 +28,9 @@ type LocationTree = Record<string, Record<string, string[]>>;
 async function seedLocations() {
   const filePath = path.resolve(__dirname, 'data/tanzania-locations.json');
   if (!fs.existsSync(filePath)) {
-    console.log('tanzania-locations.json not found — skipping region/district/ward import.');
+    console.log(
+      'tanzania-locations.json not found — skipping region/district/ward import.',
+    );
     return;
   }
   console.log('Seeding locations from tanzania-locations.json...');
@@ -47,7 +51,9 @@ async function seedLocations() {
     data: regionNames.map((name) => ({ name })),
     skipDuplicates: true,
   });
-  const regions = await prisma.region.findMany({ select: { id: true, name: true } });
+  const regions = await prisma.region.findMany({
+    select: { id: true, name: true },
+  });
   const regionIdByName = new Map(regions.map((r) => [r.name, r.id]));
   console.log(`Seeded ${regionNames.length} regions.`);
 
@@ -60,12 +66,17 @@ async function seedLocations() {
       districtInserts.push({ name: districtName, regionId });
     }
   }
-  await prisma.district.createMany({ data: districtInserts, skipDuplicates: true });
+  await prisma.district.createMany({
+    data: districtInserts,
+    skipDuplicates: true,
+  });
   const districts = await prisma.district.findMany({
     select: { id: true, name: true, regionId: true },
   });
   // Key by regionId::name because a district name can repeat across regions.
-  const districtIdByKey = new Map(districts.map((d) => [`${d.regionId}::${d.name}`, d.id]));
+  const districtIdByKey = new Map(
+    districts.map((d) => [`${d.regionId}::${d.name}`, d.id]),
+  );
   console.log(`Seeded ${districtInserts.length} districts.`);
 
   // 3. Wards (linked to their district), chunked to keep query size sane
@@ -91,35 +102,18 @@ async function seedLocations() {
   console.log(`Seeded ${wardInserts.length} wards.`);
 }
 
-/**
- * Seeds the 8 legacy UserRole values as informational `Role` rows (isSystem:
- * true) purely for display in the Roles & Permissions UI, and the initial
- * catalog of `Resource`s the first batch of custom-role enforcement covers.
- * Existing users' `roleId` is intentionally left untouched (NULL) — they
- * keep working entirely through the legacy `role` enum column.
- */
+/** Only Super Admin is built in. All other roles are created in Role Management. */
 async function seedRolesAndPermissions() {
-  console.log('Seeding system roles...');
-  const systemRoles: { name: string; systemRole: 'SUPER_ADMIN' | 'ADMIN' | 'FIELD_OFFICER' | 'FARMER' | 'MAMCOS_SECRETARY' | 'AUDITOR' | 'BUYER' | 'FINANCIAL_PROVIDER' }[] = [
-    { name: 'Super Admin', systemRole: 'SUPER_ADMIN' },
-    { name: 'Admin', systemRole: 'ADMIN' },
-    { name: 'Field Officer', systemRole: 'FIELD_OFFICER' },
-    { name: 'Farmer', systemRole: 'FARMER' },
-    { name: 'AMCOS Secretary', systemRole: 'MAMCOS_SECRETARY' },
-    { name: 'Auditor', systemRole: 'AUDITOR' },
-    { name: 'Buyer', systemRole: 'BUYER' },
-    { name: 'Financial Provider', systemRole: 'FINANCIAL_PROVIDER' },
-  ];
-  for (const role of systemRoles) {
-    await prisma.role.upsert({
-      where: { name: role.name },
-      update: { isSystem: true, systemRole: role.systemRole },
-      create: { name: role.name, isSystem: true, systemRole: role.systemRole },
-    });
-  }
+  await prisma.role.upsert({
+    where: { name: 'Super Admin' },
+    update: { isSystem: true, systemRole: 'SUPER_ADMIN', isActive: true },
+    create: { name: 'Super Admin', isSystem: true, systemRole: 'SUPER_ADMIN' },
+  });
 
   console.log('Seeding permission resources...');
   const resources = [
+    { key: 'workspace', label: 'Operational Workspace' },
+    { key: 'farm_alerts', label: 'Farm Alerts' },
     { key: 'farmers', label: 'Farmers' },
     { key: 'mamcos', label: 'AMCOS' },
     { key: 'memberships', label: 'Memberships' },
@@ -152,6 +146,10 @@ async function seedRolesAndPermissions() {
     { key: 'users', label: 'User Accounts' },
     { key: 'settings', label: 'Settings' },
     { key: 'locations', label: 'Locations' },
+    { key: 'ai_insights', label: 'AI Insights' },
+    { key: 'buyer_portal', label: 'Buyer Portal' },
+    { key: 'rice_protocols', label: 'Rice Calendar & Protocols' },
+    { key: 'farm_reports', label: 'Farm Reports & Surveys' },
   ];
   for (const resource of resources) {
     await prisma.resource.upsert({
@@ -169,9 +167,24 @@ async function main() {
   console.log('Seeding AMCOS reference records...');
   await prisma.mamcos.createMany({
     data: [
-      { name: 'Madibira AMCOS', location: 'Madibira', district: 'Mbarali', isActive: true },
-      { name: 'Mbuyuni AMCOS', location: 'Mbuyuni', district: 'Mbarali', isActive: true },
-      { name: 'Ubaruku AMCOS', location: 'Ubaruku', district: 'Mbarali', isActive: true },
+      {
+        name: 'Madibira AMCOS',
+        location: 'Madibira',
+        district: 'Mbarali',
+        isActive: true,
+      },
+      {
+        name: 'Mbuyuni AMCOS',
+        location: 'Mbuyuni',
+        district: 'Mbarali',
+        isActive: true,
+      },
+      {
+        name: 'Ubaruku AMCOS',
+        location: 'Ubaruku',
+        district: 'Mbarali',
+        isActive: true,
+      },
     ],
     skipDuplicates: true,
   });
@@ -216,7 +229,9 @@ async function main() {
 
   // Note: the census snapshot goes down to Ward level (ADM3). Villages (ADM4)
   // can be added dynamically via the application or a separate dataset.
-  console.log('Seeding completed successfully! (Regions, Districts, Wards, AMCOS, plans, season)');
+  console.log(
+    'Seeding completed successfully! (Regions, Districts, Wards, AMCOS, plans, season)',
+  );
 }
 
 main()

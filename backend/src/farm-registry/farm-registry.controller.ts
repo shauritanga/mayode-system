@@ -1,12 +1,17 @@
+import { PermissionResource } from '../auth/role-access';
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Param,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -27,13 +32,38 @@ import { PreRegisterFarmDto } from './dto/farm-registry.dto';
 @ApiTags('farm-registry')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('farm_registry')
 @Controller('farm-registry')
 export class FarmRegistryController {
   constructor(private readonly registry: FarmRegistryService) {}
 
+  @Post('import')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+  )
+  @RequirePermission('farm_registry', 'CREATE')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({
+    summary: 'Bulk spreadsheet import (CSV / XLSX) for AMCOS farm pre-registration',
+  })
+  importSpreadsheet(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('mamcosId') mamcosId: string | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File is required for spreadsheet import.');
+    }
+    return this.registry.importSpreadsheet(file.buffer, mamcosId, user);
+  }
+
   @Post()
   @Roles(
     UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
     UserRole.FIELD_OFFICER,
     UserRole.MAMCOS_SECRETARY,
   )

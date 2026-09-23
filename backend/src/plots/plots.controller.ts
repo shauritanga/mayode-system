@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Controller,
   Get,
@@ -33,6 +34,7 @@ import type { RequestUser } from '../common/ownership.service';
 @ApiTags('plots')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('plots')
 @Controller('plots')
 export class PlotsController {
   constructor(private readonly plotsService: PlotsService) {}

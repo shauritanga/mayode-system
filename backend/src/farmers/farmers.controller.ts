@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Controller,
   Get,
@@ -43,6 +44,7 @@ import { ExportService } from '../common/export.service';
 @ApiTags('farmers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('farmers')
 @Controller('farmers')
 export class FarmersController {
   constructor(

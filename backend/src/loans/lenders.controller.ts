@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
@@ -13,6 +14,7 @@ import { CreateLenderDto, UpdateLenderDto } from './dto/loans.dto';
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+@PermissionResource('loans')
 @Controller('lenders')
 export class LendersController {
   constructor(private readonly lenders: LendersService) {}

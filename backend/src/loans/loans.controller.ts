@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import { Body, Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -15,6 +16,7 @@ import { ExportService } from '../common/export.service';
 @ApiTags('loans')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('loans')
 @Controller('loans')
 export class LoansController {
   constructor(

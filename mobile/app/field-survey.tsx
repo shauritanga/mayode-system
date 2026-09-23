@@ -141,6 +141,9 @@ export default function FieldSurveyScreen() {
         type: asset.mimeType || 'image/jpeg',
       });
       setPhotoUrls((prev) => [...prev, up.data.url]);
+    } catch {
+      // Offline fallback: store local photo URI
+      setPhotoUrls((prev) => [...prev, asset.uri]);
     } finally {
       setUploadingPhoto(false);
     }
@@ -157,7 +160,7 @@ export default function FieldSurveyScreen() {
     }
     setSubmitting(true);
     try {
-      await fieldSurveysApi.create(selectedFarmId, {
+      const res = await fieldSurveysApi.create(selectedFarmId, {
         soilPh: draft.soilPh ? Number(draft.soilPh) : undefined,
         soilTexture: draft.soilTexture || undefined,
         soilOrganicMatter: draft.soilOrganicMatter ? Number(draft.soilOrganicMatter) : undefined,
@@ -173,14 +176,32 @@ export default function FieldSurveyScreen() {
         latitude: draft.latitude ?? undefined,
         longitude: draft.longitude ?? undefined,
       });
-      await Promise.all(photoUrls.map((url) => farmsApi.addPhoto(selectedFarmId, {
-        url,
-        caption: t('fieldSurveyPhotoCaption'),
-        latitude: draft.latitude ?? undefined,
-        longitude: draft.longitude ?? undefined,
-      })));
+
+      // Best effort for photos (will succeed if online)
+      await Promise.allSettled(
+        photoUrls
+          .filter((url) => !url.startsWith('file:'))
+          .map((url) =>
+            farmsApi.addPhoto(selectedFarmId, {
+              url,
+              caption: t('fieldSurveyPhotoCaption'),
+              latitude: draft.latitude ?? undefined,
+              longitude: draft.longitude ?? undefined,
+            }),
+          ),
+      );
+
       await AsyncStorage.removeItem(draftKey);
-      Alert.alert(t('fieldSurvey'), t('surveySubmitted'), [{ text: 'OK', onPress: () => router.back() }]);
+
+      if (res?.data?.queued) {
+        Alert.alert(t('fieldSurvey'), t('surveyQueuedOffline'), [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      } else {
+        Alert.alert(t('fieldSurvey'), t('surveySubmitted'), [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }
     } catch (e: any) {
       const msg = e?.response?.data?.message;
       Alert.alert(t('fieldSurvey'), Array.isArray(msg) ? msg.join('\n') : msg || String(e?.message ?? e));

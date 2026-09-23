@@ -5,12 +5,14 @@ import {
   IsEmail,
   IsEnum,
   IsBoolean,
+  IsUUID,
   MinLength,
   Matches,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum UserRole {
+  CUSTOM = 'CUSTOM',
   SUPER_ADMIN = 'SUPER_ADMIN',
   ADMIN = 'ADMIN',
   FIELD_OFFICER = 'FIELD_OFFICER',
@@ -44,9 +46,14 @@ export class RegisterDto {
   @MinLength(6)
   password: string;
 
-  @ApiProperty({ example: 'FARMER', enum: UserRole })
+  @ApiPropertyOptional({ enum: UserRole, description: 'Legacy profile hint; does not grant access' })
+  @IsOptional()
   @IsEnum(UserRole)
-  role: UserRole;
+  role?: UserRole;
+
+  @ApiProperty({ description: 'Active custom role with a Farmer operational profile, created by Super Admin' })
+  @IsUUID()
+  roleId: string;
 
   @ApiProperty({ example: 'John' })
   @IsString()
@@ -113,6 +120,9 @@ export class AuthResponseDto {
     firstName?: string;
     lastName?: string;
     role: string;
+    roleId?: string;
+    customRoleName?: string;
+    permissions: { resource: string; action: string }[];
     controlNumber?: string;
     profilePhotoUrl?: string;
   };

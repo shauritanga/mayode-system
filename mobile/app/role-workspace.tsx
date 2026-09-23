@@ -599,7 +599,7 @@ function OfficerChartsSection({
         visits={visits}
         t={t}
         width={width}
-        cardStyle={hasOverview ? { marginTop: 14 } : null}
+        cardStyle={hasOverview ? { marginTop: 14 } : undefined}
       />
     </>
   );

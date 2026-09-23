@@ -103,9 +103,35 @@ export class DisputesService {
         resolution: dto.resolution,
         resolvedByUserId: closing ? user.id : undefined,
         resolvedAt: closing ? new Date() : undefined,
+        ...(dto.assignedOfficerId !== undefined
+          ? { assignedOfficerId: dto.assignedOfficerId }
+          : {}),
       },
       include: DISPUTE_INCLUDE,
     });
+
+    if (
+      dto.assignedOfficerId &&
+      dto.assignedOfficerId !== dispute.assignedOfficerId
+    ) {
+      let targetUserId = dto.assignedOfficerId;
+      const staff = await this.prisma.mamcosStaff.findFirst({
+        where: {
+          OR: [{ id: dto.assignedOfficerId }, { userId: dto.assignedOfficerId }],
+        },
+        select: { userId: true },
+      });
+      if (staff) {
+        targetUserId = staff.userId;
+      }
+      await this.notifications.create({
+        userId: targetUserId,
+        type: 'dispute.assigned',
+        title: 'Dispute reassigned to you',
+        body: `A ${dispute.type.replace(/_/g, ' ').toLowerCase()} dispute has been reassigned to you${dispute.farm ? ` for farm ${dispute.farm.farmCode}` : ''}.${dto.resolution ? ` Note: ${dto.resolution}` : ''}`,
+        data: { disputeId: id, farmId: dispute.farmId },
+      });
+    }
 
     if (closing && dispute.farm?.farmerId) {
       const owner = await this.prisma.farmer.findUnique({

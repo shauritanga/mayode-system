@@ -1,3 +1,4 @@
+import { assertAssignedRole } from '../role-access';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -35,6 +36,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User is inactive or unauthorized');
     }
 
+    assertAssignedRole(user);
+
     let controlNumber: string | undefined = undefined;
     if (user.farmer) {
       controlNumber = user.farmer.controlNumber;
@@ -43,7 +46,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // A user's own cooperative — from their staff assignment, or their
     // farmer profile — used to scope data access to that AMCOS alone. See
     // OwnershipService.resolveTenantMamcosId for how this is applied.
-    const mamcosId = user.mamcosStaff?.mamcosId ?? user.farmer?.mamcosId ?? null;
+    const mamcosId =
+      user.mamcosStaff?.mamcosId ?? user.farmer?.mamcosId ?? null;
 
     return {
       id: user.id,

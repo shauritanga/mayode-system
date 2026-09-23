@@ -7,6 +7,7 @@ import { join } from 'path';
 import { PrismaModule } from './prisma/prisma.module';
 import { CommonModule } from './common/common.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
+import { IdempotencyInterceptor } from './common/interceptors/idempotency.interceptor';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
@@ -142,6 +143,8 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
   providers: [
     // Global audit trail for all mutating requests
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+    // Idempotency key replay protection for offline sync retries
+    { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],
 })
 export class AppModule implements NestModule {

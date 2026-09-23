@@ -1,3 +1,4 @@
+import { hasGrant } from '../auth/role-access';
 import {
   Injectable,
   ForbiddenException,
@@ -10,19 +11,16 @@ export interface RequestUser {
   id: string;
   role: UserRole;
   mamcosId?: string | null;
+  /** Populated by JwtStrategy; drives matrix authorization. */
+  customRole?: {
+    isActive: boolean;
+    isSystem?: boolean;
+    permissions: { action: string; resource: { key: string } }[];
+  } | null;
 }
 
-/** Roles that may act on any farmer/farm/plot regardless of ownership. */
-const PRIVILEGED_ROLES: UserRole[] = [
-  UserRole.SUPER_ADMIN,
-  UserRole.ADMIN,
-  UserRole.FIELD_OFFICER,
-  UserRole.MAMCOS_SECRETARY,
-  UserRole.AUDITOR,
-];
-
 /**
- * OwnershipService — row-level authorization. Privileged staff bypass; a FARMER
+ * OwnershipService — row-level authorization. Explicitly permitted staff can access the resource; a FARMER
  * may only touch resources for farms they are actively assigned to operate.
  * `Farm.farmerId` is retained as legacy/import metadata; it is not the access
  * authority for renter-operated AMCOS farms. Call these from services before
@@ -34,7 +32,7 @@ export class OwnershipService {
 
   /**
    * Resolves which single AMCOS a user's data access should be confined to.
-   * SUPER_ADMIN/ADMIN are platform-wide (null = unscoped, no filter applied).
+   * Only SUPER_ADMIN is platform-wide (null = unscoped, no filter applied).
    * Everyone else is scoped to their own cooperative via `user.mamcosId`
    * (resolved once per request in JwtStrategy from their staff/farmer
    * profile) — null there too if they have no cooperative attached (e.g. an
@@ -42,14 +40,22 @@ export class OwnershipService {
    * those roles rather than silently hiding everything from them.
    */
   resolveTenantMamcosId(user: RequestUser): string | null {
-    if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN) {
+    if (user.role === UserRole.SUPER_ADMIN) {
       return null;
     }
     return user.mamcosId ?? null;
   }
 
-  private isPrivileged(user: RequestUser): boolean {
-    return PRIVILEGED_ROLES.includes(user.role);
+  private isPrivileged(user: RequestUser, resource: string): boolean {
+    if (user.role === UserRole.SUPER_ADMIN) return true;
+    // Farmer profiles remain ownership-scoped even when their role has grants.
+    return user.role !== UserRole.FARMER && !!user.customRole?.isActive &&
+      !user.customRole.isSystem && user.customRole.permissions.some((p) => p.resource.key === resource);
+  }
+
+  /** Service checks use the same explicit grants as route guards. */
+  passesMatrix(user: RequestUser, resource: string, action: string): boolean {
+    return hasGrant(user, resource, action);
   }
 
   /** Resolve the farmer.id owned by the requesting user (or null if not a farmer). */
@@ -62,7 +68,7 @@ export class OwnershipService {
   }
 
   async assertFarmerAccess(user: RequestUser, farmerId: string): Promise<void> {
-    if (this.isPrivileged(user)) return;
+    if (this.isPrivileged(user, 'farmers')) return;
     const ownFarmerId = await this.farmerIdForUser(user.id);
     if (ownFarmerId !== farmerId) {
       throw new ForbiddenException(
@@ -72,7 +78,7 @@ export class OwnershipService {
   }
 
   async assertFarmAccess(user: RequestUser, farmId: string): Promise<void> {
-    if (this.isPrivileged(user)) return;
+    if (this.isPrivileged(user, 'farms')) return;
     const ownFarmerId = await this.farmerIdForUser(user.id);
     if (!ownFarmerId) {
       throw new ForbiddenException(
@@ -107,7 +113,7 @@ export class OwnershipService {
   }
 
   async assertPlotAccess(user: RequestUser, plotId: string): Promise<void> {
-    if (this.isPrivileged(user)) return;
+    if (this.isPrivileged(user, 'plots')) return;
     const plot = await this.prisma.plot.findUnique({
       where: { id: plotId },
       select: { farmId: true },

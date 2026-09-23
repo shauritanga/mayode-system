@@ -1,7 +1,14 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { syncQueue } from '../services/sync-queue';
-import { cachedRead, discardOfflineMutation, reconcileOfflineMutation, resolveReplayData, stageOfflineMutation } from '../services/offline-cache';
+import {
+  cachedRead,
+  discardOfflineMutation,
+  reconcileOfflineMutation,
+  resolveReplayData,
+  stageOfflineMutation,
+  saveToReadCache,
+} from '../services/offline-cache';
 
 /**
  * Base URL resolution order:
@@ -58,7 +65,16 @@ syncQueue.configure(async (mutation) => {
       return;
     }
   }
-  const response = await api.request({ method: mutation.method, url: mutation.url, data: await resolveReplayData(mutation.data), params: mutation.params, headers: { 'X-MAYODE-SYNC-REPLAY': '1' } });
+  const response = await api.request({
+    method: mutation.method,
+    url: mutation.url,
+    data: await resolveReplayData(mutation.data),
+    params: mutation.params,
+    headers: {
+      'X-MAYODE-SYNC-REPLAY': '1',
+      'X-Idempotency-Key': mutation.id,
+    },
+  });
   await reconcileOfflineMutation(mutation, response.data);
 });
 
@@ -122,7 +138,12 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    if (res.config?.method?.toUpperCase() === 'GET' && res.data) {
+      saveToReadCache(String(res.config.url ?? ''), res.data).catch(() => undefined);
+    }
+    return res;
+  },
   async (error) => {
     const originalConfig = error.config;
     const isRefreshCall = originalConfig?.url?.includes('/auth/refresh');
@@ -564,9 +585,11 @@ export const marketplaceApi = {
   // Tractors
   createTractorOwner: (data: { name: string; phone: string; location?: string }) =>
     api.post('/marketplace/tractors/owners', data),
+  getMyTractorOwner: () => api.get('/marketplace/tractors/owners/me'),
   createTractor: (data: object) => api.post('/marketplace/tractors', data),
   getTractors: (params?: object) => api.get('/marketplace/tractors', { params }),
   getMyTractors: (ownerId: string) => api.get(`/marketplace/tractors/owners/${ownerId}/tractors`),
+  getMyTractorBookings: () => api.get('/marketplace/tractors/bookings/mine'),
   bookTractor: (data: object) => api.post('/marketplace/tractors/book', data),
   confirmTractorBooking: (id: string) => api.patch(`/marketplace/tractors/bookings/${id}/confirm`),
   completeTractorBooking: (id: string) => api.patch(`/marketplace/tractors/bookings/${id}/complete`),
@@ -576,6 +599,10 @@ export const marketplaceApi = {
   getMarketPrices: (params?: object) => api.get('/marketplace/prices', { params }),
   createMarketPrice: (data: { commodity: string; price: number; market?: string; source?: string; recordedAt: string }) =>
     api.post('/marketplace/prices', data),
+};
+
+export const paymentsApi = {
+  mine: () => api.get('/payments/mine'),
 };
 
 export const governanceApi = {

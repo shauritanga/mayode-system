@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Controller,
   Get,
@@ -27,6 +28,7 @@ import { UserRole } from '@prisma/client';
 @ApiTags('mamcos')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('mamcos')
 @Controller('mamcos')
 export class MamcosController {
   constructor(private readonly mamcosService: MamcosService) {}

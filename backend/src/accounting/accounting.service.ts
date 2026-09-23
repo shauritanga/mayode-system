@@ -27,15 +27,17 @@ const CHART = [
 export class AccountingService {
   constructor(private readonly prisma: PrismaService) {}
   private async accounts() {
-    await Promise.all(
-      CHART.map(([code, name, type]) =>
-        this.prisma.account.upsert({
-          where: { code },
-          create: { code, name, type },
-          update: {},
-        }),
-      ),
-    );
+    // Sequential: Prisma upsert is SELECT-then-INSERT (not atomic), so
+    // concurrent upserts of the same code — from Promise.all here, or two
+    // statements requests racing on a fresh DB — collide on the unique
+    // `code` constraint (P2002). Twelve rows serially is negligible cost.
+    for (const [code, name, type] of CHART) {
+      await this.prisma.account.upsert({
+        where: { code },
+        create: { code, name, type },
+        update: {},
+      });
+    }
     return this.prisma.account.findMany();
   }
   async postToLedger(

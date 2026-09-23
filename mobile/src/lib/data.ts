@@ -39,6 +39,7 @@ export const registryApi = impl.registryApi;
 export const workspaceApi = impl.workspaceApi;
 export const officerVisitsApi = impl.officerVisitsApi;
 export const integrationsApi = impl.integrationsApi;
+export const paymentsApi = impl.paymentsApi;
 
 // Token setter is only meaningful for the remote backend; local is a no-op.
 export const setApiToken = impl.setApiToken;

@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -38,6 +39,7 @@ const STAFF_ROLES = [
 @ApiTags('insurance')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('insurance')
 @Controller('insurance')
 export class InsuranceController {
   constructor(private readonly insurance: InsuranceService) {}

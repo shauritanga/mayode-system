@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -25,6 +26,7 @@ import {
 @ApiTags('settings')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('settings')
 @Controller('settings')
 export class SettingsController {
   constructor(private readonly settings: SettingsService) {}

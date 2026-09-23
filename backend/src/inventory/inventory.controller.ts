@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Controller,
   Get,
@@ -28,6 +29,7 @@ import { UserRole } from '@prisma/client';
 @ApiTags('inventory')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('inventory')
 @Controller('inventory')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
@@ -49,9 +51,10 @@ export class InventoryController {
 
   @Post('records/mine')
   @Roles(UserRole.FARMER)
+  @RequirePermission('inventory', 'CREATE')
   @ApiOperation({
     summary:
-      'Farmer self-reports a warehouse delivery for their own crop cycle',
+      'Report a warehouse delivery: farmers self-report their own crop cycles; grant-holding staff may record on a farmer’s behalf (attributed to the cycle’s farmer)',
   })
   reportMyDelivery(
     @CurrentUser() user: RequestUser,

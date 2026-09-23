@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FarmVerificationsService } from './farm-verifications.service';
@@ -13,6 +14,7 @@ import { UserRole } from '@prisma/client';
 @ApiTags('farm-verifications')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('farm_verifications')
 @Controller('farm-verifications')
 export class FarmVerificationsController {
   constructor(

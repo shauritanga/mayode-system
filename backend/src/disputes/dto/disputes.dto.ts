@@ -86,4 +86,11 @@ export class ResolveDisputeDto {
   @IsOptional()
   @IsString()
   resolution?: string;
+
+  @ApiPropertyOptional({
+    description: 'Reassign dispute to a specific field officer',
+  })
+  @IsOptional()
+  @IsUUID()
+  assignedOfficerId?: string;
 }

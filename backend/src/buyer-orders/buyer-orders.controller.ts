@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -32,6 +33,7 @@ const STAFF_ROLES = [
 @ApiTags('buyer-orders')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('buyer_orders')
 @Controller('buyer-orders')
 export class BuyerOrdersController {
   constructor(

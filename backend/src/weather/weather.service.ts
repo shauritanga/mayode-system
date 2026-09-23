@@ -2,6 +2,7 @@ import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService, normalizeMsisdn } from '../messaging/sms.service';
 import { SettingsService } from '../settings/settings.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateWeatherAlertDto } from './dto/weather.dto';
 
 const WEATHER_ALERT_TEMPLATE_KEY = 'weather_alert';
@@ -26,6 +27,7 @@ export class WeatherService {
     private readonly prisma: PrismaService,
     private readonly sms: SmsService,
     private readonly settings: SettingsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -146,18 +148,35 @@ export class WeatherService {
         ...(dto.district ? { district: dto.district } : {}),
         ...(dto.ward ? { ward: dto.ward } : {}),
       },
-      select: { user: { select: { phone: true } } },
+      select: {
+        userId: true,
+        user: { select: { phone: true } },
+      },
     });
 
     let sent = 0;
     for (const farmer of farmers) {
-      if (!farmer.user?.phone) continue;
-      await this.sms.send(
-        normalizeMsisdn(farmer.user.phone),
-        messageBody,
-        'weather_alert',
-      );
-      sent += 1;
+      if (farmer.user?.phone) {
+        await this.sms.send(
+          normalizeMsisdn(farmer.user.phone),
+          messageBody,
+          'weather_alert',
+        );
+        sent += 1;
+      }
+      if (farmer.userId) {
+        await this.notifications.create({
+          userId: farmer.userId,
+          type: 'WEATHER_ALERT',
+          title: `Weather Alert: ${dto.title}`,
+          body: dto.message,
+          data: {
+            alertId: alert.id,
+            alertType: dto.alertType,
+            severity: dto.severity,
+          },
+        }).catch(() => undefined);
+      }
     }
 
     return this.prisma.weatherAlert.update({

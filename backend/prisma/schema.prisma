@@ -2156,7 +2156,9 @@ model FarmFieldSurvey {
 // ENUMS
 // ============================================================
 
+// Non-super values describe operational profiles only; they never grant access.
 enum UserRole {
+  CUSTOM
   SUPER_ADMIN
   ADMIN
   FIELD_OFFICER

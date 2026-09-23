@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -21,6 +22,7 @@ import { UpsertBuyerDto } from './dto/buyer.dto';
 @ApiTags('buyers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('buyers')
 @Controller('buyers')
 export class BuyersController {
   constructor(private readonly buyers: BuyersService) {}

@@ -26,6 +26,7 @@ import {
   CoinsDollarIcon,
   Package01Icon,
   Shield01Icon,
+  CloudSavingDone01Icon,
 } from '@hugeicons/core-free-icons';
 import { useAuthStore } from '../../src/store/auth.store';
 import { authApi } from '../../src/lib/data';
@@ -89,6 +90,7 @@ function FarmerDrawerContent(props: DrawerContentComponentProps) {
     { key: 'record-sale', label: t('recordSale'), icon: CoinsDollarIcon, color: '#047857', onPress: () => goSelectCycle('sale') },
     { key: 'marketplace', label: t('marketplace'), icon: ShoppingCart02Icon, color: '#059669', onPress: () => go('/marketplace') },
     { key: 'finances', label: t('finances'), icon: Wallet01Icon, color: '#0F766E', onPress: () => go('/finances') },
+    { key: 'payments', label: t('paymentsHistory'), icon: CoinsDollarIcon, color: '#10B981', onPress: () => go('/payments') },
     { key: 'insurance', label: t('insurance'), icon: Shield01Icon, color: '#047857', onPress: () => go('/insurance') },
     { key: 'inventory', label: t('warehouseStock'), icon: Package01Icon, color: '#0F766E', onPress: () => go('/inventory') },
     { key: 'calendar', label: t('calendar'), icon: Calendar01Icon, color: '#047857', onPress: () => go('/calendar') },
@@ -96,6 +98,7 @@ function FarmerDrawerContent(props: DrawerContentComponentProps) {
     { key: 'leases', label: t('myLeases'), icon: Agreement01Icon, color: '#10B981', onPress: () => go('/leases') },
     { key: 'rewards', label: t('myRewards'), icon: GiftIcon, color: '#F59E0B', onPress: () => go('/rewards') },
     { key: 'votes', label: 'Member voting', icon: Agreement01Icon, color: '#3B82F6', onPress: () => go('/votes') },
+    { key: 'sync', label: t('syncCenter'), icon: CloudSavingDone01Icon, color: '#059669', onPress: () => go('/sync-center') },
     { key: 'support', label: t('helpSupport'), icon: QuestionIcon, color: '#6B7280', onPress: () => go('/support') },
   ];
 
@@ -164,6 +167,7 @@ function OfficerDrawerContent(props: DrawerContentComponentProps) {
 
   const items: DrawerNavItem[] = [
     { key: 'field-survey', label: t('fieldSurvey'), icon: MapsSearchIcon, color: '#065F46', onPress: () => go('/field-survey') },
+    { key: 'sync', label: t('syncCenter'), icon: CloudSavingDone01Icon, color: '#059669', onPress: () => go('/sync-center') },
     { key: 'support', label: t('helpSupport'), icon: QuestionIcon, color: '#6B7280', onPress: () => go('/support') },
   ];
 

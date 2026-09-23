@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -7,6 +8,7 @@ import {
   IsUUID,
   Matches,
 } from 'class-validator';
+import { FarmGrade } from '@prisma/client';
 
 export class PreRegisterFarmDto {
   @ApiPropertyOptional({
@@ -92,6 +94,15 @@ export class PreRegisterFarmDto {
   @IsOptional()
   @IsNumber()
   farmSizeHectares?: number;
+
+  @ApiPropertyOptional({
+    example: 'B',
+    enum: FarmGrade,
+    description: 'Farm grade (A/B/C) — used for the created Farm record',
+  })
+  @IsOptional()
+  @IsEnum(FarmGrade)
+  grade?: FarmGrade;
 
   @ApiPropertyOptional()
   @IsOptional()

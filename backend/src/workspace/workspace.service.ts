@@ -32,6 +32,9 @@ export class WorkspaceService {
   constructor(private readonly prisma: PrismaService) {}
 
   async context(user: RequestUser) {
+    if (user.role === UserRole.CUSTOM) {
+      return { role: UserRole.CUSTOM, kpis: {}, workQueue: [] };
+    }
     switch (user.role) {
       case UserRole.FARMER:
         return this.renterContext(user.id);

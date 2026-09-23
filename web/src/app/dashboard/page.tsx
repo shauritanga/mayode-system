@@ -19,6 +19,7 @@ import {
   ChartBarLineIcon,
 } from '@hugeicons/core-free-icons';
 import { mamcosApi, marketplaceApi, reportsApi, workspaceApi } from '@/lib/api';
+import { getVisibleGroups } from '@/lib/nav';
 import { useAuthStore } from '@/store/auth.store';
 import AdminOverviewDashboard from '@/components/role-dashboards/AdminOverviewDashboard';
 import { CountUpValue } from '@/components/CountUpValue';
@@ -279,21 +280,13 @@ function SecretaryDashboard() {
 }
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const role = useAuthStore((state) => state.user?.role);
-
-  useEffect(() => {
-    const roleLanding: Record<string, string> = {
-      FARMER: '/dashboard/farmer',
-      FIELD_OFFICER: '/dashboard/field-officer',
-      AUDITOR: '/dashboard/auditor',
-      FINANCIAL_PROVIDER: '/dashboard/financial-provider',
-      BUYER: '/dashboard/buyer',
-    };
-    if (role && roleLanding[role]) router.replace(roleLanding[role]);
-  }, [role, router]);
-
-  if (role === 'MAMCOS_SECRETARY') return <SecretaryDashboard />;
-  if (role === 'SUPER_ADMIN' || role === 'ADMIN') return <AdminOverviewDashboard />;
-  return null;
+  const user = useAuthStore((state) => state.user);
+  if (user?.role === 'SUPER_ADMIN') return <AdminOverviewDashboard />;
+  const items = getVisibleGroups(user).flatMap((g) => g.items).filter((item) => item.href !== '/dashboard');
+  return <div>
+    <h1>{user?.customRoleName || 'Your workspace'}</h1>
+    <p>Choose an area assigned to your role.</p>
+    {items.length ? <div className="role-list">{items.map((item) => <Link className="quick-action" key={item.href} href={item.href}>{item.label}</Link>)}</div>
+      : <p>No access has been assigned yet. Contact Super Admin.</p>}
+  </div>;
 }

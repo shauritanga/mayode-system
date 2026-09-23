@@ -3,6 +3,7 @@
  * Buyer / auditor / financial-provider accounts use the web dashboard instead.
  */
 export const MOBILE_ALLOWED_ROLES = [
+  'CUSTOM',
   'FARMER',
   'FIELD_OFFICER',
   'MAMCOS_SECRETARY',

@@ -3,7 +3,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsEmail,
-  IsEnum,
+  IsIn,
   IsUUID,
   MinLength,
   Matches,
@@ -11,12 +11,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 
-/**
- * Authenticated staff/admin account creation (SUPER_ADMIN/ADMIN only — see
- * AuthController.createStaffAccount). Unlike the public RegisterDto, this
- * accepts any role, since it's gated by RolesGuard rather than open to the
- * internet.
- */
+/** Super Admin provisions an account and explicitly selects its access role. */
 export class CreateStaffUserDto {
   @ApiProperty({ example: '+255768680433' })
   @IsString()
@@ -36,13 +31,12 @@ export class CreateStaffUserDto {
   @MinLength(6)
   password: string;
 
-  @ApiProperty({ example: 'ADMIN', enum: UserRole })
-  @IsEnum(UserRole)
-  role: UserRole;
+  @ApiPropertyOptional({ enum: ['SUPER_ADMIN'], description: 'Only built-in role. Otherwise supply roleId.' })
+  @IsIn(['SUPER_ADMIN'])
+  @IsOptional()
+  role?: UserRole;
 
-  @ApiPropertyOptional({
-    description: 'Optional custom Role (from Role Management) to assign alongside the system role, for finer-grained resource permissions',
-  })
+  @ApiPropertyOptional({ description: 'Active role created by Super Admin. Required unless creating Super Admin.' })
   @IsUUID()
   @IsOptional()
   roleId?: string;

@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -35,6 +36,7 @@ const STAFF_ROLES = [
 @ApiTags('farm-corrections')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('farm_corrections')
 @Controller('farms/:farmId')
 export class FarmCorrectionsController {
   constructor(private readonly corrections: FarmCorrectionsService) {}
@@ -113,6 +115,7 @@ export class FarmCorrectionsController {
 @ApiTags('farm-corrections')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('farm_corrections')
 @Controller('suggested-updates')
 export class SuggestedUpdatesController {
   constructor(private readonly corrections: FarmCorrectionsService) {}
@@ -145,6 +148,7 @@ export class SuggestedUpdatesController {
 @ApiTags('farm-corrections')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('farm_corrections')
 @Controller('farm-data-conflicts')
 export class FarmDataConflictsController {
   constructor(private readonly corrections: FarmCorrectionsService) {}

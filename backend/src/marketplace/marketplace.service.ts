@@ -20,10 +20,13 @@ import { CreateTractorBookingDto } from './dto/create-tractor-booking.dto';
 import { CreateMarketPriceDto } from './dto/create-market-price.dto';
 import { RequestSubLeaseDto, ApproveSubLeaseDto } from './dto/sub-lease.dto';
 import { TransferOwnershipDto } from './dto/ownership-transfer.dto';
+import { AccountingService } from '../accounting/accounting.service';
+import { RequestUser } from '../common/ownership.service';
 import {
   DealType,
   LeaseStatus,
   PaymentStatus,
+  PaymentType,
   PayoutStatus,
   SubLeaseStatus,
   BookingStatus,
@@ -63,6 +66,7 @@ export class MarketplaceService {
     private readonly pricing: PricingService,
     private readonly leaseDocument: LeaseDocumentService,
     private readonly disputes: DisputesService,
+    private readonly accounting: AccountingService,
   ) {}
 
   /** ClickPesa requires an alphanumeric order reference — generate a unique one. */
@@ -2033,7 +2037,10 @@ export class MarketplaceService {
 
     const terrainSurcharge = basePrice * surchargePercent;
     const totalPrice = basePrice + terrainSurcharge;
-    const commissionAmount = totalPrice * commissionRate;
+    // Server-enforced commission rate: Grade C (difficult terrain) = 13%, otherwise standard = 10%
+    const resolvedCommissionRate =
+      terrainGrade === FarmGrade.C ? 0.13 : 0.10;
+    const commissionAmount = totalPrice * resolvedCommissionRate;
 
     const booking = await this.prisma.tractorBooking.create({
       data: {
@@ -2044,7 +2051,7 @@ export class MarketplaceService {
         basePrice,
         terrainSurcharge,
         totalPrice,
-        commissionRate,
+        commissionRate: resolvedCommissionRate,
         commissionAmount,
         status: BookingStatus.PENDING,
         scheduledDate: new Date(scheduledDate),
@@ -2124,6 +2131,33 @@ export class MarketplaceService {
         farmer: { include: { user: { select: { phone: true } } } },
       },
     });
+
+    // 1. Record completed service payment for farmer statement transparency
+    const netOwnerPayout = completed.totalPrice - completed.commissionAmount;
+    await this.prisma.payment.create({
+      data: {
+        farmerId: completed.farmerId,
+        amount: completed.totalPrice,
+        netAmount: netOwnerPayout,
+        paymentType: PaymentType.TRACTOR_SERVICE,
+        status: PaymentStatus.CLEARED,
+        description: `Tractor service (${completed.tractor.model || completed.tractor.registrationNo}) - ${completed.hectares} ha`,
+        paidAt: completed.completedAt || new Date(),
+      },
+    }).catch((e) => this.logger.warn(`Failed to create payment for tractor booking: ${e?.message}`));
+
+    // 2. Post commission revenue to double-entry general ledger
+    await this.accounting.postToLedger(
+      'TractorBooking',
+      completed.id,
+      completed.completedAt || new Date(),
+      `Tractor commission: ${completed.tractor.registrationNo}`,
+      [
+        { code: '1000', debit: completed.commissionAmount },
+        { code: '4000', credit: completed.commissionAmount },
+      ],
+    ).catch((e) => this.logger.warn(`Failed to post tractor booking to ledger: ${e?.message}`));
+
     if (completed.tractor.owner.phone) {
       await this.sms.send(
         completed.tractor.owner.phone,
@@ -2139,6 +2173,49 @@ export class MarketplaceService {
       );
     }
     return completed;
+  }
+
+  async findMyTractorBookings(user: RequestUser) {
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    if (!farmer) return [];
+    return this.prisma.tractorBooking.findMany({
+      where: { farmerId: farmer.id },
+      include: {
+        tractor: {
+          include: { owner: true },
+        },
+      },
+      orderBy: { scheduledDate: 'desc' },
+    });
+  }
+
+  async findMyTractorOwnerProfile(user: RequestUser) {
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { phone: true },
+    });
+    if (!dbUser?.phone) return null;
+    const phone = dbUser.phone;
+    const last9 = phone.slice(-9);
+
+    return this.prisma.tractorOwner.findFirst({
+      where: {
+        OR: [
+          { phone },
+          { phone: { endsWith: last9 } },
+        ],
+      },
+      include: {
+        tractors: {
+          include: {
+            bookings: true,
+          },
+        },
+      },
+    });
   }
 
   // ==========================================

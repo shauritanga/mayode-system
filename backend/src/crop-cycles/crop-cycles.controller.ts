@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Controller,
   Get,
@@ -42,6 +43,7 @@ const STAFF_ROLES = [
 @ApiTags('crop-cycles')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('crop_cycles')
 @Controller('crop-cycles')
 export class CropCyclesController {
   constructor(

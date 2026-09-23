@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -12,6 +13,8 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
@@ -20,7 +23,8 @@ import { AddFarmPhotoDto, CreateFieldSurveyDto } from './dto/farm-reports.dto';
 
 @ApiTags('farm-reports')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('farm_reports')
 @Controller('farms')
 export class FarmReportsController {
   constructor(private readonly reports: FarmReportsService) {}
@@ -34,6 +38,7 @@ export class FarmReportsController {
     UserRole.FIELD_OFFICER,
     UserRole.FARMER,
   )
+  @RequirePermission('farm_reports', 'CREATE')
   @ApiOperation({
     summary: 'Add a farm photo (owner comment §2.5: 3–5 photos)',
   })
@@ -54,6 +59,7 @@ export class FarmReportsController {
     UserRole.AUDITOR,
     UserRole.FARMER,
   )
+  @RequirePermission('farm_reports', 'VIEW')
   @ApiOperation({ summary: 'List a farm’s photos' })
   listPhotos(@Param('id') id: string) {
     return this.reports.listPhotos(id);
@@ -66,6 +72,7 @@ export class FarmReportsController {
     UserRole.FIELD_OFFICER,
     UserRole.FARMER,
   )
+  @RequirePermission('farm_reports', 'DELETE')
   @ApiOperation({ summary: 'Delete a farm photo' })
   deletePhoto(
     @Param('photoId') photoId: string,
@@ -82,6 +89,7 @@ export class FarmReportsController {
     UserRole.FIELD_OFFICER,
     UserRole.MAMCOS_SECRETARY,
   )
+  @RequirePermission('farm_reports', 'CREATE')
   @ApiOperation({
     summary: 'Record on-site field data — soil, road, water, physical (staff)',
   })
@@ -101,6 +109,7 @@ export class FarmReportsController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
+  @RequirePermission('farm_reports', 'VIEW')
   @ApiOperation({ summary: 'List a farm’s field surveys' })
   listSurveys(@Param('id') id: string) {
     return this.reports.listFieldSurveys(id);
@@ -117,6 +126,7 @@ export class FarmReportsController {
     UserRole.AUDITOR,
     UserRole.FARMER,
   )
+  @RequirePermission('farm_reports', 'VIEW')
   @ApiOperation({
     summary:
       'Comprehensive farm analytics report. Premium — free users get a basic preview + membership CTA.',
@@ -134,6 +144,7 @@ export class FarmReportsController {
     UserRole.AUDITOR,
     UserRole.FARMER,
   )
+  @RequirePermission('farm_reports', 'VIEW')
   @Header('Content-Type', 'text/html')
   @ApiOperation({
     summary:

@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -23,6 +24,7 @@ import {
 @ApiTags('farming-seasons')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('farming_seasons')
 @Controller('farming-seasons')
 export class FarmingSeasonsController {
   constructor(private readonly seasons: FarmingSeasonsService) {}

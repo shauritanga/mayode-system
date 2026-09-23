@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -21,6 +22,7 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
 import { CreateVoteDto } from './dto/create-vote.dto';
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('governance')
 @Controller('governance')
 export class GovernanceController {
   constructor(private readonly service: GovernanceService) {}

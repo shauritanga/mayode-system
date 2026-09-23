@@ -42,6 +42,13 @@ export default function FarmRegistryPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importMamcosId, setImportMamcosId] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importResult, setImportResult] = useState<{ importedCount: number; errors?: string[] } | null>(null);
+
   const load = () => {
     setLoading(true);
     registryApi.list()
@@ -56,6 +63,33 @@ export default function FarmRegistryPage() {
   }, []);
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleImport = async () => {
+    if (!importFile) {
+      setImportError('Please select a CSV or Excel file.');
+      return;
+    }
+    setImporting(true);
+    setImportError('');
+    setImportResult(null);
+
+    const formData = new FormData();
+    formData.append('file', importFile);
+    if (importMamcosId) {
+      formData.append('defaultMamcosId', importMamcosId);
+    }
+
+    try {
+      const res = await registryApi.importSpreadsheet(formData);
+      setImportResult(res.data);
+      load();
+    } catch (e: any) {
+      const msg = e?.response?.data?.message;
+      setImportError(Array.isArray(msg) ? msg.join(', ') : msg || 'Failed to import spreadsheet.');
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const submit = async () => {
     setError('');
@@ -94,9 +128,14 @@ export default function FarmRegistryPage() {
           </div>
           <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Pre-register farms &amp; owners — the AMCOS-first registry</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(true)}>
-          + Pre-register farm
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="btn-secondary" onClick={() => { setShowImport(true); setImportError(''); setImportResult(null); setImportFile(null); }}>
+            Import Spreadsheet
+          </button>
+          <button className="btn-primary" onClick={() => setShowForm(true)}>
+            + Pre-register farm
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -150,6 +189,76 @@ export default function FarmRegistryPage() {
             <Field label="Size (hectares)" value={form.farmSizeHectares} onChange={v => set('farmSizeHectares', v)} placeholder="2.5" />
           </div>
           {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
+        </Modal>
+      )}
+
+      {/* Spreadsheet import modal */}
+      {showImport && (
+        <Modal
+          title="Import farms from Spreadsheet (CSV / Excel)"
+          subtitle="Upload existing AMCOS member registries (.xlsx, .xls, .csv) with automatic column mapping"
+          onClose={() => { setShowImport(false); setImportFile(null); setImportError(''); setImportResult(null); }}
+          width="600px"
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => { setShowImport(false); setImportFile(null); setImportError(''); setImportResult(null); }} disabled={importing}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={handleImport} disabled={importing || !importFile}>
+                {importing ? 'Importing…' : 'Start Import'}
+              </button>
+            </>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={labelStyle}>Default AMCOS (Optional if specified in file)</label>
+              <select className="input-field" value={importMamcosId} onChange={e => setImportMamcosId(e.target.value)}>
+                <option value="">— select AMCOS scheme —</option>
+                {mamcos.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Select File (.csv, .xlsx, .xls) *</label>
+              <input
+                type="file"
+                accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                className="input-field"
+                style={{ padding: '8px' }}
+                onChange={e => {
+                  if (e.target.files && e.target.files[0]) {
+                    setImportFile(e.target.files[0]);
+                    setImportError('');
+                    setImportResult(null);
+                  }
+                }}
+              />
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--neutral-800)', borderRadius: '8px', padding: '12px', fontSize: '12px', color: 'var(--neutral-400)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>Supported Column Headers:</div>
+              <div>• <code>ownerName</code> / <code>owner_name</code> / <code>jina</code></div>
+              <div>• <code>ownerPhone</code> / <code>phone</code> / <code>simu</code></div>
+              <div>• <code>farmSizeHectares</code> / <code>size</code> / <code>ukubwa</code></div>
+              <div>• <code>plotNumber</code>, <code>block</code>, <code>canal</code>, <code>village</code>, <code>ward</code></div>
+            </div>
+
+            {importError && <div style={{ color: 'var(--red-400)', fontSize: '13px' }}>{importError}</div>}
+            {importResult && (
+              <div style={{ color: 'var(--green-400)', fontSize: '13px', background: 'rgba(16,185,129,0.1)', padding: '10px', borderRadius: '6px' }}>
+                Successfully imported {importResult.importedCount} farm(s).
+                {importResult.errors && importResult.errors.length > 0 && (
+                  <div style={{ marginTop: '6px', color: 'var(--gold-400)', fontSize: '12px' }}>
+                    Warnings / Skipped:
+                    <ul style={{ paddingLeft: '16px', marginTop: '4px' }}>
+                      {importResult.errors.map((err, idx) => <li key={idx}>{err}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </Modal>
       )}
 

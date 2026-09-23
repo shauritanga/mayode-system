@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -22,6 +23,7 @@ import { CreateRewardCampaignDto } from './dto/rewards.dto';
 @ApiTags('rewards')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('rewards')
 @Controller('rewards')
 export class RewardsController {
   constructor(private readonly rewards: RewardsService) {}

@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -33,6 +34,7 @@ const STAFF_ROLES = [
 @ApiTags('facilities')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('facilities')
 @Controller('facilities')
 export class FacilitiesController {
   constructor(private readonly facilities: FacilitiesService) {}

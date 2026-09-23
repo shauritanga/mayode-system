@@ -1,3 +1,4 @@
+import { assertAssignedRole } from './role-access';
 import {
   Injectable,
   ConflictException,
@@ -21,12 +22,6 @@ import {
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UserRole, MamcosStaffRole } from '@prisma/client';
 import { normalizeMsisdn } from '../messaging/sms.service';
-
-/** Roles only a SUPER_ADMIN may grant; an ADMIN cannot create peers or escalate to SUPER_ADMIN. */
-const SUPER_ADMIN_ONLY_ROLES: UserRole[] = [
-  UserRole.SUPER_ADMIN,
-  UserRole.ADMIN,
-];
 
 @Injectable()
 export class AuthService {
@@ -94,9 +89,25 @@ export class AuthService {
       firstName?: string | null;
       lastName?: string | null;
       profilePhotoUrl?: string | null;
+      roleId?: string | null;
+      customRole?: {
+        id: string;
+        name: string;
+        isActive: boolean;
+        isSystem: boolean;
+        permissions: { action: string; resource: { key: string } }[];
+      } | null;
     },
     controlNumber?: string,
   ): Promise<AuthResponseDto> {
+    assertAssignedRole(user);
+    // Flatten the custom-role matrix for clients: the web dashboard uses it
+    // to hide navigation/routes the API would reject with 403. Empty for
+    // Super Admin (the only built-in role).
+    const permissions = (user.customRole?.permissions ?? []).map((p) => ({
+      resource: p.resource.key,
+      action: p.action,
+    }));
     const accessTokenPayload = {
       sub: user.id,
       phone: user.phone,
@@ -148,6 +159,9 @@ export class AuthService {
         firstName: user.firstName || undefined,
         lastName: user.lastName || undefined,
         role: user.role,
+        roleId: user.roleId || undefined,
+        customRoleName: user.customRole?.name,
+        permissions,
         controlNumber,
         profilePhotoUrl: user.profilePhotoUrl || undefined,
       },
@@ -155,22 +169,55 @@ export class AuthService {
   }
 
   /**
-   * Public self-registration. Always creates a FARMER account — this endpoint
-   * is unauthenticated, so any other role (including staff and admin roles)
-   * must be created through UsersService.createStaffAccount by an existing
-   * SUPER_ADMIN/ADMIN. The `role` field on RegisterDto is intentionally
-   * ignored here; it only still exists on the DTO for backward-compatible
-   * request bodies (whitelist validation would otherwise reject it).
+   * Current-session profile for clients (nav guards, permission-aware UI).
+   * Same user shape as login/refresh so the frontend has a single source.
    */
-  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    const {
-      email,
-      password,
-      firstName,
-      lastName,
-      language,
-      dataShareConsent,
-    } = registerDto;
+  async me(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        farmer: true,
+        customRole: {
+          include: { permissions: { include: { resource: true } } },
+        },
+      },
+    });
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User is inactive or unauthorized');
+    }
+    assertAssignedRole(user);
+    const permissions = (user.customRole?.permissions ?? []).map((p) => ({
+      resource: p.resource.key,
+      action: p.action,
+    }));
+    return {
+      id: user.id,
+      phone: user.phone,
+      email: user.email || undefined,
+      firstName: user.firstName || undefined,
+      lastName: user.lastName || undefined,
+      role: user.role,
+      roleId: user.roleId || undefined,
+      customRoleName: user.customRole?.name,
+      permissions,
+      controlNumber: user.farmer?.controlNumber,
+      profilePhotoUrl: user.profilePhotoUrl || undefined,
+    };
+  }
+
+  /** Super Admin provisions a farmer using an explicitly selected custom role. */
+  async register(registerDto: RegisterDto, creatorRole: UserRole): Promise<AuthResponseDto> {
+    if (creatorRole !== UserRole.SUPER_ADMIN) throw new ForbiddenException('Only Super Admin may assign roles');
+    if (!registerDto.roleId) throw new BadRequestException('A custom Farmer role is required');
+    const customRole = await this.prisma.role.findUnique({
+      where: { id: registerDto.roleId },
+      include: { permissions: { include: { resource: true } } },
+    });
+    if (!customRole || !customRole.isActive || customRole.isSystem || customRole.systemRole !== UserRole.FARMER) {
+      throw new BadRequestException('Select an active custom role with a Farmer operational profile');
+    }
+    const { email, password, firstName, lastName, language, dataShareConsent } =
+      registerDto;
     const phone = normalizeMsisdn(registerDto.phone);
 
     const existingUser = await this.prisma.user.findFirst({
@@ -201,6 +248,7 @@ export class AuthService {
             firstName,
             lastName,
             role: UserRole.FARMER,
+            roleId: customRole.id,
             language: language || 'sw',
           },
         });
@@ -226,73 +274,28 @@ export class AuthService {
       );
     }
 
-    return this.generateTokens(createdUser, controlNumber);
+    return this.generateTokens({ ...createdUser, customRole }, controlNumber);
   }
 
-  /**
-   * Staff/admin account creation — authenticated, SUPER_ADMIN/ADMIN only
-   * (enforced by RolesGuard at the controller). Unlike public register(),
-   * this accepts any role. A plain ADMIN may not create SUPER_ADMIN or ADMIN
-   * accounts — only a SUPER_ADMIN can grant those, to prevent privilege
-   * escalation via a compromised or careless ADMIN account.
-   */
-  async createStaffAccount(
-    dto: CreateStaffUserDto,
-    creatorRole: UserRole,
-    creatorUserId: string,
-  ) {
-    if (
-      SUPER_ADMIN_ONLY_ROLES.includes(dto.role) &&
-      creatorRole !== UserRole.SUPER_ADMIN
-    ) {
-      throw new ForbiddenException(
-        'Only a SUPER_ADMIN can create SUPER_ADMIN or ADMIN accounts',
-      );
+  /** Only Super Admin can provision accounts and assign their access role. */
+  async createStaffAccount(dto: CreateStaffUserDto, creatorRole: UserRole) {
+    if (creatorRole !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admin may create accounts and assign roles');
     }
-
-    // An AMCOS Secretary may only self-service Field Officer accounts for
-    // their own cooperative — the mamcosId is resolved server-side and any
-    // client-supplied value is ignored, so a secretary can never create an
-    // officer under a different AMCOS.
-    if (creatorRole === UserRole.MAMCOS_SECRETARY) {
-      if (dto.role !== UserRole.FIELD_OFFICER) {
-        throw new ForbiddenException(
-          'AMCOS secretaries can only create Field Officer accounts',
-        );
-      }
-      const secretary = await this.prisma.mamcosStaff.findFirst({
-        where: { userId: creatorUserId, role: MamcosStaffRole.SECRETARY },
-        select: { mamcosId: true },
-      });
-      if (!secretary || !secretary.mamcosId) {
-        throw new ForbiddenException('AMCOS secretary profile not found');
-      }
-      dto.mamcosId = secretary.mamcosId;
-
-      // Custom roles are an admin-only concern in phase 1 — a secretary's
-      // Field Officer creation flow never opens that surface.
-      if (dto.roleId) {
-        throw new ForbiddenException(
-          'AMCOS secretaries cannot assign custom roles',
-        );
-      }
+    if (dto.role && dto.role !== UserRole.SUPER_ADMIN) {
+      throw new BadRequestException('Select a custom role created by Super Admin using roleId');
     }
-
-    if (dto.roleId) {
-      const customRole = await this.prisma.role.findUnique({
-        where: { id: dto.roleId },
-      });
-      if (!customRole || !customRole.isActive) {
-        throw new NotFoundException('Role not found or inactive');
+    if (dto.role === UserRole.SUPER_ADMIN && dto.roleId) {
+      throw new BadRequestException('Choose either Super Admin or a custom role');
+    }
+    let accountProfile: UserRole = UserRole.SUPER_ADMIN;
+    if (dto.role !== UserRole.SUPER_ADMIN) {
+      if (!dto.roleId) throw new BadRequestException('A custom role is required');
+      const customRole = await this.prisma.role.findUnique({ where: { id: dto.roleId } });
+      if (!customRole || !customRole.isActive || customRole.isSystem || customRole.systemRole === UserRole.SUPER_ADMIN) {
+        throw new BadRequestException('Select an active, non-system role created by Super Admin');
       }
-      if (
-        customRole.isSystem &&
-        customRole.systemRole &&
-        SUPER_ADMIN_ONLY_ROLES.includes(customRole.systemRole) &&
-        creatorRole !== UserRole.SUPER_ADMIN
-      ) {
-        throw new ForbiddenException('Only a SUPER_ADMIN can assign this role');
-      }
+      accountProfile = customRole.systemRole ?? UserRole.CUSTOM;
     }
 
     const existingUser = await this.prisma.user.findFirst({
@@ -315,7 +318,7 @@ export class AuthService {
           passwordHash,
           firstName: dto.firstName,
           lastName: dto.lastName,
-          role: dto.role,
+          role: accountProfile,
           roleId: dto.roleId,
           language: dto.language || 'sw',
         },
@@ -331,7 +334,7 @@ export class AuthService {
         },
       });
 
-      if (dto.role === UserRole.FARMER) {
+      if (accountProfile === UserRole.FARMER) {
         const controlNumber = await this.generateControlNumber();
         await prisma.farmer.create({
           data: {
@@ -341,7 +344,7 @@ export class AuthService {
             lastName: dto.lastName,
           },
         });
-      } else if (dto.role === UserRole.FIELD_OFFICER) {
+      } else if (accountProfile === UserRole.FIELD_OFFICER) {
         if (!dto.mamcosId)
           throw new BadRequestException(
             'mamcosId is required for a Field Officer',
@@ -363,7 +366,7 @@ export class AuthService {
             mamcosId: dto.mamcosId,
           },
         });
-      } else if (dto.role === UserRole.MAMCOS_SECRETARY) {
+      } else if (accountProfile === UserRole.MAMCOS_SECRETARY) {
         if (!dto.mamcosId)
           throw new BadRequestException(
             'mamcosId is required for an AMCOS Leader',
@@ -406,6 +409,9 @@ export class AuthService {
       where: { phone },
       include: {
         farmer: true,
+        customRole: {
+          include: { permissions: { include: { resource: true } } },
+        },
       },
     });
 
@@ -439,7 +445,12 @@ export class AuthService {
       where: { token: refreshToken },
       include: {
         user: {
-          include: { farmer: true },
+          include: {
+            farmer: true,
+            customRole: {
+              include: { permissions: { include: { resource: true } } },
+            },
+          },
         },
       },
     });
@@ -464,6 +475,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token signature');
     }
 
+    if (!storedToken.user.isActive) throw new UnauthorizedException('Account is inactive');
+    assertAssignedRole(storedToken.user);
     await this.prisma.refreshToken.delete({ where: { id: storedToken.id } });
 
     return this.generateTokens(

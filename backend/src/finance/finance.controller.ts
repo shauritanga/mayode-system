@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FinanceService } from './finance.service';
@@ -14,6 +15,7 @@ import { UserRole } from '@prisma/client';
 @ApiTags('finance')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('finance')
 @Controller('finance')
 export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}

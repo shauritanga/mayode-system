@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
   HttpCode,
@@ -33,11 +34,12 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({
     summary:
-      'Public self-registration. Always creates a FARMER account regardless of the role field sent.',
+      'Super Admin creates a farmer account with an explicitly selected custom role.',
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -48,17 +50,17 @@ export class AuthController {
     status: HttpStatus.CONFLICT,
     description: 'Phone number or email already exists',
   })
-  async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
-    return this.authService.register(registerDto);
+  async register(@Body() registerDto: RegisterDto, @CurrentUser() user: { role: UserRole }): Promise<AuthResponseDto> {
+    return this.authService.register(registerDto, user.role);
   }
 
   @Post('staff')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @Roles(UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
     summary:
-      'Create a staff account. SUPER_ADMIN/ADMIN can create any role (a plain ADMIN cannot create SUPER_ADMIN or ADMIN accounts) and may optionally assign a custom Role (from Role Management) via roleId for finer-grained resource permissions. An AMCOS Secretary can only create Field Officer accounts, scoped to their own AMCOS, and cannot assign custom roles.',
+      'Super Admin creates an account with a custom roleId, or explicitly grants the built-in Super Admin role.',
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -70,9 +72,9 @@ export class AuthController {
   })
   async createStaffAccount(
     @Body() dto: CreateStaffUserDto,
-    @CurrentUser() user: { id: string; role: UserRole },
+    @CurrentUser() user: { role: UserRole },
   ) {
-    return this.authService.createStaffAccount(dto, user.role, user.id);
+    return this.authService.createStaffAccount(dto, user.role);
   }
 
   @Post('login')
@@ -113,6 +115,17 @@ export class AuthController {
     @Body() refreshTokenDto: RefreshTokenDto,
   ): Promise<AuthResponseDto> {
     return this.authService.refresh(refreshTokenDto);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Current-session profile: role, custom role name, and flattened resource permissions for client-side guards',
+  })
+  async me(@CurrentUser() user: { id: string }) {
+    return this.authService.me(user.id);
   }
 
   @Post('logout')

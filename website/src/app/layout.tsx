@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
-import { Inter, Outfit } from 'next/font/google';
+import { Outfit } from 'next/font/google';
 import './globals.css';
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
+import './apple-overrides.css';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -41,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className={`${inter.variable} ${outfit.variable}`}>
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className={outfit.variable}>
       <head>
         {/* Set the theme before first paint to avoid a dark→light flash for light-theme users. */}
         <script

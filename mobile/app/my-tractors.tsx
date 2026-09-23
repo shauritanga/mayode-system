@@ -13,18 +13,39 @@ export default function MyTractors() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  const [resolvedOwnerId, setResolvedOwnerId] = useState<string | null>(ownerId || null);
+
   const load = useCallback(async () => {
-    if (!ownerId) { setLoading(false); return; }
     setLoading(true);
+    let targetId = ownerId || resolvedOwnerId;
+    if (!targetId) {
+      try {
+        const ownerRes = await marketplaceApi.getMyTractorOwner();
+        if (ownerRes?.data?.id) {
+          targetId = ownerRes.data.id;
+          setResolvedOwnerId(targetId);
+        } else {
+          setLoading(false);
+          router.replace('/tractor-register' as any);
+          return;
+        }
+      } catch {
+        setLoading(false);
+        router.replace('/tractor-register' as any);
+        return;
+      }
+    }
+
+    if (!targetId) { setLoading(false); return; }
     try {
-      const res = await marketplaceApi.getMyTractors(ownerId);
+      const res = await marketplaceApi.getMyTractors(targetId);
       setTractors(res.data ?? []);
     } catch {
       /* keep previous list */
     } finally {
       setLoading(false);
     }
-  }, [ownerId]);
+  }, [ownerId, resolvedOwnerId, router]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 

@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -47,10 +48,13 @@ export class RolesService {
   }
 
   async create(dto: CreateRoleDto) {
-    const existing = await this.prisma.role.findUnique({ where: { name: dto.name } });
+    const name = dto.name.trim();
+    if (!name) throw new BadRequestException('Role name is required');
+    if (dto.profileType === UserRole.SUPER_ADMIN || dto.profileType === UserRole.ADMIN) throw new BadRequestException('This operational profile cannot be assigned to a custom role');
+    const existing = await this.prisma.role.findUnique({ where: { name } });
     if (existing) throw new ConflictException('A role with this name already exists');
     return this.prisma.role.create({
-      data: { name: dto.name, description: dto.description },
+      data: { name, description: dto.description, systemRole: dto.profileType ?? UserRole.CUSTOM },
     });
   }
 

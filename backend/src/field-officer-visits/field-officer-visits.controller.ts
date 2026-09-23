@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Controller,
   Get,
@@ -23,6 +24,7 @@ import type { RequestUser } from '../common/ownership.service';
 @ApiTags('field-officer-visits')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('field_surveys')
 @Controller('field-officer-visits')
 export class FieldOfficerVisitsController {
   constructor(private readonly visits: FieldOfficerVisitsService) {}

@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import {
   Body,
   Controller,
@@ -26,6 +27,7 @@ import {
 @ApiTags('memberships')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('memberships')
 @Controller('memberships')
 export class MembershipsController {
   constructor(private readonly memberships: MembershipsService) {}

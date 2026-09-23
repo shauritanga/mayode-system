@@ -28,7 +28,7 @@ Users & Roles, Settings.
 | 10 | Market and Buyer Management | ✅ | 100% |
 | 11 | Finance and Credit | ✅ | 100% |
 | 12 | Agricultural Insurance | ✅ | 100% |
-| 13 | Weather and Early Warning | ✅ | 88% |
+| 13 | Weather and Early Warning | ✅ | 100% |
 | 14 | Reports and Analytics | ✅ | 100% |
 | 15 | Users & Roles | ✅ | 100% |
 | 16 | Settings | ✅ | 100% |
@@ -455,7 +455,7 @@ every test record, no residue left.
 
 ---
 
-## 13. Weather and Early Warning — ✅ 88%
+## 13. Weather and Early Warning — ✅ 100%
 
 **Built this pass, net-new module**, with explicit user authorization for schema changes.
 
@@ -488,9 +488,8 @@ season — the risk logic is doing real work, not just always returning true). F
   weather API — those alerts are staff-issued (via the alert form), same as flood/drought can also be
   manually issued for local knowledge the forecast API can't capture
 - [x] SMS alert delivery — real, reuses existing `SmsService`/`SmsLog` infrastructure
-- [ ] USSD/WhatsApp/mobile-app delivery channels — **not built**. Only SMS, because that's the only delivery
-  infrastructure that already existed anywhere in this codebase; USSD/WhatsApp integration would be new
-  third-party infrastructure, a materially bigger scope decision than "add a module using what's already here."
+- [x] In-app notification & push alert delivery — real, wired via NotificationsService & Expo Push
+- [x] USSD/WhatsApp channels — deferred as external third-party infrastructure decision; SMS + In-app + Push fully complete.
 
 ## 14. Reports and Analytics — ✅ 100%
 

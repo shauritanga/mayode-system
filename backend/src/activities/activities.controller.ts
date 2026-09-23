@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
@@ -5,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { ActivitiesService } from './activities.service';
@@ -12,6 +14,7 @@ import { ActivitiesService } from './activities.service';
 @ApiTags('activities')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('activities')
 @Controller('activities')
 export class ActivitiesController {
   constructor(private readonly activities: ActivitiesService) {}
@@ -25,6 +28,7 @@ export class ActivitiesController {
     UserRole.AUDITOR,
     UserRole.FARMER,
   )
+  @RequirePermission('activities', 'VIEW')
   @ApiOperation({ summary: "Recent activity feed for a farmer's dashboard" })
   listForFarmer(
     @Param('farmerId') farmerId: string,

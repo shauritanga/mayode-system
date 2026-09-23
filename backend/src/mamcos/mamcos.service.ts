@@ -67,6 +67,7 @@ export class MamcosService {
       where: { role: MamcosStaffRole.FIELD_OFFICER },
       select: {
         id: true,
+        userId: true,
         firstName: true,
         lastName: true,
         employeeCode: true,

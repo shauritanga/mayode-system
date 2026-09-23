@@ -44,9 +44,12 @@ export class UsersController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get user details by ID' })
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  @ApiOperation({
+    summary:
+      'Get user details by ID. Self-reads and Super Admin / Admin reads only — other callers get 403.',
+  })
+  findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.usersService.findOne(id, user);
   }
 
   @Patch(':id')

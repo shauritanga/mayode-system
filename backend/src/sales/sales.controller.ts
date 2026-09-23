@@ -1,3 +1,4 @@
+import { PermissionResource } from '../auth/role-access';
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
@@ -19,6 +20,7 @@ import { SalesService } from './sales.service';
 @ApiTags('sales')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('sales')
 @Controller('sales')
 export class SalesController {
   constructor(private readonly sales: SalesService) {}

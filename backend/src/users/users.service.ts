@@ -1,4 +1,6 @@
+import { hasGrant } from '../auth/role-access';
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -22,6 +24,8 @@ export class UsersService {
         firstName: true,
         lastName: true,
         role: true,
+        roleId: true,
+        customRole: { select: { id: true, name: true } },
         isActive: true,
         language: true,
         profilePhotoUrl: true,
@@ -31,7 +35,21 @@ export class UsersService {
     });
   }
 
-  async findOne(id: string) {
+  /** Self-service or an explicitly granted users VIEW permission. */
+  async findOne(id: string, requestUser?: RequestUser) {
+    const isSelf = requestUser?.id === id;
+    const isPlatformStaff =
+      hasGrant(requestUser, 'users', 'VIEW');
+    if (!isSelf && !isPlatformStaff) {
+      throw new ForbiddenException(
+        'Viewing other accounts requires users VIEW permission',
+      );
+    }
+    return this.findExisting(id);
+  }
+
+  /** Existence check without access scoping — for internal service use. */
+  private async findExisting(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
@@ -41,6 +59,7 @@ export class UsersService {
         firstName: true,
         lastName: true,
         role: true,
+        roleId: true,
         isActive: true,
         language: true,
         profilePhotoUrl: true,
@@ -63,11 +82,10 @@ export class UsersService {
     updateUserDto: UpdateUserDto,
     requestUser?: RequestUser,
   ) {
-    await this.findOne(id); // Ensure user exists
+    const existing = await this.findExisting(id);
     const isSelf = requestUser?.id === id;
     const isStaff =
-      requestUser?.role === UserRole.SUPER_ADMIN ||
-      requestUser?.role === UserRole.ADMIN;
+      hasGrant(requestUser, 'users', 'EDIT');
     if (!isSelf && !isStaff) {
       throw new ForbiddenException('You may only update your own account');
     }
@@ -76,6 +94,32 @@ export class UsersService {
         'Only a Super Admin may change a user’s role',
       );
     }
+    if (
+      updateUserDto.roleId !== undefined &&
+      requestUser?.role !== UserRole.SUPER_ADMIN
+    ) {
+      throw new ForbiddenException(
+        'Only a Super Admin may assign a custom role',
+      );
+    }
+    const data = { ...updateUserDto };
+    if (data.role !== undefined) {
+      if (data.role !== UserRole.SUPER_ADMIN || data.roleId) {
+        throw new BadRequestException('Choose Super Admin or a custom role using roleId');
+      }
+      data.roleId = null;
+    } else if (data.roleId) {
+      const customRole = await this.prisma.role.findUnique({ where: { id: data.roleId } });
+      if (!customRole || !customRole.isActive || customRole.isSystem || customRole.systemRole === UserRole.SUPER_ADMIN) {
+        throw new BadRequestException('Custom role must be an active, non-system role from Role Management');
+      }
+      data.role = customRole.systemRole ?? UserRole.CUSTOM;
+    } else if (data.roleId === null) {
+      throw new BadRequestException('Assign a replacement role; accounts cannot use built-in fallback roles');
+    }
+    if (existing.role === UserRole.SUPER_ADMIN && requestUser?.role !== UserRole.SUPER_ADMIN && !isSelf) {
+      throw new ForbiddenException('Only Super Admin may edit a Super Admin account');
+    }
     if (updateUserDto.isActive !== undefined && !isStaff) {
       throw new ForbiddenException(
         'Only staff may change account active status',
@@ -83,7 +127,7 @@ export class UsersService {
     }
     return this.prisma.user.update({
       where: { id },
-      data: updateUserDto,
+      data,
       select: {
         id: true,
         phone: true,
@@ -91,6 +135,8 @@ export class UsersService {
         firstName: true,
         lastName: true,
         role: true,
+        roleId: true,
+        customRole: { select: { id: true, name: true } },
         isActive: true,
         language: true,
         updatedAt: true,
@@ -104,7 +150,7 @@ export class UsersService {
    * 409 instead of a Prisma unique-constraint 500.
    */
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    await this.findOne(userId); // Ensure user exists
+    await this.findExisting(userId); // Ensure user exists
 
     if (dto.phone) {
       const taken = await this.prisma.user.findUnique({
@@ -144,7 +190,7 @@ export class UsersService {
   }
 
   async remove(id: string) {
-    await this.findOne(id); // Ensure user exists
+    await this.findExisting(id); // Ensure user exists
     await this.prisma.user.delete({ where: { id } });
     return {
       success: true,

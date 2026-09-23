@@ -9,6 +9,7 @@ import { MultiYearRentSchedulerService } from './multi-year-rent-scheduler.servi
 import { PaymentsModule } from '../payments/payments.module';
 import { UploadsModule } from '../uploads/uploads.module';
 import { DisputesModule } from '../disputes/disputes.module';
+import { AccountingModule } from '../accounting/accounting.module';
 
 /**
  * Global so PaymentsController can inject MarketplaceService to reconcile
@@ -18,7 +19,7 @@ import { DisputesModule } from '../disputes/disputes.module';
  */
 @Global()
 @Module({
-  imports: [PaymentsModule, UploadsModule, DisputesModule],
+  imports: [PaymentsModule, UploadsModule, DisputesModule, AccountingModule],
   controllers: [MarketplaceController],
   providers: [
     MarketplaceService,

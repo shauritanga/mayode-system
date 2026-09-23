@@ -1,3 +1,5 @@
+import { PermissionResource } from '../auth/role-access';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import {
   Body,
   Controller,
@@ -19,7 +21,8 @@ import { CreateFarmAlertDto } from './dto/farm-alerts.dto';
 
 @ApiTags('farm-alerts')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@PermissionResource('farm_alerts')
 @Controller('farm-alerts')
 export class FarmAlertsController {
   constructor(private readonly alerts: FarmAlertsService) {}
