@@ -5,7 +5,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Location01Icon, Tree02Icon } from '@hugeicons/core-free-icons';
-import { farmsApi, workspaceApi } from '../../../../src/lib/data';
+import { farmsApi, farmersApi, workspaceApi } from '../../../../src/lib/data';
 import { useAuthStore } from '../../../../src/store/auth.store';
 import { StatusBar } from 'expo-status-bar';
 import { useI18n } from '../../../../src/i18n';
@@ -32,6 +32,7 @@ export default function FarmsIndex() {
   const router = useRouter();
   const role = useAuthStore((state) => state.user?.role);
   const farmerId = useAuthStore((state) => state.farmerId);
+  const setFarmerId = useAuthStore((state) => state.setFarmerId);
   const { t } = useI18n();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,8 +46,13 @@ export default function FarmsIndex() {
       } else {
         // A farmer sees both farms they own/self-registered (Farm.farmerId)
         // and AMCOS farms with an active, field-verified seasonal assignment.
+        // Resolve the profile here as well as in the root layout. This makes
+        // the screen recover immediately when an older session has no cached
+        // farmerId (for example after the self-service permission fix).
+        const resolvedFarmerId = farmerId || (await farmersApi.me()).data?.id;
+        if (!farmerId && resolvedFarmerId) setFarmerId(resolvedFarmerId);
         const [ownedRes, assignmentsRes] = await Promise.all([
-          farmerId ? farmsApi.getByFarmerId(farmerId) : Promise.resolve({ data: [] }),
+          resolvedFarmerId ? farmsApi.getByFarmerId(resolvedFarmerId) : Promise.resolve({ data: [] }),
           workspaceApi.context(),
         ]);
         const owned = ownedRes.data?.data || ownedRes.data || [];
