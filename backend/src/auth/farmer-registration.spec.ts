@@ -8,7 +8,7 @@ const farmerRole = { id: 'farmer-role', isActive: true, isSystem: false, systemR
 
 function setup(roles = [farmerRole], configuredRoleId?: string) {
   const user = { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockImplementation(async ({ data }) => ({ id: 'user-1', ...data })) };
-  const farmer = { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) };
+  const farmer = { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]), create: jest.fn().mockResolvedValue({}) };
   const prisma = {
     role: { findMany: jest.fn().mockResolvedValue(roles), findUnique: jest.fn().mockResolvedValue(roles[0]) },
     user, farmer, $transaction: jest.fn(async (fn) => fn({ user, farmer })),

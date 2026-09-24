@@ -35,25 +35,17 @@ export class AuthService {
   /**
    * Helper to generate unique Control Number for Farmers (MYD-XXXXX)
    */
-  private async generateControlNumber(): Promise<string> {
-    const prefix =
-      this.configService.get<string>('CONTROL_NUMBER_PREFIX') || 'MYD';
-    const lastFarmer = await this.prisma.farmer.findFirst({
-      where: { controlNumber: { startsWith: prefix } },
-      orderBy: { controlNumber: 'desc' },
+  private async generateControlNumber(db: { farmer: { findMany: Function } } = this.prisma as any): Promise<string> {
+    const prefix = (this.configService.get<string>('CONTROL_NUMBER_PREFIX') || 'MYD').replace(/-+$/, '');
+    const rows = await db.farmer.findMany({
+      where: { controlNumber: { startsWith: `${prefix}-` } },
+      select: { controlNumber: true },
     });
-
-    if (!lastFarmer) {
-      return `${prefix}-00001`;
-    }
-
-    const lastNumber = parseInt(
-      lastFarmer.controlNumber.replace(`${prefix}-`, ''),
-      10,
-    );
-    const nextNumber = lastNumber + 1;
-    const padded = nextNumber.toString().padStart(5, '0');
-    return `${prefix}-${padded}`;
+    const nextNumber = rows.reduce((max: number, row: { controlNumber: string }) => {
+      const match = row.controlNumber.match(new RegExp(`^${prefix}-(\\d+)$`));
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0) + 1;
+    return `${prefix}-${nextNumber.toString().padStart(5, '0')}`;
   }
 
   /**
@@ -263,8 +255,9 @@ export class AuthService {
     let createdUser;
     let controlNumber: string | undefined = undefined;
 
-    try {
-      createdUser = await this.prisma.$transaction(async (prisma) => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        createdUser = await this.prisma.$transaction(async (prisma) => {
         const user = await prisma.user.create({
           data: {
             phone,
@@ -278,7 +271,7 @@ export class AuthService {
           },
         });
 
-        controlNumber = await this.generateControlNumber();
+        controlNumber = await this.generateControlNumber(prisma as any);
         await prisma.farmer.create({
           data: {
             userId: user.id,
@@ -291,12 +284,16 @@ export class AuthService {
         });
 
         return user;
-      });
-    } catch (error) {
-      throw new InternalServerErrorException(
-        'Failed to create user account: ' +
-          (error instanceof Error ? error.message : String(error)),
-      );
+        });
+        break;
+      } catch (error: any) {
+        const target = Array.isArray(error?.meta?.target) ? error.meta.target : [];
+        if (error?.code === 'P2002' && target.includes('control_number') && attempt < 4) continue;
+        throw new InternalServerErrorException(
+          'Failed to create user account: ' +
+            (error instanceof Error ? error.message : String(error)),
+        );
+      }
     }
 
     return this.generateTokens({ ...createdUser, customRole }, controlNumber);
