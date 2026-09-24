@@ -37,6 +37,7 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AllowSelfService } from '../auth/decorators/allow-self-service.decorator';
 import { UserRole } from '@prisma/client';
 import type { RequestUser } from '../common/ownership.service';
 import { ExportService } from '../common/export.service';
@@ -169,6 +170,7 @@ export class FarmersController {
 
   @Get('me')
   @Roles(UserRole.FARMER)
+  @AllowSelfService()
   @ApiOperation({
     summary: 'Get the farmer profile linked to the current user',
   })

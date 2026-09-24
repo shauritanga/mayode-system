@@ -27,6 +27,7 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 import type { RequestUser } from '../common/ownership.service';
+import { AllowSelfService } from '../auth/decorators/allow-self-service.decorator';
 
 @ApiTags('farms')
 @ApiBearerAuth()
@@ -135,9 +136,10 @@ export class FarmsController {
     UserRole.AUDITOR,
     UserRole.FARMER,
   )
+  @AllowSelfService()
   @ApiOperation({ summary: 'Get all farms owned by a specific farmer' })
-  findByFarmerId(@Param('farmerId') farmerId: string) {
-    return this.farmsService.findByFarmerId(farmerId);
+  findByFarmerId(@Param('farmerId') farmerId: string, @CurrentUser() user: RequestUser) {
+    return this.farmsService.findByFarmerId(farmerId, user);
   }
 
   @Patch(':id')

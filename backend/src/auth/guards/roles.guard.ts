@@ -3,12 +3,14 @@ import { Reflector } from '@nestjs/core';
 import { UserRole } from '@prisma/client';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { hasGrant, requiredPermission } from '../role-access';
+import { ALLOW_SELF_SERVICE_KEY } from '../decorators/allow-self-service.decorator';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
+    if (this.reflector.getAllAndOverride<boolean>(ALLOW_SELF_SERVICE_KEY, [context.getHandler(), context.getClass()]) === true) return true;
     const roles = this.reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [context.getHandler(), context.getClass()]);
     const { user } = context.switchToHttp().getRequest();
     if (user?.role === UserRole.SUPER_ADMIN) return true;

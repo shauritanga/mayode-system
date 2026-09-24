@@ -159,7 +159,8 @@ export class FarmsService {
     return farm;
   }
 
-  findByFarmerId(farmerId: string) {
+  async findByFarmerId(farmerId: string, user?: RequestUser) {
+    if (user?.role === 'FARMER') await this.ownership.assertFarmerAccess(user, farmerId);
     return this.prisma.farm.findMany({
       where: { farmerId },
       include: {
