@@ -189,7 +189,7 @@ api.interceptors.response.use(
 export const authApi = {
   login: (phone: string, password: string) =>
     api.post('/auth/login', { phone, password }),
-  register: (data: { phone: string; password: string; firstName: string; lastName: string; role: string; dataShareConsent: boolean }) =>
+  register: (data: { phone: string; password: string; firstName: string; lastName: string; dataShareConsent: boolean }) =>
     api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
   // AMCOS Secretary self-service: mamcosId is resolved server-side from the

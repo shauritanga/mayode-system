@@ -18,6 +18,7 @@ import { UserRole } from '@prisma/client';
 import { AuthService } from './auth.service';
 import {
   RegisterDto,
+  FarmerSelfRegisterDto,
   LoginDto,
   RefreshTokenDto,
   AuthResponseDto,
@@ -33,7 +34,26 @@ import { CurrentUser } from './decorators/current-user.decorator';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Compatibility endpoint for deployed mobile clients and older app builds.
   @Post('register')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Farmer self-registration with the configured custom Farmer role' })
+  @ApiResponse({ status: HttpStatus.CREATED, type: AuthResponseDto })
+  async registerFarmerCompatibility(@Body() dto: FarmerSelfRegisterDto): Promise<AuthResponseDto> {
+    return this.authService.selfRegisterFarmer(dto);
+  }
+
+  @Post('register/farmer')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Farmer self-registration with the configured custom Farmer role' })
+  @ApiResponse({ status: HttpStatus.CREATED, type: AuthResponseDto })
+  async registerFarmer(@Body() dto: FarmerSelfRegisterDto): Promise<AuthResponseDto> {
+    return this.authService.selfRegisterFarmer(dto);
+  }
+
+  @Post('register/admin')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN)
   @ApiBearerAuth()

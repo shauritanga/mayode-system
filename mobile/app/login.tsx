@@ -125,7 +125,7 @@ export default function LoginRoute() {
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.toggleFooter} onPress={() => router.replace('/register')}>
-              <Text style={styles.toggleFooterText}>{t('adminCreatedAccountsTitle')}</Text>
+              <Text style={styles.toggleFooterText}>{t('noAccountRegister')}</Text>
             </TouchableOpacity>
           </View>
 

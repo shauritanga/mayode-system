@@ -15,6 +15,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   RegisterDto,
+  FarmerSelfRegisterDto,
   LoginDto,
   RefreshTokenDto,
   AuthResponseDto,
@@ -205,9 +206,33 @@ export class AuthService {
     };
   }
 
+  async selfRegisterFarmer(dto: FarmerSelfRegisterDto): Promise<AuthResponseDto> {
+    const configuredRoleId = this.configService.get<string>('FARMER_SELF_REGISTRATION_ROLE_ID');
+    const roles = await this.prisma.role.findMany({
+      where: {
+        isActive: true,
+        isSystem: false,
+        systemRole: UserRole.FARMER,
+        ...(configuredRoleId ? { id: configuredRoleId } : {}),
+      },
+      take: 2,
+    });
+    if (roles.length !== 1) {
+      throw new BadRequestException(
+        'Farmer registration is not configured. Please contact support.',
+      );
+    }
+    // Only the server-selected Farmer role can be assigned through this route.
+    return this.registerFarmerAccount({ ...dto, roleId: roles[0].id });
+  }
+
   /** Super Admin provisions a farmer using an explicitly selected custom role. */
   async register(registerDto: RegisterDto, creatorRole: UserRole): Promise<AuthResponseDto> {
     if (creatorRole !== UserRole.SUPER_ADMIN) throw new ForbiddenException('Only Super Admin may assign roles');
+    return this.registerFarmerAccount(registerDto);
+  }
+
+  private async registerFarmerAccount(registerDto: RegisterDto): Promise<AuthResponseDto> {
     if (!registerDto.roleId) throw new BadRequestException('A custom Farmer role is required');
     const customRole = await this.prisma.role.findUnique({
       where: { id: registerDto.roleId },

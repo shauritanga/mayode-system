@@ -9,7 +9,7 @@ import {
   MinLength,
   Matches,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 
 export enum UserRole {
   CUSTOM = 'CUSTOM',
@@ -82,6 +82,9 @@ export class RegisterDto {
   @IsOptional()
   dataShareConsent?: boolean;
 }
+
+// Public callers cannot select an access role.
+export class FarmerSelfRegisterDto extends OmitType(RegisterDto, ['role', 'roleId'] as const) {}
 
 // ---- Login DTO ----
 export class LoginDto {
