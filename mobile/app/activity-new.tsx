@@ -69,6 +69,9 @@ export default function ActivityNew() {
   const [description, setDescription] = useState('');
   const [laborWorkers, setLaborWorkers] = useState('');
   const [laborHours, setLaborHours] = useState('');
+  const [inputs, setInputs] = useState<{ name: string; quantity: string; unit: string }[]>([]);
+  const [cycle, setCycle] = useState<any>(null);
+  useEffect(() => { if (cropCycleId) cropCyclesApi.getOne(cropCycleId).then(r => setCycle(r.data)).catch(() => {}); }, [cropCycleId]);
   const [photos, setPhotos] = useState<ActivityPhoto[]>([]);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [gps, setGps] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -86,7 +89,7 @@ export default function ActivityNew() {
   }, [farmId]);
 
   const geofenceEnforced = !!farmId && !!farm && (!!farm.boundaryCoordinates || (farm.centerLatitude != null && farm.centerLongitude != null));
-  const locationOk = farmLoading ? false : !geofenceEnforced || geofence?.status === 'inside';
+  const locationOk = farmLoading || (!!farmId && !farm) ? false : !geofenceEnforced || geofence?.status === 'inside';
   const readyPhotos = photos.filter((p) => p.remoteUrl && !p.uploading);
   const photosOk = readyPhotos.length >= MIN_PHOTOS && !photos.some((p) => p.uploading);
 
@@ -188,11 +191,20 @@ export default function ActivityNew() {
       Alert.alert(t('logActivity'), t('mustVerifyLocationFirst'));
       return;
     }
+    if ([laborWorkers, laborHours].some(v => v && (!Number.isFinite(Number(v)) || Number(v) < 0)) || (laborWorkers && !Number.isInteger(Number(laborWorkers))) || inputs.some(i => !i.name.trim() || !i.unit.trim() || !Number.isFinite(Number(i.quantity)) || Number(i.quantity) <= 0)) {
+      Alert.alert(t('validationError'), t('invalidFieldNumbers')); return;
+    }
+    const plantingDates = [cycle?.plantingDate, ...(cycle?.activities ?? []).filter((a: any) => a.activityType === 'PLANTING').map((a: any) => a.activityDate)].filter(Boolean);
+    const harvestDates = [cycle?.harvestDate, ...(cycle?.activities ?? []).filter((a: any) => a.activityType === 'HARVESTING').map((a: any) => a.activityDate)].filter(Boolean);
+    if ((activityType === 'HARVESTING' && plantingDates.some(d => date < d.slice(0, 10))) || (activityType === 'PLANTING' && harvestDates.some(d => date > d.slice(0, 10)))) {
+      Alert.alert(t('validationError'), t('harvestBeforePlanting')); return;
+    }
     setSubmitting(true);
     try {
-      await cropCyclesApi.logActivity({
+      const result = await cropCyclesApi.logActivity({
         cropCycleId: cropCycleId!,
         activityType,
+        inputsUsed: { items: inputs.map(i => ({ name: i.name.trim(), quantity: Number(i.quantity), unit: i.unit.trim() })) },
         activityDate: date,
         description: description.trim() || undefined,
         laborWorkers: laborWorkers ? Number(laborWorkers) : undefined,
@@ -201,7 +213,7 @@ export default function ActivityNew() {
         gpsLatitude: gps?.latitude,
         gpsLongitude: gps?.longitude,
       });
-      Alert.alert(t('logActivity'), t('activityLogged'), [{ text: 'OK', onPress: () => router.back() }]);
+      Alert.alert(t('logActivity'), t(result.data.queued ? 'savedOffline' : 'activityLogged'), [{ text: 'OK', onPress: () => router.back() }]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;
       Alert.alert(t('logActivity'), Array.isArray(msg) ? msg.join('\n') : msg || String(e?.message ?? e));
@@ -227,6 +239,11 @@ export default function ActivityNew() {
             formatLabel={formatActivity}
           />
 
+          {inputs.map((input, index) => <View key={index} style={{ gap: 8, marginVertical: 10 }}>
+            {(['name', 'quantity', 'unit'] as const).map(key => <View key={key}><Text style={styles.fieldLabel}>{t(key === 'name' ? 'inputName' : key === 'quantity' ? 'inputQuantity' : 'inputUnit')}</Text><TextInput style={styles.input} value={input[key]} keyboardType={key === 'quantity' ? 'decimal-pad' : 'default'} onChangeText={value => setInputs(rows => rows.map((row, i) => i === index ? { ...row, [key]: value } : row))} /></View>)}
+            <TouchableOpacity onPress={() => setInputs(rows => rows.filter((_, i) => i !== index))}><Text>{t('removeInput')}</Text></TouchableOpacity>
+          </View>)}
+          <TouchableOpacity onPress={() => setInputs(rows => [...rows, { name: '', quantity: '', unit: '' }])}><Text style={{ color: '#047857', paddingVertical: 12 }}>{t('addInput')}</Text></TouchableOpacity>
           <Text style={styles.fieldLabel}>{t('activityDate')}</Text>
           <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker(true)}>
             <HugeiconsIcon icon={Calendar01Icon} size={16} color="#10B981" strokeWidth={2} />

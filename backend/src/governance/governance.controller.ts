@@ -1,3 +1,4 @@
+import { CreateProjectDto } from './dto/create-project.dto';
 import { PermissionResource } from '../auth/role-access';
 import {
   Body,
@@ -26,31 +27,32 @@ import { CreateVoteDto } from './dto/create-vote.dto';
 @Controller('governance')
 export class GovernanceController {
   constructor(private readonly service: GovernanceService) {}
-  @Get('projects') projects() {
-    return this.service.projects();
+  @Get('projects') projects(@CurrentUser() user: RequestUser) {
+    return this.service.projects(user);
   }
-  @Get('projects/:id') project(@Param('id') id: string) {
-    return this.service.project(id);
+  @Get('projects/:id') project(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.service.project(id, user);
   }
   @Post('projects') @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN) @RequirePermission('governance', 'CREATE') createProject(
-    @Body() body: any,
+    @Body() body: CreateProjectDto,
+    @CurrentUser() user: RequestUser,
   ) {
-    return this.service.createProject(body);
+    return this.service.createProject(body, user);
   }
   @Patch('projects/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @RequirePermission('governance', 'EDIT')
-  updateProject(@Param('id') id: string, @Body() dto: UpdateProjectDto) {
-    return this.service.updateProject(id, dto);
+  updateProject(@Param('id') id: string, @Body() dto: UpdateProjectDto, @CurrentUser() user: RequestUser) {
+    return this.service.updateProject(id, dto, user);
   }
   @Delete('projects/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @RequirePermission('governance', 'DELETE')
-  removeProject(@Param('id') id: string) {
-    return this.service.removeProject(id);
+  removeProject(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.service.removeProject(id, user);
   }
-  @Get('meetings') meetings() {
-    return this.service.meetings();
+  @Get('meetings') meetings(@CurrentUser() user: RequestUser) {
+    return this.service.meetings(user);
   }
   @Get('report')
   @Roles(
@@ -59,31 +61,35 @@ export class GovernanceController {
     UserRole.MAMCOS_SECRETARY,
     UserRole.AUDITOR,
   )
-  report() {
-    return this.service.report();
+  report(@CurrentUser() user: RequestUser) {
+    return this.service.report(user);
   }
   @Post('meetings') @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN) meeting(
     @Body() body: CreateMeetingDto,
+    @CurrentUser() user: RequestUser,
   ) {
-    return this.service.createMeeting(body);
+    return this.service.createMeeting(body, user);
   }
-  @Get('votes') votes() {
-    return this.service.listVotes();
+  @Get('votes') votes(@CurrentUser() user: RequestUser) {
+    return this.service.listVotes(user);
   }
   @Post('votes') @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN) vote(
     @Body() body: CreateVoteDto,
+    @CurrentUser() user: RequestUser,
   ) {
-    return this.service.createVote(body);
+    return this.service.createVote(body, user);
   }
   @Post('votes/:id/open') @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN) open(
     @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
   ) {
-    return this.service.openVote(id);
+    return this.service.openVote(id, user);
   }
   @Post('votes/:id/close') @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN) close(
     @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
   ) {
-    return this.service.closeVote(id);
+    return this.service.closeVote(id, user);
   }
   @Post('votes/:id/respond/:optionId') @Roles(UserRole.FARMER) respond(
     @Param('id') id: string,
@@ -92,7 +98,7 @@ export class GovernanceController {
   ) {
     return this.service.respond(id, optionId, user);
   }
-  @Get('votes/:id/results') results(@Param('id') id: string) {
-    return this.service.results(id);
+  @Get('votes/:id/results') results(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.service.results(id, user);
   }
 }

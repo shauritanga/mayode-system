@@ -59,8 +59,8 @@ export class FarmersController {
   @ApiOperation({
     summary: 'Register a new farmer (provisions login + profile)',
   })
-  create(@Body() dto: CreateFarmerDto) {
-    return this.farmersService.create(dto);
+  create(@Body() dto: CreateFarmerDto, @CurrentUser() user: RequestUser) {
+    return this.farmersService.create(dto, user);
   }
 
   @Get()
@@ -176,6 +176,13 @@ export class FarmersController {
   })
   findMe(@CurrentUser() user: RequestUser) {
     return this.farmersService.findMe(user.id);
+  }
+
+  @Get('me/statement')
+  @AllowSelfService()
+  @ApiOperation({ summary: 'Own production, payment, loan and premium history; never accepts a farmer ID' })
+  myStatement(@CurrentUser() user: RequestUser) {
+    return this.farmersService.getMyStatement(user);
   }
 
   @Get(':id')

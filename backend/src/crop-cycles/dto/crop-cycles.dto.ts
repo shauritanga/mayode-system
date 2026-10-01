@@ -1,4 +1,5 @@
 import {
+  Min,
   IsString,
   IsOptional,
   IsNumber,
@@ -72,6 +73,7 @@ export class CreateCropCycleDto {
     description: 'Estimated yield in kilograms',
   })
   @IsNumber()
+  @Min(0)
   @IsOptional()
   estimatedYieldKg?: number;
 }
@@ -102,6 +104,7 @@ export class UpdateCropCycleDto {
 
   @ApiPropertyOptional({ example: 4500.5 })
   @IsNumber()
+  @Min(0)
   @IsOptional()
   estimatedYieldKg?: number;
 
@@ -110,6 +113,7 @@ export class UpdateCropCycleDto {
     description: 'Actual yield harvested in kilograms',
   })
   @IsNumber()
+  @Min(0)
   @IsOptional()
   actualYieldKg?: number;
 
@@ -168,6 +172,7 @@ export class CreateActivityLogDto {
     description: 'Number of laborers employed for this activity',
   })
   @IsInt()
+  @Min(0)
   @IsOptional()
   laborWorkers?: number;
 
@@ -176,6 +181,7 @@ export class CreateActivityLogDto {
     description: 'Total labor man-hours spent',
   })
   @IsNumber()
+  @Min(0)
   @IsOptional()
   laborHours?: number;
 
@@ -184,6 +190,7 @@ export class CreateActivityLogDto {
     description: 'Family members who contributed labour',
   })
   @IsInt()
+  @Min(0)
   @IsOptional()
   familyLaborCount?: number;
 
@@ -192,6 +199,7 @@ export class CreateActivityLogDto {
     description: 'Paid workers who contributed labour',
   })
   @IsInt()
+  @Min(0)
   @IsOptional()
   hiredLaborCount?: number;
 
@@ -200,6 +208,7 @@ export class CreateActivityLogDto {
     description: 'Total paid labour wage in TZS',
   })
   @IsNumber()
+  @Min(0)
   @IsOptional()
   laborWageTotal?: number;
 

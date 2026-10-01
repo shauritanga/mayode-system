@@ -25,6 +25,23 @@ export enum UserRole {
 
 // ---- Register DTO ----
 export class RegisterDto {
+  @IsString()
+  @IsOptional()
+  region?: string;
+
+  @IsString()
+  @IsOptional()
+  district?: string;
+
+  @IsString()
+  @IsOptional()
+  ward?: string;
+
+  @IsString()
+  @IsOptional()
+  village?: string;
+
+
   @ApiProperty({
     example: '+255768680433',
     description: 'Phone number with country code',

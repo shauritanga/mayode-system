@@ -3,10 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "dev": "npm run dev:admin",
+    "build": "npm run build:all-modes",
+    "start": "npm run start:admin",
+    "lint": "eslint src apps config",
+    "test": "node --test tests/*.test.cjs",
+    "typecheck": "tsc --noEmit",
+    "dev:farmers": "npm run dev --workspace=@mayode/farmers",
+    "build:farmers": "npm run build --workspace=@mayode/farmers",
+    "start:farmers": "npm run start --workspace=@mayode/farmers",
+    "dev:cooperatives": "npm run dev --workspace=@mayode/cooperatives",
+    "build:cooperatives": "npm run build --workspace=@mayode/cooperatives",
+    "start:cooperatives": "npm run start --workspace=@mayode/cooperatives",
+    "dev:admin": "npm run dev --workspace=@mayode/admin",
+    "build:admin": "npm run build --workspace=@mayode/admin",
+    "start:admin": "npm run start --workspace=@mayode/admin",
+    "build:all-modes": "npm run build --workspaces",
+    "test:smoke": "node tests/portals.smoke.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -33,9 +46,13 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^7.0.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
+  },
+  "workspaces": [
+    "apps/*"
+  ]
 }

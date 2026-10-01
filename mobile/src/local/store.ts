@@ -1,120 +1,118 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { offlineMigrationReady } from "../services/offline-migration";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-/**
- * Tiny AsyncStorage-backed document store. Each collection is one JSON array
- * under a namespaced key. An in-memory cache keeps reads synchronous-fast after
- * the first load. This mirrors the shape of the backend entities so the local
- * repositories can later be swapped for HTTP calls with no screen changes.
- */
+/** Account-scoped persistent field records. Writes are serialized to prevent
+ * concurrent requests from overwriting each other's rows. */
 
-const PREFIX = 'mayode.local.';
-const cache: Record<string, any[]> = {};
-
+let owner = "anonymous";
+export function setStoreOwner(id: string | null) {
+  owner = id ?? "anonymous";
+}
 export type Row = Record<string, any> & { id: string };
-
-/** Short, sortable, collision-resistant local id. */
 export function uid(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
-
 export function nowIso(): string {
   return new Date().toISOString();
 }
-
-async function load(collection: string): Promise<Row[]> {
-  if (cache[collection]) return cache[collection];
-  const raw = await AsyncStorage.getItem(PREFIX + collection);
-  const rows: Row[] = raw ? JSON.parse(raw) : [];
-  cache[collection] = rows;
-  return rows;
+const keyFor = (collection: string) => `mayode.local.${owner}.${collection}`;
+let writes: Promise<unknown> = Promise.resolve();
+async function load(key: string): Promise<Row[]> {
+  await offlineMigrationReady();
+  return JSON.parse((await AsyncStorage.getItem(key)) || "[]");
 }
-
-async function persist(collection: string, rows: Row[]): Promise<void> {
-  cache[collection] = rows;
-  await AsyncStorage.setItem(PREFIX + collection, JSON.stringify(rows));
+async function read(collection: string) {
+  const key = keyFor(collection);
+  await writes;
+  return load(key);
 }
-
+async function mutate<T>(
+  collection: string,
+  edit: (rows: Row[]) => { rows: Row[]; result: T },
+): Promise<T> {
+  const key = keyFor(collection);
+  const operation = writes.then(async () => {
+    const { rows, result } = edit(await load(key));
+    await AsyncStorage.setItem(key, JSON.stringify(rows));
+    return result;
+  });
+  writes = operation.catch(() => {});
+  return operation;
+}
 export const db = {
-  async all(collection: string): Promise<Row[]> {
-    return [...(await load(collection))];
+  all: read,
+  async where(collection: string, pred: (row: Row) => boolean) {
+    return (await read(collection)).filter(pred);
   },
-
-  async where(collection: string, pred: (r: Row) => boolean): Promise<Row[]> {
-    return (await load(collection)).filter(pred);
+  async find(collection: string, pred: (row: Row) => boolean) {
+    return (await read(collection)).find(pred);
   },
-
-  async find(collection: string, pred: (r: Row) => boolean): Promise<Row | undefined> {
-    return (await load(collection)).find(pred);
+  async findById(collection: string, id: string) {
+    return (await read(collection)).find((row) => row.id === id);
   },
-
-  async findById(collection: string, id: string): Promise<Row | undefined> {
-    return (await load(collection)).find((r) => r.id === id);
+  async count(collection: string) {
+    return (await read(collection)).length;
   },
-
-  async count(collection: string): Promise<number> {
-    return (await load(collection)).length;
+  async insert(collection: string, row: Omit<Row, "id"> & { id?: string }) {
+    return mutate(collection, (rows) => {
+      const record = { ...row, id: row.id || uid() } as Row;
+      return {
+        rows: [...rows.filter((r) => r.id !== record.id), record],
+        result: record,
+      };
+    });
   },
-
-  async insert(collection: string, row: Omit<Row, 'id'> & { id?: string }): Promise<Row> {
-    const rows = await load(collection);
-    const record: Row = { id: row.id || uid(), ...row } as Row;
-    rows.push(record);
-    await persist(collection, rows);
-    return record;
+  async update(collection: string, id: string, patch: Partial<Row>) {
+    return mutate(collection, (rows) => {
+      const index = rows.findIndex((row) => row.id === id);
+      if (index < 0) return { rows, result: undefined as Row | undefined };
+      rows[index] = { ...rows[index], ...patch, updatedAt: nowIso() };
+      return { rows, result: rows[index] };
+    });
   },
-
-  async update(collection: string, id: string, patch: Partial<Row>): Promise<Row | undefined> {
-    const rows = await load(collection);
-    const idx = rows.findIndex((r) => r.id === id);
-    if (idx === -1) return undefined;
-    rows[idx] = { ...rows[idx], ...patch, updatedAt: nowIso() };
-    await persist(collection, rows);
-    return rows[idx];
+  async remove(collection: string, id: string) {
+    await mutate(collection, (rows) => ({
+      rows: rows.filter((row) => row.id !== id),
+      result: undefined,
+    }));
   },
-
-  async remove(collection: string, id: string): Promise<void> {
-    const rows = (await load(collection)).filter((r) => r.id !== id);
-    await persist(collection, rows);
+  async replaceAll(collection: string, rows: Row[]) {
+    await mutate(collection, () => ({ rows, result: undefined }));
   },
-
-  /** Replace an entire collection (used by seeding). */
-  async replaceAll(collection: string, rows: Row[]): Promise<void> {
-    await persist(collection, rows);
-  },
-
-  /** Wipe everything (dev helper). */
-  async reset(): Promise<void> {
+  async reset() {
+    const prefix = `mayode.local.${owner}.`;
+    await writes;
     const keys = await AsyncStorage.getAllKeys();
-    const mine = keys.filter((k) => k.startsWith(PREFIX));
-    await AsyncStorage.multiRemove(mine);
-    for (const k of Object.keys(cache)) delete cache[k];
+    await AsyncStorage.multiRemove(
+      keys.filter((key) => key.startsWith(prefix)),
+    );
   },
 };
 
 export const COLLECTIONS = {
-  users: 'users',
-  farmers: 'farmers',
-  farms: 'farms',
-  plots: 'plots',
-  cropCycles: 'cropCycles',
-  activityLogs: 'activityLogs',
-  inputCosts: 'inputCosts',
-  revenues: 'revenues',
-  mamcos: 'mamcos',
-  landListings: 'landListings',
-  tractors: 'tractors',
-  tractorOwners: 'tractorOwners',
-  tractorBookings: 'tractorBookings',
-  escrowPayments: 'escrowPayments',
-  subLeases: 'subLeases',
-  ownershipTransfers: 'ownershipTransfers',
-  landListingOffers: 'landListingOffers',
-  landListingImprovements: 'landListingImprovements',
-  loanRecords: 'loanRecords',
-  marketPrices: 'marketPrices',
-  farmerVerifications: 'farmerVerifications',
-  documents: 'documents',
-  activities: 'activities',
-  fieldSurveys: 'fieldSurveys',
-  riceProtocols: 'riceProtocols',
+  users: "users",
+  farmers: "farmers",
+  farms: "farms",
+  plots: "plots",
+  cropCycles: "cropCycles",
+  activityLogs: "activityLogs",
+  inputCosts: "inputCosts",
+  revenues: "revenues",
+  mamcos: "mamcos",
+  landListings: "landListings",
+  tractors: "tractors",
+  tractorOwners: "tractorOwners",
+  tractorBookings: "tractorBookings",
+  escrowPayments: "escrowPayments",
+  subLeases: "subLeases",
+  ownershipTransfers: "ownershipTransfers",
+  landListingOffers: "landListingOffers",
+  landListingImprovements: "landListingImprovements",
+  loanRecords: "loanRecords",
+  marketPrices: "marketPrices",
+  farmerVerifications: "farmerVerifications",
+  documents: "documents",
+  activities: "activities",
+  fieldSurveys: "fieldSurveys",
+  riceProtocols: "riceProtocols",
 } as const;

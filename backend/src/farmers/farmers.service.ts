@@ -1,5 +1,6 @@
 import {
   Injectable,
+  BadRequestException,
   NotFoundException,
   ConflictException,
   ForbiddenException,
@@ -64,7 +65,12 @@ export class FarmersService {
   }
 
   /** Provision a login User + Farmer profile (admin / field-officer flow). */
-  async create(dto: CreateFarmerDto) {
+  async create(dto: CreateFarmerDto, actor?: RequestUser) {
+    const tenantId = actor ? this.ownership.resolveTenantMamcosId(actor) : null;
+    if (tenantId) dto = { ...dto, mamcosId: tenantId };
+    const roleId = this.config.get<string>('FARMER_SELF_REGISTRATION_ROLE_ID');
+    const roles = await this.prisma.role.findMany({ where: { isActive: true, isSystem: false, systemRole: UserRole.FARMER, ...(roleId ? { id: roleId } : {}) }, take: 2 });
+    if (roles.length !== 1) throw new BadRequestException('Farmer registration is not configured. Please contact support.');
     const existing = await this.prisma.user.findFirst({
       where: { OR: [{ phone: dto.phone }, { email: dto.email || undefined }] },
     });
@@ -86,6 +92,7 @@ export class FarmersService {
           firstName: dto.firstName,
           lastName: dto.lastName,
           role: UserRole.FARMER,
+          roleId: roles[0].id,
         },
       });
 
@@ -567,7 +574,7 @@ export class FarmersService {
       where: { id: farmerId },
       include: {
         cropCycles: {
-          include: { farm: { select: { farmCode: true } } },
+          include: { farm: { select: { farmCode: true } }, costs: true },
           orderBy: { createdAt: 'desc' },
         },
       },
@@ -595,6 +602,7 @@ export class FarmersService {
       totalCropCycles: cycles.length,
       harvestedCycles: harvested.length,
       totalActualYieldKg,
+      totalCostsTzs: cycles.reduce((sum, cycle) => sum + cycle.costs.reduce((total, cost) => total + cost.totalCost, 0), 0),
       totalEstimatedYieldKg,
       avgYieldKgPerCycle: Math.round(avgYieldKg),
       yieldAccuracy:
@@ -610,6 +618,7 @@ export class FarmersService {
         estimatedYieldKg: c.estimatedYieldKg,
         actualYieldKg: c.actualYieldKg,
         harvestDate: c.harvestDate,
+        totalCostsTzs: c.costs.reduce((sum, cost) => sum + cost.totalCost, 0),
       })),
     };
   }
@@ -739,6 +748,56 @@ export class FarmersService {
       include: { farm: { select: { id: true, farmCode: true, name: true } } },
       orderBy: { capturedAt: 'desc' },
     });
+  }
+
+  async getMyStatement(user: RequestUser) {
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { userId: user.id },
+      select: { id: true, mamcosId: true, controlNumber: true, firstName: true, lastName: true },
+    });
+    if (!farmer) throw new NotFoundException('No farmer profile is linked to this account');
+    const [cycles, payments, loans, contributions] = await Promise.all([
+      this.prisma.cropCycle.findMany({
+        where: { farmerId: farmer.id },
+        include: { costs: true, revenues: true, farm: { select: { farmCode: true, socialHectares: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.payment.findMany({ where: { farmerId: farmer.id }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.loanRecord.findMany({ where: { farmerId: farmer.id }, include: { deductions: true }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.saleApportionment.findMany({
+        where: { farmerId: farmer.id },
+        include: { sale: { select: { invoiceNumber: true, saleDate: true, paymentReceived: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+    const production = cycles.map((cycle) => {
+      const totalCosts = cycle.costs.reduce((sum, row) => sum + row.totalCost, 0);
+      const salesRevenue = cycle.revenues.reduce((sum, row) => sum + row.totalRevenue, 0);
+      const premium = cycle.revenues.reduce((sum, row) => sum + (row.fairtradePremium ?? 0), 0);
+      const totalRevenue = salesRevenue + premium;
+      const netProfit = totalRevenue - totalCosts;
+      return { id: cycle.id, farmId: cycle.farmId, farmCode: cycle.farm.farmCode, season: cycle.season,
+        riceVariety: cycle.riceVariety, status: cycle.status, plantingDate: cycle.plantingDate,
+        harvestDate: cycle.harvestDate, actualYieldKg: cycle.actualYieldKg, totalCosts, salesRevenue,
+        premium, totalRevenue, netProfit, profitMargin: totalRevenue > 0 ? netProfit / totalRevenue * 100 : null,
+        profitPerHectare: cycle.farm.socialHectares > 0 ? netProfit / cycle.farm.socialHectares : null };
+    });
+    const ricePayments = payments.filter((row) => row.paymentType === 'RICE_PURCHASE');
+    return {
+      farmer,
+      production: { cycles: production, totalYieldKg: production.reduce((sum, row) => sum + (row.actualYieldKg ?? 0), 0), harvestedCycles: production.filter((row) => (row.actualYieldKg ?? 0) > 0).length },
+      finance: {
+        totalCosts: production.reduce((sum, row) => sum + row.totalCosts, 0),
+        totalRevenue: production.reduce((sum, row) => sum + row.totalRevenue, 0),
+        netProfit: production.reduce((sum, row) => sum + row.netProfit, 0),
+        totalLoanOutstanding: loans.reduce((sum, row) => sum + row.amountOwed, 0),
+        activeLoanCount: loans.filter((row) => row.isActive).length,
+        outstandingPayments: ricePayments.filter((row) => ['PENDING', 'FAILED'].includes(row.status)).reduce((sum, row) => sum + (row.netAmount ?? row.amount), 0),
+        paidAmount: ricePayments.filter((row) => ['CLEARED', 'RELEASED'].includes(row.status)).reduce((sum, row) => sum + (row.netAmount ?? row.amount), 0),
+        premiumContribution: contributions.reduce((sum, row) => sum + row.fairtradePremium, 0),
+      },
+      recentPayments: payments, loans, contributions,
+    };
   }
 
   async getFormalFinancialProfile(farmerId: string, user: RequestUser) {

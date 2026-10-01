@@ -7,10 +7,13 @@ import { authApi, farmersApi } from '../src/lib/data';
 import { getApiErrorMessage } from '../src/lib/api-error';
 import { normalizePhone } from '../src/lib/phone';
 import { useAuthStore } from '../src/store/auth.store';
+import { SearchableSelect } from '../src/components/SearchableSelect';
+import { getRegions, getDistricts, getWards } from '../src/local/locations';
 import { PasswordInput } from '../src/components/PasswordInput';
 import { useI18n } from '../src/i18n';
 
 export default function RegisterRoute() {
+  const [location, setLocation] = useState({ region: '', district: '', ward: '', village: '' });
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
@@ -33,7 +36,7 @@ export default function RegisterRoute() {
   }, []);
 
   const handleRegister = async () => {
-    if (!firstName || !lastName || !phone || !password) {
+    if (!firstName || !lastName || !phone || !password || Object.values(location).some(v => !v.trim())) {
       Alert.alert(t('validationError'), t('allFieldsRequired'));
       return;
     }
@@ -50,6 +53,7 @@ export default function RegisterRoute() {
         firstName,
         lastName,
         dataShareConsent,
+        ...location,
       });
       const { accessToken, refreshToken, user } = res.data;
       setAuth(user, accessToken, refreshToken);
@@ -128,6 +132,10 @@ export default function RegisterRoute() {
               />
             </View>
 
+            <SearchableSelect label={t('region')} value={location.region} options={getRegions()} onSelect={region => setLocation({ region, district: '', ward: '', village: '' })} searchable />
+            <SearchableSelect label={t('district')} value={location.district} options={getDistricts(location.region)} onSelect={district => setLocation(l => ({ ...l, district, ward: '' }))} searchable />
+            <SearchableSelect label={t('ward')} value={location.ward} options={getWards(location.region, location.district)} onSelect={ward => setLocation(l => ({ ...l, ward }))} searchable />
+            <Text style={styles.label}>{t('village')}</Text><TextInput style={styles.input} value={location.village} onChangeText={village => setLocation(l => ({ ...l, village }))} />
             <View style={styles.consentRow}>
               <Switch value={dataShareConsent} onValueChange={setDataShareConsent} trackColor={{ true: '#10B981' }} />
               <TouchableOpacity style={styles.consentCopy} onPress={() => setDataShareConsent((value) => !value)} activeOpacity={0.8}>

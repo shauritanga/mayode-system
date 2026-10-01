@@ -237,6 +237,11 @@ model Mamcos {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
+  premiumFundEntries PremiumFundEntry[]
+  projects CommunityProject[]
+  meetings MeetingRecord[]
+  votes Vote[]
+
   // Relations
   staff              MamcosStaff[]
   farmers            Farmer[]
@@ -834,6 +839,9 @@ model Dispatch {
 // Fairtrade premium is deliberately tracked outside ordinary crop revenue so
 // members can audit fund income, expenditure and the resulting balance.
 model PremiumFundEntry {
+  mamcosId String? @map("mamcos_id")
+  mamcos Mamcos? @relation(fields: [mamcosId], references: [id])
+  @@index([mamcosId])
   id          String               @id @default(uuid())
   entryType   PremiumFundEntryType @map("entry_type")
   amount      Float
@@ -943,6 +951,10 @@ model BudgetLine {
 }
 
 model CommunityProject {
+  mamcosId String? @map("mamcos_id")
+  mamcos Mamcos? @relation(fields: [mamcosId], references: [id])
+
+  @@index([mamcosId])
   id            String        @id @default(uuid())
   name          String
   fundingSource String        @map("funding_source")
@@ -957,6 +969,10 @@ model CommunityProject {
 }
 
 model MeetingRecord {
+  mamcosId String? @map("mamcos_id")
+  mamcos Mamcos? @relation(fields: [mamcosId], references: [id])
+
+  @@index([mamcosId])
   id            String   @id @default(uuid())
   meetingDate   DateTime @map("meeting_date")
   agenda        String
@@ -969,6 +985,10 @@ model MeetingRecord {
 }
 
 model Vote {
+  mamcosId String? @map("mamcos_id")
+  mamcos Mamcos? @relation(fields: [mamcosId], references: [id])
+
+  @@index([mamcosId])
   id          String         @id @default(uuid())
   title       String
   description String?
@@ -1520,6 +1540,7 @@ model Plot {
   id                  String   @id @default(uuid())
   plotCode            String   @unique @map("plot_code") // e.g., FP-JD-01-P1
   farmId              String   @map("farm_id")
+  photoUrls           String[] @default([]) @map("photo_urls")
   name                String?
   sizeAcres           Float?   @map("size_acres")
   soilCondition       String?  @map("soil_condition")
@@ -2647,4 +2668,15 @@ enum BuyerOrderStatus {
   PARTIALLY_FULFILLED
   FULFILLED
   CANCELLED
+}
+
+// Durable responses prevent an offline retry from repeating a completed write.
+model SyncReceipt {
+  key         String   @id
+  fingerprint String
+  statusCode  Int      @map("status_code")
+  body        Json
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("sync_receipts")
 }

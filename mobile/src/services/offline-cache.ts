@@ -1,201 +1,313 @@
-import { COLLECTIONS, db, nowIso, uid } from '../local/store';
-import type { PendingMutation } from './sync-queue';
-
-/**
- * Optimistic offline cache for field workflows:
- * - Farm registration
- * - Crop-cycle creation
- * - Activity logging
- * - Field surveys (GPS, soil, water & road observations)
- * - Read-caches for Rice GAP protocols & Market price intelligence
- */
-const localId = () => `offline-${uid()}`;
-
-const collectionFor = (url: string) => {
-  if (url === '/crop-cycles/activity') return COLLECTIONS.activityLogs;
-  if (/^\/farms(?:\/[^/]+)?$/.test(url)) return COLLECTIONS.farms;
-  if (/^\/crop-cycles(?:\/[^/]+)?$/.test(url)) return COLLECTIONS.cropCycles;
-  if (/^\/farms\/[^/]+\/field-surveys$/.test(url) || url === '/field-surveys') return COLLECTIONS.fieldSurveys;
-  return null;
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { COLLECTIONS, db, nowIso } from "../local/store";
+import type { PendingMutation } from "./sync-queue";
+let owner = "anonymous";
+const assertOwner = (expected: string) => {
+  if (owner !== expected) throw new Error("Account changed.");
 };
-
-const mutationData = (data: unknown): Record<string, any> => {
-  if (typeof data === 'string') {
+export function setCacheOwner(id: string | null) {
+  owner = id ?? "anonymous";
+}
+const collections = {
+  farmers: COLLECTIONS.farmers,
+  farms: COLLECTIONS.farms,
+  plots: COLLECTIONS.plots,
+  "crop-cycles": COLLECTIONS.cropCycles,
+};
+const responseKey = (url: string, params?: unknown) =>
+  `mayode.responses.${owner}.${url}.${JSON.stringify(params ?? {})}`;
+const collectionFor = (url: string) =>
+  url.startsWith("/field-officer-visits")
+    ? "fieldVisits"
+    : /\/field-surveys/.test(url)
+      ? COLLECTIONS.fieldSurveys
+      : url.endsWith("/photos")
+        ? "farmPhotos"
+        : url === "/crop-cycles/activity"
+          ? COLLECTIONS.activityLogs
+          : url === "/finance/cost"
+            ? COLLECTIONS.inputCosts
+            : url === "/finance/revenue"
+              ? COLLECTIONS.revenues
+              : collections[url.split("/")[1] as keyof typeof collections];
+const dataObject = (data: any) =>
+  typeof data === "string" ? JSON.parse(data) : { ...data };
+export async function resolveId(id: string): Promise<string> {
+  if (!id.startsWith("offline-")) return id;
+  const mapped = await AsyncStorage.getItem(`mayode.ids.${owner}.${id}`);
+  return mapped ?? id;
+}
+export async function resolveReplayUrl(url: string) {
+  return (await Promise.all(url.split("/").map(resolveId))).join("/");
+}
+export function hasPendingReferences(data: any): boolean {
+  if (typeof data === "string") {
     try {
-      return JSON.parse(data);
+      data = JSON.parse(data);
     } catch {
-      return {};
+      return false;
     }
   }
-  return data && typeof data === 'object' ? (data as Record<string, any>) : {};
-};
-
+  if (!data || typeof data !== "object") return false;
+  return Object.entries(data).some(
+    ([key, value]) =>
+      key.endsWith("Id") &&
+      typeof value === "string" &&
+      value.startsWith("offline-"),
+  );
+}
+export async function resolveReplayData(data: unknown): Promise<any> {
+  if (data == null) return data;
+  const source = typeof data === "string" ? dataObject(data) : data;
+  if (Array.isArray(source)) return Promise.all(source.map(resolveReplayData));
+  if (typeof source !== "object") return source;
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(source))
+    result[key] =
+      key.endsWith("Id") && typeof value === "string"
+        ? await resolveId(value)
+        : value;
+  return result;
+}
 export async function stageOfflineMutation(mutation: PendingMutation) {
   const collection = collectionFor(mutation.url);
-  const data = mutationData(mutation.data);
   if (!collection) return null;
-
-  if (mutation.method.toUpperCase() === 'POST') {
-    const id = localId();
-    const farmSurveyMatch = mutation.url.match(/^\/farms\/([^/]+)\/field-surveys$/);
-    const urlFarmId = farmSurveyMatch ? farmSurveyMatch[1] : undefined;
-
-    const record = await db.insert(collection, {
-      ...data,
+  if (
+    !/^\/(farmers|farms|plots|crop-cycles)(\/[^/]+(\/boundary)?)?$/.test(
+      mutation.url,
+    ) &&
+    !/^\/(finance\/(cost|revenue)|field-officer-visits)$/.test(mutation.url) &&
+    !/\/(photos|field-surveys)$/.test(mutation.url)
+  )
+    return null;
+  const data = dataObject(mutation.data ?? {});
+  if (/\/(photos|field-surveys)$/.test(mutation.url))
+    data.farmId = mutation.url.split("/")[2];
+  // Credentials belong only to the private pending request, never to profile caches.
+  const { password: _password, ...safeData } = data;
+  if (mutation.method.toUpperCase() === "POST") {
+    const id = `offline-${mutation.id}`;
+    const existing = await db.findById(collection, id);
+    if (existing) return existing;
+    const farm = data.farmId
+      ? await db.findById(COLLECTIONS.farms, data.farmId)
+      : null;
+    return db.insert(collection, {
+      ...safeData,
       id,
-      ...(urlFarmId ? { farmId: urlFarmId } : {}),
-      ...(collection === COLLECTIONS.farms
-        ? {
-            farmCode: `PENDING-${id.slice(-6).toUpperCase()}`,
-            grade: data.grade || 'C',
-            isVerified: false,
-          }
-        : {}),
-      ...(collection === COLLECTIONS.cropCycles
-        ? { status: 'PLANNED', _count: { activities: 0, costs: 0 } }
-        : {}),
-      ...(collection === COLLECTIONS.fieldSurveys
-        ? { status: 'PENDING_SYNC', surveyDate: nowIso() }
-        : {}),
-      __syncStatus: 'PENDING',
+      farmerId: data.farmerId ?? farm?.farmerId,
+      farm: farm ?? undefined,
+      farmCode: `PENDING-${id.slice(-6)}`,
+      plotCode: `PENDING-${id.slice(-6)}`,
+      controlNumber: "PENDING",
+      user: data.phone ? { phone: data.phone } : undefined,
+      status: "PLANNED",
+      verificationStatus: "PENDING",
+      activities: [],
+      costs: [],
+      revenues: [],
+      _count: { activities: 0, costs: 0 },
+      __syncStatus: "PENDING",
       __syncMutationId: mutation.id,
       createdAt: nowIso(),
       updatedAt: nowIso(),
     });
-    return record;
   }
-
-  if (mutation.method.toUpperCase() === 'PATCH') {
-    const id = mutation.url.split('/').pop();
-    return id
-      ? db.update(collection, id, {
-          ...data,
-          __syncStatus: 'PENDING',
-          __syncMutationId: mutation.id,
-        })
-      : null;
-  }
-  return null;
+  const segments = mutation.url.split("/");
+  const id = segments[2];
+  const patch = {
+    ...safeData,
+    ...(segments[3] === "boundary"
+      ? { centerLatitude: data.centerLat, centerLongitude: data.centerLng }
+      : {}),
+    __syncStatus: "PENDING",
+    __syncMutationId: mutation.id,
+  };
+  if (await db.findById(collection, id))
+    return db.update(collection, id, patch);
+  return db.insert(collection, { id, ...patch });
 }
-
-async function serverId(id: unknown) {
-  if (typeof id !== 'string' || !id.startsWith('offline-')) return id;
-  for (const collection of [COLLECTIONS.farms, COLLECTIONS.cropCycles]) {
-    const record = await db.findById(collection, id);
-    if (record?.serverId) return record.serverId;
-  }
-  return id;
-}
-
-export async function resolveReplayData(data: unknown) {
-  const copy = mutationData(data);
-  for (const key of ['farmId', 'cropCycleId']) {
-    copy[key] = await serverId(copy[key]);
-  }
-  return copy;
-}
-
 export async function discardOfflineMutation(mutation: PendingMutation) {
   const collection = collectionFor(mutation.url);
   if (!collection) return;
-  const pending = await db.find(
-    collection,
-    (record) => record.__syncMutationId === mutation.id,
-  );
-  if (pending) {
-    await db.update(collection, pending.id, {
-      __syncStatus: 'SERVER_NEWER',
-      syncConflictAt: nowIso(),
-    });
-  }
+  const id =
+    mutation.method.toUpperCase() === "POST"
+      ? `offline-${mutation.id}`
+      : mutation.url.split("/")[2];
+  const row = await db.findById(collection, id);
+  if (row?.__syncMutationId === mutation.id) await db.remove(collection, id);
 }
-
 export async function reconcileOfflineMutation(
   mutation: PendingMutation,
-  serverRecord: any,
+  record: any,
 ) {
   const collection = collectionFor(mutation.url);
-  if (!collection || !serverRecord?.id) return;
-  const pending = await db.find(
-    collection,
-    (record) => record.__syncMutationId === mutation.id,
-  );
-  if (!pending) return;
-  await db.update(collection, pending.id, {
-    serverId: serverRecord.id,
-    __syncStatus: 'SYNCED',
-    syncedAt: nowIso(),
-    updatedAt: serverRecord.updatedAt ?? nowIso(),
-  });
-}
-
-/** Cache incoming successful online responses for offline read availability. */
-export async function saveToReadCache(url: string, data: any) {
-  try {
-    if (url.includes('/rice-protocols') && Array.isArray(data)) {
-      await db.replaceAll(COLLECTIONS.riceProtocols, data);
-    } else if (url.includes('/marketplace/prices') && Array.isArray(data)) {
-      await db.replaceAll(COLLECTIONS.marketPrices, data);
-    } else if (url === '/farms' && Array.isArray(data)) {
-      const pendingFarms = await db.where(
-        COLLECTIONS.farms,
-        (f) => f.__syncStatus === 'PENDING',
-      );
-      await db.replaceAll(COLLECTIONS.farms, [...data, ...pendingFarms]);
+  if (!collection || !record?.id) return;
+  const localId =
+    mutation.method.toUpperCase() === "POST"
+      ? `offline-${mutation.id}`
+      : mutation.url.split("/")[2];
+  await AsyncStorage.setItem(`mayode.ids.${owner}.${localId}`, record.id);
+  const pending = await db.findById(collection, localId);
+  if (pending) await db.remove(collection, localId);
+  const existing = await db.findById(collection, record.id);
+  if (existing)
+    await db.update(collection, record.id, {
+      ...record,
+      __syncStatus: "SYNCED",
+    });
+  else await db.insert(collection, { ...record, __syncStatus: "SYNCED" });
+  // Rewrite all children so pending farmer -> farm -> plot -> cycle remains navigable.
+  for (const name of Object.values(COLLECTIONS)) {
+    for (const row of await db.all(name)) {
+      const patch: Record<string, string> = {};
+      for (const field of ["farmerId", "farmId", "plotId", "cropCycleId"])
+        if (row[field] === localId) patch[field] = record.id;
+      if (Object.keys(patch).length) await db.update(name, row.id, patch);
     }
-  } catch {
-    /* non-blocking */
   }
 }
-
+async function upsert(collection: string, record: any) {
+  const context = owner;
+  if (!record?.id) return;
+  const existing = await db.findById(collection, record.id);
+  assertOwner(context);
+  if (existing?.__syncStatus === "PENDING") return;
+  if (existing) await db.update(collection, record.id, record);
+  else await db.insert(collection, record);
+  if (collection === COLLECTIONS.farms) {
+    for (const plot of record.plots ?? [])
+      await upsert(COLLECTIONS.plots, { ...plot, farmId: record.id });
+    for (const cycle of record.cropCycles ?? [])
+      await upsert(COLLECTIONS.cropCycles, {
+        ...cycle,
+        farmId: record.id,
+        farmerId: record.farmerId,
+      });
+  }
+  if (collection === COLLECTIONS.cropCycles) {
+    for (const [field, child] of [
+      ["activities", COLLECTIONS.activityLogs],
+      ["costs", COLLECTIONS.inputCosts],
+      ["revenues", COLLECTIONS.revenues],
+    ]) {
+      for (const row of record[field] ?? [])
+        await upsert(child, { ...row, cropCycleId: record.id });
+    }
+  }
+}
+export async function saveToReadCache(
+  url: string,
+  data: any,
+  params?: unknown,
+) {
+  const context = owner;
+  await AsyncStorage.setItem(responseKey(url, params), JSON.stringify(data));
+  assertOwner(context);
+  const collection = collectionFor(url);
+  if (!collection || /summary|overview|productivity|report/.test(url)) return;
+  const rows = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : [data];
+  for (const row of rows) {
+    assertOwner(context);
+    await upsert(
+      collection,
+      /\/(photos|field-surveys)$/.test(url)
+        ? { ...row, farmId: url.split("/")[2] }
+        : row,
+    );
+  }
+}
 export async function cachedRead(
   url: string,
-  params?: Record<string, unknown>,
-) {
-  if (url === '/farms') return db.all(COLLECTIONS.farms);
-  const farmById = url.match(/^\/farms\/(offline-[^/]+)$/);
-  if (farmById) return db.findById(COLLECTIONS.farms, farmById[1]);
-  const farmMatch = url.match(/^\/farms\/farmer\/(.+)$/);
-  if (farmMatch) {
-    return db.where(COLLECTIONS.farms, (farm) => farm.farmerId === farmMatch[1]);
+  params?: Record<string, any>,
+): Promise<any> {
+  url = await resolveReplayUrl(url);
+  const parts = url.split("/");
+  const collection = collectionFor(url);
+  const raw = await AsyncStorage.getItem(responseKey(url, params));
+  const saved = raw ? JSON.parse(raw) : undefined;
+  if (!collection) return saved;
+  if (parts[1] === "field-officer-visits" && parts[2] === "farmer") {
+    const pending = await db.where(
+      "fieldVisits",
+      (r) => r.farmerId === parts[3],
+    );
+    return pending.length ? pending : (saved ?? []);
   }
-  const cycleMatch = url.match(/^\/crop-cycles\/farm\/(.+)$/);
-  if (cycleMatch) {
-    return db.where(
+  if (parts[1] === "farms" && parts[3] === "photos")
+    return db.where("farmPhotos", (r) => r.farmId === parts[2]);
+  const rows = await db.all(collection);
+  const id = parts[2];
+  if (parts[1] === "farmers" && parts[3] === "production-summary") {
+    const cycles = await db.where(
       COLLECTIONS.cropCycles,
-      (cycle) => cycle.farmId === cycleMatch[1],
+      (c) => c.farmerId === id,
     );
+    if (!cycles.length && saved) return saved;
+    const costs = await db.all(COLLECTIONS.inputCosts);
+    const history = cycles.map((c) => ({
+      ...c,
+      actualYieldKg: c.actualYieldKg,
+      farmCode: c.farm?.farmCode,
+      totalCostsTzs: costs
+        .filter((cost) => cost.cropCycleId === c.id)
+        .reduce((sum, cost) => sum + Number(cost.totalCost || 0), 0),
+    }));
+    return {
+      cycles: history,
+      totalActualYieldKg: history.reduce(
+        (sum, c) => sum + Number(c.actualYieldKg || 0),
+        0,
+      ),
+      totalCostsTzs: history.reduce((sum, c) => sum + c.totalCostsTzs, 0),
+    };
   }
-  const cycleById = url.match(/^\/crop-cycles\/(offline-[^/]+)$/);
-  if (cycleById) return db.findById(COLLECTIONS.cropCycles, cycleById[1]);
-  if (url === '/crop-cycles') {
-    const cycles = await db.all(COLLECTIONS.cropCycles);
-    return params?.farmId
-      ? cycles.filter((cycle) => cycle.farmId === params.farmId)
-      : cycles;
+  if (!id || ["farm", "farmer"].includes(id)) {
+    const field =
+      id === "farm" ? "farmId" : id === "farmer" ? "farmerId" : null;
+    let filtered = rows.filter((r) => !field || r[field] === parts[3]);
+    for (const key of ["farmId", "farmerId", "mamcosId"])
+      if (params?.[key])
+        filtered = filtered.filter((r) => r[key] === params[key]);
+    if (params?.search)
+      filtered = filtered.filter((r) =>
+        `${r.firstName} ${r.lastName} ${r.controlNumber}`
+          .toLowerCase()
+          .includes(params.search.toLowerCase()),
+      );
+    return parts[1] === "farmers"
+      ? { data: filtered, total: filtered.length }
+      : filtered;
   }
-
-  // Field surveys cached read
-  const surveyMatch = url.match(/^\/farms\/([^/]+)\/field-surveys$/);
-  if (surveyMatch) {
-    const surveys = await db.where(
-      COLLECTIONS.fieldSurveys,
-      (s) => s.farmId === surveyMatch[1],
-    );
-    return surveys.length > 0 ? surveys : undefined;
+  if (parts.length === 3) {
+    const row = rows.find((r) => r.id === id);
+    if (!row) return saved;
+    if (collection === COLLECTIONS.cropCycles)
+      return {
+        ...row,
+        activities: await db.where(
+          COLLECTIONS.activityLogs,
+          (a) => a.cropCycleId === id,
+        ),
+        costs: await db.where(
+          COLLECTIONS.inputCosts,
+          (a) => a.cropCycleId === id,
+        ),
+        revenues: await db.where(
+          COLLECTIONS.revenues,
+          (a) => a.cropCycleId === id,
+        ),
+      };
+    if (collection === COLLECTIONS.farms)
+      return {
+        ...row,
+        plots: await db.where(COLLECTIONS.plots, (p) => p.farmId === id),
+      };
+    return row;
   }
-
-  // Rice GAP Protocols cached read
-  if (url.includes('/rice-protocols')) {
-    const protocols = await db.all(COLLECTIONS.riceProtocols);
-    return protocols.length > 0 ? protocols : undefined;
-  }
-
-  // Market prices cached read
-  if (url.includes('/marketplace/prices')) {
-    const prices = await db.all(COLLECTIONS.marketPrices);
-    return prices.length > 0 ? prices : undefined;
-  }
-
-  return undefined;
+  return saved;
 }

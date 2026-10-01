@@ -29,14 +29,11 @@ async function bootstrap() {
     .map((origin) => origin.trim())
     .filter(Boolean);
 
-  // Enable CORS for configured clients. Local development remains permissive.
+  // Enable CORS for configured clients. Local development remains permissive
+  // regardless of CORS_ORIGINS, since .env.example ships production hostnames
+  // that would otherwise lock out every localhost frontend in dev.
   app.enableCors({
-    origin:
-      process.env.NODE_ENV === 'production'
-        ? configuredOrigins
-        : configuredOrigins.length
-          ? configuredOrigins
-          : true,
+    origin: process.env.NODE_ENV === 'production' ? configuredOrigins : true,
     credentials: true,
   });
 

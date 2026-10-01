@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -14,16 +15,30 @@ export class GovernanceService {
     private readonly ownership: OwnershipService,
     private readonly sms: SmsService,
   ) {}
-  projects() {
+  private scope(user?: RequestUser) {
+    if (!user || user.role === 'SUPER_ADMIN') return {};
+    if (user.mamcosId) return { OR: [{ mamcosId: user.mamcosId }, { mamcosId: null }] };
+    return { mamcosId: null };
+  }
+  private assertScope(record: { mamcosId?: string | null }, user?: RequestUser, write = false) {
+    if (!user || user.role === 'SUPER_ADMIN') return;
+    if ((record.mamcosId && record.mamcosId !== user.mamcosId) ||
+        (write && !record.mamcosId && !!user.mamcosId)) {
+      throw new ForbiddenException('This record belongs to another governance workspace');
+    }
+  }
+  projects(user?: RequestUser) {
     return this.prisma.communityProject.findMany({
+      where: this.scope(user),
       orderBy: { createdAt: 'desc' },
     });
   }
-  async project(id: string) {
+  async project(id: string, user?: RequestUser) {
     const project = await this.prisma.communityProject.findUnique({
       where: { id },
     });
     if (!project) throw new NotFoundException('Community project not found');
+    this.assertScope(project, user);
     return project;
   }
   createProject(data: {
@@ -31,12 +46,13 @@ export class GovernanceService {
     fundingSource: string;
     budget: number;
     milestones?: unknown;
-  }) {
+  }, user?: RequestUser) {
     return this.prisma.communityProject.create({
-      data: { ...data, milestones: data.milestones as any },
+      data: { ...data, mamcosId: user?.mamcosId ?? null, milestones: data.milestones as any },
     });
   }
-  updateProject(id: string, dto: UpdateProjectDto) {
+  async updateProject(id: string, dto: UpdateProjectDto, user?: RequestUser) {
+    this.assertScope(await this.project(id, user), user, true);
     return this.prisma.communityProject.update({
       where: { id },
       data: {
@@ -46,18 +62,20 @@ export class GovernanceService {
       },
     });
   }
-  async removeProject(id: string) {
-    await this.project(id);
+  async removeProject(id: string, user?: RequestUser) {
+    this.assertScope(await this.project(id, user), user, true);
     return this.prisma.communityProject.delete({ where: { id } });
   }
-  meetings() {
+  meetings(user?: RequestUser) {
     return this.prisma.meetingRecord.findMany({
+      where: this.scope(user),
       include: { votes: true },
       orderBy: { meetingDate: 'desc' },
     });
   }
-  async report() {
+  async report(user?: RequestUser) {
     const meetings = await this.prisma.meetingRecord.findMany({
+      where: this.scope(user),
       include: {
         votes: {
           include: {
@@ -91,9 +109,9 @@ export class GovernanceService {
     agenda: string;
     decisions: string;
     attendeeCount: number;
-  }) {
+  }, user?: RequestUser) {
     return this.prisma.meetingRecord.create({
-      data: { ...data, meetingDate: new Date(data.meetingDate) },
+      data: { ...data, mamcosId: user?.mamcosId ?? null, meetingDate: new Date(data.meetingDate) },
     });
   }
   createVote(data: {
@@ -103,7 +121,7 @@ export class GovernanceService {
     closesAt: string;
     meetingId?: string;
     options: string[];
-  }) {
+  }, user?: RequestUser) {
     const options = data.options.map((label) => label.trim()).filter(Boolean);
     if (options.length < 2)
       throw new BadRequestException('A vote needs at least two options');
@@ -116,9 +134,19 @@ export class GovernanceService {
       throw new BadRequestException(
         'Vote closing time must be after opening time',
       );
+    return this.persistVote(data, options, user);
+  }
+  private async persistVote(data: { title: string; description?: string; opensAt: string; closesAt: string; meetingId?: string; options: string[] }, options: string[], user?: RequestUser) {
+    if (data.meetingId) {
+      const meeting = await this.prisma.meetingRecord.findUnique({ where: { id: data.meetingId } });
+      if (!meeting) throw new NotFoundException("Meeting not found");
+      this.assertScope(meeting, user, true);
+      if ((meeting.mamcosId ?? null) !== (user?.mamcosId ?? null)) throw new BadRequestException("Vote and meeting must belong to the same workspace");
+    }
     return this.prisma.vote.create({
       data: {
         ...data,
+        mamcosId: user?.mamcosId ?? null,
         opensAt: new Date(data.opensAt),
         closesAt: new Date(data.closesAt),
         options: { create: options.map((label) => ({ label })) },
@@ -126,14 +154,18 @@ export class GovernanceService {
       include: { options: true },
     });
   }
-  listVotes() {
-    return this.prisma.vote.findMany({
+  async listVotes(user?: RequestUser) {
+    const farmer = user ? await this.prisma.farmer.findUnique({ where: { userId: user.id }, select: { id: true } }) : null;
+    const votes = await this.prisma.vote.findMany({
+      where: { ...this.scope(user), ...(user?.role === 'FARMER' ? { status: { not: 'DRAFT' as const } } : {}) },
       include: {
         options: { include: { _count: { select: { responses: true } } } },
         _count: { select: { responses: true } },
+        responses: { where: { farmerId: farmer?.id ?? '__no_farmer__' }, select: { optionId: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
+    return votes.map(({ responses, ...vote }) => ({ ...vote, myOptionId: responses[0]?.optionId ?? null }));
   }
   async respond(voteId: string, optionId: string, user: RequestUser) {
     const farmer = await this.prisma.farmer.findUnique({
@@ -152,13 +184,16 @@ export class GovernanceService {
       vote.closesAt < new Date()
     )
       throw new BadRequestException('Voting is not open');
+    this.assertScope(vote, { ...user, mamcosId: farmer.mamcosId });
+    const existing = await this.prisma.voteResponse.findUnique({ where: { voteId_farmerId: { voteId, farmerId: farmer.id } } });
+    if (existing) throw new BadRequestException('You have already voted on this decision');
     if (!vote.options.some((o) => o.id === optionId))
       throw new BadRequestException('Option does not belong to this vote');
     return this.prisma.voteResponse.create({
       data: { voteId, optionId, farmerId: farmer.id },
     });
   }
-  async results(voteId: string) {
+  async results(voteId: string, user?: RequestUser) {
     const vote = await this.prisma.vote.findUnique({
       where: { id: voteId },
       include: {
@@ -167,6 +202,7 @@ export class GovernanceService {
       },
     });
     if (!vote) throw new NotFoundException('Vote not found');
+    this.assertScope(vote, user);
     return {
       ...vote,
       results: vote.options.map((o) => ({
@@ -179,9 +215,10 @@ export class GovernanceService {
       })),
     };
   }
-  async openVote(id: string) {
+  async openVote(id: string, user?: RequestUser) {
     const current = await this.prisma.vote.findUnique({ where: { id } });
     if (!current) throw new NotFoundException('Vote not found');
+    this.assertScope(current, user, true);
     if (current.status !== 'DRAFT')
       throw new BadRequestException('Only a draft vote can be opened');
     const vote = await this.prisma.vote.update({
@@ -189,6 +226,7 @@ export class GovernanceService {
       data: { status: 'OPEN' },
     });
     const farmers = await this.prisma.farmer.findMany({
+      where: current.mamcosId ? { mamcosId: current.mamcosId } : {},
       include: { user: { select: { phone: true } } },
     });
     await Promise.all(
@@ -202,9 +240,10 @@ export class GovernanceService {
     );
     return vote;
   }
-  async closeVote(id: string) {
+  async closeVote(id: string, user?: RequestUser) {
     const current = await this.prisma.vote.findUnique({ where: { id } });
     if (!current) throw new NotFoundException('Vote not found');
+    this.assertScope(current, user, true);
     if (current.status !== 'OPEN')
       throw new BadRequestException('Only an open vote can be closed');
     return this.prisma.vote.update({

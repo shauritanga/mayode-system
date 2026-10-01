@@ -27,6 +27,7 @@
     "scheme": "mayode",
     "plugins": [
       "expo-router",
+      "expo-background-task",
       [
         "expo-notifications",
         {

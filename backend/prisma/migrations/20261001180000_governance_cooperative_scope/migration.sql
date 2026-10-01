@@ -1,0 +1,12 @@
+ALTER TABLE "community_projects" ADD COLUMN "mamcos_id" TEXT;
+CREATE INDEX "community_projects_mamcos_id_idx" ON "community_projects"("mamcos_id");
+ALTER TABLE "community_projects" ADD CONSTRAINT "community_projects_mamcos_id_fkey" FOREIGN KEY ("mamcos_id") REFERENCES "mamcos"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "meeting_records" ADD COLUMN "mamcos_id" TEXT;
+CREATE INDEX "meeting_records_mamcos_id_idx" ON "meeting_records"("mamcos_id");
+ALTER TABLE "meeting_records" ADD CONSTRAINT "meeting_records_mamcos_id_fkey" FOREIGN KEY ("mamcos_id") REFERENCES "mamcos"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "votes" ADD COLUMN "mamcos_id" TEXT;
+CREATE INDEX "votes_mamcos_id_idx" ON "votes"("mamcos_id");
+ALTER TABLE "votes" ADD CONSTRAINT "votes_mamcos_id_fkey" FOREIGN KEY ("mamcos_id") REFERENCES "mamcos"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "premium_fund_entries" ADD COLUMN "mamcos_id" TEXT;
+CREATE INDEX "premium_fund_entries_mamcos_id_idx" ON "premium_fund_entries"("mamcos_id");
+ALTER TABLE "premium_fund_entries" ADD CONSTRAINT "premium_fund_entries_mamcos_id_fkey" FOREIGN KEY ("mamcos_id") REFERENCES "mamcos"("id") ON DELETE SET NULL ON UPDATE CASCADE;

@@ -3,7 +3,7 @@ import axios from 'axios';
 // NOTE: the Nest backend mounts every route under the `api/v1` global
 // prefix (see backend/src/main.ts), so NEXT_PUBLIC_API_URL must include it,
 // e.g. http://localhost:3001/api/v1 — bare-host values 404 every call.
-const API_BASE_URL =
+export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 export const api = axios.create({
@@ -126,6 +126,7 @@ export const farmersApi = {
   overview: () => api.get('/farmers/overview'),
   getOne: (id: string) => api.get(`/farmers/${id}`),
   getMe: () => api.get('/farmers/me'),
+  myStatement: () => api.get('/farmers/me/statement'),
   getByControlNumber: (controlNumber: string) => api.get(`/farmers/control-number/${encodeURIComponent(controlNumber)}`),
   update: (id: string, data: object) => api.patch(`/farmers/${id}`, data),
   assignOfficer: (id: string, officerId: string) => api.patch(`/farmers/${id}/assign-officer`, { officerId }),
@@ -299,6 +300,7 @@ export const reportsApi = {
   impact: () => api.get('/reports/impact'),
   complianceSummary: () => api.get('/reports/compliance-summary'),
   farmerPayments: (params?: object) => api.get('/reports/farmer-payments', { params }),
+  createPremiumExpense: (data: object) => api.post('/reports/premium-fund/entries', { ...data, entryType: 'EXPENSE' }),
   premiumFund: (params?: object) => api.get('/reports/premium-fund', { params }),
   flocertAuditPack: (params?: object) => api.get('/reports/flocert-audit-pack', { params }),
   farmers: (params?: object) => api.get('/reports/farmers', { params }),
@@ -361,6 +363,9 @@ export const buyerOrdersApi = {
 
 // ── Inventory ──
 export const inventoryApi = {
+  mine: () => api.get('/inventory/records/mine'),
+  mySummary: () => api.get('/inventory/summary/mine'),
+  reportDelivery: (data: object) => api.post('/inventory/records/mine', data),
   getAll: (params?: object) => api.get('/inventory/records', { params }),
   receive: (data: object) => api.post('/inventory/records', data),
   updateStatus: (id: string, data: object) => api.patch(`/inventory/records/${id}/status`, data),
@@ -396,6 +401,10 @@ export const settingsApi = {
 
 // ── Marketplace ──
 export const marketplaceApi = {
+  depositQuote: (id: string) => api.get(`/marketplace/land/${id}/quote`),
+  managedListings: () => api.get('/marketplace/land/manage'),
+  myTractorBookings: () => api.get('/marketplace/tractors/bookings/mine'),
+  respondToCounter: (listingId: string, offerId: string, data: object) => api.patch(`/marketplace/land/${listingId}/offers/${offerId}/counter-response`, data),
   // Land listings
   getLandListings: (params?: object) => api.get('/marketplace/land', { params }),
   getLandListing: (id: string) => api.get(`/marketplace/land/${id}`),

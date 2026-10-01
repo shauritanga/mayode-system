@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, PremiumFundEntryType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -33,6 +33,7 @@ export class ReportsService {
   /** Builds a Farmer where-clause from the shared docx filter set (region/district/ward/village/cooperative/officer/gender/youth). */
   private farmerFilterWhere(filter: ReportFilterDto): Prisma.FarmerWhereInput {
     const where: Prisma.FarmerWhereInput = {};
+    if (filter.farmerId) where.id = filter.farmerId;
     if (filter.region) where.region = filter.region;
     if (filter.district) where.district = filter.district;
     if (filter.ward) where.ward = filter.ward;
@@ -50,6 +51,7 @@ export class ReportsService {
 
   private hasFarmerFilters(filter: ReportFilterDto): boolean {
     return !!(
+      filter.farmerId ||
       filter.region ||
       filter.district ||
       filter.ward ||
@@ -175,31 +177,27 @@ export class ReportsService {
     return [...rows.values()].sort((a, b) => a.farmer.localeCompare(b.farmer));
   }
 
-  async premiumFund(range: DateRangeDto) {
+  async premiumFund(range: ReportFilterDto) {
     const entries = await this.prisma.premiumFundEntry.findMany({
-      where:
-        range.from || range.to
-          ? {
-              entryDate: {
-                ...(range.from ? { gte: new Date(range.from) } : {}),
-                ...(range.to ? { lte: new Date(range.to) } : {}),
-              },
-            }
-          : undefined,
-      include: { sale: { select: { invoiceNumber: true } } },
+      where: {
+        ...(range.from || range.to ? { entryDate: { ...(range.from ? { gte: new Date(range.from) } : {}), ...(range.to ? { lte: new Date(range.to) } : {}) } } : {}),
+        ...(range.mamcosId ? { OR: [{ mamcosId: range.mamcosId }, { sale: { apportionments: { some: { farmer: { mamcosId: range.mamcosId } } } } }] } : {}),
+      },
+      include: { sale: { select: { invoiceNumber: true, apportionments: { where: range.mamcosId ? { farmer: { mamcosId: range.mamcosId } } : undefined, select: { fairtradePremium: true } } } } },
       orderBy: [{ entryDate: 'asc' }, { createdAt: 'asc' }],
     });
     let balance = 0;
     return entries.map((entry) => {
+      const amount = range.mamcosId && entry.sale && entry.entryType === PremiumFundEntryType.INCOME ? entry.sale.apportionments.reduce((sum, row) => sum + row.fairtradePremium, 0) : entry.amount;
       balance +=
         entry.entryType === PremiumFundEntryType.INCOME
-          ? entry.amount
-          : -entry.amount;
+          ? amount
+          : -amount;
       return {
         id: entry.id,
         entryDate: entry.entryDate.toISOString(),
         type: entry.entryType,
-        amount: entry.amount,
+        amount,
         description: entry.description,
         invoiceNumber: entry.sale?.invoiceNumber ?? '',
         runningBalance: balance,
@@ -207,9 +205,11 @@ export class ReportsService {
     });
   }
 
-  createPremiumExpense(dto: CreatePremiumFundEntryDto) {
+  createPremiumExpense(dto: CreatePremiumFundEntryDto, mamcosId?: string | null) {
+    if (dto.entryType !== PremiumFundEntryType.EXPENSE) throw new BadRequestException('Premium income is created automatically from sales');
     return this.prisma.premiumFundEntry.create({
       data: {
+        mamcosId: mamcosId ?? null,
         entryType: dto.entryType,
         amount: dto.amount,
         description: dto.description,
@@ -218,15 +218,18 @@ export class ReportsService {
     });
   }
 
-  async kpis() {
+  async kpis(filter: ReportFilterDto = {}) {
+    const farmer = this.farmerFilterWhere(filter);
+    const cycle = { ...(this.hasFarmerFilters(filter) ? { farmer } : {}), ...(filter.farmId ? { farmId: filter.farmId } : {}), ...(filter.season ? { season: filter.season } : {}), ...(filter.riceVariety ? { riceVariety: filter.riceVariety } : {}) };
     const [farm, yields, revenue, farmerCount, premium] = await Promise.all([
-      this.prisma.farm.aggregate({ _sum: { socialHectares: true } }),
-      this.prisma.cropCycle.aggregate({ _sum: { actualYieldKg: true } }),
+      this.prisma.farm.aggregate({ where: { ...(filter.mamcosId ? { mamcosId: filter.mamcosId } : {}), ...(filter.farmId ? { id: filter.farmId } : {}), ...(filter.farmerId ? { farmerId: filter.farmerId } : {}) }, _sum: { socialHectares: true } }),
+      this.prisma.cropCycle.aggregate({ where: cycle, _sum: { actualYieldKg: true } }),
       this.prisma.revenue.aggregate({
+        where: { cropCycle: cycle, ...(filter.from || filter.to ? { saleDate: { ...(filter.from ? { gte: new Date(filter.from) } : {}), ...(filter.to ? { lte: new Date(filter.to) } : {}) } } : {}) },
         _sum: { totalRevenue: true, fairtradePremium: true },
       }),
-      this.prisma.farmer.count(),
-      this.premiumFund({}),
+      this.prisma.farmer.count({ where: farmer }),
+      this.premiumFund(filter),
     ]);
     const hectares = farm._sum.socialHectares ?? 0;
     const totalYieldKg = yields._sum.actualYieldKg ?? 0;
@@ -244,13 +247,14 @@ export class ReportsService {
     };
   }
 
-  async impactReport() {
+  async impactReport(filter: ReportFilterDto = {}) {
     const [kpis, memberships, projects, revenues, seasonGroups] =
       await Promise.all([
-        this.kpis(),
-        this.prisma.membership.findMany({ select: { createdAt: true } }),
-        this.prisma.communityProject.findMany({ orderBy: { createdAt: 'desc' } }),
+        this.kpis(filter),
+        this.prisma.membership.findMany({ where: { farmer: this.farmerFilterWhere(filter) }, select: { createdAt: true } }),
+        this.prisma.communityProject.findMany({ where: filter.mamcosId ? { OR: [{ mamcosId: filter.mamcosId }, { mamcosId: null }] } : {}, orderBy: { createdAt: 'desc' } }),
         this.prisma.revenue.findMany({
+          where: { cropCycle: { farmer: this.farmerFilterWhere(filter) } },
           select: {
             saleDate: true,
             totalRevenue: true,
@@ -259,6 +263,7 @@ export class ReportsService {
           },
         }),
         this.prisma.cropCycle.groupBy({
+          where: { farmer: this.farmerFilterWhere(filter) },
           by: ['season'],
           _count: { _all: true },
           _sum: { actualYieldKg: true, estimatedYieldKg: true },
@@ -565,7 +570,7 @@ export class ReportsService {
     };
   }
 
-  async membershipGrowth() {
+  async membershipGrowth(filter: ReportFilterDto = {}) {
     const now = new Date();
     const currentStart = new Date(now);
     currentStart.setDate(now.getDate() - 30);
@@ -573,10 +578,10 @@ export class ReportsService {
     previousStart.setDate(currentStart.getDate() - 30);
     const [current, previous] = await Promise.all([
       this.prisma.membership.count({
-        where: { createdAt: { gte: currentStart, lte: now } },
+        where: { farmer: this.farmerFilterWhere(filter), createdAt: { gte: currentStart, lte: now } },
       }),
       this.prisma.membership.count({
-        where: { createdAt: { gte: previousStart, lt: currentStart } },
+        where: { farmer: this.farmerFilterWhere(filter), createdAt: { gte: previousStart, lt: currentStart } },
       }),
     ]);
     return {
@@ -628,6 +633,7 @@ export class ReportsService {
       ? this.farmerFilterWhere(filter)
       : undefined;
     const where: Prisma.CropCycleWhereInput = {
+      ...(filter.farmId ? { farmId: filter.farmId } : {}),
       ...(filter.season ? { season: filter.season } : {}),
       ...(filter.riceVariety ? { riceVariety: filter.riceVariety } : {}),
       ...(farmerFilter ? { farmer: farmerFilter } : {}),

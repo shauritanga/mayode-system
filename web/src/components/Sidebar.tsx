@@ -8,6 +8,7 @@ import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import UserMenu from './UserMenu';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
+import { APP_MODE, APP_MODE_LABEL } from '@/lib/app-mode';
 import { getVisibleGroups } from '@/lib/nav';
 
 function NavList({ onNavigate, collapsed = false }: { onNavigate?: () => void; collapsed?: boolean }) {
@@ -65,7 +66,7 @@ function Logo() {
       <img src="/app-icon.png" alt="" className="sidebar-logo-icon" />
       <div className="sidebar-logo-text">
         <div className="sidebar-logo-name">MAYODE</div>
-        <div className="sidebar-logo-sub">GROUP PLATFORM</div>
+        <div className="sidebar-logo-sub">{APP_MODE_LABEL[APP_MODE]}</div>
       </div>
     </div>
   );

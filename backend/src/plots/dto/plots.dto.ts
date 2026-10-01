@@ -5,10 +5,29 @@ import {
   IsObject,
   IsNotEmpty,
   Min,
+  Max,
+  IsArray,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePlotDto {
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  photoUrls?: string[];
+
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  @IsOptional()
+  centerLatitude?: number;
+
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  @IsOptional()
+  centerLongitude?: number;
+
   @ApiProperty({
     example: 'farm-uuid-1234',
     description: 'ID of the parent farm',
@@ -43,6 +62,23 @@ export class CreatePlotDto {
 }
 
 export class UpdatePlotDto {
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  photoUrls?: string[];
+
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  @IsOptional()
+  centerLatitude?: number;
+
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  @IsOptional()
+  centerLongitude?: number;
+
   @ApiPropertyOptional({ example: 'South Paddy' })
   @IsString()
   @IsOptional()

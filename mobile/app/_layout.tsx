@@ -14,6 +14,9 @@ import {
   addNotificationResponseReceivedListener,
   isPushSupported,
 } from '../src/services/notifications.service';
+import NetInfo from '@react-native-community/netinfo';
+import { prepareOfflineRecords } from '../src/services/prepare-offline';
+import { registerBackgroundSync } from '../src/services/background-sync';
 import { syncQueue } from '../src/services/sync-queue';
 
 // Configure foreground notification presentation globally (no-op in Expo Go).
@@ -27,9 +30,15 @@ export default function RootLayout() {
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
 
-  // Queue is replayed automatically on reconnect. Updates to the same resource
-  // use last-write-wins; the backend's updatedAt timestamp remains authoritative.
-  useEffect(() => syncQueue.start(), []);
+  // Replay ordered field writes on reconnect and whenever the app resumes.
+  useEffect(() => { if (_hydrated && isAuthenticated) { void registerBackgroundSync().catch(() => {}); return syncQueue.start(); } }, [_hydrated, isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    if (!_hydrated || !isAuthenticated) return;
+    return NetInfo.addEventListener(state => {
+      if (state.isConnected && state.isInternetReachable !== false) void prepareOfflineRecords().catch(() => {});
+    });
+  }, [_hydrated, isAuthenticated, user?.id]);
 
   // Backfill farmerId for sessions that logged in before /farmers/me was used
   // (old flow hit a staff-only control-number endpoint and left farmerId null).

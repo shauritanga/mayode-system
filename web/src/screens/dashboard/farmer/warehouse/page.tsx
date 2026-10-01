@@ -1,0 +1,21 @@
+'use client';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { inventoryApi } from '@/lib/api';
+import { apiError, downloadCsv } from '@/lib/download';
+import { EmptyState, InsightPanel, MetricTile } from '@/components/role-dashboards/DashboardPrimitives';
+import { useFarmerData } from '../FarmerDataContext';
+
+export default function FarmerWarehousePage() {
+  const { cycleOptions } = useFarmerData();
+  const [records, setRecords] = useState<any[]>([]); const [summary, setSummary] = useState<any>(null);
+  const [cycleId, setCycleId] = useState(''); const [weight, setWeight] = useState(''); const [grade, setGrade] = useState(''); const [location, setLocation] = useState('');
+  const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => { setLoading(true); setError(''); try { const [r, s] = await Promise.all([inventoryApi.mine(), inventoryApi.mySummary()]); setRecords(r.data); setSummary(s.data); } catch (err) { setError(apiError(err)); } finally { setLoading(false); } }, []);
+  useEffect(() => { void load(); }, [load]);
+  async function submit(e: FormEvent) { e.preventDefault(); if (busy) return; setBusy(true); setError(''); try { await inventoryApi.reportDelivery({ cropCycleId: cycleId, weightKg: Number(weight), qualityGrade: grade || undefined, warehouseLocation: location || undefined }); setWeight(''); await load(); } catch (err) { setError(apiError(err)); } finally { setBusy(false); } }
+  return <div className="page-shell"><h1 className="page-title">My deliveries</h1>{error && <div role="alert" className="alert-box alert-danger">{error}<button className="btn-secondary" onClick={() => void load()}>Retry</button></div>}
+    <div className="role-grid"><MetricTile label="Delivered" value={summary ? `${summary.totalKg.toLocaleString()} kg` : '—'} /><MetricTile label="In warehouse" value={summary ? `${summary.inWarehouseKg.toLocaleString()} kg` : '—'} /><MetricTile label="Batched, shipped or sold" value={summary ? `${summary.batchedOrSoldKg.toLocaleString()} kg` : '—'} /></div>
+    <InsightPanel title="Warehouse receipts" subtitle="Latest 100 receipts, linked to your farms, seasons and lots."><button className="btn-secondary" disabled={!records.length} onClick={() => downloadCsv('my-deliveries.csv', records.map((r) => ({ code: r.trackingCode, received: r.receivedDate, farm: r.farm?.farmCode, season: r.cropCycle?.season, kg: r.weightKg, grade: r.qualityGrade, warehouse: r.warehouseLocation, status: r.status, lot: r.lotNumber })))}>Export CSV</button>{loading ? <p>Loading receipts…</p> : <div className="role-list">{records.map((r) => <div className="role-list-item" key={r.id}><div><strong>{r.trackingCode}</strong><p>{r.farm?.farmCode} · {r.cropCycle?.season} · {r.receivedDate.slice(0, 10)}</p><p>{r.warehouseLocation} · Grade {r.qualityGrade || 'not recorded'} · Lot {r.lotNumber || 'not assigned'}</p></div><div><strong>{r.weightKg} kg</strong><p>{r.status}</p></div></div>)}{!records.length && <EmptyState>No warehouse receipts yet.</EmptyState>}</div>}</InsightPanel>
+    <InsightPanel title="Report a delivery" subtitle="Record a delivery from one of your crop cycles; the cooperative confirms it at the weighbridge."><form className="form-grid" onSubmit={submit}><label className="form-label">Crop cycle<select className="input-field" required value={cycleId} onChange={(e) => setCycleId(e.target.value)}><option value="">Choose a crop cycle</option>{cycleOptions.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label><label className="form-label">Weight kg<input className="input-field" required type="number" min="0.01" step="0.01" value={weight} onChange={(e) => setWeight(e.target.value)} /></label><label className="form-label">Quality grade (optional)<input className="input-field" value={grade} onChange={(e) => setGrade(e.target.value)} /></label><label className="form-label">Warehouse<input className="input-field" value={location} onChange={(e) => setLocation(e.target.value)} /></label><button className="btn-primary" disabled={busy || !cycleId}>{busy ? 'Saving…' : 'Report delivery'}</button></form></InsightPanel>
+  </div>;
+}

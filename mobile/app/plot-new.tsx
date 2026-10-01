@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator,
+  View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { plotsApi } from '../src/lib/data';
+import * as ImagePicker from 'expo-image-picker';
+import { getCurrentPoint } from '../src/services/location.service';
+import { plotsApi, uploadsApi, resolveMediaUrl } from '../src/lib/data';
 import { useI18n } from '../src/i18n';
 
 export default function PlotNew() {
@@ -15,11 +17,31 @@ export default function PlotNew() {
   const [sizeAcres, setSizeAcres] = useState('');
   const [soilCondition, setSoilCondition] = useState('');
   const [irrigationStatus, setIrrigationStatus] = useState('');
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [gps, setGps] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [capturing, setCapturing] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const capture = async (camera: boolean) => {
+    setCapturing(true);
+    try {
+      if (camera && !(await ImagePicker.requestCameraPermissionsAsync()).granted) { Alert.alert(t('cameraPermissionNeeded')); return; }
+      const result = camera ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.75 }) : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.75 });
+      if (!result.canceled) {
+        const asset = result.assets[0];
+        const res = await uploadsApi.uploadFile({ uri: asset.uri, name: asset.fileName || 'plot.jpg', type: asset.mimeType || 'image/jpeg' });
+        setPhotoUrl(res.data.url);
+      }
+    } catch (e: any) { Alert.alert(t('error'), e.message); }
+    finally { setCapturing(false); }
+  };
+  const locate = async () => {
+    try { setGps(await getCurrentPoint()); } catch (e: any) { Alert.alert(t('error'), e.message); }
+  };
   const submit = async () => {
     if (!farmId) return;
-    if (sizeAcres && isNaN(Number(sizeAcres))) {
+    if (!gps || !photoUrl) { Alert.alert(t("validationError"), t("plotPhotoRequired")); return; }
+    if (sizeAcres && (!Number.isFinite(Number(sizeAcres)) || Number(sizeAcres) <= 0)) {
       Alert.alert(t('invalidSize'), t('plotSizeNumber'));
       return;
     }
@@ -27,13 +49,16 @@ export default function PlotNew() {
     try {
       const res = await plotsApi.create({
         farmId,
+        photoUrls: [photoUrl],
+        centerLatitude: gps.latitude,
+        centerLongitude: gps.longitude,
         name: name || undefined,
         sizeAcres: sizeAcres ? Number(sizeAcres) : undefined,
         soilCondition: soilCondition || undefined,
         irrigationStatus: irrigationStatus || undefined,
       });
       const plot = res.data;
-      Alert.alert(t('plotCreated'), t('plotAdded', { code: plot.plotCode }), [
+      Alert.alert(t('plotCreated'), plot.queued ? t('savedOffline') : t('plotAdded', { code: plot.plotCode }), [
         {
           text: t('walkBoundaryNow'),
           onPress: () =>
@@ -54,12 +79,18 @@ export default function PlotNew() {
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         {!!farmCode && <Text style={styles.context}>{t('farmContext', { code: farmCode })}</Text>}
 
+        <Text style={styles.label}>{t('plotPhoto')}</Text>
+        {photoUrl && <Image source={{ uri: resolveMediaUrl(photoUrl) || photoUrl }} style={{ width: '100%', height: 180, borderRadius: 12 }} />}
+        <TouchableOpacity disabled={capturing} onPress={() => { void capture(true); }} style={styles.btn}><Text style={styles.btnText}>{t('takePhoto')}</Text></TouchableOpacity>
+        <TouchableOpacity disabled={capturing} onPress={() => { void capture(false); }} style={styles.btn}><Text style={styles.btnText}>{t('chooseFromGallery')}</Text></TouchableOpacity>
+        <TouchableOpacity onPress={locate} style={styles.btn}><Text style={styles.btnText}>{t('captureLocation')}</Text></TouchableOpacity>
+        {gps && <Text>{gps.latitude.toFixed(6)}, {gps.longitude.toFixed(6)}</Text>}
         <Field label={t('plotNameOptional')} value={name} onChangeText={setName} placeholder={t('plotNamePlaceholder')} />
         <Field label={t('sizeAcres')} value={sizeAcres} onChangeText={setSizeAcres} placeholder="e.g. 2.5" keyboardType="decimal-pad" />
         <Field label={t('soilConditionOptional')} value={soilCondition} onChangeText={setSoilCondition} placeholder={t('soilPlaceholder')} />
         <Field label={t('irrigationOptional')} value={irrigationStatus} onChangeText={setIrrigationStatus} placeholder={t('irrigationPlaceholder')} />
 
-        <TouchableOpacity style={[styles.btn, saving && styles.btnDisabled]} onPress={submit} disabled={saving}>
+        <TouchableOpacity style={[styles.btn, saving && styles.btnDisabled]} onPress={submit} disabled={saving || capturing}>
           {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>{t('createPlot')}</Text>}
         </TouchableOpacity>
       </ScrollView>

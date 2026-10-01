@@ -1,8 +1,15 @@
+import { migrateLegacyOffline } from '../services/offline-migration';
 import axios from 'axios';
+import NetInfo from '@react-native-community/netinfo';
+import { retainUpload, resolveMedia, LocalUpload } from '../services/offline-media';
+import { setStoreOwner } from '../local/store';
 import Constants from 'expo-constants';
 import { syncQueue } from '../services/sync-queue';
 import {
   cachedRead,
+  hasPendingReferences,
+  setCacheOwner,
+  resolveReplayUrl,
   discardOfflineMutation,
   reconcileOfflineMutation,
   resolveReplayData,
@@ -54,28 +61,38 @@ export const api = axios.create({
   timeout: 15000,
 });
 
-syncQueue.configure(async (mutation) => {
-  if (mutation.method.toUpperCase() === 'PATCH') {
-    // Server records expose updatedAt. If another device has a newer version,
-    // discard this stale local write; otherwise the queued mutation wins.
-    const current = await api.get(mutation.url);
-    const serverUpdatedAt = current.data?.updatedAt;
-    if (serverUpdatedAt && new Date(serverUpdatedAt).getTime() > new Date(mutation.createdAt).getTime()) {
-      await discardOfflineMutation(mutation);
-      return;
-    }
-  }
-  const response = await api.request({
-    method: mutation.method,
-    url: mutation.url,
-    data: await resolveReplayData(mutation.data),
-    params: mutation.params,
-    headers: {
-      'X-MAYODE-SYNC-REPLAY': '1',
-      'X-Idempotency-Key': mutation.id,
-    },
-  });
+let sessionOwner: string | null = null;
+export function setOfflineOwner(id: string | null) {
+  migrateLegacyOffline(id);
+  sessionOwner = id;
+  setStoreOwner(id);
+  setCacheOwner(id);
+  syncQueue.setOwner(id);
+}
+function isFieldMutation(url: string, method: string) {
+  return ['POST', 'PATCH', 'PUT'].includes(method) && /^\/(farmers|farms|plots|crop-cycles|finance|field-surveys|field-officer-visits)(\/|$)/.test(url);
+}
+async function sendFile(file: LocalUpload) {
+  const form = new FormData();
+  form.append('file', file as unknown as Blob);
+  return api.post('/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+}
+syncQueue.onDiscard(discardOfflineMutation);
+syncQueue.configure(async mutation => {
+  const replayOwner = sessionOwner;
+  if (!sessionOwner || !inMemoryToken) throw new Error('Sign in to synchronize field records.');
+  const url = await resolveReplayUrl(mutation.url);
+  const data = await resolveReplayData(mutation.data);
+  if (url.includes('offline-') || hasPendingReferences(data)) throw new Error('A related record must synchronize first.');
+  const response = await api.request({ method: mutation.method, url, data, params: mutation.params,
+    headers: { 'X-MAYODE-SYNC-REPLAY': '1', 'X-Idempotency-Key': mutation.id } });
+  if (replayOwner !== sessionOwner) throw new Error("Account changed. Sign back in to finish synchronization.");
   await reconcileOfflineMutation(mutation, response.data);
+  for (const pending of await syncQueue.pending()) {
+    if (pending.id === mutation.id || pending.method.toUpperCase() !== 'PATCH') continue;
+    const pendingUrl = await resolveReplayUrl(pending.url);
+    if (pendingUrl.split('/')[2] === response.data?.id) await stageOfflineMutation({ ...pending, url: pendingUrl, data: await resolveReplayData(pending.data) });
+  }
 });
 
 let inMemoryToken: string | null = null;
@@ -106,10 +123,33 @@ export const registerAuthHandlers = (handlers: {
   onRefreshFailed = handlers.onRefreshFailed;
 };
 
-api.interceptors.request.use((config) => {
-  if (inMemoryToken) {
-    config.headers.Authorization = `Bearer ${inMemoryToken}`;
+api.interceptors.request.use(async config => {
+  const requestOwner = sessionOwner;
+  (config as any)._offlineOwner = requestOwner;
+  if (inMemoryToken) config.headers.Authorization = `Bearer ${inMemoryToken}`;
+  const method = String(config.method).toUpperCase();
+  const originalUrl = String(config.url ?? '');
+  config.url = await resolveReplayUrl(originalUrl);
+  if (method === 'GET') {
+    const network = await NetInfo.fetch();
+    if (!network.isConnected || network.isInternetReachable === false || config.url.includes('offline-')) throw Object.assign(new Error('Offline record unavailable'), { config });
   }
+  if (isFieldMutation(originalUrl, method)) {
+    config.headers['X-Idempotency-Key'] ||= `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    config.data = await resolveReplayData(config.data);
+    const network = await NetInfo.fetch();
+    if (!network.isConnected || network.isInternetReachable === false || config.url.includes('offline-') || hasPendingReferences(config.data)) {
+      throw Object.assign(new Error('Saved for synchronization'), { config });
+    }
+    try {
+      config.data = await resolveMedia(config.data, sessionOwner ?? '', async file => (await sendFile(file)).data.url);
+    } catch (error: any) {
+      // Keep the field request (including its local file references) for retry.
+      if (!error.response) throw Object.assign(new Error(error.message), { config });
+      throw error;
+    }
+  }
+  if (requestOwner !== sessionOwner) throw Object.assign(new Error("Account changed."), { config });
   return config;
 });
 
@@ -119,17 +159,21 @@ api.interceptors.request.use((config) => {
 let refreshPromise: Promise<string | null> | null = null;
 
 async function refreshAccessToken(): Promise<string | null> {
+  const refreshOwner = sessionOwner;
   if (!inMemoryRefreshToken) return null;
   try {
     const res = await axios.post(`${API_BASE_URL}/auth/refresh`, {
       refreshToken: inMemoryRefreshToken,
     });
+    if (refreshOwner !== sessionOwner) return null;
     const { accessToken, refreshToken } = res.data;
     inMemoryToken = accessToken;
     inMemoryRefreshToken = refreshToken;
     onTokensRefreshed?.(accessToken, refreshToken);
     return accessToken;
-  } catch {
+  } catch (error: any) {
+    if (refreshOwner !== sessionOwner) return null;
+    if (!error.response || error.response.status >= 500) throw error;
     inMemoryToken = null;
     inMemoryRefreshToken = null;
     onRefreshFailed?.();
@@ -138,14 +182,16 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 api.interceptors.response.use(
-  (res) => {
-    if (res.config?.method?.toUpperCase() === 'GET' && res.data) {
-      saveToReadCache(String(res.config.url ?? ''), res.data).catch(() => undefined);
+  async (res) => {
+    if ((res.config as any)._offlineOwner !== sessionOwner) return res;
+    if (res.data && (res.config?.method?.toUpperCase() === 'GET' || (res.data.id && isFieldMutation(String(res.config?.url), String(res.config?.method).toUpperCase())))) {
+      await saveToReadCache(String(res.config.url ?? ''), res.data, res.config.params).catch(() => undefined);
     }
     return res;
   },
   async (error) => {
     const originalConfig = error.config;
+    if (originalConfig && originalConfig._offlineOwner !== sessionOwner) return Promise.reject(error);
     const isRefreshCall = originalConfig?.url?.includes('/auth/refresh');
 
     if (error.response?.status === 401 && originalConfig && !originalConfig._retry && !isRefreshCall) {
@@ -157,7 +203,14 @@ api.interceptors.response.use(
         });
       }
 
-      const newToken = await refreshPromise;
+      let newToken: string | null;
+      try { newToken = await refreshPromise; }
+      catch (refreshError: any) {
+        // A connection outage during token renewal must not lose the field write.
+        if (refreshError.response) return Promise.reject(refreshError);
+        error = Object.assign(new Error(refreshError.message), { config: originalConfig });
+        newToken = null;
+      }
       if (newToken) {
         originalConfig.headers.Authorization = `Bearer ${newToken}`;
         return api(originalConfig);
@@ -167,15 +220,14 @@ api.interceptors.response.use(
     // Network errors for normal data mutations are persisted locally and replayed
     // on reconnect. Authentication, uploads and payment actions are excluded.
     const method = String(originalConfig?.method ?? '').toUpperCase();
-    const replayable = ['POST', 'PATCH', 'PUT'].includes(method) && !originalConfig?.headers?.['X-MAYODE-SYNC-REPLAY'] && !String(originalConfig?.url ?? '').startsWith('/auth/') && !String(originalConfig?.url ?? '').startsWith('/uploads') && !String(originalConfig?.url ?? '').includes('payout');
+    const replayable = originalConfig && isFieldMutation(String(originalConfig.url ?? ''), method) && !originalConfig.headers?.['X-MAYODE-SYNC-REPLAY'];
     if (!error.response && replayable) {
-      const queued = await syncQueue.enqueue({ method, url: originalConfig.url, data: originalConfig.data, params: originalConfig.params });
+      const queued = await syncQueue.enqueue({ id: originalConfig.headers?.['X-Idempotency-Key'], method, url: originalConfig.url, data: originalConfig.data, params: originalConfig.params });
       const optimistic = await stageOfflineMutation(queued);
       return { data: { ...(optimistic ?? {}), queued: true, syncId: queued.id }, status: 202, statusText: 'Queued for sync', headers: {}, config: originalConfig };
     }
 
-    // Offline reads for the three field workflows are served from the same
-    // persistent optimistic cache that backs queued mutations.
+    // Offline field reads use the account-scoped persistent record cache.
     if (!error.response && method === 'GET') {
       const cached = await cachedRead(String(originalConfig?.url ?? ''), originalConfig?.params as Record<string, unknown> | undefined);
       if (cached !== undefined) return { data: cached, status: 200, statusText: 'Offline cache', headers: {}, config: originalConfig };
@@ -189,7 +241,7 @@ api.interceptors.response.use(
 export const authApi = {
   login: (phone: string, password: string) =>
     api.post('/auth/login', { phone, password }),
-  register: (data: { phone: string; password: string; firstName: string; lastName: string; dataShareConsent: boolean }) =>
+  register: (data: { phone: string; password: string; firstName: string; lastName: string; dataShareConsent: boolean; region?: string; district?: string; ward?: string; village?: string }) =>
     api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
   // AMCOS Secretary self-service: mamcosId is resolved server-side from the
@@ -399,13 +451,15 @@ export const locationsApi = {
 // ── Uploads ──
 export const uploadsApi = {
   /** Upload a local file (from image/document picker) as multipart. */
-  uploadFile: (file: { uri: string; name: string; type: string }) => {
-    const form = new FormData();
-    // React Native FormData accepts { uri, name, type } for file parts.
-    form.append('file', file as unknown as Blob);
-    return api.post('/uploads', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+  uploadFile: async (file: LocalUpload) => {
+    const retained = await retainUpload(file);
+    const network = await NetInfo.fetch();
+    if (!network.isConnected || network.isInternetReachable === false) return { data: { url: retained.uri, queued: true } };
+    try { return await sendFile(retained); }
+    catch (error: any) {
+      if (error.response) throw error;
+      return { data: { url: retained.uri, queued: true } };
+    }
   },
 };
 

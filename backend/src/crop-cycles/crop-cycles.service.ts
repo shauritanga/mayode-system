@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MamcosStaffRole, Prisma } from '@prisma/client';
+import { MamcosStaffRole, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { ActivitiesService } from '../activities/activities.service';
@@ -64,9 +64,9 @@ export class CropCyclesService {
       where: { userId: user.id },
       select: { id: true },
     });
-    const farmerId = dto.farmerId
-      ? await this.assertKnownFarmer(dto.farmerId)
-      : requester?.id;
+    const farmerId = user.role === UserRole.FARMER
+      ? requester?.id
+      : dto.farmerId ? await this.assertKnownFarmer(dto.farmerId) : farm.farmerId;
     if (!farmerId)
       throw new NotFoundException(
         'A renter farmer profile is required to start a crop cycle',
@@ -184,7 +184,8 @@ export class CropCyclesService {
   }
 
   async updateActivityLog(id: string, dto: UpdateActivityLogDto) {
-    await this.findActivityLogById(id);
+    const existing = await this.findActivityLogById(id);
+    await this.validateActivity(existing.cropCycleId, { ...existing, ...dto }, id);
     return this.prisma.activityLog.update({
       where: { id },
       data: {
@@ -392,6 +393,16 @@ export class CropCyclesService {
       );
     }
 
+    const expectedHarvest = dto.expectedHarvest ? new Date(dto.expectedHarvest) : existing.expectedHarvest;
+    if (plantingDate && expectedHarvest && expectedHarvest < plantingDate) {
+      throw new BadRequestException('Expected harvest date cannot be earlier than planting date');
+    }
+    const day = (d: Date) => d.toISOString().slice(0, 10);
+    if (existing.activities.some(a =>
+      (a.activityType === 'HARVESTING' && plantingDate && day(a.activityDate) < day(plantingDate)) ||
+      (a.activityType === 'PLANTING' && harvestDate && day(a.activityDate) > day(harvestDate)))) {
+      throw new BadRequestException('Cycle dates conflict with recorded planting or harvest activities');
+    }
     const cropCycle = await this.prisma.cropCycle.update({
       where: { id },
       data: {
@@ -434,8 +445,26 @@ export class CropCyclesService {
    * feature). The requesting farmer must own the crop cycle's farm; staff may
    * log on behalf of any farmer (e.g. a field officer's field visit).
    */
+  private async validateActivity(cropCycleId: string, dto: { activityType: string; activityDate: string | Date; inputsUsed?: unknown }, excludeId?: string) {
+    const cycle = await this.prisma.cropCycle.findUniqueOrThrow({ where: { id: cropCycleId }, include: { activities: true } });
+    const day = (value: string | Date) => new Date(value).toISOString().slice(0, 10);
+    const activities = cycle.activities.filter(a => a.id !== excludeId);
+    const plantingDates = [cycle.plantingDate, ...activities.filter(a => a.activityType === 'PLANTING').map(a => a.activityDate)].filter((d): d is Date => !!d);
+    const harvestDates = [cycle.harvestDate, ...activities.filter(a => a.activityType === 'HARVESTING').map(a => a.activityDate)].filter((d): d is Date => !!d);
+    if ((dto.activityType === 'HARVESTING' && plantingDates.some(d => day(dto.activityDate) < day(d))) ||
+        (dto.activityType === 'PLANTING' && harvestDates.some(d => day(dto.activityDate) > day(d)))) {
+      throw new BadRequestException('Harvest date cannot be earlier than planting date');
+    }
+    const items = (dto.inputsUsed as { items?: unknown } | null)?.items;
+    if (items !== undefined && (!Array.isArray(items) || items.some(item => !item || typeof item.name !== 'string' || !item.name.trim() || typeof item.unit !== 'string' || !item.unit.trim() || typeof item.quantity !== 'number' || !Number.isFinite(item.quantity) || item.quantity <= 0))) {
+      throw new BadRequestException('Each input requires a name, positive quantity and unit');
+    }
+  }
+
   async logActivity(user: RequestUser, dto: CreateActivityLogDto) {
     const cropCycle = await this.findOne(dto.cropCycleId, user); // verifies existence + ownership
+
+    await this.validateActivity(dto.cropCycleId, dto);
 
     const fieldOfficer = await this.prisma.mamcosStaff.findFirst({
       where: { userId: user.id, role: MamcosStaffRole.FIELD_OFFICER },

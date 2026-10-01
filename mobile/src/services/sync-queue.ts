@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import NetInfo from '@react-native-community/netinfo';
-
-const QUEUE_KEY = 'mayode.sync.queue.v1';
-const LAST_SYNC_KEY = 'mayode.sync.last.v1';
+import { offlineMigrationReady } from "./offline-migration";
+import { useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
+import { AppState } from "react-native";
 
 export type PendingMutation = {
   id: string;
@@ -15,7 +14,6 @@ export type PendingMutation = {
   attempts: number;
   lastError?: string;
 };
-
 export type SyncState = {
   isConnected: boolean;
   isSyncing: boolean;
@@ -24,205 +22,175 @@ export type SyncState = {
   errorCount: number;
   pendingList: PendingMutation[];
 };
-
-type Replay = (mutation: PendingMutation) => Promise<void>;
-type Listener = (state: SyncState) => void;
-
-let replay: Replay | null = null;
+let owner: string | null = null;
+let replay: ((mutation: PendingMutation) => Promise<void>) | null = null;
 let running = false;
-let isConnected = true;
-let lastSyncedAt: string | null = null;
-const listeners = new Set<Listener>();
-
-async function readQueue(): Promise<PendingMutation[]> {
-  try {
-    const raw = await AsyncStorage.getItem(QUEUE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+let discard: ((mutation: PendingMutation) => Promise<void>) | null = null;
+let connected = true;
+let lock: Promise<unknown> = Promise.resolve();
+const listeners = new Set<(state: SyncState) => void>();
+const key = (id: string) => `mayode.sync.v2.${id}`;
+async function read(id = owner): Promise<PendingMutation[]> {
+  await offlineMigrationReady();
+  return id ? JSON.parse((await AsyncStorage.getItem(key(id))) || "[]") : [];
 }
-
-async function writeQueue(queue: PendingMutation[]): Promise<void> {
-  await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-  notify();
-}
-
-async function initLastSync(): Promise<void> {
-  try {
-    lastSyncedAt = await AsyncStorage.getItem(LAST_SYNC_KEY);
-  } catch {
-    lastSyncedAt = null;
-  }
-}
-initLastSync();
-
-function notify(): void {
-  readQueue().then((queue) => {
-    const errorCount = queue.filter((m) => m.attempts > 0).length;
-    const state: SyncState = {
-      isConnected,
-      isSyncing: running,
-      pendingCount: queue.length,
-      lastSyncedAt,
-      errorCount,
-      pendingList: queue,
-    };
-    listeners.forEach((listener) => listener(state));
+async function change(
+  id: string,
+  edit: (queue: PendingMutation[]) => PendingMutation[],
+) {
+  const operation = lock.then(async () => {
+    await AsyncStorage.setItem(key(id), JSON.stringify(edit(await read(id))));
   });
+  lock = operation.catch(() => {});
+  await operation;
+  await notify();
 }
-
+async function notify() {
+  const id = owner;
+  const queue = await read(id);
+  const lastSyncedAt = id
+    ? await AsyncStorage.getItem(`${key(id)}.last`)
+    : null;
+  if (id !== owner) return;
+  const state = {
+    isConnected: connected,
+    isSyncing: running,
+    pendingCount: queue.length,
+    lastSyncedAt,
+    errorCount: queue.filter((m) => m.attempts > 0).length,
+    pendingList: queue,
+  };
+  listeners.forEach((listener) => listener(state));
+}
 export const syncQueue = {
-  configure(handler: Replay) {
+  setOwner(id: string | null) {
+    owner = id;
+    void notify();
+  },
+  onDiscard(handler: (mutation: PendingMutation) => Promise<void>) {
+    discard = handler;
+  },
+  configure(handler: (mutation: PendingMutation) => Promise<void>) {
     replay = handler;
   },
-
-  async enqueue(input: Omit<PendingMutation, 'id' | 'createdAt' | 'attempts'>) {
-    const queue = await readQueue();
-    // Last-write-wins for repeated updates to exactly the same resource.
-    const filtered =
-      input.method.toUpperCase() === 'PATCH'
-        ? queue.filter(
-            (item) =>
-              !(
-                item.method.toUpperCase() === 'PATCH' &&
-                item.url === input.url
-              ),
-          )
-        : queue;
-
+  async enqueue(
+    input: Omit<PendingMutation, "id" | "createdAt" | "attempts"> & {
+      id?: string;
+    },
+  ) {
+    if (!owner) throw new Error("Sign in before saving field records.");
     const mutation: PendingMutation = {
       ...input,
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      id: input.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       createdAt: new Date().toISOString(),
       attempts: 0,
     };
-
-    await writeQueue([...filtered, mutation]);
+    // Preserve every ordered write: replacing PATCHes loses independent fields.
+    await change(owner, (queue) =>
+      queue.some((m) => m.id === mutation.id) ? queue : [...queue, mutation],
+    );
     return mutation;
   },
-
-  async pending(): Promise<PendingMutation[]> {
-    return readQueue();
-  },
-
-  async flush(): Promise<void> {
-    if (running || !replay) return;
-    const net = await NetInfo.fetch();
-    if (!net.isConnected) {
-      isConnected = false;
-      notify();
-      return;
-    }
-    isConnected = true;
+  pending: () => read(),
+  async flush() {
+    if (running || !replay || !owner) return;
     running = true;
-    notify();
-
+    const id = owner;
     try {
-      const queue = await readQueue();
-      for (const mutation of queue) {
+      const network = await NetInfo.fetch();
+      connected =
+        !!network.isConnected && network.isInternetReachable !== false;
+      if (!connected) return;
+      await notify();
+      for (const mutation of await read(id)) {
+        if (owner !== id) break;
         try {
           await replay(mutation);
-          const current = await readQueue();
-          await writeQueue(current.filter((item) => item.id !== mutation.id));
-          lastSyncedAt = new Date().toISOString();
-          await AsyncStorage.setItem(LAST_SYNC_KEY, lastSyncedAt);
-        } catch (err: any) {
-          const errMsg = err?.response?.data?.message || err?.message || 'Sync failed';
-          const current = await readQueue();
-          await writeQueue(
-            current.map((item) =>
-              item.id === mutation.id
-                ? { ...item, attempts: item.attempts + 1, lastError: errMsg }
-                : item,
+          await change(id, (queue) =>
+            queue.filter((m) => m.id !== mutation.id),
+          );
+          await AsyncStorage.setItem(
+            `${key(id)}.last`,
+            new Date().toISOString(),
+          );
+        } catch (error: any) {
+          await change(id, (queue) =>
+            queue.map((m) =>
+              m.id === mutation.id
+                ? {
+                    ...m,
+                    attempts: m.attempts + 1,
+                    lastError: String(
+                      error?.response?.data?.message || error.message,
+                    ),
+                  }
+                : m,
             ),
           );
+          // Keep dependent records behind the failed parent until corrected/retried.
           break;
         }
       }
     } finally {
       running = false;
-      notify();
+      await notify();
     }
   },
-
-  async retryItem(id: string): Promise<void> {
-    if (!replay || running) return;
-    const queue = await readQueue();
+  async retryItem(_id: string) {
+    await this.flush();
+  },
+  async discardItem(id: string) {
+    if (!owner || running)
+      throw new Error("Wait for synchronization to finish.");
+    const queue = await read();
     const item = queue.find((m) => m.id === id);
     if (!item) return;
-
-    running = true;
-    notify();
-    try {
-      await replay(item);
-      const current = await readQueue();
-      await writeQueue(current.filter((m) => m.id !== id));
-      lastSyncedAt = new Date().toISOString();
-      await AsyncStorage.setItem(LAST_SYNC_KEY, lastSyncedAt);
-    } catch (err: any) {
-      const errMsg = err?.response?.data?.message || err?.message || 'Sync failed';
-      const current = await readQueue();
-      await writeQueue(
-        current.map((m) =>
-          m.id === id
-            ? { ...m, attempts: m.attempts + 1, lastError: errMsg }
-            : m,
-        ),
-      );
-    } finally {
-      running = false;
-      notify();
-    }
+    const reference = `offline-${id}`;
+    if (
+      queue.some(
+        (m) =>
+          m.id !== id &&
+          (m.url.includes(reference) ||
+            JSON.stringify(m.data ?? {}).includes(reference)),
+      )
+    )
+      throw new Error("Discard dependent records first.");
+    await discard?.(item);
+    await change(owner, (rows) => rows.filter((m) => m.id !== id));
   },
-
-  async discardItem(id: string): Promise<void> {
-    const queue = await readQueue();
-    await writeQueue(queue.filter((item) => item.id !== id));
+  async clearAll() {
+    if (!owner || running)
+      throw new Error("Wait for synchronization to finish.");
+    for (const item of (await read()).reverse()) await discard?.(item);
+    await change(owner, () => []);
   },
-
-  async clearAll(): Promise<void> {
-    await writeQueue([]);
-  },
-
-  subscribe(listener: Listener): () => void {
+  subscribe(listener: (state: SyncState) => void) {
     listeners.add(listener);
-    // Emit current state immediately
-    readQueue().then((queue) => {
-      listener({
-        isConnected,
-        isSyncing: running,
-        pendingCount: queue.length,
-        lastSyncedAt,
-        errorCount: queue.filter((m) => m.attempts > 0).length,
-        pendingList: queue,
-      });
-    });
-    return () => listeners.delete(listener);
+    void notify();
+    return () => {
+      listeners.delete(listener);
+    };
   },
-
   start() {
-    NetInfo.fetch().then((state) => {
-      isConnected = !!state.isConnected;
-      notify();
-    });
-
     const unsubscribe = NetInfo.addEventListener((state) => {
-      const connected = !!state.isConnected;
-      const wasDisconnected = !isConnected && connected;
-      isConnected = connected;
-      notify();
-      if (wasDisconnected) {
-        this.flush().catch(() => undefined);
-      }
+      connected = !!state.isConnected && state.isInternetReachable !== false;
+      void notify();
+      if (connected) void this.flush();
     });
-
-    this.flush().catch(() => undefined);
-    return unsubscribe;
+    const app = AppState.addEventListener("change", (state) => {
+      if (state === "active") void this.flush();
+    });
+    const timer = setInterval(() => {
+      void this.flush();
+    }, 30000);
+    void this.flush();
+    return () => {
+      unsubscribe();
+      app.remove();
+      clearInterval(timer);
+    };
   },
 };
-
-/** React hook for real-time sync status observation and control. */
 export function useSyncStatus() {
   const [state, setState] = useState<SyncState>({
     isConnected: true,
@@ -232,11 +200,7 @@ export function useSyncStatus() {
     errorCount: 0,
     pendingList: [],
   });
-
-  useEffect(() => {
-    return syncQueue.subscribe((updated) => setState(updated));
-  }, []);
-
+  useEffect(() => syncQueue.subscribe(setState), []);
   return {
     ...state,
     flush: () => syncQueue.flush(),

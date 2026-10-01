@@ -4,7 +4,7 @@ import {
   Alert, ActivityIndicator, KeyboardAvoidingView, Keyboard, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { farmsApi, mamcosApi } from '../src/lib/data';
 import { useAuthStore } from '../src/store/auth.store';
 import { SearchableSelect } from '../src/components/SearchableSelect';
@@ -17,7 +17,9 @@ interface MamcosOption { id: string; name: string; }
 
 export default function RegisterFarmScreen() {
   const router = useRouter();
-  const { farmerId } = useAuthStore();
+  const { farmerId: ownFarmerId, user } = useAuthStore();
+  const { farmerId: selectedFarmerId } = useLocalSearchParams<{ farmerId?: string }>();
+  const farmerId = user?.role === "FARMER" ? ownFarmerId : selectedFarmerId;
   const { t } = useI18n();
   const scrollRef = useRef<ScrollView>(null);
 
@@ -115,7 +117,7 @@ export default function RegisterFarmScreen() {
       Alert.alert(t('farmRegistered'), queued ? 'Farm saved on this device and will sync automatically when you reconnect.' : t('farmCreated', { code: farm.farmCode }), [
         {
           text: t('walkGpsBoundary'),
-          onPress: () => queued ? Alert.alert('Pending sync', 'Connect to the internet before mapping this farm boundary.') : router.replace({ pathname: '/boundary', params: { id: farm.id, label: t('farmContext', { code: farm.farmCode }) } }),
+          onPress: () => router.replace({ pathname: '/boundary', params: { id: farm.id, label: t('farmContext', { code: farm.farmCode }) } }),
         },
         { text: t('done'), style: 'cancel', onPress: () => router.replace('/(drawer)/(tabs)/farms') },
       ]);

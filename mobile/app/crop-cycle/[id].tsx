@@ -11,7 +11,7 @@ import { timeAgo, useI18n } from '../../src/i18n';
 
 interface Activity {
   id: string; activityType: string; activityDate: string; description?: string;
-  laborWorkers?: number; laborHours?: number;
+  laborWorkers?: number; laborHours?: number; inputsUsed?: { items?: { name: string; quantity: number; unit: string }[] };
 }
 interface Cost {
   id: string; category: string; itemName: string; totalCost: number; dateIncurred: string;
@@ -22,6 +22,7 @@ interface Revenue {
 }
 interface CropCycle {
   id: string; season: string; riceVariety?: string; status: string;
+  plantingDate?: string;
   estimatedYieldKg?: number; actualYieldKg?: number;
   farm?: { id: string; farmCode: string };
   activities: Activity[]; costs: Cost[]; revenues: Revenue[];
@@ -94,18 +95,21 @@ export default function CropCycleDetail() {
   };
 
   const markHarvested = async () => {
-    if (!actualYield.trim()) {
+    if (!actualYield.trim() || !Number.isFinite(Number(actualYield)) || Number(actualYield) < 0) {
       Alert.alert(t('markHarvested'), t('fillHarvestFields'));
       return;
     }
+    if (cycle?.plantingDate && new Date().toISOString().slice(0, 10) < cycle.plantingDate.slice(0, 10)) {
+      Alert.alert(t('validationError'), t('harvestBeforePlanting')); return;
+    }
     setSaving(true);
     try {
-      await cropCyclesApi.update(id!, {
+      const result = await cropCyclesApi.update(id!, {
         status: 'HARVESTED',
         actualYieldKg: Number(actualYield),
         harvestDate: new Date().toISOString(),
       });
-      Alert.alert(t('markHarvested'), t('cropCycleUpdated'));
+      Alert.alert(t('markHarvested'), t(result.data.queued ? 'savedOffline' : 'cropCycleUpdated'));
       setHarvestOpen(false);
       load();
     } catch (e: any) {
@@ -303,6 +307,7 @@ export default function CropCycleDetail() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rowTitle}>{a.activityType.replace(/_/g, ' ')}</Text>
                   {!!a.description && <Text style={styles.rowSub} numberOfLines={1}>{a.description}</Text>}
+                  {a.inputsUsed?.items?.map((input, index) => <Text key={index}>{input.name}: {input.quantity} {input.unit}</Text>)}
                   {(a.laborWorkers || a.laborHours) ? (
                     <Text style={styles.rowSub}>
                       {a.laborWorkers ? `${a.laborWorkers} workers` : ''} {a.laborHours ? `· ${a.laborHours}h` : ''}

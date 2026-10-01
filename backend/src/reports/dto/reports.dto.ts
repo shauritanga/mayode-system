@@ -19,6 +19,8 @@ export class DateRangeDto {
 
 // Filter set from the docx: region/district/ward/village/cooperative/officer/season/variety/gender/youth.
 export class ReportFilterDto extends DateRangeDto {
+  @IsOptional() @IsString() farmerId?: string;
+  @IsOptional() @IsString() farmId?: string;
   @IsOptional() @IsString() region?: string;
   @IsOptional() @IsString() district?: string;
   @IsOptional() @IsString() ward?: string;

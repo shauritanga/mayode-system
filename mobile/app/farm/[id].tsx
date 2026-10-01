@@ -23,6 +23,7 @@ const STAFF_ROLES = ['SUPER_ADMIN', 'ADMIN', 'FIELD_OFFICER', 'MAMCOS_SECRETARY'
 const FARM_MENU_TIP_KEY = 'mayode.farm.overflow.tip.seen';
 
 interface Plot {
+  photoUrls?: string[];
   id: string; plotCode: string; name?: string; sizeAcres?: number;
   centerLatitude?: number; centerLongitude?: number;
   _count?: { cropCycles: number };
@@ -517,11 +518,12 @@ export default function FarmDetail() {
           </View>
         ) : (
           plots.map((p) => {
-            const plotGps = !!p.centerLatitude;
+            const plotGps = p.centerLatitude != null && p.centerLongitude != null;
             return (
               <View key={p.id} style={styles.plotCard}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.plotCode}>{p.plotCode}</Text>
+                  {p.photoUrls?.map((url, index) => <Image key={index} source={{ uri: resolveMediaUrl(url) || url }} style={{ width: 100, height: 75, borderRadius: 8, marginVertical: 8 }} />)}
                   <Text style={styles.plotSub}>
                     {p.name || t('unnamed')} · {p.sizeAcres ? `${p.sizeAcres} ac` : t('sizeUnknown')} · {p._count?.cropCycles ?? 0} {t('cycles')}
                   </Text>

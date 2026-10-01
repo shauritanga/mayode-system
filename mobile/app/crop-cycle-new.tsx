@@ -46,9 +46,12 @@ export default function CropCycleNew() {
       Alert.alert(t('startCropCycle'), t('fillCropCycleFields'));
       return;
     }
+    if ((plantingDate && expectedHarvest && expectedHarvest < plantingDate) || (estimatedYieldKg && (!Number.isFinite(Number(estimatedYieldKg)) || Number(estimatedYieldKg) < 0))) {
+      Alert.alert(t('validationError'), t(plantingDate && expectedHarvest && expectedHarvest < plantingDate ? 'harvestBeforePlanting' : 'invalidFieldNumbers')); return;
+    }
     setSubmitting(true);
     try {
-      await cropCyclesApi.create({
+      const result = await cropCyclesApi.create({
         farmId: farmId!,
         season: season.trim(),
         riceVariety: riceVariety.trim() || undefined,
@@ -56,7 +59,7 @@ export default function CropCycleNew() {
         expectedHarvest: expectedHarvest || undefined,
         estimatedYieldKg: estimatedYieldKg ? Number(estimatedYieldKg) : undefined,
       });
-      Alert.alert(t('startCropCycle'), t('cropCycleCreated'), [{ text: 'OK', onPress: () => router.back() }]);
+      Alert.alert(t('startCropCycle'), t(result.data.queued ? 'savedOffline' : 'cropCycleCreated'), [{ text: 'OK', onPress: () => router.back() }]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;
       Alert.alert(t('startCropCycle'), Array.isArray(msg) ? msg.join('\n') : msg || String(e?.message ?? e));

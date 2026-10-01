@@ -1,3 +1,4 @@
+import { MarketplaceActorGuard } from './marketplace-actor.guard';
 import { PermissionResource } from '../auth/role-access';
 import {
   Controller,
@@ -55,7 +56,7 @@ export class MarketplaceController {
 
   @Post('land')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -75,27 +76,42 @@ export class MarketplaceController {
   @ApiQuery({ name: 'dealType', enum: DealType, required: false })
   @ApiQuery({ name: 'maxPrice', type: Number, required: false })
   @ApiQuery({ name: 'leaseStatus', enum: LeaseStatus, required: false })
-  findAllLandListings(
+  async findAllLandListings(
     @Query('dealType') dealType?: DealType,
     @Query('maxPrice') maxPrice?: number,
     @Query('leaseStatus') leaseStatus?: LeaseStatus,
   ) {
-    return this.marketplaceService.findAllLandListings({
+    const listings = await this.marketplaceService.findAllLandListings({
       dealType,
       maxPrice,
       leaseStatus,
     });
+    return listings.map((listing) => this.marketplaceService.publicListing(listing));
+  }
+
+  @Get('land/manage')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
+  @RequirePermission('marketplace', 'VIEW')
+  managedListings(@CurrentUser() user: RequestUser) {
+    return this.marketplaceService.managedListings(user);
+  }
+
+  @Get('land/:id/quote')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
+  @RequirePermission('marketplace', 'VIEW')
+  depositQuote(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.marketplaceService.quoteForUser(id, user);
   }
 
   @Get('land/:id')
   @ApiOperation({ summary: 'Get details of a specific Land Listing' })
-  findOneLandListing(@Param('id') id: string) {
-    return this.marketplaceService.findOneLandListing(id);
+  async findOneLandListing(@Param('id') id: string) {
+    return this.marketplaceService.publicListing(await this.marketplaceService.findOneLandListing(id));
   }
 
   @Get('land/:id/protection')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -115,7 +131,7 @@ export class MarketplaceController {
 
   @Get('land/farm/:farmId/suggested-price')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -142,7 +158,7 @@ export class MarketplaceController {
 
   @Patch('land/:id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -162,7 +178,7 @@ export class MarketplaceController {
 
   @Patch('land/:id/cancel')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -179,7 +195,7 @@ export class MarketplaceController {
 
   @Post('land/:id/escrow-deposit')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FARMER)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({
@@ -188,13 +204,15 @@ export class MarketplaceController {
   depositEscrow(
     @Param('id') id: string,
     @Body() escrowDepositDto: EscrowDepositDto,
+    @CurrentUser() user: RequestUser,
   ) {
+    if (user.role === UserRole.FARMER) this.marketplaceService.assertOnlinePayments();
     return this.marketplaceService.depositEscrow(id, escrowDepositDto);
   }
 
   @Post('land/:id/escrow-reconcile')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({
@@ -219,7 +237,7 @@ export class MarketplaceController {
 
   @Post('land/:id/escrow-release')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -236,20 +254,21 @@ export class MarketplaceController {
 
   @Post('land/:id/installments/pay')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FARMER)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({
     summary:
       "Pay the next year's installment on a multi-year ANNUAL-plan lease",
   })
-  payInstallment(@Param('id') id: string, @Body() dto: PayInstallmentDto) {
+  payInstallment(@Param('id') id: string, @Body() dto: PayInstallmentDto, @CurrentUser() user: RequestUser) {
+    if (user.role === UserRole.FARMER) this.marketplaceService.assertOnlinePayments();
     return this.marketplaceService.payAnnualInstallment(id, dto.renterId, dto);
   }
 
   @Get('land/:id/rent-schedule')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -268,7 +287,7 @@ export class MarketplaceController {
 
   @Post('land/:id/improvements')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FARMER)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({
@@ -281,7 +300,7 @@ export class MarketplaceController {
 
   @Post('land/:id/agreement/regenerate')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({
@@ -297,7 +316,7 @@ export class MarketplaceController {
 
   @Post('land/:id/offers')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FARMER)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({
@@ -313,7 +332,7 @@ export class MarketplaceController {
 
   @Get('land/:id/offers')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -324,13 +343,13 @@ export class MarketplaceController {
   )
   @RequirePermission('marketplace', 'VIEW')
   @ApiOperation({ summary: 'List all offers made on a listing' })
-  findOffers(@Param('id') id: string) {
-    return this.marketplaceService.findOffersForListing(id);
+  async findOffers(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.marketplaceService.visibleOffers(id, user);
   }
 
   @Patch('land/:id/offers/:offerId/respond')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FARMER)
   @RequirePermission('marketplace', 'EDIT')
   @ApiOperation({
@@ -351,7 +370,7 @@ export class MarketplaceController {
 
   @Patch('land/:id/offers/:offerId/counter-response')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FARMER)
   @RequirePermission('marketplace', 'EDIT')
   @ApiOperation({
@@ -374,7 +393,7 @@ export class MarketplaceController {
 
   @Post('land/:id/sub-lease/request')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FARMER)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({
@@ -387,7 +406,7 @@ export class MarketplaceController {
 
   @Patch('land/:id/sub-lease/:subLeaseId/approve')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FARMER)
   @RequirePermission('marketplace', 'EDIT')
   @ApiOperation({
@@ -408,7 +427,7 @@ export class MarketplaceController {
 
   @Post('land/:id/transfer-ownership')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FARMER)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({
@@ -432,7 +451,7 @@ export class MarketplaceController {
 
   @Post('tractors/owners')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({ summary: 'Register a new Tractor Owner or Service Company' })
@@ -442,7 +461,7 @@ export class MarketplaceController {
 
   @Post('tractors')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({
@@ -467,7 +486,7 @@ export class MarketplaceController {
 
   @Get('tractors/owners/me')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -484,7 +503,7 @@ export class MarketplaceController {
 
   @Get('tractors/owners/:ownerId/tractors')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -501,7 +520,7 @@ export class MarketplaceController {
 
   @Get('tractors/bookings/mine')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -518,7 +537,7 @@ export class MarketplaceController {
 
   @Post('tractors/book')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -536,7 +555,7 @@ export class MarketplaceController {
 
   @Patch('tractors/bookings/:id/confirm')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @RequirePermission('marketplace', 'EDIT')
   @ApiOperation({
@@ -548,7 +567,7 @@ export class MarketplaceController {
 
   @Patch('tractors/bookings/:id/cancel')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FARMER)
   @RequirePermission('marketplace', 'EDIT')
   @ApiOperation({
@@ -560,7 +579,7 @@ export class MarketplaceController {
 
   @Patch('tractors/bookings/:id/complete')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -582,7 +601,7 @@ export class MarketplaceController {
 
   @Get('farmers/:farmerId/input-credit-eligibility')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -600,7 +619,7 @@ export class MarketplaceController {
 
   @Post('farmers/:farmerId/input-credit')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({
@@ -616,7 +635,7 @@ export class MarketplaceController {
 
   @Get('mamcos/:mamcosId/stability')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -634,7 +653,7 @@ export class MarketplaceController {
 
   @Post('farms/:farmId/flag-unreported-activity')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({
@@ -654,7 +673,7 @@ export class MarketplaceController {
 
   @Get('farmers/:farmerId/buy-back-eligibility')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
@@ -676,7 +695,7 @@ export class MarketplaceController {
 
   @Post('prices')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FIELD_OFFICER)
   @RequirePermission('marketplace', 'CREATE')
   @ApiOperation({

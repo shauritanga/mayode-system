@@ -1,3 +1,4 @@
+import { FarmerPerformance } from '../../../src/components/FarmerPerformance';
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert,
@@ -86,6 +87,8 @@ export default function OfficerFarmerDetailScreen() {
           )}
         </View>
 
+        <FarmerPerformance farmerId={id!} />
+        <TouchableOpacity onPress={() => router.push({ pathname: "/farm-register", params: { farmerId: id } })}><Text style={{ color: "#047857", fontWeight: "700", paddingVertical: 12 }}>{t("registerFarm")}</Text></TouchableOpacity>
         <Text style={styles.sectionTitle}>{t('farms')}</Text>
         {farms.length === 0 ? (
           <Text style={styles.emptyText}>{t('noFarmersFound')}</Text>

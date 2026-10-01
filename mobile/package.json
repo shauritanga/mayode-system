@@ -1,7 +1,7 @@
 {
   "name": "mobile",
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "index.ts",
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.2.1",
     "@hugeicons/react-native": "^1.0.15",
@@ -10,10 +10,12 @@
     "@react-native-community/netinfo": "12.0.1",
     "axios": "^1.18.1",
     "expo": "~57.0.14",
+    "expo-background-task": "~57.0.11",
     "expo-build-properties": "~57.0.12",
     "expo-constants": "~57.0.12",
     "expo-device": "~57.0.1",
     "expo-document-picker": "~57.0.1",
+    "expo-file-system": "~57.0.4",
     "expo-image-picker": "~57.0.11",
     "expo-linear-gradient": "~57.0.1",
     "expo-linking": "~57.0.6",
@@ -23,6 +25,7 @@
     "expo-splash-screen": "~57.0.7",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.2",
+    "expo-task-manager": "~57.0.11",
     "react": "19.2.3",
     "react-native": "0.86.2",
     "react-native-gesture-handler": "~2.32.0",
@@ -43,6 +46,7 @@
     "react-dom": "19.2.3"
   },
   "scripts": {
+    "test:offline": "node tests/offline.test.cjs",
     "start": "expo start",
     "start:clear": "expo start -c",
     "android": "expo run:android",

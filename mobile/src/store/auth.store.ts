@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setApiToken } from '../lib/data';
-import { setApiRefreshToken, registerAuthHandlers } from '../lib/api';
+import { setApiRefreshToken, registerAuthHandlers, setOfflineOwner } from '../lib/api';
 
 interface User {
   id: string;
@@ -44,6 +44,7 @@ export const useAuthStore = create<AuthState>()(
       pushToken: null,
       _hydrated: false,
       setAuth: (user, accessToken, refreshToken) => {
+        setOfflineOwner(user.id);
         setApiToken(accessToken);
         setApiRefreshToken(refreshToken ?? null);
         set({
@@ -59,6 +60,7 @@ export const useAuthStore = create<AuthState>()(
       })),
       setFarmerId: (farmerId) => set({ farmerId }),
       clearAuth: () => {
+        setOfflineOwner(null);
         setApiToken(null);
         setApiRefreshToken(null);
         set({ user: null, accessToken: null, refreshToken: null, farmerId: null, isAuthenticated: false });
@@ -79,6 +81,7 @@ export const useAuthStore = create<AuthState>()(
       }),
       onRehydrateStorage: () => (state) => {
         // Re-inject the persisted tokens into axios and flag hydration complete.
+        setOfflineOwner(state?.user?.id ?? null);
         if (state?.accessToken) setApiToken(state.accessToken);
         if (state?.refreshToken) setApiRefreshToken(state.refreshToken);
         useAuthStore.setState({ _hydrated: true });

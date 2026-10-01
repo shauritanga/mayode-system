@@ -1,3 +1,4 @@
+import { FarmerPerformance } from '../../../src/components/FarmerPerformance';
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -104,6 +105,7 @@ export default function ProfileTab() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {!!farmerId && !isStaff && <FarmerPerformance farmerId={farmerId} />}
         <View style={styles.avatarContainer}>
           <UserAvatar
             size={88}

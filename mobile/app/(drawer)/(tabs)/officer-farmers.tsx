@@ -49,6 +49,7 @@ export default function OfficerFarmersScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity onPress={() => router.push("/farmer-new")} style={{ padding: 16, backgroundColor: "#047857" }}><Text style={{ color: "#fff", fontWeight: "700" }}>{t("registerFarmer")}</Text></TouchableOpacity>
       <View style={styles.searchBar}>
         <HugeiconsIcon icon={Search01Icon} size={18} color="#6B7280" strokeWidth={2} />
         <TextInput

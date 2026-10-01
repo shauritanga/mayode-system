@@ -278,6 +278,10 @@ export class AuthService {
             controlNumber,
             firstName,
             lastName,
+            region: registerDto.region,
+            district: registerDto.district,
+            ward: registerDto.ward,
+            village: registerDto.village,
             dataShareConsent: dataShareConsent ?? false,
             consentedAt: dataShareConsent ? new Date() : null,
           },
@@ -320,6 +324,10 @@ export class AuthService {
       accountProfile = customRole.systemRole ?? UserRole.CUSTOM;
     }
 
+    if (accountProfile === UserRole.FARMER) {
+      throw new BadRequestException('Farmer registration is mobile-only. Use farmer self-registration or field-officer registration.');
+    }
+
     const existingUser = await this.prisma.user.findFirst({
       where: { OR: [{ phone: dto.phone }, { email: dto.email || undefined }] },
     });
@@ -356,17 +364,7 @@ export class AuthService {
         },
       });
 
-      if (accountProfile === UserRole.FARMER) {
-        const controlNumber = await this.generateControlNumber();
-        await prisma.farmer.create({
-          data: {
-            userId: user.id,
-            controlNumber,
-            firstName: dto.firstName,
-            lastName: dto.lastName,
-          },
-        });
-      } else if (accountProfile === UserRole.FIELD_OFFICER) {
+      if (accountProfile === UserRole.FIELD_OFFICER) {
         if (!dto.mamcosId)
           throw new BadRequestException(
             'mamcosId is required for a Field Officer',

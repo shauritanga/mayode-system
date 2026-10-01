@@ -21,6 +21,7 @@ import {
   InformationCircleIcon,
 } from '@hugeicons/core-free-icons';
 import { useSyncStatus, PendingMutation } from '../src/services/sync-queue';
+import { prepareOfflineRecords } from '../src/services/prepare-offline';
 import { useI18n } from '../src/i18n';
 
 export default function SyncCenterScreen() {
@@ -39,6 +40,7 @@ export default function SyncCenterScreen() {
     clearAll,
   } = useSyncStatus();
 
+  const [downloading, setDownloading] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const handleSyncNow = async () => {
@@ -64,7 +66,7 @@ export default function SyncCenterScreen() {
       {
         text: t('discard'),
         style: 'destructive',
-        onPress: () => discardItem(id),
+        onPress: () => { void discardItem(id).catch(e => Alert.alert(t('syncCenter'), e.message)); },
       },
     ]);
   };
@@ -75,7 +77,7 @@ export default function SyncCenterScreen() {
       {
         text: t('discardAll'),
         style: 'destructive',
-        onPress: () => clearAll(),
+        onPress: () => { void clearAll().catch(e => Alert.alert(t('syncCenter'), e.message)); },
       },
     ]);
   };
@@ -102,6 +104,13 @@ export default function SyncCenterScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.content}>
+        <TouchableOpacity disabled={downloading || !isConnected} style={{ padding: 16, backgroundColor: '#047857', borderRadius: 12, marginBottom: 16 }} onPress={async () => {
+          setDownloading(true);
+          try { await flush(); await prepareOfflineRecords(); Alert.alert(t('syncCenter'), t('offlineRecordsReady')); }
+          catch (e: any) { Alert.alert(t('syncCenter'), e.message); }
+          finally { setDownloading(false); }
+        }}><Text style={{ color: '#fff', fontWeight: '700' }}>{t(downloading ? 'preparingOfflineRecords' : 'downloadOfflineRecords')}</Text></TouchableOpacity>
+
         {/* Status Card */}
         <View style={styles.statusCard}>
           <View style={styles.statusHeader}>

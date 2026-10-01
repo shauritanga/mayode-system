@@ -1,3 +1,4 @@
+import { MarketplaceActorGuard } from './marketplace-actor.guard';
 import { Global, Module } from '@nestjs/common';
 import { MarketplaceService } from './marketplace.service';
 import { MarketplaceController } from './marketplace.controller';
@@ -22,6 +23,7 @@ import { AccountingModule } from '../accounting/accounting.module';
   imports: [PaymentsModule, UploadsModule, DisputesModule, AccountingModule],
   controllers: [MarketplaceController],
   providers: [
+    MarketplaceActorGuard,
     MarketplaceService,
     PayoutSchedulerService,
     PricingService,

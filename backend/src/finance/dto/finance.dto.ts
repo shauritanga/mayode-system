@@ -1,4 +1,5 @@
 import {
+  Min,
   IsString,
   IsOptional,
   IsNumber,
@@ -33,6 +34,7 @@ export class CreateInputCostDto {
 
   @ApiPropertyOptional({ example: 10 })
   @IsNumber()
+  @Min(0)
   @IsOptional()
   quantity?: number;
 
@@ -46,11 +48,13 @@ export class CreateInputCostDto {
     description: 'Price per unit in TZS',
   })
   @IsNumber()
+  @Min(0)
   @IsOptional()
   unitPrice?: number;
 
   @ApiProperty({ example: 750000.0, description: 'Total cost incurred in TZS' })
   @IsNumber()
+  @Min(0)
   totalCost: number;
 
   @ApiPropertyOptional({
@@ -117,6 +121,7 @@ export class CreateRevenueDto {
     description: 'Quantity of rice sold in kilograms',
   })
   @IsNumber()
+  @Min(0)
   quantityKg: number;
 
   @ApiProperty({
@@ -124,6 +129,7 @@ export class CreateRevenueDto {
     description: 'Selling price per kilogram in TZS',
   })
   @IsNumber()
+  @Min(0)
   pricePerKg: number;
 
   @ApiProperty({
@@ -131,6 +137,7 @@ export class CreateRevenueDto {
     description: 'Total gross revenue in TZS',
   })
   @IsNumber()
+  @Min(0)
   totalRevenue: number;
 
   @ApiPropertyOptional({
@@ -138,6 +145,7 @@ export class CreateRevenueDto {
     description: 'Fairtrade premium earned in TZS',
   })
   @IsNumber()
+  @Min(0)
   @IsOptional()
   fairtradePremium?: number;
 

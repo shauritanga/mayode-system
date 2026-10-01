@@ -10,7 +10,7 @@ import {
   PlayIcon, PauseIcon, Layers01Icon,
 } from '@hugeicons/core-free-icons';
 import { farmsApi, plotsApi } from '../src/lib/data';
-import { ensureLocationPermission, getCurrentPoint } from '../src/services/location.service';
+import { ensureLocationPermission, getCurrentPoint, centroid, polygonAreaAcres, toGeoJsonPolygon, distanceMeters } from '../src/services/location.service';
 import { boundaryMapHtml } from '../src/lib/leaflet-boundary-html';
 import { useI18n } from '../src/i18n';
 
@@ -30,6 +30,17 @@ export default function BoundaryScreen() {
   const loadedRef = useRef(false);
   const center = useRef<{ lat: number; lng: number } | null>(null);
   const existing = useRef<any>(null);
+  const points = useRef<{ latitude: number; longitude: number }[]>([]);
+  const updateWalkMetrics = () => {
+    const areaAcres = polygonAreaAcres(points.current);
+    const perimeterM = points.current.reduce((sum, point, i, list) => sum + (list.length > 1 ? distanceMeters(point, list[(i + 1) % list.length]) : 0), 0);
+    setMetrics({ pointCount: points.current.length, areaAcres, areaHa: areaAcres * 0.40468564224, perimeterM });
+  };
+  const addWalkPoint = (latitude: number, longitude: number) => {
+    points.current.push({ latitude, longitude });
+    updateWalkMetrics();
+    send({ cmd: 'addPoint', lat: latitude, lng: longitude });
+  };
 
   const [mode, setMode] = useState<Mode>('walk');
   const [layer, setLayer] = useState<'satellite' | 'street'>('satellite');
@@ -52,7 +63,14 @@ export default function BoundaryScreen() {
         const res = plotId ? await plotsApi.getOne(plotId) : id ? await farmsApi.getOne(id) : null;
         const d: any = res?.data;
         if (d?.centerLatitude) center.current = { lat: d.centerLatitude, lng: d.centerLongitude };
-        if (d?.boundaryCoordinates) existing.current = d.boundaryCoordinates;
+        if (d?.boundaryCoordinates) {
+          existing.current = d.boundaryCoordinates;
+          const ring = d.boundaryCoordinates.coordinates?.[0] ?? [];
+          if (!points.current.length) {
+            points.current = ring.slice(0, -1).map(([longitude, latitude]: number[]) => ({ latitude, longitude }));
+            updateWalkMetrics();
+          }
+        }
       } catch {}
       if (!center.current) {
         try { const p = await getCurrentPoint(); center.current = { lat: p.latitude, lng: p.longitude }; } catch {}
@@ -66,7 +84,7 @@ export default function BoundaryScreen() {
     let m: any;
     try { m = JSON.parse(e.nativeEvent.data); } catch { return; }
     if (m.type === 'loaded') { loadedRef.current = true; sendInit(); }
-    else if (m.type === 'metrics') setMetrics(m);
+    else if (m.type === 'metrics' && mode === 'draw') setMetrics(m);
     else if (m.type === 'mode') setMode(m.mode);
     else if (m.type === 'result') handleResult(m);
   };
@@ -79,28 +97,34 @@ export default function BoundaryScreen() {
       { accuracy: Location.Accuracy.BestForNavigation, distanceInterval: 3, timeInterval: 2000 },
       (loc) => {
         setAccuracy(loc.coords.accuracy ?? null);
-        if (!pausedRef.current) send({ cmd: 'addPoint', lat: loc.coords.latitude, lng: loc.coords.longitude, acc: loc.coords.accuracy });
+        if (!pausedRef.current) addWalkPoint(loc.coords.latitude, loc.coords.longitude);
       },
     );
   };
   const stopWalk = () => { watchRef.current?.remove(); watchRef.current = null; setWalking(false); };
   const togglePause = () => { const p = !pausedRef.current; pausedRef.current = p; setPaused(p); };
   const addManual = async () => {
-    try { const p = await getCurrentPoint(); send({ cmd: 'addPoint', lat: p.latitude, lng: p.longitude }); }
+    try { const p = await getCurrentPoint(); addWalkPoint(p.latitude, p.longitude); }
     catch { Alert.alert(t('gpsError'), t('couldNotReadGps')); }
   };
-  const undo = () => send({ cmd: 'undo' });
+  const undo = () => { if (mode === 'walk') { points.current.pop(); updateWalkMetrics(); } send({ cmd: 'undo' }); };
   const clearAll = () => Alert.alert(t('clearBoundary'), t('clearBoundaryQuestion'), [
     { text: t('cancel'), style: 'cancel' },
-    { text: t('clear'), style: 'destructive', onPress: () => send({ cmd: 'clear' }) },
+    { text: t('clear'), style: 'destructive', onPress: () => { points.current = []; updateWalkMetrics(); send({ cmd: 'clear' }); } },
   ]);
 
-  const switchMode = (m: Mode) => { setMode(m); if (m === 'draw') stopWalk(); send({ cmd: 'setMode', mode: m }); };
+  const switchMode = (m: Mode) => { if (m === 'draw' && !loadedRef.current) { Alert.alert(t('map'), t('walkOfflineHint')); return; } setMode(m); if (m === 'draw') stopWalk(); send({ cmd: 'setMode', mode: m }); };
   const switchLayer = () => { const next = layer === 'satellite' ? 'street' : 'satellite'; setLayer(next); send({ cmd: 'setLayer', layer: next }); };
   const close = () => { stopWalk(); router.back(); };
 
   // ---- Save ----
-  const save = () => { setSaving(true); send({ cmd: 'getResult' }); };
+  const save = () => {
+    setSaving(true);
+    if (mode === 'walk') {
+      const center = centroid(points.current);
+      void handleResult({ ok: points.current.length >= 3 && metrics.areaAcres > 0, geometry: toGeoJsonPolygon(points.current), centerLat: center.latitude, centerLng: center.longitude, ...metrics });
+    } else send({ cmd: 'getResult' });
+  };
   const handleResult = async (d: any) => {
     if (!d.ok) { setSaving(false); Alert.alert(t('notEnoughPoints'), t('notEnoughPointsMessage')); return; }
     try {
@@ -131,6 +155,7 @@ export default function BoundaryScreen() {
         </View>
       </View>
 
+      <Text style={{ padding: 10, backgroundColor: "#ECFDF5", color: "#065F46" }}>{t("walkOfflineHint")}</Text>
       <View style={styles.mapWrap}>
         <WebView
           ref={webRef}

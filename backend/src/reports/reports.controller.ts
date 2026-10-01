@@ -1,3 +1,5 @@
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { RequestUser } from '../common/ownership.service';
 import { PermissionResource } from '../auth/role-access';
 import {
   Body,
@@ -44,6 +46,10 @@ export class ReportsController {
     private readonly builder: ReportBuilderService,
   ) {}
 
+  private scoped<T extends ReportFormatDto>(query: T, user: RequestUser): T {
+    return user.role !== UserRole.SUPER_ADMIN && user.mamcosId ? { ...query, mamcosId: user.mamcosId } : query;
+  }
+
   private async send(
     rows: Record<string, unknown>[],
     name: string,
@@ -88,10 +94,11 @@ export class ReportsController {
   @RequirePermission('reports', 'VIEW')
   async farmerPayments(
     @Query() query: ReportFormatDto,
+    @CurrentUser() user: RequestUser,
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.send(
-      await this.reports.farmerPayments(query),
+      await this.reports.farmerPayments(this.scoped(query, user)),
       'farmer-payments',
       query.format,
       response,
@@ -108,10 +115,11 @@ export class ReportsController {
   @RequirePermission('reports', 'VIEW')
   async premiumFund(
     @Query() query: ReportFormatDto,
+    @CurrentUser() user: RequestUser,
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.send(
-      await this.reports.premiumFund(query),
+      await this.reports.premiumFund(this.scoped(query, user)),
       'fairtrade-premium-fund',
       query.format,
       response,
@@ -128,10 +136,11 @@ export class ReportsController {
   @RequirePermission('reports', 'VIEW')
   async farmers(
     @Query() query: ReportFormatDto,
+    @CurrentUser() user: RequestUser,
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.send(
-      await this.reports.farmersExport(query),
+      await this.reports.farmersExport(this.scoped(query, user)),
       'farmers',
       query.format,
       response,
@@ -148,10 +157,11 @@ export class ReportsController {
   @RequirePermission('reports', 'VIEW')
   async cropCycles(
     @Query() query: ReportFormatDto,
+    @CurrentUser() user: RequestUser,
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.send(
-      await this.reports.cropCyclesExport(query),
+      await this.reports.cropCyclesExport(this.scoped(query, user)),
       'crop-cycles',
       query.format,
       response,
@@ -172,6 +182,7 @@ export class ReportsController {
   })
   async fieldOfficerPerformance(
     @Query() query: ReportFormatDto,
+    @CurrentUser() user: RequestUser,
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.send(
@@ -196,6 +207,7 @@ export class ReportsController {
   })
   async insuranceCoverage(
     @Query() query: ReportFormatDto,
+    @CurrentUser() user: RequestUser,
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.send(
@@ -219,10 +231,11 @@ export class ReportsController {
   })
   async genderYouthInclusion(
     @Query() query: ReportFormatDto,
+    @CurrentUser() user: RequestUser,
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.send(
-      await this.reports.genderYouthInclusion(query),
+      await this.reports.genderYouthInclusion(this.scoped(query, user)),
       'gender-youth-inclusion',
       query.format,
       response,
@@ -237,8 +250,8 @@ export class ReportsController {
     UserRole.AUDITOR,
   )
   @RequirePermission('reports', 'VIEW')
-  kpis() {
-    return this.reports.kpis();
+  kpis(@Query() query: ReportFormatDto, @CurrentUser() user: RequestUser) {
+    return this.reports.kpis(this.scoped(query, user));
   }
 
   @Get('compliance-summary')
@@ -249,10 +262,10 @@ export class ReportsController {
     UserRole.AUDITOR,
   )
   @RequirePermission('reports', 'VIEW')
-  async complianceSummary() {
+  async complianceSummary(@CurrentUser() user: RequestUser) {
     const [kpis, membershipGrowth] = await Promise.all([
-      this.reports.kpis(),
-      this.reports.membershipGrowth(),
+      this.reports.kpis(this.scoped({}, user)),
+      this.reports.membershipGrowth(this.scoped({}, user)),
     ]);
     return {
       ...kpis,
@@ -276,8 +289,8 @@ export class ReportsController {
     summary:
       'Grantor/partner impact pack: KPIs, season yields, membership growth, community projects',
   })
-  impact() {
-    return this.reports.impactReport();
+  impact(@CurrentUser() user: RequestUser) {
+    return this.reports.impactReport(this.scoped({}, user));
   }
 
   @Get('flocert-audit-pack')
@@ -355,8 +368,8 @@ export class ReportsController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @RequirePermission('reports', 'VIEW')
   @Get('premium-fund-balance')
-  async premiumFundBalance() {
-    const entries = await this.reports.premiumFund({});
+  async premiumFundBalance(@CurrentUser() user: RequestUser) {
+    const entries = await this.reports.premiumFund(this.scoped({}, user));
     return {
       balance: entries.length ? entries[entries.length - 1].runningBalance : 0,
     };
@@ -377,7 +390,7 @@ export class ReportsController {
   @Post('premium-fund/entries')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @RequirePermission('reports', 'CREATE')
-  createPremiumFundEntry(@Body() dto: CreatePremiumFundEntryDto) {
-    return this.reports.createPremiumExpense(dto);
+  createPremiumFundEntry(@Body() dto: CreatePremiumFundEntryDto, @CurrentUser() user: RequestUser) {
+    return this.reports.createPremiumExpense(dto, user.role === UserRole.SUPER_ADMIN ? null : user.mamcosId);
   }
 }

@@ -37,6 +37,9 @@ export class PlotsService {
     const plot = await this.prisma.plot.create({
       data: {
         farmId: dto.farmId,
+        photoUrls: dto.photoUrls ?? [],
+        centerLatitude: dto.centerLatitude,
+        centerLongitude: dto.centerLongitude,
         plotCode,
         name: dto.name,
         sizeAcres: dto.sizeAcres,

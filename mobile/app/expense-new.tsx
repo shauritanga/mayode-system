@@ -126,13 +126,16 @@ export default function ExpenseNew() {
       Alert.alert(t('addExpense'), t('fillExpenseFields'));
       return;
     }
+    if ([quantity, unitPrice, totalCost].some(v => v && (!Number.isFinite(Number(v)) || Number(v) < 0))) {
+      Alert.alert(t('validationError'), t('invalidFieldNumbers')); return;
+    }
     setSubmitting(true);
     try {
       const linkedId =
         supplierChoice && supplierChoice !== OTHER_SUPPLIER
           ? suppliersByName[supplierChoice]
           : undefined;
-      await financeApi.addCost({
+      const result = await financeApi.addCost({
         cropCycleId: cropCycleId!,
         category,
         itemName: itemName.trim(),
@@ -147,7 +150,7 @@ export default function ExpenseNew() {
         receiptUrl: receiptUrl || undefined,
         dateIncurred: date,
       });
-      Alert.alert(t('addExpense'), t('expenseRecorded'), [{ text: 'OK', onPress: () => router.back() }]);
+      Alert.alert(t('addExpense'), t(result.data.queued ? 'savedOffline' : 'expenseRecorded'), [{ text: 'OK', onPress: () => router.back() }]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;
       Alert.alert(t('addExpense'), Array.isArray(msg) ? msg.join('\n') : msg || String(e?.message ?? e));

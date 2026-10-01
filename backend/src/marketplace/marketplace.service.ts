@@ -5,6 +5,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClickPesaService } from '../payments/clickpesa.service';
@@ -289,6 +290,33 @@ export class MarketplaceService {
     return listing;
   }
 
+  publicListing(listing: any) {
+    const { owner, renter, escrowPayments, subLeases, agreementPdfUrl, agreementGeneratedAt, preferredRenterCode, renterId, previousRenterId, facilitatedByStaffId, ...publicData } = listing;
+    return { ...publicData, owner: owner ? { id: owner.id, firstName: owner.firstName, lastName: owner.lastName } : null };
+  }
+
+  async managedListings(user: RequestUser) {
+    const farmer = user.role === 'FARMER' ? await this.prisma.farmer.findUnique({ where: { userId: user.id }, select: { id: true } }) : null;
+    if (user.role === 'FARMER' && !farmer) return [];
+    return this.prisma.landListing.findMany({
+      where: farmer ? { OR: [{ ownerId: farmer.id }, { renterId: farmer.id }] } :
+        user.role !== 'SUPER_ADMIN' && user.mamcosId ? { farm: { mamcosId: user.mamcosId } } : {},
+      include: { farm: true, owner: { select: { id: true, firstName: true, lastName: true } },
+        renter: { select: { id: true, firstName: true, lastName: true } }, escrowPayments: true,
+        subLeases: { where: { status: 'PENDING' } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async visibleOffers(listingId: string, user: RequestUser) {
+    const listing = await this.prisma.landListing.findUnique({ where: { id: listingId } });
+    if (!listing) throw new NotFoundException('Listing not found');
+    const farmer = user.role === 'FARMER' ? await this.prisma.farmer.findUnique({ where: { userId: user.id }, select: { id: true } }) : null;
+    const offers = await this.findOffersForListing(listingId);
+    if (user.role === 'FARMER' && !farmer) return [];
+    return farmer && listing.ownerId !== farmer.id ? offers.filter((offer) => offer.farmerId === farmer.id) : offers;
+  }
+
   async findAllLandListings(query?: {
     dealType?: DealType;
     maxPrice?: number;
@@ -406,6 +434,30 @@ export class MarketplaceService {
    * becomes IN_ESCROW — and the listing only moves to PENDING_VERIFICATION —
    * once the payment is reconciled (webhook or manual/poll reconcile).
    */
+  assertOnlinePayments() {
+    if (!this.clickPesa.isConfigured()) throw new ServiceUnavailableException('Online payments are not configured. Contact the cooperative; no payment has been recorded.');
+  }
+
+  async quoteForUser(listingId: string, user: RequestUser) {
+    const farmer = await this.prisma.farmer.findUnique({ where: { userId: user.id }, select: { id: true } });
+    if (!farmer) throw new BadRequestException('A farmer profile is required');
+    return this.depositQuote(listingId, farmer.id);
+  }
+
+  async depositQuote(listingId: string, farmerId: string) {
+    const listing = await this.prisma.landListing.findUnique({ where: { id: listingId } });
+    if (!listing) throw new NotFoundException('Listing not found');
+    const offer = await this.prisma.landListingOffer.findFirst({ where: { listingId, farmerId, status: 'ACCEPTED' }, orderBy: { updatedAt: 'desc' } });
+    let amount = offer?.offerAmount ?? listing.askingPrice;
+    if (listing.isMultiYear && listing.rentScheduleJson) {
+      const schedule = listing.rentScheduleJson as unknown as RentSchedule;
+      const years = listing.paymentPlan === 'ANNUAL' ? 1 : Math.ceil(listing.leaseDurationMonths / 12);
+      amount = 0;
+      for (let year = 1; year <= years; year++) amount += await this.pricing.computeInstallmentAmount(schedule, year);
+    }
+    return { amount, paymentPlan: listing.paymentPlan, leaseDurationMonths: listing.leaseDurationMonths, onlinePaymentsAvailable: this.clickPesa.isConfigured() };
+  }
+
   async depositEscrow(listingId: string, escrowDepositDto: EscrowDepositDto) {
     const { renterId, amount, mpesaRef, phoneNumber } = escrowDepositDto;
 
@@ -468,20 +520,10 @@ export class MarketplaceService {
       );
     }
 
-    // Multi-year leases: the initial deposit amount is always server-computed
-    // from the rent schedule (PREPAID = full term, ANNUAL = year 1 only) —
-    // never trust a client-supplied amount for these.
-    let depositAmount = amount;
-    if (listing.isMultiYear && listing.rentScheduleJson) {
-      const schedule = listing.rentScheduleJson as unknown as RentSchedule;
-      if (listing.paymentPlan === 'ANNUAL') {
-        depositAmount = await this.pricing.computeInstallmentAmount(
-          schedule,
-          1,
-        );
-      } else if (schedule.model !== 'rice_linked') {
-        depositAmount = schedule.years.reduce((sum, y) => sum + y.amount, 0);
-      }
+    const quote = await this.depositQuote(listingId, renterId);
+    const depositAmount = quote.amount;
+    if (!Number.isFinite(depositAmount) || depositAmount <= 0 || Math.abs(amount - depositAmount) > 0.01) {
+      throw new BadRequestException('The deposit must match the current rental quote. Refresh the quote and try again.');
     }
 
     const payViaClickPesa = this.clickPesa.isConfigured();
