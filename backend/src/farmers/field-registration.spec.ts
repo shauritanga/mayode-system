@@ -36,7 +36,7 @@ function setup() {
   return { service, prisma, ownership };
 }
 describe('Officer registration and basic performance', () => {
-  it('assigns the configured farmer login role and the officer cooperative', async () => {
+  it('creates the farmer login without a role, in the officer cooperative', async () => {
     const { service, prisma } = setup();
     await service.create(
       {
@@ -49,12 +49,9 @@ describe('Officer registration and basic performance', () => {
       },
       { id: 'officer', role: UserRole.FIELD_OFFICER },
     );
-    expect(prisma.user.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        roleId: 'farmer-role',
-        role: UserRole.FARMER,
-      }),
-    });
+    const data = prisma.user.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({ role: UserRole.FARMER });
+    expect(data).not.toHaveProperty('roleId');
     expect(prisma.farmer.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

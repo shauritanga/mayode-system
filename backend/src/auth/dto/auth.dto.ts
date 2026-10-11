@@ -68,9 +68,10 @@ export class RegisterDto {
   @IsEnum(UserRole)
   role?: UserRole;
 
-  @ApiProperty({ description: 'Active platform-level role for the farmer (the configured Farmer role)' })
+  @ApiPropertyOptional({ description: 'Ignored. Farmers are not a managed role and are created without one.' })
+  @IsOptional()
   @IsUUID()
-  roleId: string;
+  roleId?: string;
 
   @ApiProperty({ example: 'John' })
   @IsString()

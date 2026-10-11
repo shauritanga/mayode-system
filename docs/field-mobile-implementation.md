@@ -14,7 +14,7 @@ Implemented workflows:
 ## Deployment
 
 1. Deploy backend and apply the migration in `backend/prisma/migrations/20260930120000_plot_photos` with `npx prisma migrate deploy` from `backend`. Generate Prisma Client during the normal backend build. The migration adds plot photos and durable synchronization receipts.
-2. Ensure `FARMER_SELF_REGISTRATION_ROLE_ID` identifies an active custom Farmer role, or exactly one such role exists. Officer roles need the existing field-workflow permissions.
+2. Farmers need no role: they are created without one and their access is built into the API. Officer roles need the existing field-workflow permissions.
 3. Install mobile dependencies and rebuild the native Android/iOS app. This change adds Expo FileSystem, BackgroundTask and TaskManager and uses `mobile/index.ts` as the entry point. An OTA JavaScript update alone does not install native modules.
 
 The database migration is supplied but was not applied to an external database during implementation.

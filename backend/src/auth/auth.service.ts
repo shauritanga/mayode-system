@@ -1,4 +1,5 @@
 import { assertAssignedRole } from './role-access';
+import { isLegacyFarmerRole } from './farmer-role';
 import {
   Injectable,
   ConflictException,
@@ -32,7 +33,6 @@ import {
   PLATFORM_ONLY_RESOURCES,
   requireTenant,
 } from './delegation';
-import { resolveFarmerRole } from './farmer-role';
 import { CreateCooperativeAdminDto } from './dto/create-cooperative-admin.dto';
 
 const WEB_ONLY_ROLES = new Set<UserRole>([UserRole.BUYER, UserRole.AUDITOR, UserRole.FINANCIAL_PROVIDER]);
@@ -216,15 +216,13 @@ export class AuthService {
   }
 
   async selfRegisterFarmer(dto: FarmerSelfRegisterDto): Promise<AuthResponseDto> {
-    const configuredRoleId = this.configService.get<string>('FARMER_SELF_REGISTRATION_ROLE_ID');
-    const farmerRole = await resolveFarmerRole(this.prisma, configuredRoleId);
-    // Only the server-selected Farmer role can be assigned through this route.
-    return this.registerFarmerAccount({ ...dto, roleId: farmerRole.id });
+    // Farmers are not a managed role: the account is a plain FARMER with no custom role attached.
+    return this.registerFarmerAccount(dto);
   }
 
-  /** Super Admin provisions a farmer using an explicitly selected custom role. */
+  /** Super Admin provisions a farmer account. */
   async register(registerDto: RegisterDto, creatorRole: UserRole): Promise<AuthResponseDto> {
-    if (creatorRole !== UserRole.SUPER_ADMIN) throw new ForbiddenException('Only Super Admin may assign roles');
+    if (creatorRole !== UserRole.SUPER_ADMIN) throw new ForbiddenException('Only Super Admin may create farmer accounts');
     return this.registerFarmerAccount(registerDto);
   }
 
@@ -232,9 +230,7 @@ export class AuthService {
   async registerVerifiedFarmer(
     dto: Omit<FarmerSelfRegisterDto, 'password'>,
   ): Promise<AuthResponseDto> {
-    const configuredRoleId = this.configService.get<string>('FARMER_SELF_REGISTRATION_ROLE_ID');
-    const farmerRole = await resolveFarmerRole(this.prisma, configuredRoleId);
-    return this.registerFarmerAccount({ ...dto, roleId: farmerRole.id });
+    return this.registerFarmerAccount(dto);
   }
 
   /** Sign in an active account whose phone was just verified by a code. Null when there is no such account. */
@@ -259,14 +255,6 @@ export class AuthService {
   private async registerFarmerAccount(
     registerDto: Omit<RegisterDto, 'password'> & { password?: string },
   ): Promise<AuthResponseDto> {
-    if (!registerDto.roleId) throw new BadRequestException('A custom Farmer role is required');
-    const customRole = await this.prisma.role.findUnique({
-      where: { id: registerDto.roleId },
-      include: { permissions: { include: { resource: true } } },
-    });
-    if (!customRole || !customRole.isActive || customRole.isSystem || customRole.mamcosId) {
-      throw new BadRequestException('Select an active platform-level role for the farmer');
-    }
     const { email, password, firstName, lastName, language, dataShareConsent } =
       registerDto;
     const phone = normalizeMsisdn(registerDto.phone);
@@ -301,7 +289,6 @@ export class AuthService {
             firstName,
             lastName,
             role: UserRole.FARMER,
-            roleId: customRole.id,
             language: language || 'sw',
           },
         });
@@ -335,7 +322,7 @@ export class AuthService {
       }
     }
 
-    return this.generateTokens({ ...createdUser, customRole }, controlNumber);
+    return this.generateTokens({ ...createdUser, customRole: null }, controlNumber);
   }
 
   /**
@@ -374,7 +361,7 @@ export class AuthService {
         where: { id: dto.roleId },
         include: { permissions: { include: { resource: true } } },
       });
-      if (!customRole || !customRole.isActive || customRole.isSystem || customRole.systemRole === UserRole.SUPER_ADMIN) {
+      if (!customRole || isLegacyFarmerRole(customRole) || !customRole.isActive || customRole.isSystem || customRole.systemRole === UserRole.SUPER_ADMIN) {
         throw new BadRequestException('Select an active, non-system role');
       }
       if (superActor) {

@@ -61,9 +61,19 @@ describe('Role visibility is confined to the actor\'s cooperative', () => {
     const findMany = jest.fn().mockResolvedValue([]);
     const service = new RolesService({ role: { findMany } } as any);
     await service.findAll(coopAdmin(FULL));
-    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { mamcosId: 'mamcos-1' } }));
+    // The legacy platform "Farmer" role is always excluded: farmers are not a managed role.
+    const notFarmer = { NOT: { mamcosId: null, name: { equals: 'Farmer', mode: 'insensitive' } } };
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { mamcosId: 'mamcos-1', ...notFarmer } }));
     await service.findAll(superAdmin);
-    expect(findMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: undefined }));
+    expect(findMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: notFarmer }));
+  });
+
+  it('hides the legacy Farmer role and refuses to create one', async () => {
+    const service = new RolesService({
+      role: { findUnique: jest.fn().mockResolvedValue({ id: 'f', name: 'Farmer', mamcosId: null, permissions: [], _count: { users: 4 } }) },
+    } as any);
+    await expect(service.findOne('f', superAdmin)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.create({ name: ' farmer ' } as any, superAdmin)).rejects.toThrow('Farmers are not a role');
   });
 
   it('hides other cooperatives\' and platform roles as not found', async () => {

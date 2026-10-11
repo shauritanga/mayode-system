@@ -12,6 +12,11 @@ import { PrismaService } from '../src/prisma/prisma.service';
 
 const TAG = 'E2E' + Date.now().toString().slice(-6);
 process.env.OTP_DEV_ECHO = 'true';
+// Never send a real SMS from a test, even when the local .env holds real provider keys.
+process.env.SMS_PROVIDER = 'simulated';
+process.env.BEEM_API_KEY = '';
+process.env.BEEM_SECRET_KEY = '';
+process.env.AT_API_KEY = '';
 let base = '';
 let failures = 0;
 const log = (ok: boolean, name: string, extra = '') => {
@@ -36,16 +41,13 @@ async function main() {
   await app.listen(0);
   base = (await app.getUrl()).replace('[::1]', 'localhost') + '/api/v1';
   const prisma = app.get(PrismaService);
-  // The farmer role self sign-up assigns is read from config per request.
-  const role = await prisma.role.create({ data: { name: `${TAG} Farmer`, systemRole: 'CUSTOM' } });
-  process.env.FARMER_SELF_REGISTRATION_ROLE_ID = role.id;
-
+  // Farmers are not a role: accounts are created without one.
   const existing = `07${TAG.slice(-6)}11`;
   const fresh = `07${TAG.slice(-6)}22`;
   const buyer = `07${TAG.slice(-6)}33`;
   const norm = (p: string) => `+255${p.slice(1)}`;
   const hash = await bcrypt.hash('Secret123!', 10);
-  const user = await prisma.user.create({ data: { phone: norm(existing), passwordHash: hash, firstName: 'Ex', lastName: TAG, role: 'FARMER', roleId: role.id } });
+  const user = await prisma.user.create({ data: { phone: norm(existing), passwordHash: hash, firstName: 'Ex', lastName: TAG, role: 'FARMER' } });
   await prisma.farmer.create({ data: { userId: user.id, controlNumber: `${TAG}-1`, firstName: 'Ex', lastName: TAG } });
   const buyerUser = await prisma.user.create({ data: { phone: norm(buyer), passwordHash: hash, firstName: 'Bu', lastName: TAG, role: 'BUYER' } });
 
@@ -107,7 +109,6 @@ async function main() {
     await prisma.refreshToken.deleteMany({ where: { userId: { in: ids } } });
     await prisma.user.deleteMany({ where: { id: { in: ids } } });
     void buyerUser;
-    await prisma.role.delete({ where: { id: role.id } });
     await app.close();
   }
   console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);

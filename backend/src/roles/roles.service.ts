@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { LEGACY_FARMER_ROLE_NAME, NOT_LEGACY_FARMER_ROLE, isLegacyFarmerRole } from '../auth/farmer-role';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { SetRolePermissionsDto } from './dto/set-role-permissions.dto';
@@ -26,7 +27,9 @@ export class RolesService {
   /** Roles the actor may see: everything for Super Admin, else their own AMCOS's roles. */
   async findAll(actor: DelegatingActor) {
     const roles = await this.prisma.role.findMany({
-      where: isSuperAdmin(actor) ? undefined : { mamcosId: requireTenant(actor) },
+      where: isSuperAdmin(actor)
+        ? NOT_LEGACY_FARMER_ROLE
+        : { mamcosId: requireTenant(actor), ...NOT_LEGACY_FARMER_ROLE },
       orderBy: [{ isSystem: 'desc' }, { name: 'asc' }],
       include: {
         _count: { select: { permissions: true, users: true } },
@@ -57,7 +60,8 @@ export class RolesService {
         _count: { select: { users: true } },
       },
     });
-    if (!role) throw new NotFoundException('Role not found');
+    // The legacy platform "Farmer" role is hidden: farmers are not a managed role.
+    if (!role || isLegacyFarmerRole(role)) throw new NotFoundException('Role not found');
     if (!isSuperAdmin(actor) && role.mamcosId !== requireTenant(actor)) {
       throw new NotFoundException('Role not found');
     }
@@ -86,6 +90,9 @@ export class RolesService {
   async create(dto: CreateRoleDto, actor: DelegatingActor) {
     const name = dto.name.trim();
     if (!name) throw new BadRequestException('Role name is required');
+    if (name.toLowerCase() === LEGACY_FARMER_ROLE_NAME.toLowerCase()) {
+      throw new BadRequestException('Farmers are not a role: they have their own dashboard and app');
+    }
     let mamcosId: string | null;
     if (isSuperAdmin(actor)) {
       // A cooperative's roles are its administrator's to create; Super Admin defines platform roles only.

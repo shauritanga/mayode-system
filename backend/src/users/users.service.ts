@@ -10,6 +10,7 @@ import {
 import { UserRole } from '@prisma/client';
 import { normalizeMsisdn } from '../messaging/sms.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { isLegacyFarmerRole } from '../auth/farmer-role';
 import { UpdateProfileDto, UpdateUserDto } from './dto/update-user.dto';
 import type { RequestUser } from '../common/ownership.service';
 
@@ -151,7 +152,7 @@ export class UsersService {
         where: { id: data.roleId },
         include: { permissions: { include: { resource: true } } },
       });
-      if (!customRole || !customRole.isActive || customRole.isSystem || customRole.systemRole === UserRole.SUPER_ADMIN) {
+      if (!customRole || isLegacyFarmerRole(customRole) || !customRole.isActive || customRole.isSystem || customRole.systemRole === UserRole.SUPER_ADMIN) {
         throw new BadRequestException('Custom role must be an active, non-system role from Role Management');
       }
       if (tenant && !superActor) {

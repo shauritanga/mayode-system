@@ -214,8 +214,8 @@ export class FarmersController {
     UserRole.FINANCIAL_PROVIDER,
   )
   @ApiOperation({ summary: 'Get stored credit score and blacklist status' })
-  getCreditScore(@Param('id') id: string) {
-    return this.farmersService.getCreditScore(id);
+  getCreditScore(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.farmersService.getCreditScore(id, user);
   }
 
   @Get(':id/credit-readiness')
@@ -375,8 +375,8 @@ export class FarmersController {
     UserRole.FARMER,
   )
   @ApiOperation({ summary: 'List a farmer’s uploaded documents' })
-  listDocuments(@Param('id') id: string) {
-    return this.farmersService.listDocuments(id);
+  listDocuments(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.farmersService.listDocuments(id, user);
   }
 
   @Patch(':id')
@@ -496,7 +496,7 @@ export class FarmersController {
   @Delete('documents/:documentId')
   @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.FARMER)
   @ApiOperation({ summary: 'Delete a document by ID' })
-  removeDocument(@Param('documentId') documentId: string) {
-    return this.farmersService.removeDocument(documentId);
+  removeDocument(@Param('documentId') documentId: string, @CurrentUser() user: RequestUser) {
+    return this.farmersService.removeDocument(documentId, user);
   }
 }

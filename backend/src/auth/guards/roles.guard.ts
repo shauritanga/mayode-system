@@ -2,7 +2,7 @@ import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@
 import { Reflector } from '@nestjs/core';
 import { UserRole } from '@prisma/client';
 import { ROLES_KEY } from '../decorators/roles.decorator';
-import { hasGrant, requiredPermission } from '../role-access';
+import { hasGrant, isFarmerRoute, requiredPermission } from '../role-access';
 import { ALLOW_SELF_SERVICE_KEY } from '../decorators/allow-self-service.decorator';
 
 @Injectable()
@@ -14,6 +14,7 @@ export class RolesGuard implements CanActivate {
     const roles = this.reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [context.getHandler(), context.getClass()]);
     const { user } = context.switchToHttp().getRequest();
     if (user?.role === UserRole.SUPER_ADMIN) return true;
+    if (isFarmerRoute(this.reflector, context, user)) return true;
     // An explicit Super Admin-only endpoint cannot be delegated via a grant.
     if (roles?.length === 1 && roles[0] === UserRole.SUPER_ADMIN) {
       throw new ForbiddenException('Only Super Admin may perform this action');

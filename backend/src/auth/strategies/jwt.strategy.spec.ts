@@ -7,8 +7,12 @@ function strategy(user: any) {
 }
 const token = { sub: 'user-1', phone: '+255700000001', role: 'SUPER_ADMIN' };
 describe('JWT role assignment is reloaded on every request', () => {
-  it.each([UserRole.ADMIN, UserRole.FARMER, UserRole.CUSTOM])('denies unassigned %s, even with a stale Super Admin JWT', async (role) => {
+  it.each([UserRole.ADMIN, UserRole.CUSTOM])('denies unassigned %s, even with a stale Super Admin JWT', async (role) => {
     await expect(strategy({ id: 'user-1', isActive: true, role, customRole: null }).validate(token)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+  it('lets a farmer in without a role, and never promotes them from a stale Super Admin JWT', async () => {
+    await expect(strategy({ id: 'user-1', isActive: true, role: UserRole.FARMER, customRole: null }).validate(token))
+      .resolves.toMatchObject({ role: UserRole.FARMER, customRole: null });
   });
   it('denies a role immediately after deactivation', async () => {
     await expect(strategy({ isActive: true, role: UserRole.CUSTOM, customRole: { isActive: false } }).validate(token)).rejects.toBeInstanceOf(ForbiddenException);

@@ -1,6 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { hasGrant, requiredPermission } from '../role-access';
+import { hasGrant, isFarmerRoute, requiredPermission } from '../role-access';
 import { ALLOW_SELF_SERVICE_KEY } from '../decorators/allow-self-service.decorator';
 
 @Injectable()
@@ -12,6 +12,7 @@ export class PermissionsGuard implements CanActivate {
     const required = requiredPermission(this.reflector, context);
     if (!required) return true; // Explicit self-service routes enforce ownership in their service.
     const { user } = context.switchToHttp().getRequest();
+    if (isFarmerRoute(this.reflector, context, user)) return true;
     if (!hasGrant(user, required.resource, required.action)) {
       throw new ForbiddenException(`Missing permission: ${required.action} on ${required.resource}`);
     }

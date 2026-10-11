@@ -36,7 +36,7 @@ There is no per-role "operational profile" any more. When creating an account yo
 
 ## Farmers
 
-Farmers self-register in the mobile app (`POST /auth/register`, rate-limited; `/auth/register/farmer` is an alias). Signup uses one platform-level role: set backend `FARMER_SELF_REGISTRATION_ROLE_ID`, or name an active platform role **Farmer**. It fails with a configuration message if there isn't exactly one candidate; it never creates a role or grants permissions itself. A cooperative admin or field officer can register farmers inside their AMCOS with the same role.
+Farmers are **not a role**. They have their own dashboard and the mobile app, and what a farmer may do is fixed in code: a farmer can call any route that lists `FARMER` in `@Roles`, and every read and write is confined to the farmer's own records by the ownership checks. There is nothing to configure and no Farmer role to manage; the Roles screens never show one. Farmers sign up in the mobile app (`POST /auth/register`, or code sign-in via `/auth/otp/*`); a cooperative admin or field officer can register farmers inside their AMCOS. Accounts are created with no custom role. Older deployments may still hold a platform role named **Farmer** that early accounts were linked to: it is ignored, hidden from role management, and cannot be assigned to staff.
 
 ## Deployment
 

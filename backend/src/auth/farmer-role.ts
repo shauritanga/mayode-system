@@ -1,31 +1,18 @@
-import { BadRequestException } from '@nestjs/common';
-
-/** Name of the platform role used for farmer accounts when none is configured explicitly. */
-export const DEFAULT_FARMER_ROLE_NAME = 'Farmer';
-
 /**
- * The role every farmer account is created with. Farmers are not staff, so there is no
- * per-account choice: the platform designates one active, platform-level role either via
- * FARMER_SELF_REGISTRATION_ROLE_ID or by naming it "Farmer". It is never created or
- * granted permissions automatically.
+ * Farmers are not a managed role. They have their own dashboard and mobile app, and what they may do
+ * is fixed in code (see isFarmerRoute in role-access.ts), not in a grant matrix an admin edits.
+ *
+ * Older deployments still hold a platform role named "Farmer" that early farmer accounts were linked
+ * to. It is kept so those links stay valid, but it is hidden from role management and can never be
+ * given to staff.
  */
-export async function resolveFarmerRole(
-  prisma: { role: { findMany: (args: any) => Promise<any[]> } },
-  configuredRoleId?: string,
-) {
-  const roles = await prisma.role.findMany({
-    where: {
-      isActive: true,
-      isSystem: false,
-      mamcosId: null,
-      ...(configuredRoleId
-        ? { id: configuredRoleId }
-        : { name: { equals: DEFAULT_FARMER_ROLE_NAME, mode: 'insensitive' } }),
-    },
-    take: 2,
-  });
-  if (roles.length !== 1) {
-    throw new BadRequestException('Farmer registration is not configured. Please contact support.');
-  }
-  return roles[0];
+export const LEGACY_FARMER_ROLE_NAME = 'Farmer';
+
+/** Prisma filter that excludes the legacy platform "Farmer" role from role listings. */
+export const NOT_LEGACY_FARMER_ROLE = {
+  NOT: { mamcosId: null, name: { equals: LEGACY_FARMER_ROLE_NAME, mode: 'insensitive' as const } },
+};
+
+export function isLegacyFarmerRole(role: { name: string; mamcosId?: string | null }): boolean {
+  return !role.mamcosId && role.name?.trim().toLowerCase() === LEGACY_FARMER_ROLE_NAME.toLowerCase();
 }

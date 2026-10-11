@@ -1,4 +1,3 @@
-import { resolveFarmerRole } from '../auth/farmer-role';
 import {
   Injectable,
   BadRequestException,
@@ -69,8 +68,6 @@ export class FarmersService {
   async create(dto: CreateFarmerDto, actor?: RequestUser) {
     const tenantId = actor ? this.ownership.resolveTenantMamcosId(actor) : null;
     if (tenantId) dto = { ...dto, mamcosId: tenantId };
-    const roleId = this.config.get<string>('FARMER_SELF_REGISTRATION_ROLE_ID');
-    const farmerRole = await resolveFarmerRole(this.prisma, roleId);
     const existing = await this.prisma.user.findFirst({
       where: { OR: [{ phone: dto.phone }, { email: dto.email || undefined }] },
     });
@@ -92,7 +89,6 @@ export class FarmersService {
           firstName: dto.firstName,
           lastName: dto.lastName,
           role: UserRole.FARMER,
-          roleId: farmerRole.id,
         },
       });
 
@@ -221,6 +217,8 @@ export class FarmersService {
   }
 
   async findOne(id: string, user?: RequestUser) {
+    // A farmer sees only their own record; staff are limited by cooperative below.
+    if (user?.role === UserRole.FARMER) await this.ownership.assertFarmerAccess(user, id);
     const farmer = await this.prisma.farmer.findUnique({
       where: { id },
       include: {
@@ -555,12 +553,23 @@ export class FarmersService {
     return updated;
   }
 
-  async listDocuments(farmerId: string) {
-    await this.findOne(farmerId);
+  async listDocuments(farmerId: string, user?: RequestUser) {
+    await this.findOne(farmerId, user);
     return this.documents.listForFarmer(farmerId);
   }
 
-  async removeDocument(documentId: string) {
+  async removeDocument(documentId: string, user?: RequestUser) {
+    // A farmer may only delete documents attached to their own profile or their own farms.
+    if (user?.role === UserRole.FARMER) {
+      const doc = await this.prisma.document.findUnique({
+        where: { id: documentId },
+        select: { farmerId: true, farmId: true },
+      });
+      if (!doc) throw new NotFoundException(`Document with ID ${documentId} not found`);
+      if (doc.farmerId) await this.ownership.assertFarmerAccess(user, doc.farmerId);
+      else if (doc.farmId) await this.ownership.assertFarmAccess(user, doc.farmId);
+      else throw new ForbiddenException('You can only delete your own documents');
+    }
     return this.documents.remove(documentId);
   }
 
@@ -1112,7 +1121,8 @@ export class FarmersService {
   }
 
   /** Lightweight read of the stored credit score + blacklist status. */
-  async getCreditScore(id: string) {
+  async getCreditScore(id: string, user?: RequestUser) {
+    if (user?.role === UserRole.FARMER) await this.ownership.assertFarmerAccess(user, id);
     const farmer = await this.prisma.farmer.findUnique({
       where: { id },
       select: {
