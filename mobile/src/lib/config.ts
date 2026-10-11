@@ -10,7 +10,7 @@ export const ENABLE_PUSH_NOTIFICATIONS = true;
  * Production API base URL (Nest API on the DigitalOcean droplet).
  * Wired via app.json → expo.extra.apiUrl and EAS production env.
  */
-export const PRODUCTION_API_URL = 'http://139.59.139.30:3002/api/v1';
+export const PRODUCTION_API_URL = 'https://api.mayodegroup.com/api/v1';
 
 /**
  * OpenWeatherMap API key for the home-screen weather card.

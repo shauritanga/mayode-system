@@ -32,4 +32,4 @@ Seed scripts (`backend/prisma/seed-*.ts`) run on production only when the user r
 
 ## Mobile / Expo
 
-Mobile dev uses Metro locally; production API is `http://139.59.139.30:3002/api/v1`. Backend deploys follow the GitHub pull workflow above.
+Mobile dev uses Metro locally; production API is `https://api.mayodegroup.com/api/v1`. Backend deploys follow the GitHub pull workflow above.
