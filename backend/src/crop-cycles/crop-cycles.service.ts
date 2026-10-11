@@ -38,6 +38,29 @@ export class CropCyclesService {
   ) {}
 
   /**
+   * The variety a farmer picked: by id from the admin's list, or - for older app versions that
+   * still send text - by matching the typed name to the list. Unknown text is kept as typed.
+   */
+  private async resolveVariety(riceVarietyId?: string, riceVariety?: string) {
+    if (riceVarietyId) {
+      const variety = await this.prisma.riceVariety.findUnique({
+        where: { id: riceVarietyId },
+      });
+      if (!variety || !variety.isActive)
+        throw new BadRequestException('That rice variety is not available');
+      return { riceVarietyId: variety.id, riceVariety: variety.name };
+    }
+    const typed = riceVariety?.trim();
+    if (!typed) return {};
+    const match = await this.prisma.riceVariety.findFirst({
+      where: { name: { equals: typed, mode: 'insensitive' }, isActive: true },
+    });
+    return match
+      ? { riceVarietyId: match.id, riceVariety: match.name }
+      : { riceVariety: typed };
+  }
+
+  /**
    * Start a crop cycle for a farm. `farmerId` is always derived from the farm
    * server-side for farmer-role requests, so a farmer cannot start a cycle
    * under someone else's name by tampering with the request body.
@@ -64,20 +87,27 @@ export class CropCyclesService {
       where: { userId: user.id },
       select: { id: true },
     });
-    const farmerId = user.role === UserRole.FARMER
-      ? requester?.id
-      : dto.farmerId ? await this.assertKnownFarmer(dto.farmerId) : farm.farmerId;
+    const farmerId =
+      user.role === UserRole.FARMER
+        ? requester?.id
+        : dto.farmerId
+          ? await this.assertKnownFarmer(dto.farmerId)
+          : farm.farmerId;
     if (!farmerId)
       throw new NotFoundException(
         'A renter farmer profile is required to start a crop cycle',
       );
 
+    const variety = await this.resolveVariety(
+      dto.riceVarietyId,
+      dto.riceVariety,
+    );
     const cropCycle = await this.prisma.cropCycle.create({
       data: {
         farmId: dto.farmId,
         farmerId,
         season: dto.season,
-        riceVariety: dto.riceVariety,
+        ...variety,
         plantingDate: dto.plantingDate ? new Date(dto.plantingDate) : null,
         expectedHarvest: dto.expectedHarvest
           ? new Date(dto.expectedHarvest)
@@ -99,10 +129,10 @@ export class CropCyclesService {
       farmerId,
       'crop_cycle.started',
       `Started crop cycle: ${cropCycle.season}`,
-      `${farm.farmCode}${dto.riceVariety ? ` · ${dto.riceVariety}` : ''}`,
+      `${farm.farmCode}${variety.riceVariety ? ` · ${variety.riceVariety}` : ''}`,
       '🌾',
     );
-    await this.riceProtocols.scheduleForCycle(cropCycle.id, farm.mamcosId);
+    await this.riceProtocols.scheduleForCycle(cropCycle.id);
     return cropCycle;
   }
 
@@ -185,7 +215,11 @@ export class CropCyclesService {
 
   async updateActivityLog(id: string, dto: UpdateActivityLogDto) {
     const existing = await this.findActivityLogById(id);
-    await this.validateActivity(existing.cropCycleId, { ...existing, ...dto }, id);
+    await this.validateActivity(
+      existing.cropCycleId,
+      { ...existing, ...dto },
+      id,
+    );
     return this.prisma.activityLog.update({
       where: { id },
       data: {
@@ -393,20 +427,51 @@ export class CropCyclesService {
       );
     }
 
-    const expectedHarvest = dto.expectedHarvest ? new Date(dto.expectedHarvest) : existing.expectedHarvest;
+    const expectedHarvest = dto.expectedHarvest
+      ? new Date(dto.expectedHarvest)
+      : existing.expectedHarvest;
     if (plantingDate && expectedHarvest && expectedHarvest < plantingDate) {
-      throw new BadRequestException('Expected harvest date cannot be earlier than planting date');
+      throw new BadRequestException(
+        'Expected harvest date cannot be earlier than planting date',
+      );
     }
     const day = (d: Date) => d.toISOString().slice(0, 10);
-    if (existing.activities.some(a =>
-      (a.activityType === 'HARVESTING' && plantingDate && day(a.activityDate) < day(plantingDate)) ||
-      (a.activityType === 'PLANTING' && harvestDate && day(a.activityDate) > day(harvestDate)))) {
-      throw new BadRequestException('Cycle dates conflict with recorded planting or harvest activities');
+    if (
+      existing.activities.some(
+        (a) =>
+          (a.activityType === 'HARVESTING' &&
+            plantingDate &&
+            day(a.activityDate) < day(plantingDate)) ||
+          (a.activityType === 'PLANTING' &&
+            harvestDate &&
+            day(a.activityDate) > day(harvestDate)),
+      )
+    ) {
+      throw new BadRequestException(
+        'Cycle dates conflict with recorded planting or harvest activities',
+      );
+    }
+    const variety =
+      dto.riceVarietyId || dto.riceVariety
+        ? await this.resolveVariety(dto.riceVarietyId, dto.riceVariety)
+        : {};
+    const varietyChanged =
+      !!variety.riceVarietyId &&
+      variety.riceVarietyId !== existing.riceVarietyId;
+    if (varietyChanged && user.role === UserRole.FARMER) {
+      // Once required work has been recorded under one variety, a farmer cannot switch the history to another.
+      const done = await this.prisma.riceCalendarTask.count({
+        where: { cropCycleId: id, status: 'COMPLETED' },
+      });
+      if (done > 0)
+        throw new BadRequestException(
+          'The rice variety cannot be changed after activities have been recorded. Ask your field officer.',
+        );
     }
     const cropCycle = await this.prisma.cropCycle.update({
       where: { id },
       data: {
-        riceVariety: dto.riceVariety,
+        ...variety,
         plantingDate: dto.plantingDate ? new Date(dto.plantingDate) : undefined,
         expectedHarvest: dto.expectedHarvest
           ? new Date(dto.expectedHarvest)
@@ -421,11 +486,10 @@ export class CropCyclesService {
       },
     });
 
-    if (dto.plantingDate || dto.expectedHarvest) {
-      await this.riceProtocols.scheduleForCycle(
-        cropCycle.id,
-        cropCycle.farm?.mamcosId,
-      );
+    if (dto.plantingDate || dto.expectedHarvest || varietyChanged) {
+      await this.riceProtocols.scheduleForCycle(cropCycle.id, {
+        varietyChanged,
+      });
     }
 
     if (dto.status && dto.status !== existing.status) {
@@ -445,19 +509,63 @@ export class CropCyclesService {
    * feature). The requesting farmer must own the crop cycle's farm; staff may
    * log on behalf of any farmer (e.g. a field officer's field visit).
    */
-  private async validateActivity(cropCycleId: string, dto: { activityType: string; activityDate: string | Date; inputsUsed?: unknown }, excludeId?: string) {
-    const cycle = await this.prisma.cropCycle.findUniqueOrThrow({ where: { id: cropCycleId }, include: { activities: true } });
-    const day = (value: string | Date) => new Date(value).toISOString().slice(0, 10);
-    const activities = cycle.activities.filter(a => a.id !== excludeId);
-    const plantingDates = [cycle.plantingDate, ...activities.filter(a => a.activityType === 'PLANTING').map(a => a.activityDate)].filter((d): d is Date => !!d);
-    const harvestDates = [cycle.harvestDate, ...activities.filter(a => a.activityType === 'HARVESTING').map(a => a.activityDate)].filter((d): d is Date => !!d);
-    if ((dto.activityType === 'HARVESTING' && plantingDates.some(d => day(dto.activityDate) < day(d))) ||
-        (dto.activityType === 'PLANTING' && harvestDates.some(d => day(dto.activityDate) > day(d)))) {
-      throw new BadRequestException('Harvest date cannot be earlier than planting date');
+  private async validateActivity(
+    cropCycleId: string,
+    dto: {
+      activityType: string;
+      activityDate: string | Date;
+      inputsUsed?: unknown;
+    },
+    excludeId?: string,
+  ) {
+    const cycle = await this.prisma.cropCycle.findUniqueOrThrow({
+      where: { id: cropCycleId },
+      include: { activities: true },
+    });
+    const day = (value: string | Date) =>
+      new Date(value).toISOString().slice(0, 10);
+    const activities = cycle.activities.filter((a) => a.id !== excludeId);
+    const plantingDates = [
+      cycle.plantingDate,
+      ...activities
+        .filter((a) => a.activityType === 'PLANTING')
+        .map((a) => a.activityDate),
+    ].filter((d): d is Date => !!d);
+    const harvestDates = [
+      cycle.harvestDate,
+      ...activities
+        .filter((a) => a.activityType === 'HARVESTING')
+        .map((a) => a.activityDate),
+    ].filter((d): d is Date => !!d);
+    if (
+      (dto.activityType === 'HARVESTING' &&
+        plantingDates.some((d) => day(dto.activityDate) < day(d))) ||
+      (dto.activityType === 'PLANTING' &&
+        harvestDates.some((d) => day(dto.activityDate) > day(d)))
+    ) {
+      throw new BadRequestException(
+        'Harvest date cannot be earlier than planting date',
+      );
     }
     const items = (dto.inputsUsed as { items?: unknown } | null)?.items;
-    if (items !== undefined && (!Array.isArray(items) || items.some(item => !item || typeof item.name !== 'string' || !item.name.trim() || typeof item.unit !== 'string' || !item.unit.trim() || typeof item.quantity !== 'number' || !Number.isFinite(item.quantity) || item.quantity <= 0))) {
-      throw new BadRequestException('Each input requires a name, positive quantity and unit');
+    if (
+      items !== undefined &&
+      (!Array.isArray(items) ||
+        items.some(
+          (item) =>
+            !item ||
+            typeof item.name !== 'string' ||
+            !item.name.trim() ||
+            typeof item.unit !== 'string' ||
+            !item.unit.trim() ||
+            typeof item.quantity !== 'number' ||
+            !Number.isFinite(item.quantity) ||
+            item.quantity <= 0,
+        ))
+    ) {
+      throw new BadRequestException(
+        'Each input requires a name, positive quantity and unit',
+      );
     }
   }
 

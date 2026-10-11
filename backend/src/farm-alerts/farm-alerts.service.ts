@@ -112,6 +112,8 @@ export class FarmAlertsService {
       farmerId?: string;
       farmingSeasonId?: string;
       dedupeKey?: string;
+      /** false: record the alert without pushing a notification (the caller already notified). */
+      notify?: boolean;
     },
   ): Promise<FarmAlert | null> {
     const farm = await this.prisma.farm.findUnique({
@@ -157,7 +159,7 @@ export class FarmAlertsService {
           select: { userId: true },
         })
       : null;
-    if (farmer) {
+    if (farmer && input.notify !== false) {
       await this.notifications.create({
         userId: farmer.userId,
         type: 'farm.alert',
@@ -280,7 +282,12 @@ export class FarmAlertsService {
           include: {
             activities: { select: { activityType: true } },
             calendarTasks: {
-              where: { status: CalendarTaskStatus.PENDING },
+              // Missed activities keep showing as a red alert until they are done (late).
+              where: {
+                status: {
+                  in: [CalendarTaskStatus.PENDING, CalendarTaskStatus.MISSED],
+                },
+              },
               select: {
                 id: true,
                 taskKey: true,
@@ -389,14 +396,15 @@ export class FarmAlertsService {
                 ? AlertUrgency.HIGH
                 : AlertUrgency.MEDIUM,
             title: task.title,
-            previewMessage:
-              'Kazi ya kalenda ya Mbalari inahitaji kufanywa kwenye shamba hili.',
+            previewMessage: 'A rice calendar task is due on this farm.',
             recommendation: task.guidance,
             actionDetails:
-              'Fungua kalenda ya zao, kamilisha kazi hii na uweke vipimo pamoja na picha inayohitajika.',
+              'Open the crop calendar, complete this task, and add the required measurements and photo.',
             expectedActionDate: task.dueDate.toISOString(),
             cropCycleId: cycle.id,
             dedupeKey: `mbalari-task:${task.id}`,
+            // The reminder/missed job already notified the farmer about this activity.
+            notify: false,
           });
         }
       }

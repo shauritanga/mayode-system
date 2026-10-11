@@ -3,19 +3,14 @@ import { View, Text, Image, TextInput, TouchableOpacity, StyleSheet, ActivityInd
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { authApi, farmersApi } from '../src/lib/data';
+import { authApi } from '../src/lib/data';
 import { getApiErrorMessage } from '../src/lib/api-error';
-import { isMobileAllowedRole } from '../src/lib/mobile-roles';
 import { normalizePhone } from '../src/lib/phone';
-import { useAuthStore } from '../src/store/auth.store';
-import { PasswordInput } from '../src/components/PasswordInput';
 import { useI18n } from '../src/i18n';
 
 export default function LoginRoute() {
   const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { setAuth, setFarmerId } = useAuthStore();
   const { t } = useI18n();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
@@ -28,39 +23,21 @@ export default function LoginRoute() {
     return () => sub.remove();
   }, []);
 
-  const handleLogin = async () => {
-    if (!phone || !password) {
-      Alert.alert(t('validationError'), t('phonePasswordRequired'));
+  const handleSendCode = async () => {
+    if (!phone.trim()) {
+      Alert.alert(t('validationError'), t('otpPhoneRequired'));
       return;
     }
-
     setLoading(true);
     try {
-      const res = await authApi.login(normalizePhone(phone), password);
-      const { accessToken, refreshToken, user } = res.data;
-
-      // Credentials are valid, but this app is role-scoped.
-      if (!isMobileAllowedRole(user?.role)) {
-        Alert.alert(t('mobileAccessDeniedTitle'), t('mobileAccessDeniedMessage'));
-        return;
-      }
-
-      setAuth(user, accessToken, refreshToken);
-
-      // Resolve farmer profile id via /farmers/me (control-number lookup is staff-only → 403 for FARMER).
-      if (user.role === 'FARMER') {
-        try {
-          const f = await farmersApi.me();
-          setFarmerId(f.data?.id ?? null);
-        } catch {
-          setFarmerId(null);
-        }
-      } else {
-        setFarmerId(null);
-      }
-      router.replace('/(drawer)/(tabs)');
+      const normalized = normalizePhone(phone);
+      const res = await authApi.requestOtp(normalized);
+      router.push({
+        pathname: '/verify',
+        params: { phone: normalized, resendIn: String(res.data?.resendInSeconds ?? 60) },
+      });
     } catch (err: unknown) {
-      Alert.alert(t('loginFailed'), getApiErrorMessage(err, t('loginFailedMessage')));
+      Alert.alert(t('otpSendFailed'), getApiErrorMessage(err, t('otpSendFailedMessage')));
     } finally {
       setLoading(false);
     }
@@ -85,8 +62,8 @@ export default function LoginRoute() {
 
           {/* Card Section */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{t('farmerOfficerPortal')}</Text>
-            <Text style={styles.cardSubtitle}>{t('signInSubtitle')}</Text>
+            <Text style={styles.cardTitle}>{t('otpPhoneTitle')}</Text>
+            <Text style={styles.cardSubtitle}>{t('otpPhoneSubtitle')}</Text>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>{t('phoneNumber')}</Text>
@@ -98,35 +75,27 @@ export default function LoginRoute() {
                 value={phone}
                 onChangeText={setPhone}
                 autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>{t('password')}</Text>
-              <PasswordInput
-                boxStyle={styles.input}
-                placeholder="••••••••"
-                placeholderTextColor="#6B7280"
-                value={password}
-                onChangeText={setPassword}
+                autoComplete="tel"
+                textContentType="telephoneNumber"
+                autoFocus
+                returnKeyType="send"
+                onSubmitEditing={handleSendCode}
               />
             </View>
 
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleLogin}
+              onPress={handleSendCode}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>{t('signIn')}</Text>
+                <Text style={styles.buttonText}>{t('otpSendCode')}</Text>
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.toggleFooter} onPress={() => router.replace('/register')}>
-              <Text style={styles.toggleFooterText}>{t('noAccountRegister')}</Text>
-            </TouchableOpacity>
+            <Text style={styles.hint}>{t('otpNewHere')}</Text>
           </View>
 
           <Text style={styles.footerText}>{t('allRightsReserved', { year: new Date().getFullYear() })}</Text>
@@ -229,6 +198,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  hint: {
+    marginTop: 20,
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
   },
   toggleFooter: {
     marginTop: 24,

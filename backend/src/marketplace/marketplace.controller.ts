@@ -19,6 +19,7 @@ import {
 import { MarketplaceService } from './marketplace.service';
 import { CreateLandListingDto } from './dto/create-land-listing.dto';
 import { EscrowDepositDto } from './dto/escrow-deposit.dto';
+import { RedeemCodeDto } from './dto/redeem-code.dto';
 import { CreateTractorOwnerDto } from './dto/create-tractor-owner.dto';
 import { CreateTractorDto } from './dto/create-tractor.dto';
 import { CreateTractorBookingDto } from './dto/create-tractor-booking.dto';
@@ -67,8 +68,14 @@ export class MarketplaceController {
   @ApiOperation({
     summary: 'Create a new Land Lease Listing on M-LAX Marketplace',
   })
-  createLandListing(@Body() createLandListingDto: CreateLandListingDto) {
-    return this.marketplaceService.createLandListing(createLandListingDto);
+  createLandListing(
+    @Body() createLandListingDto: CreateLandListingDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.marketplaceService.createLandListing(
+      createLandListingDto,
+      user,
+    );
   }
 
   @Get('land')
@@ -86,7 +93,9 @@ export class MarketplaceController {
       maxPrice,
       leaseStatus,
     });
-    return listings.map((listing) => this.marketplaceService.publicListing(listing));
+    return listings.map((listing) =>
+      this.marketplaceService.publicListing(listing),
+    );
   }
 
   @Get('land/manage')
@@ -103,10 +112,54 @@ export class MarketplaceController {
     return this.marketplaceService.quoteForUser(id, user);
   }
 
+  @Get('land/:id/access')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
+  @RequirePermission('marketplace', 'VIEW')
+  @ApiOperation({
+    summary:
+      'Can I take this listing? OPEN, OWNER, GRANTED, NEEDS_CODE or EXPIRED_OR_TAKEN, with the full listing once I have access',
+  })
+  accessFor(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.marketplaceService.accessFor(id, user);
+  }
+
+  @Post('land/:id/redeem-code')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
+  @Roles(UserRole.FARMER)
+  @RequirePermission('marketplace', 'VIEW')
+  @ApiOperation({
+    summary:
+      'Enter the code the owner gave you to unlock a private deal; the listing is then reserved for you alone',
+  })
+  redeemCode(
+    @Param('id') id: string,
+    @Body() dto: RedeemCodeDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.marketplaceService.redeemAccessCode(id, user, dto.code);
+  }
+
+  @Post('land/:id/regenerate-code')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, MarketplaceActorGuard)
+  @Roles(UserRole.FARMER)
+  @RequirePermission('marketplace', 'EDIT')
+  @ApiOperation({
+    summary:
+      'Owner: issue a new private-deal code (the old one stops working and any holder loses access)',
+  })
+  regenerateCode(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.marketplaceService.regenerateAccessCode(id, user);
+  }
+
   @Get('land/:id')
   @ApiOperation({ summary: 'Get details of a specific Land Listing' })
   async findOneLandListing(@Param('id') id: string) {
-    return this.marketplaceService.publicListing(await this.marketplaceService.findOneLandListing(id));
+    return this.marketplaceService.publicListing(
+      await this.marketplaceService.findOneLandListing(id),
+    );
   }
 
   @Get('land/:id/protection')
@@ -206,7 +259,8 @@ export class MarketplaceController {
     @Body() escrowDepositDto: EscrowDepositDto,
     @CurrentUser() user: RequestUser,
   ) {
-    if (user.role === UserRole.FARMER) this.marketplaceService.assertOnlinePayments();
+    if (user.role === UserRole.FARMER)
+      this.marketplaceService.assertOnlinePayments();
     return this.marketplaceService.depositEscrow(id, escrowDepositDto);
   }
 
@@ -261,8 +315,13 @@ export class MarketplaceController {
     summary:
       "Pay the next year's installment on a multi-year ANNUAL-plan lease",
   })
-  payInstallment(@Param('id') id: string, @Body() dto: PayInstallmentDto, @CurrentUser() user: RequestUser) {
-    if (user.role === UserRole.FARMER) this.marketplaceService.assertOnlinePayments();
+  payInstallment(
+    @Param('id') id: string,
+    @Body() dto: PayInstallmentDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    if (user.role === UserRole.FARMER)
+      this.marketplaceService.assertOnlinePayments();
     return this.marketplaceService.payAnnualInstallment(id, dto.renterId, dto);
   }
 

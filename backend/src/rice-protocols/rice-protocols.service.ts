@@ -11,6 +11,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
+import { isBackdated, lateByDays, taskView } from './task-state';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CompleteRiceCalendarTaskDto,
@@ -35,49 +36,55 @@ type ProtocolTask = {
   evidenceRequired?: boolean;
 };
 
+/** Tasks the harvest quality check and warehouse intake depend on. */
+const REQUIRED_TASK_KEYS = ['harvest', 'drying', 'bagging'];
+
+const DAY_MS = 86_400_000;
+
 const MBALARI_TASKS: ProtocolTask[] = [
   {
     key: 'market_plan',
-    title: 'Mpango wa msimu na soko',
-    guidance: 'Panga uzalishaji kwa bei ya soko na ushauri wa afisa ugani.',
+    title: 'Season and market plan',
+    guidance:
+      'Plan production around market prices and the extension officer\u2019s advice.',
     daysFromPlanting: -120,
   },
   {
     key: 'certified_seed',
-    title: 'Mbegu zilizoidhinishwa',
-    guidance: 'Nunua mbegu bora zilizoidhinishwa kutoka chanzo salama.',
+    title: 'Certified seed',
+    guidance: 'Buy good-quality certified seed from a trusted source.',
     daysFromPlanting: -90,
   },
   {
     key: 'land_preparation',
-    title: 'Andaa shamba',
+    title: 'Prepare the field',
     guidance:
-      'Safisha na sawazisha shamba; tengeneza mifereji ya kuingiza na kutoa maji.',
+      'Clear and level the field; dig channels to bring water in and drain it out.',
     daysFromPlanting: -45,
     activityType: ActivityType.LAND_PREPARATION,
     evidenceRequired: true,
   },
   {
     key: 'nursery',
-    title: 'Andaa vitalu',
+    title: 'Prepare the nursery',
     guidance:
-      'Tengeneza matuta ya kitalu yenye upana wa sentimita 120–160, upana wa juu sentimita 30–50, na kina cha 40–50.',
+      'Build nursery beds 120\u2013160 cm wide, 30\u201350 cm wide at the top, and 40\u201350 cm deep.',
     daysFromPlanting: -30,
     requiredMeasurements: {
       nurseryWidthCm: {
-        label: 'Upana wa kitalu',
+        label: 'Nursery bed width',
         unit: 'cm',
         min: 120,
         max: 160,
       },
       nurseryTopWidthCm: {
-        label: 'Upana wa juu wa tuta',
+        label: 'Bed top width',
         unit: 'cm',
         min: 30,
         max: 50,
       },
       nurseryDepthCm: {
-        label: 'Kina cha kitalu',
+        label: 'Nursery bed depth',
         unit: 'cm',
         min: 40,
         max: 50,
@@ -87,34 +94,34 @@ const MBALARI_TASKS: ProtocolTask[] = [
   },
   {
     key: 'transplanting',
-    title: 'Pandikiza miche',
+    title: 'Transplant seedlings',
     guidance:
-      'Pandikiza miche ya siku 14–21 kwa nafasi ya sentimita 20; miche 1–3 kwa shina.',
+      'Transplant seedlings aged 14\u201321 days at 20 cm spacing, 1\u20133 seedlings per hill.',
     daysFromPlanting: 0,
     activityType: ActivityType.PLANTING,
     requiredMeasurements: {
       seedlingAgeDays: {
-        label: 'Umri wa miche',
-        unit: 'siku',
+        label: 'Seedling age',
+        unit: 'days',
         min: 14,
         max: 21,
       },
-      spacingCm: { label: 'Nafasi', unit: 'cm', min: 20, max: 20 },
-      seedlingsPerHill: { label: 'Miche kwa shina', min: 1, max: 3 },
-      waterDepthCm: { label: 'Kina cha maji', unit: 'cm', min: 0, max: 3 },
+      spacingCm: { label: 'Spacing', unit: 'cm', min: 20, max: 20 },
+      seedlingsPerHill: { label: 'Seedlings per hill', min: 1, max: 3 },
+      waterDepthCm: { label: 'Water depth', unit: 'cm', min: 0, max: 3 },
     },
     evidenceRequired: true,
   },
   {
     key: 'basal_fertilizer',
-    title: 'Mbolea ya kupandia',
+    title: 'Basal fertilizer',
     guidance:
-      'Weka mbolea ya kupandia ndani ya siku 5 baada ya kupandikiza kwa kiwango kilichoshauriwa.',
+      'Apply basal fertilizer within 5 days of transplanting, at the recommended rate.',
     daysFromPlanting: 5,
     activityType: ActivityType.FERTILIZING,
     requiredMeasurements: {
       quantityKg: {
-        label: 'Kiasi cha mbolea ya kupandia',
+        label: 'Basal fertilizer quantity',
         unit: 'kg',
         min: 0.01,
       },
@@ -123,29 +130,29 @@ const MBALARI_TASKS: ProtocolTask[] = [
   },
   {
     key: 'gap_filling',
-    title: 'Rudishia miche iliyokufa',
+    title: 'Replace dead seedlings',
     guidance:
-      'Rudishia miche kwenye nafasi zilizokufa ndani ya siku 10 baada ya kupandikiza.',
+      'Replant gaps where seedlings died, within 10 days of transplanting.',
     daysFromPlanting: 10,
     activityType: ActivityType.PLANTING,
   },
   {
     key: 'fertilizer_1',
-    title: 'Mbolea ya kukuzia',
+    title: 'Top-dressing fertilizer',
     guidance:
-      'Ondoa magugu kwanza; maji yasizidi sentimita 5, kisha weka mbolea ya kukuzia siku 14 baada ya kupandikiza kwa ushauri wa afisa ugani.',
+      'Weed first and keep water no deeper than 5 cm, then apply top-dressing fertilizer 14 days after transplanting, as the extension officer advises.',
     daysFromPlanting: 14,
     activityType: ActivityType.FERTILIZING,
     requiredMeasurements: {
-      quantityKg: { label: 'Kiasi cha mbolea', unit: 'kg', min: 0.01 },
+      quantityKg: { label: 'Fertilizer quantity', unit: 'kg', min: 0.01 },
       waterDepthCm: {
-        label: 'Kina cha maji kabla ya mbolea',
+        label: 'Water depth before fertilizing',
         unit: 'cm',
         min: 0,
         max: 5,
       },
       weedCoveragePct: {
-        label: 'Kiwango cha magugu kabla ya mbolea',
+        label: 'Weed cover before fertilizing',
         unit: '%',
         min: 0,
         max: 5,
@@ -155,25 +162,25 @@ const MBALARI_TASKS: ProtocolTask[] = [
   },
   {
     key: 'weed_water',
-    title: 'Dhibiti magugu na maji',
-    guidance: 'Ondoa magugu na hakikisha kina cha maji hakizidi sentimita 15.',
+    title: 'Control weeds and water',
+    guidance: 'Remove weeds and keep the water no deeper than 15 cm.',
     daysFromPlanting: 45,
     activityType: ActivityType.WEEDING,
     requiredMeasurements: {
-      waterDepthCm: { label: 'Kina cha maji', unit: 'cm', min: 0, max: 15 },
+      waterDepthCm: { label: 'Water depth', unit: 'cm', min: 0, max: 15 },
     },
     evidenceRequired: true,
   },
   {
     key: 'pest_disease_scouting',
-    title: 'Kagua wadudu na magonjwa',
+    title: 'Scout for pests and diseases',
     guidance:
-      'Kagua shamba kwa wadudu na magonjwa; ukitumia viuatilifu, tumia kipimo sahihi cha lebo au ushauri wa afisa ugani.',
+      'Inspect the field for pests and diseases; if you use pesticide, follow the label rate or the extension officer\u2019s advice.',
     daysFromPlanting: 60,
     activityType: ActivityType.PEST_CONTROL,
     requiredMeasurements: {
       scoutedAreaPct: {
-        label: 'Sehemu ya shamba iliyokaguliwa',
+        label: 'Share of the field inspected',
         unit: '%',
         min: 100,
         max: 100,
@@ -183,69 +190,69 @@ const MBALARI_TASKS: ProtocolTask[] = [
   },
   {
     key: 'pesticide_container_disposal_1',
-    title: 'Ondoa vifungashio vya viuatilifu',
+    title: 'Remove pesticide containers',
     guidance:
-      'Usiache vifungashio vya viuatilifu shambani; kusanya na vitunze/ondoa kwa njia salama baada ya matumizi.',
+      'Never leave pesticide containers in the field; collect them and store or dispose of them safely after use.',
     daysFromPlanting: 61,
     activityType: ActivityType.PEST_CONTROL,
     evidenceRequired: true,
   },
   {
     key: 'fertilizer_2',
-    title: 'Mbolea ya kuzalisha',
+    title: 'Grain-filling fertilizer',
     guidance:
-      'Weka mbolea ya kuzalisha kwa kiwango sahihi na endelea kufuatilia visumbufu.',
+      'Apply the grain-filling fertilizer at the right rate and keep watching for pests.',
     daysFromPlanting: 90,
     activityType: ActivityType.FERTILIZING,
     requiredMeasurements: {
-      quantityKg: { label: 'Kiasi cha mbolea', unit: 'kg', min: 0.01 },
+      quantityKg: { label: 'Fertilizer quantity', unit: 'kg', min: 0.01 },
     },
     evidenceRequired: true,
   },
   {
     key: 'pesticide_container_disposal_2',
-    title: 'Rudia ukaguzi wa vifungashio vya viuatilifu',
+    title: 'Re-check for pesticide containers',
     guidance:
-      'Hakikisha hakuna vifungashio vya viuatilifu vilivyoachwa shambani wakati wa ufuatiliaji wa Machi.',
+      'Make sure no pesticide containers have been left in the field during the March follow-up.',
     daysFromPlanting: 91,
     activityType: ActivityType.PEST_CONTROL,
     evidenceRequired: true,
   },
   {
     key: 'pesticide_container_disposal_3',
-    title: 'Ukaguzi wa mwisho wa vifungashio vya viuatilifu',
+    title: 'Final check for pesticide containers',
     guidance:
-      'Aprili-Mei: hakikisha vifungashio vyote vya viuatilifu vimeondolewa shambani kabla ya maandalizi ya kuvuna.',
+      'April\u2013May: make sure all pesticide containers have been removed from the field before harvest preparation.',
     daysFromHarvest: -45,
     activityType: ActivityType.PEST_CONTROL,
     evidenceRequired: true,
   },
   {
     key: 'bird_pest_control',
-    title: 'Dhibiti ndege na wanyama',
-    guidance: 'Tumia njia salama za kuzuia ndege, wanyama waharibifu na panya.',
+    title: 'Control birds and animals',
+    guidance: 'Use safe ways to keep off birds, destructive animals and rats.',
     daysFromHarvest: -30,
     activityType: ActivityType.PEST_CONTROL,
     evidenceRequired: true,
   },
   {
     key: 'harvest_preparation',
-    title: 'Maandalizi ya kuvuna',
+    title: 'Prepare for harvest',
     guidance:
-      'Andaa magunia, ghala, mashine za kuvuna, kupura na usafirishaji.',
+      'Get sacks, storage, harvesting and threshing machines, and transport ready.',
     daysFromHarvest: -21,
   },
   {
     key: 'harvest',
-    title: 'Vuna mpunga',
+    title: 'Harvest the rice',
     guidance:
-      'Vuna wakati 80–85% ya suke limekomaa au unyevu wa punje ni 20–25%.',
+      'Harvest when 80\u201385% of the panicle has matured or grain moisture is 20\u201325%.',
     daysFromHarvest: 0,
     activityType: ActivityType.HARVESTING,
     requiredMeasurements: {
-      maturityPct: { label: 'Ukomavu wa suke', unit: '%', min: 80, max: 85 },
+      maturityPct: { label: 'Panicle maturity', unit: '%', min: 80, max: 85 },
       panicleMoisturePct: {
-        label: 'Unyevu wa punje',
+        label: 'Grain moisture',
         unit: '%',
         min: 20,
         max: 25,
@@ -255,13 +262,13 @@ const MBALARI_TASKS: ProtocolTask[] = [
   },
   {
     key: 'drying',
-    title: 'Kausha mpunga',
-    guidance: 'Kausha mpunga hadi unyevu wa punje ufikie au uwe chini ya 14%.',
+    title: 'Dry the rice',
+    guidance: 'Dry the paddy until grain moisture reaches 14% or lower.',
     daysFromHarvest: 2,
     activityType: ActivityType.DRYING,
     requiredMeasurements: {
       dryingMoisturePct: {
-        label: 'Unyevu baada ya kukausha',
+        label: 'Moisture after drying',
         unit: '%',
         min: 0,
         max: 14,
@@ -271,22 +278,22 @@ const MBALARI_TASKS: ProtocolTask[] = [
   },
   {
     key: 'bagging',
-    title: 'Pakia na tenganisha aina',
+    title: 'Bag and separate varieties',
     guidance:
-      'Tenganisha aina za mpunga na pakia kwenye magunia safi yenye lebo.',
+      'Separate the rice varieties and pack them in clean, labelled sacks.',
     daysFromHarvest: 7,
     activityType: ActivityType.STORAGE,
     requiredMeasurements: {
-      bagCount: { label: 'Idadi ya magunia', min: 1 },
-      bagWeightKg: { label: 'Uzito wa gunia', unit: 'kg', min: 1 },
+      bagCount: { label: 'Number of bags', min: 1 },
+      bagWeightKg: { label: 'Bag weight', unit: 'kg', min: 1 },
     },
     evidenceRequired: true,
   },
   {
     key: 'warehouse_receipt',
-    title: 'Pokea ghala la ushirika',
+    title: 'Deliver to the cooperative warehouse',
     guidance:
-      'Peleka mpunga uliokaguliwa kwenye ghala la ushirika kwa hifadhi na uuzaji wa pamoja.',
+      'Take the inspected rice to the cooperative warehouse for storage and joint selling.',
     daysFromHarvest: 10,
     activityType: ActivityType.TRANSPORT,
   },
@@ -331,21 +338,131 @@ export class RiceProtocolsService {
     private readonly ownership: OwnershipService,
   ) {}
 
-  private async assertProtocolAdmin(mamcosId: string, user: RequestUser) {
-    if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN)
-      return;
-    const staff = await this.prisma.mamcosStaff.findFirst({
-      where: { mamcosId, userId: user.id, role: 'SECRETARY' },
-      select: { id: true },
-    });
-    if (!staff)
+  /**
+   * Who may change a calendar. The platform calendar (mamcosId null) is Super Admin's alone. A
+   * cooperative's own calendar belongs to that cooperative: its users need the grant (checked by
+   * the route) and must be in that cooperative. Anyone else gets a 404, not a hint it exists.
+   */
+  private assertCanManage(mamcosId: string | null, user: RequestUser) {
+    if (user.role === UserRole.SUPER_ADMIN) return;
+    if (mamcosId === null) {
       throw new ForbiddenException(
-        'Only this cooperative’s secretary may manage its rice calendar',
+        'The platform rice calendar can only be changed by Super Admin',
       );
+    }
+    if ((user.mamcosId ?? null) !== mamcosId)
+      throw new NotFoundException('Rice calendar not found');
   }
 
+  /** Versions are numbered separately for each calendar: the platform default, each variety, each cooperative. */
+  private nextVersion(
+    mamcosId: string | null,
+    varietyId: string | null = null,
+  ): Promise<number> {
+    return this.prisma.riceProtocol
+      .aggregate({ where: { mamcosId, varietyId }, _max: { version: true } })
+      .then((r) => (r._max.version ?? 0) + 1);
+  }
+
+  private defaultTasks() {
+    return MBALARI_TASKS as unknown as Prisma.InputJsonValue;
+  }
+
+  // ---------- platform calendars (what farmers see in the mobile app) ----------
+
+  /** The active calendar that belongs to exactly this variety (null = the default calendar). */
+  async activePlatformExact(varietyId: string | null) {
+    return this.prisma.riceProtocol.findFirst({
+      where: { mamcosId: null, varietyId, isActive: true },
+      orderBy: { version: 'desc' },
+    });
+  }
+
+  /**
+   * The calendar a crop cycle of this variety follows: the variety's own calendar, or the default
+   * one when that variety has none yet. Null only when Super Admin has created no calendar at all.
+   */
+  async activePlatform(varietyId?: string | null) {
+    if (varietyId) {
+      const own = await this.activePlatformExact(varietyId);
+      if (own) return own;
+    }
+    return this.activePlatformExact(null);
+  }
+
+  /** What every signed-in farmer and staff member may read: the calendar for a variety. */
+  async platformCalendar(varietyId?: string | null) {
+    const active = await this.activePlatform(varietyId);
+    if (!active) return null;
+    return {
+      id: active.id,
+      name: active.name,
+      version: active.version,
+      varietyId: active.varietyId,
+      /** True when the variety asked for has no calendar of its own and the default is shown. */
+      usesDefault: !!varietyId && active.varietyId !== varietyId,
+      updatedAt: active.updatedAt,
+      tasks: (active.taskDefinitions as unknown as ProtocolTask[]).map((t) => ({
+        ...t,
+        stageName: STAGE_NAME_BY_TASK_KEY[t.key] ?? null,
+      })),
+    };
+  }
+
+  async platformVersions(user: RequestUser, varietyId: string | null = null) {
+    this.assertCanManage(null, user);
+    return this.prisma.riceProtocol.findMany({
+      where: { mamcosId: null, varietyId },
+      orderBy: { version: 'desc' },
+    });
+  }
+
+  /**
+   * Creates the active calendar for the default (no variety) or for one variety. A new variety
+   * calendar starts as a copy of the default, or of another variety's calendar, so the admin edits
+   * what differs instead of retyping every activity.
+   */
+  async bootstrapPlatform(
+    user: RequestUser,
+    opts: { varietyId?: string | null; copyFromVarietyId?: string | null } = {},
+  ) {
+    this.assertCanManage(null, user);
+    const varietyId = opts.varietyId ?? null;
+    let varietyName: string | null = null;
+    if (varietyId) {
+      const variety = await this.prisma.riceVariety.findUnique({
+        where: { id: varietyId },
+      });
+      if (!variety) throw new NotFoundException('Rice variety not found');
+      varietyName = variety.name;
+    }
+    const active = await this.activePlatformExact(varietyId);
+    if (active) return active;
+
+    let tasks: Prisma.InputJsonValue = this.defaultTasks();
+    if (varietyId) {
+      const source = await this.activePlatformExact(
+        opts.copyFromVarietyId ?? null,
+      );
+      if (source) tasks = source.taskDefinitions as Prisma.InputJsonValue;
+    }
+    return this.prisma.riceProtocol.create({
+      data: {
+        mamcosId: null,
+        varietyId,
+        name: varietyName
+          ? `${varietyName} Rice Farming Calendar`
+          : 'Mbalari Rice Farming Calendar',
+        version: await this.nextVersion(null, varietyId),
+        taskDefinitions: tasks,
+      },
+    });
+  }
+
+  // ---------- a cooperative's own calendar (never sent to the mobile app) ----------
+
   async bootstrap(mamcosId: string, user: RequestUser) {
-    await this.assertProtocolAdmin(mamcosId, user);
+    this.assertCanManage(mamcosId, user);
     const active = await this.prisma.riceProtocol.findFirst({
       where: { mamcosId, isActive: true },
       orderBy: { version: 'desc' },
@@ -354,15 +471,15 @@ export class RiceProtocolsService {
     return this.prisma.riceProtocol.create({
       data: {
         mamcosId,
-        name: 'Kalenda ya Kilimo cha Mpunga — Mbalari',
-        version: 1,
-        taskDefinitions: MBALARI_TASKS,
+        name: 'Mbalari Rice Farming Calendar',
+        version: await this.nextVersion(mamcosId),
+        taskDefinitions: this.defaultTasks(),
       },
     });
   }
 
   async getForMamcos(mamcosId: string, user: RequestUser) {
-    await this.assertProtocolAdmin(mamcosId, user);
+    this.assertCanManage(mamcosId, user);
     return this.prisma.riceProtocol.findMany({
       where: { mamcosId },
       orderBy: { version: 'desc' },
@@ -374,64 +491,240 @@ export class RiceProtocolsService {
       where: { id },
     });
     if (!current) throw new NotFoundException('Rice protocol not found');
-    await this.assertProtocolAdmin(current.mamcosId, user);
-    const next = await this.prisma.riceProtocol.create({
-      data: {
-        mamcosId: current.mamcosId,
-        name: dto.name,
-        version: current.version + 1,
-        taskDefinitions:
-          dto.taskDefinitions as unknown as Prisma.InputJsonValue,
-      },
-    });
-    await this.prisma.riceProtocol.update({
-      where: { id: current.id },
-      data: { isActive: false },
-    });
+    this.assertCanManage(current.mamcosId, user);
+    if (!current.isActive)
+      throw new BadRequestException(
+        'Only the active version can be edited; this one has been replaced',
+      );
+    const keys = dto.taskDefinitions.map((t) => t.key);
+    if (new Set(keys).size !== keys.length)
+      throw new BadRequestException('Every task needs its own unique key');
+    // The quality gate and warehouse intake rely on these tasks, so they cannot be removed.
+    const missing = REQUIRED_TASK_KEYS.filter((k) => !keys.includes(k));
+    if (missing.length)
+      throw new BadRequestException(
+        `These tasks are needed for the harvest quality check and cannot be removed: ${missing.join(', ')}`,
+      );
+    const version = await this.nextVersion(current.mamcosId, current.varietyId);
+    const [next] = await this.prisma.$transaction([
+      this.prisma.riceProtocol.create({
+        data: {
+          mamcosId: current.mamcosId,
+          varietyId: current.varietyId,
+          name: dto.name,
+          version,
+          taskDefinitions:
+            dto.taskDefinitions as unknown as Prisma.InputJsonValue,
+        },
+      }),
+      this.prisma.riceProtocol.update({
+        where: { id: current.id },
+        data: { isActive: false },
+      }),
+    ]);
     return next;
   }
 
-  async scheduleForCycle(cropCycleId: string, mamcosId?: string | null) {
-    if (!mamcosId) return [];
+  /**
+   * The cooperative's own calendar laid over its members' crop cycles: what falls due soon, and
+   * what is overdue. Worked out on the fly; it creates no tasks and the mobile app never sees it.
+   */
+  async upcoming(mamcosId: string, user: RequestUser, windowDays = 45) {
+    this.assertCanManage(mamcosId, user);
     const protocol = await this.prisma.riceProtocol.findFirst({
       where: { mamcosId, isActive: true },
       orderBy: { version: 'desc' },
     });
     if (!protocol) return [];
+    const defs = protocol.taskDefinitions as unknown as ProtocolTask[];
+    const cycles = await this.prisma.cropCycle.findMany({
+      where: {
+        plantingDate: { not: null },
+        status: { in: ['PLANNED', 'ACTIVE'] },
+        farm: { mamcosId },
+      },
+      select: {
+        id: true,
+        season: true,
+        plantingDate: true,
+        expectedHarvest: true,
+        farm: { select: { farmCode: true } },
+        farmer: { select: { firstName: true, lastName: true } },
+      },
+    });
+    const now = Date.now();
+    const from = now - 14 * 86_400_000;
+    const to = now + windowDays * 86_400_000;
+    const rows: {
+      cropCycleId: string;
+      farmCode: string;
+      farmer: string;
+      season: string;
+      taskKey: string;
+      title: string;
+      stageName: string | null;
+      dueDate: Date;
+      overdue: boolean;
+    }[] = [];
+    for (const cycle of cycles) {
+      for (const def of defs) {
+        const base =
+          def.daysFromHarvest != null
+            ? cycle.expectedHarvest
+            : cycle.plantingDate;
+        if (!base) continue;
+        const due = new Date(
+          base.getTime() +
+            (def.daysFromHarvest ?? def.daysFromPlanting ?? 0) * 86_400_000,
+        );
+        if (due.getTime() < from || due.getTime() > to) continue;
+        rows.push({
+          cropCycleId: cycle.id,
+          farmCode: cycle.farm.farmCode,
+          farmer: `${cycle.farmer.firstName} ${cycle.farmer.lastName}`.trim(),
+          season: cycle.season,
+          taskKey: def.key,
+          title: def.title,
+          stageName: STAGE_NAME_BY_TASK_KEY[def.key] ?? null,
+          dueDate: due,
+          overdue: due.getTime() < now,
+        });
+      }
+    }
+    return rows
+      .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+      .slice(0, 300);
+  }
+
+  /**
+   * Builds (and keeps current) a crop cycle's calendar from the PLATFORM calendar for its rice
+   * variety, falling back to the default calendar. The mobile app, reminders and the harvest quality
+   * check all read these tasks; cooperatives' own calendars never create them.
+   *
+   * Re-planning rules, so a farmer can never plan a missed activity away:
+   *  - only PENDING tasks that are still in the future are re-dated when planting/harvest dates change;
+   *  - COMPLETED and MISSED tasks are never touched;
+   *  - a staff-rescheduled task keeps the date staff gave it;
+   *  - changing the variety swaps the wording of pending tasks and drops pending ones the new
+   *    calendar does not have.
+   */
+  async scheduleForCycle(
+    cropCycleId: string,
+    opts: { varietyChanged?: boolean } = {},
+  ) {
+    const result = { created: 0, redated: 0, refreshed: 0, removed: 0 };
     const cycle = await this.prisma.cropCycle.findUnique({
       where: { id: cropCycleId },
-      select: { plantingDate: true, expectedHarvest: true },
+      select: {
+        plantingDate: true,
+        expectedHarvest: true,
+        riceVarietyId: true,
+        variety: { select: { maturityDays: true } },
+      },
     });
-    if (!cycle?.plantingDate) return [];
-    const tasks = (
-      protocol.taskDefinitions as unknown as ProtocolTask[]
-    ).filter((task) => task.daysFromHarvest == null || cycle.expectedHarvest);
+    if (!cycle?.plantingDate) return result;
+    const protocol = await this.activePlatform(cycle.riceVarietyId);
+    if (!protocol) return result;
+
+    // Varieties take different times to grow: when only a planting date is known, the harvest date follows from it.
+    let expectedHarvest = cycle.expectedHarvest;
+    if (!expectedHarvest && cycle.variety?.maturityDays) {
+      expectedHarvest = new Date(
+        cycle.plantingDate.getTime() + cycle.variety.maturityDays * DAY_MS,
+      );
+      await this.prisma.cropCycle.update({
+        where: { id: cropCycleId },
+        data: { expectedHarvest },
+      });
+    }
+
+    const defs = (protocol.taskDefinitions as unknown as ProtocolTask[]).filter(
+      (task) => task.daysFromHarvest == null || expectedHarvest,
+    );
+    const dueFor = (task: ProtocolTask) =>
+      new Date(
+        (task.daysFromHarvest != null
+          ? expectedHarvest!
+          : cycle.plantingDate!
+        ).getTime() +
+          (task.daysFromHarvest ?? task.daysFromPlanting ?? 0) * DAY_MS,
+      );
+    const content = (task: ProtocolTask) => ({
+      title: task.title,
+      guidance: task.guidance,
+      activityType: task.activityType ?? null,
+      requiredMeasurements: (task.requiredMeasurements ??
+        Prisma.JsonNull) as Prisma.InputJsonValue,
+      evidenceRequired: task.evidenceRequired ?? false,
+      protocolVersion: protocol.version,
+      protocolId: protocol.id,
+    });
+
     const existing = await this.prisma.riceCalendarTask.findMany({
       where: { cropCycleId },
-      select: { taskKey: true },
     });
-    const existingKeys = new Set(existing.map((task) => task.taskKey));
-    const newTasks = tasks.filter((task) => !existingKeys.has(task.key));
-    if (!newTasks.length) return { count: 0 };
-    return this.prisma.riceCalendarTask.createMany({
-      data: newTasks.map((task) => ({
-        cropCycleId,
-        protocolVersion: protocol.version,
-        taskKey: task.key,
-        title: task.title,
-        guidance: task.guidance,
-        activityType: task.activityType,
-        dueDate: new Date(
-          (task.daysFromHarvest != null
-            ? cycle.expectedHarvest!
-            : cycle.plantingDate!
-          ).getTime() +
-            (task.daysFromHarvest ?? task.daysFromPlanting ?? 0) * 86400000,
-        ),
-        requiredMeasurements: task.requiredMeasurements,
-        evidenceRequired: task.evidenceRequired ?? false,
-      })),
-    });
+    const byKey = new Map(existing.map((t) => [t.taskKey, t]));
+    const now = Date.now();
+
+    const fresh = defs.filter((task) => !byKey.has(task.key));
+    if (fresh.length) {
+      await this.prisma.riceCalendarTask.createMany({
+        data: fresh.map((task) => {
+          const dueDate = dueFor(task);
+          return {
+            cropCycleId,
+            taskKey: task.key,
+            ...content(task),
+            dueDate,
+            originalDueDate: dueDate,
+            // The column has no default, so a task created without photos must say so explicitly.
+            photoUrls: [],
+          };
+        }),
+      });
+      result.created = fresh.length;
+    }
+
+    const defKeys = new Set(defs.map((d) => d.key));
+    for (const task of defs) {
+      const current = byKey.get(task.key);
+      if (!current || current.status !== CalendarTaskStatus.PENDING) continue;
+      const data: Prisma.RiceCalendarTaskUpdateInput = {};
+      if (opts.varietyChanged || current.protocolId !== protocol.id) {
+        Object.assign(data, content(task));
+        result.refreshed++;
+      }
+      const newDue = dueFor(task);
+      if (
+        current.rescheduleCount === 0 &&
+        current.dueDate.getTime() > now &&
+        newDue.getTime() !== current.dueDate.getTime()
+      ) {
+        data.dueDate = newDue;
+        data.rescheduleReason =
+          current.rescheduleReason ?? 'Planting, harvest or variety changed';
+        result.redated++;
+      }
+      if (Object.keys(data).length)
+        await this.prisma.riceCalendarTask.update({
+          where: { id: current.id },
+          data,
+        });
+    }
+
+    if (opts.varietyChanged) {
+      const stale = existing.filter(
+        (t) =>
+          t.status === CalendarTaskStatus.PENDING && !defKeys.has(t.taskKey),
+      );
+      if (stale.length) {
+        await this.prisma.riceCalendarTask.deleteMany({
+          where: { id: { in: stale.map((t) => t.id) } },
+        });
+        result.removed = stale.length;
+      }
+    }
+    return result;
   }
 
   async tasksForCycle(cropCycleId: string, user: RequestUser) {
@@ -445,9 +738,14 @@ export class RiceProtocolsService {
       where: { cropCycleId },
       orderBy: { dueDate: 'asc' },
     });
+    const now = new Date();
     return tasks.map((task) => ({
       ...task,
       stageName: STAGE_NAME_BY_TASK_KEY[task.taskKey] ?? null,
+      // ON_TIME | LATE | MISSED | OVERDUE | DUE_SOON | UPCOMING, for the red/amber/green display.
+      view: taskView(task, now),
+      lateByDays: lateByDays(task),
+      backdated: isBackdated(task),
     }));
   }
 
@@ -473,12 +771,23 @@ export class RiceProtocolsService {
     });
     if (!task) throw new NotFoundException('Calendar task not found');
     await this.ownership.assertFarmAccess(user, task.cropCycle.farmId);
-    const guidance = dto.reason
-      ? `${task.guidance}\n\nRatiba imebadilishwa: ${dto.reason}`
-      : task.guidance;
+    if (
+      task.status === CalendarTaskStatus.COMPLETED ||
+      task.status === CalendarTaskStatus.MISSED
+    ) {
+      // A missed activity stays missed on the record; it can be completed late, never moved away.
+      throw new BadRequestException(
+        'A completed or missed activity cannot be rescheduled',
+      );
+    }
     return this.prisma.riceCalendarTask.update({
       where: { id },
-      data: { dueDate: new Date(dto.dueDate), guidance },
+      data: {
+        dueDate: new Date(dto.dueDate),
+        originalDueDate: task.originalDueDate ?? task.dueDate,
+        rescheduleCount: { increment: 1 },
+        rescheduleReason: dto.reason?.trim() || 'Rescheduled by staff',
+      },
     });
   }
 
@@ -494,6 +803,7 @@ export class RiceProtocolsService {
     if (!task) throw new NotFoundException('Calendar task not found');
     await this.ownership.assertFarmAccess(user, task.cropCycle.farmId);
     if (task.status === CalendarTaskStatus.COMPLETED) return task;
+    // PENDING or MISSED: a missed activity can still be recorded, and then reads as completed late.
     const measurements = dto.measurements ?? {};
     const rules = (task.requiredMeasurements ?? {}) as Record<
       string,
@@ -515,9 +825,11 @@ export class RiceProtocolsService {
       throw new BadRequestException(
         'A photo is required to complete this Mbalari calendar task',
       );
-    const completedAt = dto.completedAt
-      ? new Date(dto.completedAt)
-      : new Date();
+    const recordedAt = new Date();
+    // The phone may report when the work was done (it can be offline), but never a time in the future.
+    let completedAt = dto.completedAt ? new Date(dto.completedAt) : recordedAt;
+    if (Number.isNaN(completedAt.getTime()) || completedAt > recordedAt)
+      completedAt = recordedAt;
     const activity = task.activityType
       ? await this.prisma.activityLog.create({
           data: {
@@ -537,6 +849,7 @@ export class RiceProtocolsService {
         measurements: measurements,
         photoUrls: dto.photoUrls ?? [],
         completedAt,
+        recordedAt,
         completedByUserId: user.id,
         activityLogId: activity?.id,
       },

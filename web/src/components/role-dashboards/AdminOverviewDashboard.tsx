@@ -161,9 +161,12 @@ export default function AdminOverviewDashboard() {
       if (visitResult.status === 'fulfilled') setOfficerVisits(visitResult.value.data || []);
       if (kpiResult.status === 'fulfilled') setKpis(kpiResult.value.data);
       if (weatherResult.status === 'fulfilled') setWeather(weatherResult.value.data);
-      if (farmerResult.status === 'rejected' && farmResult.status === 'rejected') {
-        setError('Unable to load MAYOData administration data.');
-      }
+      const failed = [
+        ['farmers', farmerResult], ['farms', farmResult], ['crop cycles', cropCycleResult],
+        ['inventory', inventoryResult], ['field visits', visitResult], ['KPIs', kpiResult],
+      ].filter(([, r]) => (r as PromiseSettledResult<unknown>).status === 'rejected').map(([name]) => name as string);
+      if (failed.length === 6) setError('Unable to load MAYOData administration data.');
+      else if (failed.length) setError(`Some data failed to load (${failed.join(', ')}); figures below may be incomplete.`);
       setLoading(false);
     });
   }, []);

@@ -4,6 +4,10 @@ import { motion, useReducedMotion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Search01Icon, Cancel01Icon, Shield01Icon } from '@hugeicons/core-free-icons';
 import { rolesApi } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api-error';
+import ErrorBanner from '@/components/ErrorBanner';
+import { useAuthStore } from '@/store/auth.store';
+import { hasPermission } from '@/lib/nav';
 import Modal from '@/components/Modal';
 import { MetricTile, MetricTileSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
@@ -12,8 +16,9 @@ interface Role {
   name: string;
   description?: string | null;
   isSystem: boolean;
-  systemRole?: string | null;
   isActive: boolean;
+  mamcosId?: string | null;
+  mamcosName?: string | null;
   permissionCount: number;
   userCount: number;
 }
@@ -37,11 +42,19 @@ const TYPE_OPTIONS = [
   { value: 'system', label: 'System roles' },
 ];
 
-const EMPTY_FORM = { name: '', description: '', profileType: 'CUSTOM' };
+const EMPTY_FORM = { name: '', description: '' };
 
 export default function RolesPage() {
   const reduce = useReducedMotion();
+  // Super Admin manages platform roles and any cooperative's; a cooperative admin manages only
+  // their own AMCOS's roles, using grants they hold. The API enforces the same limits.
+  const user = useAuthStore((s) => s.user);
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const canCreate = hasPermission(user, 'roles', 'CREATE');
+  const canEdit = hasPermission(user, 'roles', 'EDIT');
+  const canDelete = hasPermission(user, 'roles', 'DELETE');
   const [roles, setRoles] = useState<Role[]>([]);
+  const [loadError, setLoadError] = useState('');
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -65,8 +78,9 @@ export default function RolesPage() {
       .then(([rolesRes, resourcesRes]) => {
         setRoles(rolesRes.data || []);
         setResources(resourcesRes.data || []);
+        setLoadError('');
       })
-      .catch(console.error)
+      .catch((err) => setLoadError(apiErrorMessage(err, 'Could not load roles.')))
       .finally(() => setLoading(false));
   };
 
@@ -106,12 +120,12 @@ export default function RolesPage() {
     setCreating(true);
     setError('');
     try {
-      await rolesApi.create({ name: form.name, description: form.description || undefined, profileType: form.profileType });
+      await rolesApi.create({ name: form.name, description: form.description || undefined });
       setForm({ ...EMPTY_FORM });
       setShowCreate(false);
       load();
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Could not create role.');
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not create role.'));
     } finally {
       setCreating(false);
     }
@@ -122,8 +136,8 @@ export default function RolesPage() {
     try {
       await rolesApi.remove(role.id);
       load();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || 'Could not delete role.');
+    } catch (err) {
+      setLoadError(apiErrorMessage(err, 'Could not delete role.'));
     }
   };
 
@@ -137,8 +151,9 @@ export default function RolesPage() {
         matrix[row.resourceKey] = new Set(row.actions);
       }
       setPermMatrix(matrix);
-    } catch {
+    } catch (err) {
       setPermMatrix({});
+      setLoadError(apiErrorMessage(err, 'Could not load this role’s permissions.'));
     } finally {
       setPermLoading(false);
     }
@@ -165,8 +180,9 @@ export default function RolesPage() {
       await rolesApi.setPermissions(permRoleId, { permissions });
       setPermRoleId(null);
       load();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || 'Could not save permissions.');
+    } catch (err) {
+      setPermRoleId(null);
+      setLoadError(apiErrorMessage(err, 'Could not save permissions.'));
     } finally {
       setPermSaving(false);
     }
@@ -186,10 +202,16 @@ export default function RolesPage() {
             <div style={{ width: '4px', height: '26px', background: 'linear-gradient(to bottom, var(--accent), var(--green-400))', borderRadius: '9999px' }} />
             <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Roles &amp; Permissions</h1>
           </div>
-          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>Super Admin is the only built-in role. Create all other roles and grant their permissions here.</p>
+          <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>
+            {isSuperAdmin
+              ? 'Super Admin is the only built-in role. Create all other roles and grant their permissions here.'
+              : 'Create the roles your cooperative’s staff work under. You can only grant permissions you hold yourself.'}
+          </p>
         </div>
-        <button className="btn-primary" onClick={() => setShowCreate(true)}>+ New role</button>
+        {canCreate && <button className="btn-primary" onClick={() => setShowCreate(true)}>+ New role</button>}
       </div>
+
+      <ErrorBanner message={loadError} onDismiss={() => setLoadError('')} />
 
       {showCreate && (
         <Modal
@@ -208,18 +230,6 @@ export default function RolesPage() {
             <input className="input-field" placeholder="Role name (e.g. Regional Auditor)" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <input className="input-field" placeholder="Description (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </form>
-            <label style={{ display: 'grid', gap: '6px' }}>Operational profile
-              <select className="input-field" value={form.profileType} onChange={(e) => setForm({ ...form, profileType: e.target.value })}>
-                <option value="CUSTOM">General</option>
-                <option value="FARMER">Farmer records</option>
-                <option value="FIELD_OFFICER">Field officer records</option>
-                <option value="MAMCOS_SECRETARY">AMCOS leadership records</option>
-                <option value="AUDITOR">Audit work</option>
-                <option value="BUYER">Buyer records</option>
-                <option value="FINANCIAL_PROVIDER">Financial provider records</option>
-              </select>
-              <small>Sets up related records for new accounts. Access comes only from the permissions you grant.</small>
-            </label>
           {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
         </Modal>
       )}
@@ -282,7 +292,7 @@ export default function RolesPage() {
         ) : (
           <>
             <MetricTile label="Total roles" value={totalRoles} hint="System + custom" tone="green" />
-            <MetricTile label="Custom roles" value={customRoles} hint="Created by Super Admin" tone="blue" />
+            <MetricTile label="Custom roles" value={customRoles} hint={isSuperAdmin ? 'Created by Super Admin' : 'Created for your cooperative'} tone="blue" />
             <MetricTile label="System roles" value={systemRoles} hint="Super Admin only" tone="gold" />
             <MetricTile label="Staff assigned" value={staffAssigned} hint="Accounts using a custom role" tone="red" />
           </>
@@ -369,6 +379,7 @@ export default function RolesPage() {
                 <tr>
                   <th>Role</th>
                   <th>Type</th>
+                  {isSuperAdmin && <th>Scope</th>}
                   <th className="num">Permissions</th>
                   <th className="num">Staff</th>
                   <th></th>
@@ -391,6 +402,7 @@ export default function RolesPage() {
                         {role.isSystem ? 'System' : 'Custom'}
                       </span>
                     </td>
+                    {isSuperAdmin && <td style={{ fontSize: 12, color: 'var(--text-2)' }}>{role.mamcosName ?? 'Platform'}</td>}
                     <td className="num">
                       <span className="farmers-size">{role.isSystem ? '—' : role.permissionCount}</span>
                     </td>
@@ -398,14 +410,18 @@ export default function RolesPage() {
                       <span className="farmers-size">{role.userCount}</span>
                     </td>
                     <td>
-                      {!role.isSystem && (
+                      {!role.isSystem && (isSuperAdmin || role.id !== user?.roleId) && (
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                          <button className="btn-secondary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => openPermissions(role)}>
-                            Manage permissions
-                          </button>
-                          <button className="btn-secondary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => removeRole(role)}>
-                            Delete
-                          </button>
+                          {canEdit && (
+                            <button className="btn-secondary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => openPermissions(role)}>
+                              Manage permissions
+                            </button>
+                          )}
+                          {canDelete && role.id !== user?.roleId && (
+                            <button className="btn-secondary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => removeRole(role)}>
+                              Delete
+                            </button>
+                          )}
                         </div>
                       )}
                     </td>

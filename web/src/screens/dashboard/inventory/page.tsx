@@ -2,9 +2,10 @@
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { cropCyclesApi, inventoryApi, riceProtocolsApi } from '@/lib/api';
+import { cropCyclesApi, inventoryApi, riceProtocolsApi, warehousesApi } from '@/lib/api';
+import { useAuthStore } from '@/store/auth.store';
+import { hasPermission } from '@/lib/nav';
 import { ChartCard, DonutBreakdown, HorizontalBarChart } from '@/components/role-dashboards/Charts';
-import WarehouseDispatchPanel from './WarehouseDispatchPanel';
 
 interface DashboardSummary {
   totalReceivedKg: number;
@@ -25,6 +26,8 @@ interface InventoryRecord {
   qualityGrade?: string;
   moistureContentPct?: number;
   warehouseLocation?: string;
+  warehouseId?: string | null;
+  warehouse?: { name: string } | null;
   status: string;
   receivedDate: string;
   lotNumber?: string | null;
@@ -75,10 +78,13 @@ const formatMissing = (missing: string[] = []) =>
 const STEPS = ['Source cycle', 'Measures', 'Confirm'] as const;
 
 export default function InventoryPage() {
-  const [tab, setTab] = useState<'records' | 'dispatch'>('records');
+  const user = useAuthStore((state) => state.user);
+  const canReceiveIntoWarehouse = hasPermission(user, 'warehouse_desk', 'EDIT');
+  const [warehouses, setWarehouses] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
   const [records, setRecords] = useState<InventoryRecord[]>([]);
   const [lots, setLots] = useState<LotRow[]>([]);
   const [cycles, setCycles] = useState<CropCycleOption[]>([]);
+  const [cyclesBlocked, setCyclesBlocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [step, setStep] = useState(0);
@@ -87,6 +93,7 @@ export default function InventoryPage() {
     weightKg: '',
     qualityGrade: 'Grade 1',
     moistureContentPct: '',
+    warehouseId: '',
     warehouseLocation: '',
     receivedDate: new Date().toISOString().slice(0, 10),
   });
@@ -103,17 +110,28 @@ export default function InventoryPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
 
   const reload = async () => {
-    const [inventoryRes, cycleRes, summaryRes, lotsRes] = await Promise.all([
+    // Each part loads on its own: a person without crop-cycle access still sees stock and lots.
+    const [inventoryRes, cycleRes, summaryRes, lotsRes] = await Promise.allSettled([
       inventoryApi.getAll(),
       cropCyclesApi.getAll(),
       inventoryApi.dashboardSummary(),
       inventoryApi.lots(),
     ]);
-    setRecords(inventoryRes.data || []);
-    setCycles(cycleRes.data?.data || cycleRes.data || []);
-    setSummary(summaryRes.data || null);
-    setLots(lotsRes.data || []);
+    if (inventoryRes.status === 'rejected') throw inventoryRes.reason;
+    setRecords(inventoryRes.value.data || []);
+    setCycles(cycleRes.status === 'fulfilled' ? cycleRes.value.data?.data || cycleRes.value.data || [] : []);
+    setCyclesBlocked(cycleRes.status === 'rejected');
+    setSummary(summaryRes.status === 'fulfilled' ? summaryRes.value.data || null : null);
+    setLots(lotsRes.status === 'fulfilled' ? lotsRes.value.data || [] : []);
   };
+
+  useEffect(() => {
+    if (!canReceiveIntoWarehouse) return;
+    warehousesApi
+      .list()
+      .then((res) => setWarehouses((res.data || []).filter((w: { isActive: boolean }) => w.isActive)))
+      .catch(() => setWarehouses([]));
+  }, [canReceiveIntoWarehouse]);
 
   useEffect(() => {
     reload()
@@ -172,6 +190,7 @@ export default function InventoryPage() {
       weightKg: '',
       qualityGrade: 'Grade 1',
       moistureContentPct: '',
+      warehouseId: '',
       warehouseLocation: '',
       receivedDate: new Date().toISOString().slice(0, 10),
     });
@@ -207,10 +226,19 @@ export default function InventoryPage() {
           warehouseLocation: form.warehouseLocation || undefined,
         });
       }
+      const code = received.data?.trackingCode ? ` as ${received.data.trackingCode}` : '';
+      let placed = '';
+      if (recordId && form.warehouseId) {
+        try {
+          await warehousesApi.receive(form.warehouseId, { inventoryRecordIds: [recordId] });
+          placed = ` and received into ${warehouses.find((w) => w.id === form.warehouseId)?.name ?? 'the warehouse'}`;
+        } catch (exception: any) {
+          // The delivery is already recorded; only the warehouse step failed, so say exactly that.
+          placed = `, but it could not be received into the warehouse (${errorText(exception)}). Receive it from the Warehouse page.`;
+        }
+      }
       await reload();
-      setMessage(
-        `Inventory received${received.data?.trackingCode ? ` as ${received.data.trackingCode}` : ''} and placed in storage.`,
-      );
+      setMessage(`Delivery recorded${code}${placed || '. Next: receive it into a warehouse.'}`);
       resetIntake();
     } catch (exception: any) {
       setMessage(errorText(exception));
@@ -268,10 +296,11 @@ export default function InventoryPage() {
     <div className="page-shell">
       <div className="page-heading">
         <div>
-          <div className="page-kicker">Warehouse</div>
-          <h1 className="page-title">Inventory</h1>
+          <div className="page-kicker">Harvest</div>
+          <h1 className="page-title">Harvest Intake &amp; Lots</h1>
           <p className="page-subtitle">
-            Guided intake (weight, grade, moisture, bay), then batch Fairtrade lots from traceable stock.
+            Record each farmer&rsquo;s delivery (weight, grade, moisture) and group deliveries into lots for sale.
+            The physical stock, buyers&rsquo; references and loading are on the <Link href="/dashboard/warehouse">Warehouse</Link> page.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -290,22 +319,6 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        {(['records', 'dispatch'] as const).map((t) => (
-          <button
-            key={t}
-            className={tab === t ? 'btn-primary' : 'btn-secondary'}
-            style={{ fontSize: '13px', padding: '8px 16px' }}
-            onClick={() => setTab(t)}
-          >
-            {t === 'records' ? 'Records & Lots' : 'Warehouse Dispatch'}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'dispatch' && <WarehouseDispatchPanel />}
-
-      {tab === 'records' && (
       <>
       <form onSubmit={receive} className="action-panel">
         <div className="panel-header">
@@ -372,6 +385,16 @@ export default function InventoryPage() {
                 ))}
               </select>
             </label>
+            {cyclesBlocked && (
+              <p className="muted" style={{ fontSize: 13, gridColumn: '1 / -1', color: 'var(--red-400)' }}>
+                Your role cannot see crop cycles, so deliveries can&rsquo;t be recorded here. Ask your administrator to give you View access to Crop Cycles.
+              </p>
+            )}
+            {!cyclesBlocked && cycles.length === 0 && (
+              <p className="muted" style={{ fontSize: 13, gridColumn: '1 / -1' }}>
+                No crop cycles to deliver against yet.
+              </p>
+            )}
             {selectedCycle && (
               <p className="muted" style={{ fontSize: 13, gridColumn: '1 / -1' }}>
                 Farm {selectedCycle.farm?.farmCode || '—'} · Farmer{' '}
@@ -430,11 +453,35 @@ export default function InventoryPage() {
                 }
               />
             </label>
+            {canReceiveIntoWarehouse && (
+              <label className="form-label">
+                Receive into warehouse
+                <select
+                  className="input-field"
+                  value={form.warehouseId}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, warehouseId: event.target.value }))
+                  }
+                >
+                  <option value="">Not yet (receive later)</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+                <small style={{ fontWeight: 400, color: 'var(--neutral-500)' }}>
+                  {warehouses.length
+                    ? 'Adds this weight to that warehouse\u2019s stock so it can be sold.'
+                    : 'No warehouses yet. Create one on the Warehouse page.'}
+                </small>
+              </label>
+            )}
             <label className="form-label">
-              Warehouse bay
+              Bay or stack<span style={{ fontWeight: 400, color: 'var(--neutral-500)' }}> (optional)</span>
               <input
                 className="input-field"
-                placeholder="Bay A"
+                placeholder="e.g. Bay A"
                 value={form.warehouseLocation}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, warehouseLocation: event.target.value }))
@@ -480,8 +527,8 @@ export default function InventoryPage() {
               <strong>Weight</strong> · {form.weightKg || '—'} kg · {form.qualityGrade}
             </div>
             <div>
-              <strong>Moisture</strong> · {form.moistureContentPct || '—'}% · Bay{' '}
-              {form.warehouseLocation || 'unassigned'}
+              <strong>Moisture</strong> · {form.moistureContentPct || '—'}% · {warehouses.find((w) => w.id === form.warehouseId)?.name ?? 'No warehouse yet'}
+              {form.warehouseLocation ? ` · ${form.warehouseLocation}` : ''}
             </div>
             <div>
               <strong>Received</strong> · {form.receivedDate}
@@ -518,7 +565,7 @@ export default function InventoryPage() {
           <div>
             <h2 className="panel-title">Create export lot</h2>
             <p className="panel-copy">
-              Combine unbatched receipts into one Fairtrade lot number for cooperative sales and dispatch.
+              Combine unbatched receipts into one lot number. Deliveries in different warehouses can&rsquo;t share a lot. Next: sell it from <Link href="/dashboard/sale-orders">Sale Orders</Link>.
             </p>
           </div>
           <span className="badge badge-blue">{unbatched.length} unbatched</span>
@@ -762,7 +809,7 @@ export default function InventoryPage() {
                   <th>Weight</th>
                   <th>Quality</th>
                   <th>Moisture</th>
-                  <th>Warehouse Bay</th>
+                  <th>Warehouse</th>
                   <th>Lot</th>
                   <th>Received</th>
                   <th>Status</th>
@@ -812,7 +859,18 @@ export default function InventoryPage() {
                       {r.moistureContentPct != null ? `${r.moistureContentPct}%` : '—'}
                     </td>
                     <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>
-                      {r.warehouseLocation || '—'}
+                      {r.warehouse?.name ? (
+                        <>
+                          {r.warehouse.name}
+                          {r.warehouseLocation ? ` · ${r.warehouseLocation}` : ''}
+                        </>
+                      ) : ['RECEIVED', 'IN_STORAGE'].includes(r.status) ? (
+                        <Link href="/dashboard/warehouse" style={{ textDecoration: 'none' }} title="Receive this delivery into a warehouse">
+                          <span className="badge badge-gold">Not in a warehouse</span>
+                        </Link>
+                      ) : (
+                        r.warehouseLocation || '—'
+                      )}
                     </td>
                     <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>
                       {r.lotNumber ? (
@@ -842,7 +900,6 @@ export default function InventoryPage() {
         )}
       </div>
       </>
-      )}
     </div>
   );
 }

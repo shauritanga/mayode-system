@@ -1,81 +1,78 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ViewIcon, ViewOffIcon } from '@hugeicons/core-free-icons';
 import Modal from '@/components/Modal';
-import { authApi, mamcosApi } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api-error';
+import { authApi } from '@/lib/api';
 
-interface CustomRole {
+export interface AssignableRole {
   id: string;
   name: string;
-  systemRole?: string | null;
+  /** Set when the role belongs to one cooperative; null/undefined for platform roles. */
+  mamcosId?: string | null;
+  mamcosName?: string | null;
 }
 
-interface Mamcos {
-  id: string;
-  name: string;
-}
+type StaffType = '' | 'FIELD_OFFICER' | 'MAMCOS_SECRETARY';
 
 const EMPTY_FORM = {
   firstName: '', lastName: '', phone: '', email: '', password: '',
-  role: '', roleId: '', mamcosId: '', assignedArea: '', language: 'sw',
+  role: '', roleId: '', staffType: '' as StaffType, mamcosId: '', assignedArea: '', language: 'sw',
 };
 
 export default function CreateAccountModal({
   customRoles,
   isSuperAdmin,
+  ownMamcosId,
   onClose,
   onCreated,
 }: {
-  customRoles: CustomRole[];
+  customRoles: AssignableRole[];
   isSuperAdmin: boolean;
+  /** The creator's own cooperative; set for cooperative admins, who can only create inside it. */
+  ownMamcosId?: string | null;
   onClose: () => void;
   onCreated: (name: string) => void;
 }) {
-
-  const [mamcosList, setMamcosList] = useState<Mamcos[]>([]);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  useEffect(() => {
-    mamcosApi.getAll().then((res) => {
-      const raw = res.data;
-      setMamcosList(Array.isArray(raw) ? raw : (raw?.data ?? []));
-    }).catch(() => {});
-  }, []);
+  const isSuperAdminAccount = form.role === 'SUPER_ADMIN';
+  const roleSelection = isSuperAdminAccount ? 'SUPER_ADMIN' : form.roleId;
+  // Super Admin only creates platform accounts: a cooperative's team is created by its own
+  // administrator. So Super Admin sees platform roles only, and cooperative admins see their own.
+  const roles = useMemo(
+    () => (isSuperAdmin ? customRoles.filter((r) => !r.mamcosId) : customRoles),
+    [customRoles, isSuperAdmin],
+  );
 
-  const staffRoles = customRoles.filter((role) => role.systemRole !== 'FARMER');
-  const profile = customRoles.find((r) => r.id === form.roleId)?.systemRole;
-  const needsMamcos = profile === 'FIELD_OFFICER' || profile === 'MAMCOS_SECRETARY';
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isSuperAdmin) return;
-    if (profile === 'FARMER') { setError('Farmer registration is available only in the mobile app.'); return; }
-    if (!form.roleId && form.role !== 'SUPER_ADMIN') { setError('Create a role in Roles & Permissions, then select it here.'); return; }
+    if (!form.roleId && !isSuperAdminAccount) { setError('Select a role first. Roles are created in Roles & Permissions.'); return; }
     setCreating(true);
     setError('');
     try {
       await authApi.createStaff({
-        firstName: form.firstName,
-        lastName: form.lastName,
-        phone: form.phone,
-        email: form.email || undefined,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim() || undefined,
         password: form.password,
-        role: form.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : undefined,
+        role: isSuperAdminAccount ? 'SUPER_ADMIN' : undefined,
         roleId: form.roleId || undefined,
-        mamcosId: needsMamcos ? (form.mamcosId || undefined) : undefined,
-        assignedArea: profile === 'FIELD_OFFICER' ? (form.assignedArea || undefined) : undefined,
+        staffType: !isSuperAdmin && form.staffType ? form.staffType : undefined,
+        assignedArea: !isSuperAdmin && form.staffType === 'FIELD_OFFICER' ? (form.assignedArea.trim() || undefined) : undefined,
         language: form.language,
       });
       onCreated(`${form.firstName} ${form.lastName}`.trim() || form.phone);
       onClose();
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string | string[] } } }).response?.data?.message
-          : undefined;
-      setError(Array.isArray(msg) ? msg.join(', ') : msg || 'Could not create account.');
+      setError(apiErrorMessage(err, 'Could not create account.'));
     } finally {
       setCreating(false);
     }
@@ -83,52 +80,103 @@ export default function CreateAccountModal({
 
   return (
     <Modal
-      title="New staff account"
-      subtitle="Choose a staff role. Farmers register through the mobile app."
+      title="New account"
+      subtitle={ownMamcosId ? 'Add a member of your cooperative’s team.' : 'Add a member of your team. Farmers register themselves in the mobile app.'}
       onClose={onClose}
-      width="560px"
+      width="580px"
       footer={
         <>
-          <button className="btn-secondary" onClick={onClose} disabled={creating}>Cancel</button>
-          <button className="btn-primary" onClick={submit} disabled={creating}>{creating ? 'Creating…' : 'Create account'}</button>
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={creating}>Cancel</button>
+          <button type="submit" form="create-account-form" className="btn-primary" disabled={creating}>
+            {creating ? 'Creating…' : 'Create account'}
+          </button>
         </>
       }
     >
-      <form onSubmit={submit} style={{ display: 'grid', gap: '12px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          <input className="input-field" placeholder="First name" required value={form.firstName} onChange={(e) => set('firstName', e.target.value)} />
-          <input className="input-field" placeholder="Last name" required value={form.lastName} onChange={(e) => set('lastName', e.target.value)} />
-        </div>
-        <input className="input-field" placeholder="Phone +255…" required value={form.phone} onChange={(e) => set('phone', e.target.value)} />
-        <input className="input-field" type="email" placeholder="Email (optional)" value={form.email} onChange={(e) => set('email', e.target.value)} />
-        <input className="input-field" type="password" minLength={6} placeholder="Temporary password" required value={form.password} onChange={(e) => set('password', e.target.value)} />
+      <form id="create-account-form" className="ua-form" onSubmit={submit}>
+        <section className="ua-section" aria-labelledby="ua-sec-person">
+          <h3 className="ua-section-title" id="ua-sec-person">Personal details</h3>
+          <div className="ua-row">
+            <div className="ua-field">
+              <label className="ua-label" htmlFor="ua-first">First name</label>
+              <input id="ua-first" className="input-field" autoComplete="off" required value={form.firstName} onChange={(e) => set('firstName', e.target.value)} />
+            </div>
+            <div className="ua-field">
+              <label className="ua-label" htmlFor="ua-last">Last name</label>
+              <input id="ua-last" className="input-field" autoComplete="off" required value={form.lastName} onChange={(e) => set('lastName', e.target.value)} />
+            </div>
+          </div>
+          <div className="ua-field">
+            <label className="ua-label" htmlFor="ua-phone">Phone number</label>
+            <input id="ua-phone" className="input-field" type="tel" inputMode="tel" autoComplete="off" placeholder="+255 7XX XXX XXX" required value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+            <span className="ua-hint">This is the sign-in name for the account.</span>
+          </div>
+          <div className="ua-field">
+            <label className="ua-label" htmlFor="ua-email">Email<span className="ua-opt">optional</span></label>
+            <input id="ua-email" className="input-field" type="email" autoComplete="off" value={form.email} onChange={(e) => set('email', e.target.value)} />
+          </div>
+        </section>
 
-        <label style={{ display: 'grid', gap: '5px' }}>
-          <span style={{ fontSize: '12px', fontWeight: 600 }}>Role</span>
-          <select className="input-field" required value={form.role || form.roleId}
-            onChange={(e) => setForm((f) => ({ ...f, role: e.target.value === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : '', roleId: e.target.value === 'SUPER_ADMIN' ? '' : e.target.value }))}>
-            <option value="">Select a role…</option>
-            <option value="SUPER_ADMIN">Super Admin (built-in)</option>
-            {staffRoles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-          </select>
-          {staffRoles.length === 0 && <p>Create your first role in Roles &amp; Permissions to create a non-super-admin account.</p>}
-        </label>
+        <section className="ua-section" aria-labelledby="ua-sec-signin">
+          <h3 className="ua-section-title" id="ua-sec-signin">Sign-in</h3>
+          <div className="ua-field">
+            <label className="ua-label" htmlFor="ua-password">Temporary password</label>
+            <div className="ua-input-wrap">
+              <input id="ua-password" className="input-field" type={showPassword ? 'text' : 'password'} autoComplete="new-password" minLength={6} required value={form.password} onChange={(e) => set('password', e.target.value)} />
+              <button type="button" className="ua-reveal" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                <HugeiconsIcon icon={showPassword ? ViewOffIcon : ViewIcon} size={18} strokeWidth={1.8} />
+              </button>
+            </div>
+            <span className="ua-hint">At least 6 characters. Share it securely and ask them to change it after signing in.</span>
+          </div>
+        </section>
 
-        {needsMamcos && (
-          <label style={{ display: 'grid', gap: '5px' }}>
-            <span style={{ fontSize: '12px', color: 'var(--neutral-400)', fontWeight: 600 }}>AMCOS</span>
-            <select className="input-field" required value={form.mamcosId} onChange={(e) => set('mamcosId', e.target.value)}>
-              <option value="">Select AMCOS…</option>
-              {mamcosList.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+        <section className="ua-section" aria-labelledby="ua-sec-access">
+          <h3 className="ua-section-title" id="ua-sec-access">Access</h3>
+          <div className="ua-field">
+            <label className="ua-label" htmlFor="ua-role">Role</label>
+            <select id="ua-role" className="input-field" required value={roleSelection}
+              onChange={(e) => setForm((f) => ({ ...f, role: e.target.value === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : '', roleId: e.target.value === 'SUPER_ADMIN' ? '' : e.target.value, staffType: e.target.value === 'SUPER_ADMIN' ? '' : f.staffType }))}>
+              <option value="">Select a role…</option>
+              {isSuperAdmin && <option value="SUPER_ADMIN">Super Admin (built-in)</option>}
+              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
-          </label>
-        )}
+            {roles.length === 0 && (
+              <span className="ua-hint">No roles yet. Create one in Roles &amp; Permissions first.</span>
+            )}
+          </div>
+          {isSuperAdminAccount && (
+            <div className="ua-role-note is-super">Super Admin has unrestricted access, including role management. Grant it sparingly.</div>
+          )}
+          {roleSelection && !isSuperAdminAccount && (
+            <div className="ua-role-note">This account gets exactly the permissions ticked for the selected role.</div>
+          )}
 
-        {profile === 'FIELD_OFFICER' && (
-          <input className="input-field" placeholder="Assigned area (optional)" value={form.assignedArea} onChange={(e) => set('assignedArea', e.target.value)} />
-        )}
+          {!isSuperAdmin && (
+            <div className="ua-field">
+              <label className="ua-label" htmlFor="ua-type">Position<span className="ua-opt">optional</span></label>
+              <select id="ua-type" className="input-field" value={form.staffType} onChange={(e) => set('staffType', e.target.value)}>
+                <option value="">Other staff</option>
+                <option value="FIELD_OFFICER">Field officer</option>
+                <option value="MAMCOS_SECRETARY">AMCOS secretary</option>
+              </select>
+              <span className="ua-hint">Field officers and secretaries also get a staff record in your cooperative.</span>
+            </div>
+          )}
 
-        {error && <div style={{ color: 'var(--red-400)', fontSize: '13px' }}>{error}</div>}
+          {!isSuperAdmin && (
+            <div className="ua-role-note">This account will belong to your cooperative and sign in to the cooperatives portal.</div>
+          )}
+
+          {!isSuperAdmin && form.staffType === 'FIELD_OFFICER' && (
+            <div className="ua-field">
+              <label className="ua-label" htmlFor="ua-area">Assigned area<span className="ua-opt">optional</span></label>
+              <input id="ua-area" className="input-field" value={form.assignedArea} onChange={(e) => set('assignedArea', e.target.value)} />
+            </div>
+          )}
+        </section>
+
+        {error && <div className="ua-form-error" role="alert">{error}</div>}
       </form>
     </Modal>
   );

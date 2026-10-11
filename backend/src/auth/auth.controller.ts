@@ -6,7 +6,9 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -16,6 +18,8 @@ import {
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { UserRole } from '@prisma/client';
 import { AuthService } from './auth.service';
+import { OtpService } from './otp.service';
+import { OtpRegisterDto, RequestOtpDto, VerifyOtpDto } from './dto/otp.dto';
 import {
   RegisterDto,
   FarmerSelfRegisterDto,
@@ -24,6 +28,9 @@ import {
   AuthResponseDto,
 } from './dto/auth.dto';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
+import { CreateCooperativeAdminDto } from './dto/create-cooperative-admin.dto';
+import { RequirePermission } from './decorators/require-permission.decorator';
+import type { DelegatingActor } from './delegation';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
@@ -32,7 +39,38 @@ import { CurrentUser } from './decorators/current-user.decorator';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly otp: OtpService,
+  ) {}
+
+  // ---- Passwordless sign-in for the mobile app: phone number, then the code sent by SMS ----
+  @Post('otp/request')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Text a 6-digit sign-in code to a phone number' })
+  requestOtp(@Body() dto: RequestOtpDto, @Req() req: Request) {
+    return this.otp.request(dto.phone, req.ip);
+  }
+
+  @Post('otp/verify')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Check the code: signs in, or returns a token to finish sign-up for a new number' })
+  verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.otp.verify(dto.phone, dto.code);
+  }
+
+  @Post('otp/register')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Finish sign-up for a verified new number (no password)' })
+  @ApiResponse({ status: HttpStatus.CREATED, type: AuthResponseDto })
+  registerWithOtp(@Body() dto: OtpRegisterDto) {
+    return this.otp.register(dto);
+  }
 
   // Compatibility endpoint for deployed mobile clients and older app builds.
   @Post('register')
@@ -76,7 +114,8 @@ export class AuthController {
 
   @Post('staff')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  // Super Admin always; a cooperative admin needs the `users` CREATE grant and is confined to their AMCOS.
+  @RequirePermission('users', 'CREATE')
   @ApiBearerAuth()
   @ApiOperation({
     summary:
@@ -92,9 +131,21 @@ export class AuthController {
   })
   async createStaffAccount(
     @Body() dto: CreateStaffUserDto,
-    @CurrentUser() user: { role: UserRole },
+    @CurrentUser() actor: DelegatingActor,
   ) {
-    return this.authService.createStaffAccount(dto, user.role);
+    return this.authService.createStaffAccount(dto, actor);
+  }
+
+  @Post('cooperative-admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Super Admin registers the administrator of a cooperative; they manage that AMCOS’s roles and staff.',
+  })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Cooperative admin created' })
+  createCooperativeAdmin(@Body() dto: CreateCooperativeAdminDto) {
+    return this.authService.createCooperativeAdmin(dto);
   }
 
   @Post('login')

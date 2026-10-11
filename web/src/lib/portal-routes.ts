@@ -24,7 +24,6 @@ export const PORTAL_SECTIONS = {
     "governance",
     "insurance",
     "inventory",
-    "leadership",
     "leases",
     "marketplace",
     "memberships",
@@ -39,8 +38,14 @@ export const PORTAL_SECTIONS = {
     "traceability",
     "weather",
     "ai",
+    "users",
+    "roles",
     "profile",
-    "forbidden"
+    "forbidden",
+    "sale-orders",
+    "warehouse",
+    "audit-log",
+    "buyers"
   ],
   "admin": [
     "premium-fund",
@@ -50,10 +55,12 @@ export const PORTAL_SECTIONS = {
     "auditor",
     "buyer",
     "buyer-orders",
+    "buyers",
     "compliance",
     "corrections",
     "crop-cycles",
     "disputes",
+    "facilities",
     "farm-registry",
     "farmers",
     "farms",
@@ -66,7 +73,6 @@ export const PORTAL_SECTIONS = {
     "grantor",
     "insurance",
     "inventory",
-    "leadership",
     "leases",
     "locations",
     "mamcos",
@@ -82,11 +88,13 @@ export const PORTAL_SECTIONS = {
     "sales",
     "seasons",
     "settings",
-    "staff",
     "staff-management",
     "suppliers",
     "traceability",
     "users",
-    "weather"
+    "weather",
+    "sale-orders",
+    "warehouse",
+    "audit-log"
   ]
 } as const;

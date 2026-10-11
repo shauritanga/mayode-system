@@ -104,11 +104,17 @@ async function seedLocations() {
 
 /** Only Super Admin is built in. All other roles are created in Role Management. */
 async function seedRolesAndPermissions() {
-  await prisma.role.upsert({
-    where: { name: 'Super Admin' },
-    update: { isSystem: true, systemRole: 'SUPER_ADMIN', isActive: true },
-    create: { name: 'Super Admin', isSystem: true, systemRole: 'SUPER_ADMIN' },
-  });
+  // Role names are unique per scope (platform roles have mamcosId null), so a
+  // plain name upsert is no longer possible.
+  const superAdminRole = await prisma.role.findFirst({ where: { name: 'Super Admin', mamcosId: null } });
+  if (superAdminRole) {
+    await prisma.role.update({
+      where: { id: superAdminRole.id },
+      data: { isSystem: true, systemRole: 'SUPER_ADMIN', isActive: true },
+    });
+  } else {
+    await prisma.role.create({ data: { name: 'Super Admin', isSystem: true, systemRole: 'SUPER_ADMIN' } });
+  }
 
   console.log('Seeding permission resources...');
   const resources = [
@@ -144,6 +150,12 @@ async function seedRolesAndPermissions() {
     { key: 'loans', label: 'Loans' },
     { key: 'buyers', label: 'Buyers' },
     { key: 'users', label: 'User Accounts' },
+    { key: 'roles', label: 'Roles & Permissions' },
+    { key: 'warehouses', label: 'Warehouses & Stock' },
+    { key: 'sale_orders', label: 'Sale Orders' },
+    { key: 'warehouse_desk', label: 'Warehouse Desk (confirm & release)' },
+    { key: 'release_approvals', label: 'Release & Credit Approvals' },
+    { key: 'audit_logs', label: 'Audit Log' },
     { key: 'settings', label: 'Settings' },
     { key: 'locations', label: 'Locations' },
     { key: 'ai_insights', label: 'AI Insights' },

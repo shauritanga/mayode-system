@@ -28,10 +28,19 @@ describe('Farmer mobile self-registration', () => {
     expect(tokens).toHaveBeenCalledWith(expect.objectContaining({ customRole: farmerRole }), 'MYD-00001');
   });
 
-  it('filters configured roles to active custom Farmer profiles', async () => {
+  it('uses the configured role, restricted to active platform-level roles', async () => {
     const { service, prisma } = setup([farmerRole], 'farmer-role');
     await service.selfRegisterFarmer(dto);
-    expect(prisma.role.findMany).toHaveBeenCalledWith({ where: { id: 'farmer-role', isActive: true, isSystem: false, systemRole: UserRole.FARMER }, take: 2 });
+    expect(prisma.role.findMany).toHaveBeenCalledWith({ where: { id: 'farmer-role', isActive: true, isSystem: false, mamcosId: null }, take: 2 });
+  });
+
+  it('falls back to the single platform role named Farmer when none is configured', async () => {
+    const { service, prisma } = setup();
+    await service.selfRegisterFarmer(dto);
+    expect(prisma.role.findMany).toHaveBeenCalledWith({
+      where: { isActive: true, isSystem: false, mamcosId: null, name: { equals: 'Farmer', mode: 'insensitive' } },
+      take: 2,
+    });
   });
 
   it.each([{ roles: [] }, { roles: [farmerRole, { ...farmerRole, id: 'another' }] }])('rejects missing or ambiguous configuration (%j)', async ({ roles }) => {

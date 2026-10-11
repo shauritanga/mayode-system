@@ -1,9 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ActivityType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -24,7 +26,14 @@ export class RiceProtocolTaskDefinitionDto {
   @IsNumber()
   daysFromPlanting?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() daysFromHarvest?: number;
-  @ApiPropertyOptional() @IsOptional() @IsString() activityType?: string;
+  @ApiPropertyOptional({
+    enum: ActivityType,
+    description:
+      'Completing the task records this kind of crop activity. Leave empty for tasks that are not field work.',
+  })
+  @IsOptional()
+  @IsEnum(ActivityType)
+  activityType?: ActivityType;
   @ApiPropertyOptional()
   @IsOptional()
   @IsObject()

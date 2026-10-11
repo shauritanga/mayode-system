@@ -70,4 +70,12 @@ export class CreateStaffUserDto {
   @IsString()
   @IsOptional()
   assignedArea?: string;
+
+  @ApiPropertyOptional({
+    enum: ['FIELD_OFFICER', 'MAMCOS_SECRETARY'],
+    description: 'Marks the account as AMCOS field staff and creates the related staff record. Requires an AMCOS.',
+  })
+  @IsIn(['FIELD_OFFICER', 'MAMCOS_SECRETARY'])
+  @IsOptional()
+  staffType?: UserRole;
 }

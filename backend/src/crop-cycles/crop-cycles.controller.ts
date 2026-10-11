@@ -40,6 +40,8 @@ const STAFF_ROLES = [
   UserRole.AUDITOR,
 ];
 
+import { FarmingHistoryService } from '../rice-protocols/farming-history.service';
+
 @ApiTags('crop-cycles')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -49,6 +51,7 @@ export class CropCyclesController {
   constructor(
     private readonly cropCyclesService: CropCyclesService,
     private readonly exporter: ExportService,
+    private readonly history: FarmingHistoryService,
   ) {}
 
   @Post()
@@ -176,6 +179,16 @@ export class CropCyclesController {
     @CurrentUser() user: RequestUser,
   ) {
     return this.cropCyclesService.findByFarmerId(farmerId, user);
+  }
+
+  @Get(':id/farming-history')
+  @Roles(...STAFF_ROLES, UserRole.FARMER)
+  @ApiOperation({
+    summary:
+      'Farming record: scheduled activities (on time, late, missed) and extra activities',
+  })
+  farmingHistory(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.history.forCycle(id, user);
   }
 
   @Get(':id')

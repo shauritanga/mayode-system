@@ -18,6 +18,7 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { InsuranceService } from './insurance.service';
+import { FarmingHistoryService } from '../rice-protocols/farming-history.service';
 import {
   AmendPolicyDto,
   CreateInsuranceClaimDto,
@@ -42,7 +43,10 @@ const STAFF_ROLES = [
 @PermissionResource('insurance')
 @Controller('insurance')
 export class InsuranceController {
-  constructor(private readonly insurance: InsuranceService) {}
+  constructor(
+    private readonly insurance: InsuranceService,
+    private readonly history: FarmingHistoryService,
+  ) {}
 
   @Post('providers')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
@@ -140,6 +144,19 @@ export class InsuranceController {
     @CurrentUser() user: RequestUser,
   ) {
     return this.insurance.createClaim(dto, user);
+  }
+
+  @Get('claims/:id/farming-history')
+  @Roles(...STAFF_ROLES, UserRole.FARMER)
+  @ApiOperation({
+    summary:
+      'Farming record behind a claim: required activities done on time, late or missed, plus extras',
+  })
+  claimFarmingHistory(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.history.forClaim(id, user);
   }
 
   @Get('claims')

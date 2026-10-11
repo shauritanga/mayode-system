@@ -5,6 +5,12 @@ sidebar IA and `image3.png` Farmers table). This file is the single place we upd
 each module reaches 100% — update the status + evidence line whenever you ship a piece
 of a module, don't let this drift out of sync with the code.
 
+> **Status caveat (2026-10-07 audit):** the percentages below were written before the Super-Admin-only role model
+> and the move to `web/src/screens/dashboard` + `web/apps/admin`. File paths under `web/src/app/dashboard/...` are
+> stale — the equivalents live in `web/src/screens/dashboard/...`. Treat "100%" as "built", not "verified in a
+> browser against production data". Open follow-ups: backend aggregation endpoint for the overview dashboard,
+> ESLint backlog (~320 errors), browser walkthrough per role.
+
 **Legend:** ✅ Done &nbsp;&nbsp;🟡 Partial &nbsp;&nbsp;❌ Missing
 
 Sidebar order below matches the docx wireframe (`image2.png`) exactly: Dashboard,

@@ -99,6 +99,8 @@ export const authApi = {
   register: (data: object) => api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
   createStaff: (data: object) => api.post('/auth/staff', data),
+  /** Super Admin: register the administrator who manages one cooperative's roles and staff. */
+  createCooperativeAdmin: (data: object) => api.post('/auth/cooperative-admin', data),
   /** Current-session profile: role, custom role, flattened permissions. */
   me: () => api.get('/auth/me'),
 };
@@ -197,6 +199,7 @@ export const farmVerificationsApi = {
 export const cropCyclesApi = {
   getAll: (params?: object) => api.get('/crop-cycles', { params }),
   getOne: (id: string) => api.get(`/crop-cycles/${id}`),
+  farmingHistory: (id: string) => api.get(`/crop-cycles/${id}/farming-history`),
   getByFarmId: (farmId: string) => api.get(`/crop-cycles/farm/${farmId}`),
   create: (data: object) => api.post('/crop-cycles', data),
   update: (id: string, data: object) => api.patch(`/crop-cycles/${id}`, data),
@@ -208,6 +211,12 @@ export const cropCyclesApi = {
   deleteActivityLog: (id: string) => api.delete(`/crop-cycles/activity/${id}`),
 };
 export const riceProtocolsApi = {
+  platformActive: (varietyId?: string) => api.get('/rice-protocols/platform/active', { params: varietyId ? { varietyId } : undefined }),
+  /** `varietyId` omitted = the default calendar used by varieties that have none of their own. */
+  platformVersions: (varietyId?: string) => api.get('/rice-protocols/platform', { params: varietyId ? { varietyId } : undefined }),
+  platformBootstrap: (varietyId?: string, copyFrom?: string) =>
+    api.post('/rice-protocols/platform/bootstrap', undefined, { params: { ...(varietyId ? { varietyId } : {}), ...(copyFrom ? { copyFrom } : {}) } }),
+  upcoming: (mamcosId: string) => api.get(`/rice-protocols/mamcos/${mamcosId}/upcoming`),
   bootstrap: (mamcosId: string) => api.post(`/rice-protocols/mamcos/${mamcosId}/bootstrap`),
   list: (mamcosId: string) => api.get(`/rice-protocols/mamcos/${mamcosId}`),
   update: (id: string, data: object) => api.patch(`/rice-protocols/${id}`, data),
@@ -215,6 +224,12 @@ export const riceProtocolsApi = {
   readiness: (cropCycleId: string, params?: { includeWarehouse?: boolean }) => api.get(`/rice-protocols/crop-cycles/${cropCycleId}/readiness`, { params }),
   rescheduleTask: (id: string, data: { dueDate: string; reason?: string }) => api.patch(`/rice-protocols/tasks/${id}/schedule`, data),
   completeTask: (id: string, data: object) => api.post(`/rice-protocols/tasks/${id}/complete`, data),
+};
+
+export const riceVarietiesApi = {
+  list: (includeInactive = false) => api.get('/rice-varieties', { params: includeInactive ? { includeInactive: true } : undefined }),
+  create: (data: object) => api.post('/rice-varieties', data),
+  update: (id: string, data: object) => api.patch(`/rice-varieties/${id}`, data),
 };
 
 export const activitiesApi = {
@@ -288,6 +303,7 @@ export const insuranceApi = {
   inspectClaim: (id: string, data: object) => api.patch(`/insurance/claims/${id}/inspect`, data),
   updateClaimPayment: (id: string, data: object) => api.patch(`/insurance/claims/${id}/payment`, data),
   getWeatherContextForClaim: (id: string) => api.get(`/insurance/claims/${id}/weather-context`),
+  farmingHistoryForClaim: (id: string) => api.get(`/insurance/claims/${id}/farming-history`),
   coverageSummary: () => api.get('/insurance/coverage-summary'),
 };
 export const weatherApi = {
@@ -339,7 +355,6 @@ export const governanceApi = {
   results: (id: string) => api.get(`/governance/votes/${id}/results`), projects: () => api.get('/governance/projects'), createProject: (data: object) => api.post('/governance/projects', data), updateProject: (id: string, data: object) => api.patch(`/governance/projects/${id}`, data), removeProject: (id: string) => api.delete(`/governance/projects/${id}`), meetings: () => api.get('/governance/meetings'), createMeeting: (data: object) => api.post('/governance/meetings', data), report: () => api.get('/governance/report'),
 };
 export const salesApi = {
-  create: (data: object) => api.post('/sales', data),
   list: () => api.get('/sales'),
   settle: (id: string) => api.post(`/sales/${id}/settle`, {}),
   collect: (id: string, phoneNumber?: string) => api.post(`/sales/${id}/collect`, { phoneNumber }),
@@ -352,7 +367,41 @@ export const salesApi = {
   createDispatch: (reference: string, data: object) =>
     api.post(`/sales/${encodeURIComponent(reference)}/dispatch`, data),
 };
-export const buyersApi = { list: () => api.get('/buyers') };
+export const warehousesApi = {
+  list: () => api.get('/warehouses'),
+  create: (data: object) => api.post('/warehouses', data),
+  update: (id: string, data: object) => api.patch(`/warehouses/${id}`, data),
+  assignKeeper: (id: string, userId: string) => api.post(`/warehouses/${id}/keepers`, { userId }),
+  removeKeeper: (id: string, userId: string) => api.delete(`/warehouses/${id}/keepers/${userId}`),
+  receive: (id: string, data: object) => api.post(`/warehouses/${id}/receive`, data),
+  adjust: (id: string, data: object) => api.post(`/warehouses/${id}/adjust`, data),
+  makeLot: (id: string, data: object) => api.post(`/warehouses/${id}/lots`, data),
+  movements: (id: string) => api.get(`/warehouses/${id}/movements`),
+  unreceived: () => api.get('/warehouses/unreceived-records'),
+};
+export const saleOrdersApi = {
+  list: (params?: { status?: string; q?: string }) => api.get('/sale-orders', { params }),
+  lots: (warehouseId: string) => api.get('/sale-orders/lots', { params: { warehouseId } }),
+  get: (id: string) => api.get(`/sale-orders/${id}`),
+  lookup: (reference: string) => api.get(`/sale-orders/lookup/${encodeURIComponent(reference.trim())}`),
+  reserve: (data: object) => api.post('/sale-orders', data),
+  cancel: (id: string, reason: string) => api.post(`/sale-orders/${id}/cancel`, { reason }),
+  confirm: (id: string, note?: string) => api.post(`/sale-orders/${id}/confirm`, { note }),
+  approve: (id: string, data: object) => api.post(`/sale-orders/${id}/approve`, data),
+  loadTruck: (id: string, data: object) => api.post(`/sale-orders/${id}/loads`, data),
+  loadStatus: (id: string, loadId: string, data: object) => api.post(`/sale-orders/${id}/loads/${loadId}/status`, data),
+  closeShort: (id: string, reason: string) => api.post(`/sale-orders/${id}/close-short`, { reason }),
+  complete: (id: string) => api.post(`/sale-orders/${id}/complete`, {}),
+};
+export const auditLogsApi = {
+  list: (params?: object) => api.get('/audit-logs', { params }),
+};
+export const buyersApi = {
+  list: () => api.get('/buyers'),
+  create: (data: object) => api.post('/buyers', data),
+  update: (id: string, data: object) => api.patch(`/buyers/${id}`, data),
+  remove: (id: string) => api.delete(`/buyers/${id}`),
+};
 export const buyerOrdersApi = {
   getAll: () => api.get('/buyer-orders'),
   getForBuyer: (buyerId: string) => api.get(`/buyer-orders/buyer/${buyerId}`),
@@ -393,6 +442,10 @@ export const locationsApi = {
 export const settingsApi = {
   getOrg: () => api.get('/settings/org'),
   updateOrg: (data: object) => api.put('/settings/org', data),
+  getSales: () => api.get('/settings/sales'),
+  updateSales: (data: object) => api.put('/settings/sales', data),
+  getCalendar: () => api.get('/settings/calendar'),
+  updateCalendar: (data: object) => api.put('/settings/calendar', data),
   getTemplates: () => api.get('/settings/notification-templates'),
   createTemplate: (data: object) => api.post('/settings/notification-templates', data),
   updateTemplate: (id: string, data: object) => api.patch(`/settings/notification-templates/${id}`, data),
@@ -402,6 +455,10 @@ export const settingsApi = {
 // ── Marketplace ──
 export const marketplaceApi = {
   depositQuote: (id: string) => api.get(`/marketplace/land/${id}/quote`),
+  /** Private deals: can I take this listing? OPEN, OWNER, GRANTED, NEEDS_CODE or EXPIRED_OR_TAKEN. */
+  accessFor: (id: string) => api.get(`/marketplace/land/${id}/access`),
+  redeemCode: (id: string, code: string) => api.post(`/marketplace/land/${id}/redeem-code`, { code }),
+  regenerateCode: (id: string) => api.post(`/marketplace/land/${id}/regenerate-code`),
   managedListings: () => api.get('/marketplace/land/manage'),
   myTractorBookings: () => api.get('/marketplace/tractors/bookings/mine'),
   respondToCounter: (listingId: string, offerId: string, data: object) => api.patch(`/marketplace/land/${listingId}/offers/${offerId}/counter-response`, data),

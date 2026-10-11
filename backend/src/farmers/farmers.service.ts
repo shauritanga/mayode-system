@@ -1,3 +1,4 @@
+import { resolveFarmerRole } from '../auth/farmer-role';
 import {
   Injectable,
   BadRequestException,
@@ -69,8 +70,7 @@ export class FarmersService {
     const tenantId = actor ? this.ownership.resolveTenantMamcosId(actor) : null;
     if (tenantId) dto = { ...dto, mamcosId: tenantId };
     const roleId = this.config.get<string>('FARMER_SELF_REGISTRATION_ROLE_ID');
-    const roles = await this.prisma.role.findMany({ where: { isActive: true, isSystem: false, systemRole: UserRole.FARMER, ...(roleId ? { id: roleId } : {}) }, take: 2 });
-    if (roles.length !== 1) throw new BadRequestException('Farmer registration is not configured. Please contact support.');
+    const farmerRole = await resolveFarmerRole(this.prisma, roleId);
     const existing = await this.prisma.user.findFirst({
       where: { OR: [{ phone: dto.phone }, { email: dto.email || undefined }] },
     });
@@ -92,7 +92,7 @@ export class FarmersService {
           firstName: dto.firstName,
           lastName: dto.lastName,
           role: UserRole.FARMER,
-          roleId: roles[0].id,
+          roleId: farmerRole.id,
         },
       });
 

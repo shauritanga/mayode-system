@@ -1,20 +1,46 @@
-# Super Admin and custom roles
+# Roles, accounts and cooperative administrators
 
-Super Admin is the only built-in access role. In **Roles & Permissions**, Super Admin creates a role, saves its resource permissions, then assigns it in **User Accounts**. New custom roles have no grants. Only Super Admin can create roles, change permissions, provision staff accounts, or change an account's role. Farmers can self-register in the mobile app; the server assigns their Farmer role automatically.
+Super Admin is the only built-in access role. Everything else is a **custom role** that carries permissions only. A role never decides which portal someone signs in to or what records exist for them.
 
-Non-super accounts need an active custom role. Neither an old `ADMIN` value nor another historical profile grants access. Permission changes are loaded from the database on every authenticated request. Deactivating a role blocks its users' next request and token refresh.
+## Who manages what
 
-An optional operational profile configures farmer/cooperative records for newly created accounts. The historical enum values remain for those domain workflows and existing records; they are not built-in access roles. Generic roles use `CUSTOM`. Ownership checks still apply in addition to resource permissions.
+| | Super Admin | Cooperative admin |
+|---|---|---|
+| Scope | Whole platform | One AMCOS |
+| Roles | Create, edit, delete platform roles and any AMCOS's roles | Create, edit, delete roles of **their own AMCOS** |
+| Permissions on a role | Anything | Only permissions **they hold themselves**, never platform-wide resources (`settings`, `locations`, `rewards`, `buyer_portal`) |
+| Accounts | Create any account, change any role, activate/deactivate | Create accounts and assign roles **inside their AMCOS**; activate/deactivate their staff |
+| Never | — | Create a Super Admin, edit their own role, change their own role, deactivate themselves, delete users, see another cooperative |
 
-## Farmer self-registration
+A **cooperative admin** is an ordinary account whose `mamcosId` is set and whose role holds the `users` and `roles` permissions. Nothing else is special about it; the API enforces the limits above on every request (`backend/src/auth/delegation.ts`).
 
-The mobile signup form restored from `36d476f` (last changed in `2100318`, removed in `1780206`) submits to public, rate-limited `POST /auth/register` (with `/auth/register/farmer` retained as an alias). It creates a farmer profile and signs the farmer in. Public requests cannot select a role or roleId. Super Admin provisioning uses the protected `POST /auth/register/admin` endpoint.
+## Setting up a cooperative
 
-Create an active custom role with the `FARMER` operational profile and the desired permissions. If exactly one such role exists, signup uses it automatically. If multiple exist, set backend `FARMER_SELF_REGISTRATION_ROLE_ID` to the intended role ID. Signup fails with a configuration message when no eligible role exists or the selection is ambiguous; it never creates a built-in role or grants permissions automatically.
+1. **Admin portal → AMCOS** — create the AMCOS. Optionally add its administrator in the same form, or press **Add admin** on the list later (`POST /auth/cooperative-admin`, Super Admin only).
+2. That creates (once) an AMCOS-scoped **Cooperative Admin** role holding every grantable permission, and an account on it.
+3. The administrator signs in to the **Cooperative Portal** and opens **Roles & Permissions** to create roles (for example *Clerk*, *Accountant*) and **User Accounts** to add staff, each with a role of their own AMCOS.
+
+Role names are unique per scope, so two cooperatives can both have a *Clerk* role.
+
+## Which portal an account uses
+
+Decided by who the account belongs to:
+
+- **Farmers portal** — farmers.
+- **Cooperative portal** — anyone tied to an AMCOS: its admin and staff, secretaries, field officers.
+- **Admin portal** — Super Admin and platform staff (no AMCOS). Field officers may use either.
+
+## Account type (field officers and secretaries)
+
+There is no per-role "operational profile" any more. When creating an account you may mark it as a **Field officer** or **AMCOS secretary**; that creates their staff record in the AMCOS (an employee code for officers; at most one secretary per AMCOS). Everyone else is general staff.
+
+## Farmers
+
+Farmers self-register in the mobile app (`POST /auth/register`, rate-limited; `/auth/register/farmer` is an alias). Signup uses one platform-level role: set backend `FARMER_SELF_REGISTRATION_ROLE_ID`, or name an active platform role **Farmer**. It fails with a configuration message if there isn't exactly one candidate; it never creates a role or grants permissions itself. A cooperative admin or field officer can register farmers inside their AMCOS with the same role.
 
 ## Deployment
 
-After backing up the database, apply the checked-in migrations from `backend`:
+After backing up the database, from `backend`:
 
 ```sh
 npx prisma migrate deploy
@@ -22,11 +48,9 @@ npx prisma generate
 npm run build
 ```
 
-The migration removes non-super built-in role records, preserves users and existing custom roles, and adds database constraints preventing additional built-in roles. It does not grant replacement access automatically. Super Admin must assign custom roles to legacy accounts without one. Existing custom roles and their grants are preserved for review. The old automatic role-template seed is disabled.
-
-This migration does not require running the full application seed. A new installation's seed creates only the Super Admin role and the resource catalog; provision the initial Super Admin account using the existing administrative bootstrap process.
+The cooperative-scope migration (`20261007120000_cooperative_scoped_roles`) is additive: existing roles and accounts stay platform-level, it adds the `roles` permission resource, and it copies each existing secretary's / field officer's AMCOS onto their account so a cooperative admin can manage them. Existing farmer-signup setups keep working if the farmer role is named **Farmer** or `FARMER_SELF_REGISTRATION_ROLE_ID` is set — **check this before deploying**, because auto-detection by operational profile is gone.
 
 ## Verification
 
 Backend: `npm test -- --runInBand` and `npm run build` in `backend`.
-Web: `node tests/nav.test.cjs` and `npx tsc --noEmit` in `web`.
+Web: `node --test tests/*.test.cjs` and `npx tsc --noEmit` in `web`.

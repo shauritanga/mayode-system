@@ -10,9 +10,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
-  UserCircleIcon,
   Edit02Icon,
-  Plant01Icon,
   Wallet01Icon,
   Calendar01Icon,
   StarIcon,
@@ -82,9 +80,7 @@ function FarmerDrawerContent(props: DrawerContentComponentProps) {
   };
 
   const items: DrawerNavItem[] = [
-    { key: 'profile', label: t('myProfile'), icon: UserCircleIcon, color: '#065F46', onPress: () => go('/profile') },
     { key: 'edit-profile', label: t('editProfile'), icon: Edit02Icon, color: '#10B981', onPress: () => go('/edit-profile') },
-    { key: 'farms', label: t('farms'), icon: Plant01Icon, color: '#059669', onPress: () => go('/farms') },
     { key: 'log-activity', label: t('logActivity'), icon: TaskDaily01Icon, color: '#065F46', onPress: () => goSelectCycle('activity') },
     { key: 'add-expense', label: t('addExpense'), icon: Wallet01Icon, color: '#0F766E', onPress: () => goSelectCycle('expense') },
     { key: 'record-sale', label: t('recordSale'), icon: CoinsDollarIcon, color: '#047857', onPress: () => goSelectCycle('sale') },

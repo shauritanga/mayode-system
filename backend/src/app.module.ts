@@ -44,6 +44,10 @@ import { SuppliersModule } from './suppliers/suppliers.module';
 import { FacilitiesModule } from './facilities/facilities.module';
 import { SettingsModule } from './settings/settings.module';
 import { SalesModule } from './sales/sales.module';
+import { WarehousesModule } from './warehouses/warehouses.module';
+import { RiceVarietiesModule } from './rice-varieties/rice-varieties.module';
+import { SaleOrdersModule } from './sale-orders/sale-orders.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { ReportsModule } from './reports/reports.module';
 import { LoansModule } from './loans/loans.module';
 import { AccountingModule } from './accounting/accounting.module';
@@ -109,6 +113,10 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     FacilitiesModule,
     SettingsModule,
     SalesModule,
+    WarehousesModule,
+    RiceVarietiesModule,
+    SaleOrdersModule,
+    AuditLogsModule,
     ReportsModule,
     LoansModule,
     AccountingModule,

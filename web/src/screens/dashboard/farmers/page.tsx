@@ -1,4 +1,6 @@
 'use client';
+import ErrorBanner from '@/components/ErrorBanner';
+import { apiErrorMessage } from '@/lib/api-error';
 import { useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
@@ -111,6 +113,7 @@ export default function FarmersPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [mamcosList, setMamcosList] = useState<Mamcos[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [overviewLoading, setOverviewLoading] = useState(true);
 
   const [page, setPage] = useState(1);
@@ -201,11 +204,13 @@ export default function FarmersPage() {
         })
         .then((res) => {
           if (cancelled) return;
+          setLoadError('');
           setFarmers(res.data?.data ?? []);
           setPagination(res.data?.pagination ?? null);
         })
-        .catch(() => {
+        .catch((e) => {
           if (!cancelled) {
+            setLoadError(apiErrorMessage(e, 'Failed to load farmers'));
             setFarmers([]);
             setPagination(null);
           }
@@ -219,7 +224,7 @@ export default function FarmersPage() {
     mamcosApi.getAll().then((res) => {
       const raw = res.data;
       setMamcosList(Array.isArray(raw) ? raw : (raw?.data ?? []));
-    }).catch(() => {});
+    }).catch((e) => setLoadError(apiErrorMessage(e, 'Failed to load AMCOS filter list')));
   }, []);
 
   const pages = useMemo(
@@ -337,6 +342,8 @@ export default function FarmersPage() {
             </div>
           )}
         </div>
+
+        <ErrorBanner message={loadError} onDismiss={() => setLoadError('')} />
 
         {loading ? (
           <div className="farmers-skeleton">

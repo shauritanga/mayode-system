@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 import { useIdleLogout } from '@/hooks/useIdleLogout';
 import { authApi } from '@/lib/api';
 import { isPathAllowed } from '@/lib/nav';
-import { isRoleAllowedInThisMode } from '@/lib/app-mode';
+import { isAccountAllowedInThisMode } from '@/lib/app-mode';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, _hasHydrated, updateUser, clearAuth } = useAuthStore();
@@ -49,7 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // and is bounced to a 403 page instead of rendering then failing at the API.
   useEffect(() => {
     if (!_hasHydrated || !isAuthenticated || !user) return;
-    if (!isRoleAllowedInThisMode(user.role)) {
+    if (!isAccountAllowedInThisMode(user)) {
       // Local-only cleanup: never call the server /auth/logout endpoint here —
       // it revokes the account's refresh tokens across every device/session,
       // which would also kill a legitimate session on the correct subdomain.
@@ -63,7 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [_hasHydrated, isAuthenticated, user, pathname, router, clearAuth]);
 
   if (!_hasHydrated || !isAuthenticated) return null;
-  if (user && (!isRoleAllowedInThisMode(user.role) || !isPathAllowed(pathname, user))) return null;
+  if (user && (!isAccountAllowedInThisMode(user) || !isPathAllowed(pathname, user))) return null;
 
   return (
     <div className={`shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>

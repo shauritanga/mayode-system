@@ -47,7 +47,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // farmer profile — used to scope data access to that AMCOS alone. See
     // OwnershipService.resolveTenantMamcosId for how this is applied.
     const mamcosId =
-      user.mamcosStaff?.mamcosId ?? user.farmer?.mamcosId ?? null;
+      user.mamcosId ?? user.mamcosStaff?.mamcosId ?? user.farmer?.mamcosId ?? null;
 
     return {
       id: user.id,

@@ -24,6 +24,8 @@ interface LandListing {
   askingPrice: number;
   suggestedPrice?: number;
   dealType: string;
+  /** Has a private-deal code; set by the server. */
+  isPrivate?: boolean;
   leaseStatus: string;
   leaseDurationMonths: number;
   commissionRate: number;
@@ -593,8 +595,13 @@ export default function MarketplacePage() {
               <select className="input-field" value={listingForm.dealType} onChange={e => setL('dealType', e.target.value)}>
                 <option value="STANDARD">Standard</option>
                 <option value="FLASH_DEAL">Flash Deal</option>
-                <option value="RELATIONSHIP">Relationship</option>
+                <option value="RELATIONSHIP">Relationship (private)</option>
               </select>
+              {listingForm.dealType === 'RELATIONSHIP' && (
+                <p style={{ fontSize: 12, color: 'var(--neutral-500)', marginTop: 6 }}>
+                  Private deal: the owner receives a secret code by SMS to give to the one person they choose. You will not see the code.
+                </p>
+              )}
             </div>
             <TextField label="Commission rate (0-1)" value={listingForm.commissionRate} onChange={v => setL('commissionRate', v)} placeholder="0.10" />
             <TextField label="Lease duration (months)" value={listingForm.leaseDurationMonths} onChange={v => setL('leaseDurationMonths', v)} placeholder="6" />
@@ -894,7 +901,7 @@ export default function MarketplacePage() {
                             <td style={{ color: 'var(--gold-400)', fontSize: '12px' }}>{l.suggestedPrice ? `${Number(l.suggestedPrice).toLocaleString()} TZS` : '—'}</td>
                             <td>
                               <span className={`badge ${l.isFlashDeal ? 'badge-red' : l.dealType === 'RELATIONSHIP' ? 'badge-blue' : 'badge-gold'}`}>
-                                {l.isFlashDeal ? '⚡ Flash' : l.dealType}
+                                {l.isFlashDeal ? '⚡ Flash' : `${l.isPrivate ? '🔒 ' : ''}${l.dealType}`}
                               </span>
                             </td>
                             <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{l.leaseDurationMonths} months</td>

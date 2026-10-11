@@ -39,8 +39,8 @@ export class UsersController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @RequirePermission('users', 'VIEW')
   @ApiOperation({ summary: 'Get all users (Super Admin / Admin only)' })
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@CurrentUser() user: RequestUser) {
+    return this.usersService.findAll(user);
   }
 
   @Get(':id')

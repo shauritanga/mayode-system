@@ -17,13 +17,14 @@ export function LandListingCard({ listing: l, onPress }: LandListingCardProps) {
           <Text style={styles.subText}>{l.farm?.socialHectares || '—'} ha · {t('gradeValue', { grade: l.farm?.grade || 'A' })}</Text>
         </View>
         <View style={[styles.badge, l.isFlashDeal ? styles.badgeRed : styles.badgeGold]}>
-          <Text style={l.isFlashDeal ? styles.badgeTextRed : styles.badgeTextGold}>{l.dealType}</Text>
+          <Text style={l.isFlashDeal ? styles.badgeTextRed : styles.badgeTextGold}>{l.isPrivate ? `🔒 ${t('mlaxPrivateDeal')}` : l.dealType}</Text>
         </View>
       </View>
 
       <View style={styles.priceBox}>
         <Text style={styles.priceLabel}>{t('askingPrice')}</Text>
-        <Text style={styles.priceValue}>{Number(l.askingPrice).toLocaleString()} TZS</Text>
+        {/* A private deal's price is for the owner and the renter who entered the code. */}
+        <Text style={styles.priceValue}>{l.priceHidden || l.askingPrice == null ? '🔒' : `${Number(l.askingPrice).toLocaleString()} TZS`}</Text>
       </View>
 
       <View style={styles.cardFooter}>

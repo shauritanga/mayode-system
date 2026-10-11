@@ -20,6 +20,8 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { SettingsService } from './settings.service';
 import {
   UpdateOrgSettingsDto,
+  UpdateSalesSettingsDto,
+  UpdateCalendarSettingsDto,
   UpsertNotificationTemplateDto,
 } from './dto/settings.dto';
 
@@ -43,6 +45,34 @@ export class SettingsController {
   @RequirePermission('settings', 'EDIT')
   updateOrgSettings(@Body() dto: UpdateOrgSettingsDto) {
     return this.settings.updateOrgSettings(dto);
+  }
+
+  @Get('sales')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('settings', 'VIEW')
+  getSalesSettings() {
+    return this.settings.getSalesSettings();
+  }
+
+  @Put('sales')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('settings', 'EDIT')
+  updateSalesSettings(@Body() dto: UpdateSalesSettingsDto) {
+    return this.settings.updateSalesSettings(dto);
+  }
+
+  @Get('calendar')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('settings', 'VIEW')
+  getCalendarSettings() {
+    return this.settings.getCalendarSettings();
+  }
+
+  @Put('calendar')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @RequirePermission('settings', 'EDIT')
+  updateCalendarSettings(@Body() dto: UpdateCalendarSettingsDto) {
+    return this.settings.updateCalendarSettings(dto);
   }
 
   @Post('notification-templates')

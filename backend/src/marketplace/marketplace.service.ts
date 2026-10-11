@@ -1,5 +1,8 @@
 import { randomBytes } from 'crypto';
 import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
@@ -22,6 +25,20 @@ import { CreateMarketPriceDto } from './dto/create-market-price.dto';
 import { RequestSubLeaseDto, ApproveSubLeaseDto } from './dto/sub-lease.dto';
 import { TransferOwnershipDto } from './dto/ownership-transfer.dto';
 import { AccountingService } from '../accounting/accounting.service';
+import {
+  accessStateFor,
+  AccessState,
+  expiryFromNow,
+  FARMER_WINDOW_MINUTES,
+  generateCode,
+  hashCode,
+  isPrivate,
+  LISTING_WINDOW_MINUTES,
+  maskCode,
+  redactForViewer,
+  throttleReason,
+  verifyCode,
+} from './listing-access';
 import { RequestUser } from '../common/ownership.service';
 import {
   DealType,
@@ -126,7 +143,10 @@ export class MarketplaceService {
   // 🌾 A. LAND LEASING & ESCROW WORKFLOWS
   // ==========================================
 
-  async createLandListing(createLandListingDto: CreateLandListingDto) {
+  async createLandListing(
+    createLandListingDto: CreateLandListingDto,
+    actor?: RequestUser,
+  ) {
     const {
       farmId,
       ownerId,
@@ -135,7 +155,6 @@ export class MarketplaceService {
       dealType,
       leaseDurationMonths,
       isFlashDeal,
-      preferredRenterCode,
       isMultiYear,
       pricingModel,
       autoDropPrice,
@@ -221,6 +240,9 @@ export class MarketplaceService {
         )
       : null;
 
+    const issuedCode =
+      dealType === DealType.RELATIONSHIP ? generateCode() : undefined;
+
     const listing = await this.prisma.landListing.create({
       data: {
         farmId,
@@ -234,7 +256,6 @@ export class MarketplaceService {
         leaseStatus: LeaseStatus.DRAFT,
         leaseDurationMonths,
         isFlashDeal: isFlashDeal ?? false,
-        preferredRenterCode,
         isMultiYear: resolvedIsMultiYear,
         pricingModel,
         paymentPlan: resolvedIsMultiYear ? paymentPlan : undefined,
@@ -242,6 +263,13 @@ export class MarketplaceService {
         autoDropPrice,
         autoDropDays,
         facilitatedByStaffId,
+        // A Relationship deal is private: the owner gets a code for the one person they choose.
+        ...(issuedCode
+          ? {
+              accessCodeHash: hashCode(issuedCode),
+              accessCodeExpiresAt: expiryFromNow(),
+            }
+          : {}),
       },
       include: {
         farm: true,
@@ -287,34 +315,396 @@ export class MarketplaceService {
       });
     }
 
-    return listing;
+    if (issuedCode && listing.owner.user?.phone) {
+      await this.sendPrivateCode(
+        listing.owner.user.phone,
+        listing.farm.farmCode,
+        issuedCode,
+        listing.accessCodeExpiresAt!,
+      );
+    }
+
+    // The code is shown once, and only to the owner themselves. A field officer or secretary who
+    // listed on the owner's behalf never sees it; the owner gets it by SMS and can regenerate it.
+    const ownerFarmer =
+      actor?.role === 'FARMER'
+        ? await this.prisma.farmer.findUnique({
+            where: { userId: actor.id },
+            select: { id: true },
+          })
+        : null;
+    const { owner: listedOwner, ...rest } = redactForViewer(
+      listing,
+      'OWNER',
+    ) as Record<string, any>;
+    return {
+      ...rest,
+      owner: listedOwner
+        ? {
+            id: listedOwner.id,
+            firstName: listedOwner.firstName,
+            lastName: listedOwner.lastName,
+          }
+        : null,
+      ...(issuedCode && ownerFarmer?.id === ownerId
+        ? {
+            accessCode: issuedCode,
+            accessCodeExpiresAt: listing.accessCodeExpiresAt,
+          }
+        : {}),
+    };
   }
 
-  publicListing(listing: any) {
-    const { owner, renter, escrowPayments, subLeases, agreementPdfUrl, agreementGeneratedAt, preferredRenterCode, renterId, previousRenterId, facilitatedByStaffId, ...publicData } = listing;
-    return { ...publicData, owner: owner ? { id: owner.id, firstName: owner.firstName, lastName: owner.lastName } : null };
+  /** The code reaches the owner's phone but is never stored in the SMS log. */
+  private async sendPrivateCode(
+    phone: string,
+    farmCode: string,
+    code: string,
+    expiresAt: Date,
+  ) {
+    await this.sms.send(
+      phone,
+      `MAYODE: Private deal code for farm ${farmCode} is ${code}. Give it only to the person you choose; it works for one person. Valid until ${expiresAt.toLocaleDateString('en-GB')}.`,
+      'mlax_private_code',
+      `MAYODE: Private deal code for farm ${farmCode} is ${maskCode()}.`,
+    );
+  }
+
+  /**
+   * What a viewer who is not signed in (or is not a party to the deal) sees. A private listing keeps
+   * its location and farm details visible but hides the price and terms until the code is redeemed.
+   */
+  publicListing(
+    listing: any,
+    viewerFarmerId: string | null = null,
+    forcedState?: AccessState,
+  ): Record<string, any> {
+    const state = forcedState ?? accessStateFor(listing, viewerFarmerId);
+    const {
+      owner,
+      renter,
+      escrowPayments,
+      subLeases,
+      agreementPdfUrl,
+      agreementGeneratedAt,
+      preferredRenterCode,
+      renterId,
+      previousRenterId,
+      facilitatedByStaffId,
+      ...publicData
+    } = listing;
+    const redacted = redactForViewer(publicData, state);
+    return {
+      ...redacted,
+      owner: owner
+        ? { id: owner.id, firstName: owner.firstName, lastName: owner.lastName }
+        : null,
+    };
+  }
+
+  /** Does this person hold the right to take a private listing? Staff and open listings: yes. */
+  private async viewerFarmerId(user: RequestUser): Promise<string | null> {
+    if (user.role !== 'FARMER') return null;
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    return farmer?.id ?? null;
+  }
+
+  /** One question for the screens: do I need a code, may I see the price, am I the owner? */
+  async accessFor(listingId: string, user: RequestUser) {
+    const listing = await this.findOneLandListing(listingId);
+    const farmerId = await this.viewerFarmerId(user);
+    // Staff act for farmers and see the full listing; farmers are judged on their own account.
+    const state: AccessState =
+      user.role === 'FARMER'
+        ? accessStateFor(listing, farmerId)
+        : isPrivate(listing)
+          ? 'OWNER'
+          : 'OPEN';
+    return {
+      state,
+      listing: this.publicListing(listing, farmerId, state),
+      ...(state === 'OWNER'
+        ? {
+            codeExpiresAt: listing.accessCodeExpiresAt,
+            claimed: !!listing.claimedByFarmerId,
+          }
+        : {}),
+    };
+  }
+
+  /**
+   * A renter enters the code the owner gave them. A correct code binds the listing to that renter;
+   * from then on nobody else can use it, even with the same code.
+   */
+  async redeemAccessCode(
+    listingId: string,
+    user: RequestUser,
+    rawCode: string,
+  ) {
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { userId: user.id },
+      include: { user: { select: { phone: true } } },
+    });
+    if (!farmer) throw new BadRequestException('A farmer profile is required');
+    if (farmer.isBlacklisted) {
+      throw new BadRequestException(
+        'This farmer is blacklisted from M-LAX and cannot rent land',
+      );
+    }
+    const listing = await this.prisma.landListing.findUnique({
+      where: { id: listingId },
+      include: {
+        farm: true,
+        owner: { include: { user: { select: { phone: true } } } },
+      },
+    });
+    if (!listing) throw new NotFoundException('Listing not found');
+    if (listing.ownerId === farmer.id) {
+      throw new BadRequestException(
+        'You own this listing; you do not need a code',
+      );
+    }
+    if (!isPrivate(listing)) {
+      throw new BadRequestException('This listing does not need a code');
+    }
+    if (listing.leaseStatus !== LeaseStatus.DRAFT) {
+      throw new BadRequestException('This listing is no longer open');
+    }
+    if (listing.claimedByFarmerId === farmer.id)
+      return this.accessFor(listingId, user);
+
+    // Throttle guessing before looking at the code at all.
+    const now = Date.now();
+    const [failsOnListing, failsAcrossListings] = await Promise.all([
+      this.prisma.landListingCodeAttempt.count({
+        where: {
+          listingId,
+          farmerId: farmer.id,
+          success: false,
+          createdAt: { gte: new Date(now - LISTING_WINDOW_MINUTES * 60_000) },
+        },
+      }),
+      this.prisma.landListingCodeAttempt.count({
+        where: {
+          farmerId: farmer.id,
+          success: false,
+          createdAt: { gte: new Date(now - FARMER_WINDOW_MINUTES * 60_000) },
+        },
+      }),
+    ]);
+    const wait = throttleReason({ failsOnListing, failsAcrossListings });
+    if (wait) throw new HttpException(wait, HttpStatus.TOO_MANY_REQUESTS);
+
+    const fail = async () => {
+      await this.prisma.landListingCodeAttempt.create({
+        data: { listingId, farmerId: farmer.id, success: false },
+      });
+      throw new BadRequestException('That code is not valid for this listing');
+    };
+    // Someone already holds it: the same words as a wrong code, so a stranger learns nothing.
+    if (listing.claimedByFarmerId) return fail();
+    if (!verifyCode(rawCode, listing.accessCodeHash)) return fail();
+    if (
+      listing.accessCodeExpiresAt &&
+      listing.accessCodeExpiresAt.getTime() < now
+    ) {
+      throw new BadRequestException(
+        'This code has expired. Ask the owner for a new one.',
+      );
+    }
+
+    // Bind atomically so two people entering the same code at once cannot both win.
+    const bound = await this.prisma.landListing.updateMany({
+      where: {
+        id: listingId,
+        claimedByFarmerId: null,
+        accessCodeHash: listing.accessCodeHash,
+      },
+      data: { claimedByFarmerId: farmer.id, claimedAt: new Date() },
+    });
+    if (!bound.count) return fail();
+    await this.prisma.landListingCodeAttempt.create({
+      data: { listingId, farmerId: farmer.id, success: true },
+    });
+
+    if (listing.owner.user?.phone) {
+      await this.sms.send(
+        listing.owner.user.phone,
+        `MAYODE: ${farmer.firstName} ${farmer.lastName} entered your private code for farm ${listing.farm.farmCode}. Only they can take this farm now.`,
+        'mlax_private_code_used',
+      );
+    }
+    return this.accessFor(listingId, user);
+  }
+
+  /**
+   * The owner replaces the code: the old one stops working, whoever had redeemed it loses access,
+   * and the new code is shown once (and sent to the owner's phone). Only before a deposit.
+   */
+  async regenerateAccessCode(listingId: string, user: RequestUser) {
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { userId: user.id },
+      include: { user: { select: { phone: true } } },
+    });
+    if (!farmer)
+      throw new ForbiddenException('Only the farm owner can change the code');
+    const listing = await this.prisma.landListing.findUnique({
+      where: { id: listingId },
+      include: { farm: true },
+    });
+    if (!listing) throw new NotFoundException('Listing not found');
+    if (listing.ownerId !== farmer.id) {
+      throw new ForbiddenException('Only the farm owner can change the code');
+    }
+    if (listing.dealType !== DealType.RELATIONSHIP) {
+      throw new BadRequestException('Only a Relationship deal can be private');
+    }
+    if (listing.leaseStatus !== LeaseStatus.DRAFT) {
+      throw new BadRequestException(
+        'The code can only be changed before a deposit is made',
+      );
+    }
+
+    const code = generateCode();
+    const expiresAt = expiryFromNow();
+    await this.prisma.$transaction(async (tx) => {
+      if (listing.claimedByFarmerId) {
+        // The previous holder loses access, so their open offers go with it.
+        await tx.landListingOffer.updateMany({
+          where: {
+            listingId,
+            farmerId: listing.claimedByFarmerId,
+            status: { in: ['PENDING', 'COUNTERED'] },
+          },
+          data: { status: 'REJECTED' },
+        });
+      }
+      await tx.landListing.update({
+        where: { id: listingId },
+        data: {
+          accessCodeHash: hashCode(code),
+          accessCodeExpiresAt: expiresAt,
+          claimedByFarmerId: null,
+          claimedAt: null,
+        },
+      });
+    });
+    if (farmer.user?.phone)
+      await this.sendPrivateCode(
+        farmer.user.phone,
+        listing.farm.farmCode,
+        code,
+        expiresAt,
+      );
+    return { accessCode: code, accessCodeExpiresAt: expiresAt };
+  }
+
+  /**
+   * The one rule behind every way of taking a listing (offer, quote, deposit). A private listing
+   * can only be taken by the renter who redeemed its code. Old listings that named a renter by
+   * control number keep that check.
+   */
+  private assertMayTake(
+    listing: {
+      preferredRenterCode?: string | null;
+      accessCodeHash?: string | null;
+      claimedByFarmerId?: string | null;
+    },
+    renter: { id: string; controlNumber?: string },
+    opts: { skipCode?: boolean } = {},
+  ) {
+    if (
+      listing.preferredRenterCode &&
+      renter.controlNumber &&
+      listing.preferredRenterCode.trim().toUpperCase() !==
+        renter.controlNumber.trim().toUpperCase()
+    ) {
+      throw new BadRequestException(
+        `This listing is reserved for a specific renter (control number ${listing.preferredRenterCode}). Your control number does not match.`,
+      );
+    }
+    if (
+      !opts.skipCode &&
+      isPrivate(listing) &&
+      listing.claimedByFarmerId !== renter.id
+    ) {
+      throw new ForbiddenException(
+        'This is a private deal. Enter the code the owner gave you.',
+      );
+    }
   }
 
   async managedListings(user: RequestUser) {
-    const farmer = user.role === 'FARMER' ? await this.prisma.farmer.findUnique({ where: { userId: user.id }, select: { id: true } }) : null;
+    const farmer =
+      user.role === 'FARMER'
+        ? await this.prisma.farmer.findUnique({
+            where: { userId: user.id },
+            select: { id: true },
+          })
+        : null;
     if (user.role === 'FARMER' && !farmer) return [];
-    return this.prisma.landListing.findMany({
-      where: farmer ? { OR: [{ ownerId: farmer.id }, { renterId: farmer.id }] } :
-        user.role !== 'SUPER_ADMIN' && user.mamcosId ? { farm: { mamcosId: user.mamcosId } } : {},
-      include: { farm: true, owner: { select: { id: true, firstName: true, lastName: true } },
-        renter: { select: { id: true, firstName: true, lastName: true } }, escrowPayments: true,
-        subLeases: { where: { status: 'PENDING' } } },
+    const listings = await this.prisma.landListing.findMany({
+      where: farmer
+        ? { OR: [{ ownerId: farmer.id }, { renterId: farmer.id }] }
+        : user.role !== 'SUPER_ADMIN' && user.mamcosId
+          ? { farm: { mamcosId: user.mamcosId } }
+          : {},
+      include: {
+        farm: true,
+        owner: { select: { id: true, firstName: true, lastName: true } },
+        renter: { select: { id: true, firstName: true, lastName: true } },
+        escrowPayments: true,
+        claimedByFarmer: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        subLeases: { where: { status: 'PENDING' } },
+      },
       orderBy: { createdAt: 'desc' },
+    });
+    // Owners and staff may see whether a code exists, when it lapses and who holds it. The code and
+    // its hash are never sent; a renter sees their own deal like any other viewer.
+    return listings.map((listing) => {
+      const privateDeal = isPrivate(listing)
+        ? {
+            expiresAt: listing.accessCodeExpiresAt,
+            claimedBy: listing.claimedByFarmer
+              ? `${listing.claimedByFarmer.firstName} ${listing.claimedByFarmer.lastName}`.trim()
+              : null,
+          }
+        : null;
+      const state: AccessState = farmer
+        ? accessStateFor(listing, farmer.id)
+        : isPrivate(listing)
+          ? 'OWNER'
+          : 'OPEN';
+      const safe = redactForViewer(listing, state);
+      return {
+        ...safe,
+        ...(state === 'OWNER' || state === 'OPEN' ? { privateDeal } : {}),
+      };
     });
   }
 
   async visibleOffers(listingId: string, user: RequestUser) {
-    const listing = await this.prisma.landListing.findUnique({ where: { id: listingId } });
+    const listing = await this.prisma.landListing.findUnique({
+      where: { id: listingId },
+    });
     if (!listing) throw new NotFoundException('Listing not found');
-    const farmer = user.role === 'FARMER' ? await this.prisma.farmer.findUnique({ where: { userId: user.id }, select: { id: true } }) : null;
+    const farmer =
+      user.role === 'FARMER'
+        ? await this.prisma.farmer.findUnique({
+            where: { userId: user.id },
+            select: { id: true },
+          })
+        : null;
     const offers = await this.findOffersForListing(listingId);
     if (user.role === 'FARMER' && !farmer) return [];
-    return farmer && listing.ownerId !== farmer.id ? offers.filter((offer) => offer.farmerId === farmer.id) : offers;
+    return farmer && listing.ownerId !== farmer.id
+      ? offers.filter((offer) => offer.farmerId === farmer.id)
+      : offers;
   }
 
   async findAllLandListings(query?: {
@@ -383,16 +773,33 @@ export class MarketplaceService {
     // input — same rule as createLandListing.
     const dealType = dto.dealType ?? listing.dealType;
     const commissionRate = DEAL_TYPE_COMMISSION_RATE[dealType];
+    // The access code is never edited through here, and the old "preferred renter" field is retired.
+    const { preferredRenterCode: _retired, ...editable } =
+      dto as Partial<CreateLandListingDto> & {
+        preferredRenterCode?: string;
+      };
+    // Turning a private deal into any other kind makes it public again, so the code goes away.
+    const dropsPrivacy =
+      isPrivate(listing) && dealType !== DealType.RELATIONSHIP;
 
-    return this.prisma.landListing.update({
+    const updated = await this.prisma.landListing.update({
       where: { id },
       data: {
-        ...dto,
+        ...editable,
         commissionRate,
         commissionAmount: askingPrice * commissionRate,
+        ...(dropsPrivacy
+          ? {
+              accessCodeHash: null,
+              accessCodeExpiresAt: null,
+              claimedByFarmerId: null,
+              claimedAt: null,
+            }
+          : {}),
       },
       include: { farm: true, owner: true, renter: true },
     });
+    return this.publicListing(updated, null, 'OWNER');
   }
 
   /** Owner (or admin) cancels a listing that hasn't taken any money yet. */
@@ -435,27 +842,50 @@ export class MarketplaceService {
    * once the payment is reconciled (webhook or manual/poll reconcile).
    */
   assertOnlinePayments() {
-    if (!this.clickPesa.isConfigured()) throw new ServiceUnavailableException('Online payments are not configured. Contact the cooperative; no payment has been recorded.');
+    if (!this.clickPesa.isConfigured())
+      throw new ServiceUnavailableException(
+        'Online payments are not configured. Contact the cooperative; no payment has been recorded.',
+      );
   }
 
   async quoteForUser(listingId: string, user: RequestUser) {
-    const farmer = await this.prisma.farmer.findUnique({ where: { userId: user.id }, select: { id: true } });
+    const farmer = await this.prisma.farmer.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
     if (!farmer) throw new BadRequestException('A farmer profile is required');
     return this.depositQuote(listingId, farmer.id);
   }
 
   async depositQuote(listingId: string, farmerId: string) {
-    const listing = await this.prisma.landListing.findUnique({ where: { id: listingId } });
+    const listing = await this.prisma.landListing.findUnique({
+      where: { id: listingId },
+    });
     if (!listing) throw new NotFoundException('Listing not found');
-    const offer = await this.prisma.landListingOffer.findFirst({ where: { listingId, farmerId, status: 'ACCEPTED' }, orderBy: { updatedAt: 'desc' } });
+    // A quote shows the price, so a private deal's quote needs the same access as taking it.
+    if (listing.leaseStatus === LeaseStatus.DRAFT)
+      this.assertMayTake(listing, { id: farmerId });
+    const offer = await this.prisma.landListingOffer.findFirst({
+      where: { listingId, farmerId, status: 'ACCEPTED' },
+      orderBy: { updatedAt: 'desc' },
+    });
     let amount = offer?.offerAmount ?? listing.askingPrice;
     if (listing.isMultiYear && listing.rentScheduleJson) {
       const schedule = listing.rentScheduleJson as unknown as RentSchedule;
-      const years = listing.paymentPlan === 'ANNUAL' ? 1 : Math.ceil(listing.leaseDurationMonths / 12);
+      const years =
+        listing.paymentPlan === 'ANNUAL'
+          ? 1
+          : Math.ceil(listing.leaseDurationMonths / 12);
       amount = 0;
-      for (let year = 1; year <= years; year++) amount += await this.pricing.computeInstallmentAmount(schedule, year);
+      for (let year = 1; year <= years; year++)
+        amount += await this.pricing.computeInstallmentAmount(schedule, year);
     }
-    return { amount, paymentPlan: listing.paymentPlan, leaseDurationMonths: listing.leaseDurationMonths, onlinePaymentsAvailable: this.clickPesa.isConfigured() };
+    return {
+      amount,
+      paymentPlan: listing.paymentPlan,
+      leaseDurationMonths: listing.leaseDurationMonths,
+      onlinePaymentsAvailable: this.clickPesa.isConfigured(),
+    };
   }
 
   async depositEscrow(listingId: string, escrowDepositDto: EscrowDepositDto) {
@@ -479,6 +909,7 @@ export class MarketplaceService {
     // Normally an ACTIVE listing can't take a new deposit — unless the owner
     // has approved a sub-lease (the original renter re-listing their season)
     // and a new renter hasn't stepped in yet.
+    let openApprovedSubLease = false;
     if (listing.leaseStatus === LeaseStatus.ACTIVE) {
       const openSubLease = await this.prisma.landListingSubLease.findFirst({
         where: {
@@ -492,6 +923,7 @@ export class MarketplaceService {
           'This land listing is already actively leased',
         );
       }
+      openApprovedSubLease = true;
     }
 
     const renter = await this.prisma.farmer.findUnique({
@@ -507,23 +939,20 @@ export class MarketplaceService {
       );
     }
 
-    // Relationship deals lock the discounted price to one named renter
-    // (the doc's "Closed Circle" feature) — the depositing renter's control
-    // number must match the code the owner set when listing.
-    if (
-      listing.preferredRenterCode &&
-      listing.preferredRenterCode.trim().toUpperCase() !==
-        renter.controlNumber.trim().toUpperCase()
-    ) {
-      throw new BadRequestException(
-        `This listing is reserved for a specific renter (control number ${listing.preferredRenterCode}). Your control number does not match.`,
-      );
-    }
+    // A private deal can only be taken by the renter who redeemed the owner's code. A sub-lease the
+    // owner has already approved is a different path (the owner chose that renter), so it skips the code.
+    this.assertMayTake(listing, renter, { skipCode: openApprovedSubLease });
 
     const quote = await this.depositQuote(listingId, renterId);
     const depositAmount = quote.amount;
-    if (!Number.isFinite(depositAmount) || depositAmount <= 0 || Math.abs(amount - depositAmount) > 0.01) {
-      throw new BadRequestException('The deposit must match the current rental quote. Refresh the quote and try again.');
+    if (
+      !Number.isFinite(depositAmount) ||
+      depositAmount <= 0 ||
+      Math.abs(amount - depositAmount) > 0.01
+    ) {
+      throw new BadRequestException(
+        'The deposit must match the current rental quote. Refresh the quote and try again.',
+      );
     }
 
     const payViaClickPesa = this.clickPesa.isConfigured();
@@ -1291,6 +1720,7 @@ export class MarketplaceService {
         'This farmer is blacklisted from M-LAX and cannot make offers',
       );
     }
+    this.assertMayTake(listing, farmer);
 
     const offer = await this.prisma.landListingOffer.create({
       data: { listingId, farmerId, offerAmount },
@@ -2080,8 +2510,7 @@ export class MarketplaceService {
     const terrainSurcharge = basePrice * surchargePercent;
     const totalPrice = basePrice + terrainSurcharge;
     // Server-enforced commission rate: Grade C (difficult terrain) = 13%, otherwise standard = 10%
-    const resolvedCommissionRate =
-      terrainGrade === FarmGrade.C ? 0.13 : 0.10;
+    const resolvedCommissionRate = terrainGrade === FarmGrade.C ? 0.13 : 0.1;
     const commissionAmount = totalPrice * resolvedCommissionRate;
 
     const booking = await this.prisma.tractorBooking.create({
@@ -2176,29 +2605,41 @@ export class MarketplaceService {
 
     // 1. Record completed service payment for farmer statement transparency
     const netOwnerPayout = completed.totalPrice - completed.commissionAmount;
-    await this.prisma.payment.create({
-      data: {
-        farmerId: completed.farmerId,
-        amount: completed.totalPrice,
-        netAmount: netOwnerPayout,
-        paymentType: PaymentType.TRACTOR_SERVICE,
-        status: PaymentStatus.CLEARED,
-        description: `Tractor service (${completed.tractor.model || completed.tractor.registrationNo}) - ${completed.hectares} ha`,
-        paidAt: completed.completedAt || new Date(),
-      },
-    }).catch((e) => this.logger.warn(`Failed to create payment for tractor booking: ${e?.message}`));
+    await this.prisma.payment
+      .create({
+        data: {
+          farmerId: completed.farmerId,
+          amount: completed.totalPrice,
+          netAmount: netOwnerPayout,
+          paymentType: PaymentType.TRACTOR_SERVICE,
+          status: PaymentStatus.CLEARED,
+          description: `Tractor service (${completed.tractor.model || completed.tractor.registrationNo}) - ${completed.hectares} ha`,
+          paidAt: completed.completedAt || new Date(),
+        },
+      })
+      .catch((e) =>
+        this.logger.warn(
+          `Failed to create payment for tractor booking: ${e?.message}`,
+        ),
+      );
 
     // 2. Post commission revenue to double-entry general ledger
-    await this.accounting.postToLedger(
-      'TractorBooking',
-      completed.id,
-      completed.completedAt || new Date(),
-      `Tractor commission: ${completed.tractor.registrationNo}`,
-      [
-        { code: '1000', debit: completed.commissionAmount },
-        { code: '4000', credit: completed.commissionAmount },
-      ],
-    ).catch((e) => this.logger.warn(`Failed to post tractor booking to ledger: ${e?.message}`));
+    await this.accounting
+      .postToLedger(
+        'TractorBooking',
+        completed.id,
+        completed.completedAt || new Date(),
+        `Tractor commission: ${completed.tractor.registrationNo}`,
+        [
+          { code: '1000', debit: completed.commissionAmount },
+          { code: '4000', credit: completed.commissionAmount },
+        ],
+      )
+      .catch((e) =>
+        this.logger.warn(
+          `Failed to post tractor booking to ledger: ${e?.message}`,
+        ),
+      );
 
     if (completed.tractor.owner.phone) {
       await this.sms.send(
@@ -2245,10 +2686,7 @@ export class MarketplaceService {
 
     return this.prisma.tractorOwner.findFirst({
       where: {
-        OR: [
-          { phone },
-          { phone: { endsWith: last9 } },
-        ],
+        OR: [{ phone }, { phone: { endsWith: last9 } }],
       },
       include: {
         tractors: {

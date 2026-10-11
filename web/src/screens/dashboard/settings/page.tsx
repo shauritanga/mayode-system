@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { locationsApi, partnerApi, settingsApi } from '@/lib/api';
 
-const tabs = ['Locations', 'Org Profile', 'Notification Templates', 'Partner API'] as const;
+const tabs = ['Locations', 'Org Profile', 'Sales & Warehouse', 'Notification Templates', 'Partner API'] as const;
 type Tab = (typeof tabs)[number];
 
 export default function SettingsPage() {
@@ -16,7 +16,7 @@ export default function SettingsPage() {
           <div className="page-kicker">Platform</div>
           <h1 className="page-title">Settings</h1>
           <p className="page-subtitle">
-            Admin-hierarchy locations, organization profile, notification templates, and partner API keys.
+            Admin-hierarchy locations, organization profile, sales and warehouse rules, notification templates, and partner API keys.
           </p>
         </div>
       </div>
@@ -36,6 +36,7 @@ export default function SettingsPage() {
 
       {activeTab === 'Locations' && <LocationsTab />}
       {activeTab === 'Org Profile' && <OrgProfileTab />}
+      {activeTab === 'Sales & Warehouse' && <SalesRulesTab />}
       {activeTab === 'Notification Templates' && <NotificationTemplatesTab />}
       {activeTab === 'Partner API' && <PartnerApiTab />}
     </div>
@@ -197,6 +198,63 @@ function OrgProfileTab() {
       <label className="form-label form-grid-wide">Address<input className="input-field" value={form.address} onChange={(e) => setForm((c) => ({ ...c, address: e.target.value }))} /></label>
     </div>
     <button className="btn-primary" disabled={saving} style={{ marginTop: 12 }}>{saving ? 'Saving...' : 'Save profile'}</button>
+  </form>;
+}
+
+/** Platform-wide rules for loading trucks and holding stock; they apply to every cooperative. */
+function SalesRulesTab() {
+  const [form, setForm] = useState({ loadTolerancePct: '2', reservationExpiryDays: '7' });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    settingsApi.getSales()
+      .then((res) => setForm({
+        loadTolerancePct: String(res.data.loadTolerancePct),
+        reservationExpiryDays: String(res.data.reservationExpiryDays),
+      }))
+      .catch(() => { setFailed(true); setMessage('Unable to load the sales rules.'); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async (e: FormEvent) => {
+    e.preventDefault(); setSaving(true); setMessage(''); setFailed(false);
+    try {
+      await settingsApi.updateSales({
+        loadTolerancePct: Number(form.loadTolerancePct),
+        reservationExpiryDays: Number(form.reservationExpiryDays),
+      });
+      setMessage('Sales and warehouse rules saved.');
+    } catch (err: any) {
+      setFailed(true);
+      const m = err?.response?.data?.message;
+      setMessage(Array.isArray(m) ? m.join(', ') : m || 'Unable to save the rules.');
+    } finally { setSaving(false); }
+  };
+
+  if (loading) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>Loading…</div>;
+
+  return <form onSubmit={save} className="action-panel" style={{ marginTop: 16, maxWidth: 560 }}>
+    <div className="panel-header"><h2 className="panel-title">Sales &amp; warehouse rules</h2></div>
+    {message && <div className={`alert-box ${failed ? 'alert-danger' : 'alert-success'}`}>{message}</div>}
+    <div style={{ display: 'grid', gap: 18 }}>
+      <label className="form-label">Weighbridge tolerance (%)
+        <input className="input-field" type="number" min={0} max={10} step="0.1" required value={form.loadTolerancePct} onChange={(e) => setForm((c) => ({ ...c, loadTolerancePct: e.target.value }))} />
+        <small style={{ fontWeight: 400, color: 'var(--neutral-500)' }}>
+          How far the weighed rice may differ from the ordered weight. Within this, an order counts as fully loaded, and a truck may carry slightly more than ordered. Example: 2% on a 1,000 kg order accepts 980 to 1,020 kg.
+        </small>
+      </label>
+      <label className="form-label">Release unconfirmed reservations after (days)
+        <input className="input-field" type="number" min={0} max={90} step="1" required value={form.reservationExpiryDays} onChange={(e) => setForm((c) => ({ ...c, reservationExpiryDays: e.target.value }))} />
+        <small style={{ fontWeight: 400, color: 'var(--neutral-500)' }}>
+          A sale order the warehouse never confirms is cancelled after this long and its stock goes back on sale. Use 0 to never expire.
+        </small>
+      </label>
+    </div>
+    <button className="btn-primary" disabled={saving} style={{ marginTop: 12 }}>{saving ? 'Saving...' : 'Save rules'}</button>
+    <p style={{ fontSize: 12, color: 'var(--neutral-500)', marginTop: 10 }}>These rules apply to every cooperative and to the platform&rsquo;s own warehouses.</p>
   </form>;
 }
 

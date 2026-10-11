@@ -243,6 +243,13 @@ export const authApi = {
     api.post('/auth/login', { phone, password }),
   register: (data: { phone: string; password: string; firstName: string; lastName: string; dataShareConsent: boolean; region?: string; district?: string; ward?: string; village?: string }) =>
     api.post('/auth/register', data),
+  /** Passwordless sign-in: text a 6-digit code, then check it. A new number gets a registrationToken. */
+  requestOtp: (phone: string) =>
+    api.post<{ sent: true; resendInSeconds: number; expiresInSeconds: number; devCode?: string }>('/auth/otp/request', { phone }),
+  verifyOtp: (phone: string, code: string) =>
+    api.post('/auth/otp/verify', { phone, code }),
+  registerWithOtp: (data: { phone: string; registrationToken: string; firstName: string; lastName: string; dataShareConsent: boolean; region?: string; district?: string; ward?: string; village?: string }) =>
+    api.post('/auth/otp/register', data),
   logout: () => api.post('/auth/logout'),
   // AMCOS Secretary self-service: mamcosId is resolved server-side from the
   // caller's own AMCOS, so it's never sent from here.
@@ -372,6 +379,8 @@ export const cropCyclesApi = {
 };
 
 export const riceProtocolsApi = {
+  /** The platform rice calendar (set by Super Admin): every stage and what to do, for every farmer. */
+  platformCalendar: () => api.get('/rice-protocols/platform/active'),
   tasks: (cropCycleId: string) => api.get(`/rice-protocols/crop-cycles/${cropCycleId}/tasks`),
   readiness: (cropCycleId: string) => api.get(`/rice-protocols/crop-cycles/${cropCycleId}/readiness`),
   rescheduleTask: (id: string, data: { dueDate: string; reason?: string }) => api.patch(`/rice-protocols/tasks/${id}/schedule`, data),
@@ -584,6 +593,10 @@ export const marketplaceApi = {
   getLandListings: (params?: object) => api.get('/marketplace/land', { params }),
   getLandListing: (id: string) => api.get(`/marketplace/land/${id}`),
   createLandListing: (data: object) => api.post('/marketplace/land', data),
+  /** Private deals: OPEN, OWNER, GRANTED, NEEDS_CODE or EXPIRED_OR_TAKEN, plus the full listing once allowed. */
+  accessFor: (id: string) => api.get(`/marketplace/land/${id}/access`),
+  redeemCode: (id: string, code: string) => api.post(`/marketplace/land/${id}/redeem-code`, { code }),
+  regenerateCode: (id: string) => api.post(`/marketplace/land/${id}/regenerate-code`),
   updateLandListing: (id: string, data: object) => api.patch(`/marketplace/land/${id}`, data),
   cancelLandListing: (id: string) => api.patch(`/marketplace/land/${id}/cancel`),
   getSuggestedPrice: (farmId: string, askingPrice?: number) =>

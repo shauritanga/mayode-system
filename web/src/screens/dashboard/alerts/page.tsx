@@ -1,4 +1,6 @@
 'use client';
+import ErrorBanner from '@/components/ErrorBanner';
+import { apiErrorMessage } from '@/lib/api-error';
 import { useEffect, useState } from 'react';
 import { farmAlertsApi } from '@/lib/api';
 
@@ -29,12 +31,13 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
 
   const load = () => {
     setLoading(true);
     farmAlertsApi.getAll()
-      .then(res => setAlerts(res.data || []))
-      .catch(console.error)
+      .then(res => { setAlerts(res.data || []); setError(''); })
+      .catch(e => setError(apiErrorMessage(e, 'Failed to load alerts')))
       .finally(() => setLoading(false));
   };
 
@@ -46,7 +49,7 @@ export default function AlertsPage() {
       await farmAlertsApi.generateAll();
       load();
     } catch (e) {
-      console.error(e);
+      setError(apiErrorMessage(e, 'Failed to generate alerts'));
     } finally {
       setGenerating(false);
     }
@@ -69,6 +72,8 @@ export default function AlertsPage() {
           {generating ? 'Generating…' : 'Run alert generator'}
         </button>
       </div>
+
+      <ErrorBanner message={error} onDismiss={() => setError('')} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         {[

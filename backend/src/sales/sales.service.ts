@@ -4,12 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  PaymentStatus,
-  PaymentType,
-  Prisma,
-  RevenueType,
-} from '@prisma/client';
+import { PaymentStatus, PaymentType, RevenueType } from '@prisma/client';
 import { ActivitiesService } from '../activities/activities.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSaleDto } from './dto/sales.dto';
@@ -18,6 +13,7 @@ import { LoansService } from '../loans/loans.service';
 import { AccountingService } from '../accounting/accounting.service';
 import { apportionSale } from './allocation';
 import { ClickPesaService } from '../payments/clickpesa.service';
+import { tenantWhere, type TenantActor } from '../common/tenant';
 
 @Injectable()
 export class SalesService {
@@ -61,7 +57,9 @@ export class SalesService {
         capturedAt: true,
       },
     });
-    const latestSorter = sorterEvidence.find((r) => r.sourceType === 'RICE_SORTER');
+    const latestSorter = sorterEvidence.find(
+      (r) => r.sourceType === 'RICE_SORTER',
+    );
     const sorterRec =
       latestSorter?.recommendation &&
       typeof latestSorter.recommendation === 'object'
@@ -88,7 +86,7 @@ export class SalesService {
     };
   }
 
-  async create(dto: CreateSaleDto) {
+  async create(dto: CreateSaleDto, opts: { mamcosId?: string | null } = {}) {
     const [lot, buyer] = await Promise.all([
       this.prisma.lot.findUnique({
         where: { id: dto.lotId },
@@ -101,10 +99,9 @@ export class SalesService {
     if (!lot) throw new NotFoundException(`Lot with ID ${dto.lotId} not found`);
     if (!buyer)
       throw new NotFoundException(`Buyer with ID ${dto.buyerId} not found`);
-    if (!lot.inventoryRecords.length)
-      throw new BadRequestException(
-        'A sale requires a lot with source inventory records',
-      );
+    // A lot made from counted stock (no source deliveries) is the owner's own rice: it is sold and
+    // invoiced like any other, but there are no farmers to apportion revenue or payouts to.
+    const ownStock = lot.inventoryRecords.length === 0;
     if (dto.quantityKg > lot.totalWeightKg)
       throw new BadRequestException(
         'Sale quantity cannot exceed the lot weight',
@@ -114,7 +111,7 @@ export class SalesService {
       (total, record) => total + record.weightKg,
       0,
     );
-    if (totalSourceWeight <= 0)
+    if (!ownStock && totalSourceWeight <= 0)
       throw new BadRequestException(
         'Lot source weight must be greater than zero',
       );
@@ -171,15 +168,17 @@ export class SalesService {
     const invoiceNumber = await this.nextInvoiceNumber();
     const gross = dto.quantityKg * dto.pricePerKg;
     const premium = dto.fairtradePremium ?? 0;
-    const allocations = apportionSale(
-      lot.inventoryRecords.map((record) => ({
-        farmerId: record.farmerId,
-        weightKg: record.weightKg,
-      })),
-      dto.quantityKg,
-      gross,
-      premium,
-    );
+    const allocations = ownStock
+      ? []
+      : apportionSale(
+          lot.inventoryRecords.map((record) => ({
+            farmerId: record.farmerId,
+            weightKg: record.weightKg,
+          })),
+          dto.quantityKg,
+          gross,
+          premium,
+        );
 
     const sale = await this.prisma.$transaction(async (tx) => {
       const created = await tx.sale.create({
@@ -195,6 +194,7 @@ export class SalesService {
           fairtradePremium: premium || null,
           totalRevenue: gross,
           saleDate: new Date(dto.saleDate),
+          mamcosId: opts.mamcosId ?? null,
         },
       });
       if (dto.buyerOrderId) {
@@ -370,6 +370,146 @@ export class SalesService {
     return sale;
   }
 
+  /**
+   * Reduces a sale to the weight that actually left the warehouse (a buyer who takes less than
+   * ordered). The farmers' shares, their pending payouts, the invoice and the ledger are all
+   * recalculated. Refused once money has moved, because a refund is then a finance decision.
+   */
+  async reduceQuantity(saleId: string, newQuantityKg: number) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: {
+        payments: true,
+        apportionments: true,
+        lot: { include: { inventoryRecords: true } },
+      },
+    });
+    if (!sale) throw new NotFoundException(`Sale ${saleId} not found`);
+    if (newQuantityKg >= sale.quantityKg) return sale;
+    if (newQuantityKg <= 0)
+      throw new BadRequestException(
+        'Nothing was loaded, so cancel the order instead',
+      );
+    if (
+      sale.paymentReceived ||
+      sale.payments.some((p) => p.status !== PaymentStatus.PENDING)
+    ) {
+      throw new ConflictException(
+        'Payment for this sale has already been settled. Ask finance to refund or credit the buyer before closing it short.',
+      );
+    }
+
+    const ratio = newQuantityKg / sale.quantityKg;
+    const premium = (sale.fairtradePremium ?? 0) * ratio;
+    const gross = newQuantityKg * sale.pricePerKg;
+    // Counted stock (no source deliveries) has no farmers to re-apportion.
+    const allocations = sale.lot.inventoryRecords.length
+      ? apportionSale(
+          sale.lot.inventoryRecords.map((r) => ({
+            farmerId: r.farmerId,
+            weightKg: r.weightKg,
+          })),
+          newQuantityKg,
+          gross,
+          premium,
+        )
+      : [];
+    const oldPayable = sale.payments.reduce((n, p) => n + p.amount, 0);
+    const oldTotal = sale.totalRevenue + (sale.fairtradePremium ?? 0);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      for (const a of allocations) {
+        const existing = sale.apportionments.find(
+          (x) => x.farmerId === a.farmerId,
+        );
+        if (!existing) continue;
+        await tx.saleApportionment.update({
+          where: { id: existing.id },
+          data: {
+            quantityKg: a.quantityKg,
+            grossAmount: a.grossAmount,
+            fairtradePremium: a.fairtradePremium,
+          },
+        });
+        if (existing.revenueId) {
+          await tx.revenue.update({
+            where: { id: existing.revenueId },
+            data: {
+              quantityKg: a.quantityKg,
+              totalRevenue: a.grossAmount,
+              fairtradePremium: a.fairtradePremium || null,
+            },
+          });
+        }
+        for (const p of sale.payments.filter(
+          (x) => x.farmerId === a.farmerId,
+        )) {
+          const amount =
+            p.paymentType === PaymentType.FAIRTRADE_PREMIUM
+              ? a.fairtradePremium
+              : a.grossAmount;
+          await tx.payment.update({
+            where: { id: p.id },
+            data: { amount, netAmount: amount },
+          });
+        }
+      }
+      await tx.invoice.updateMany({
+        where: { saleId },
+        data: { amount: gross + premium },
+      });
+      await tx.premiumFundEntry.updateMany({
+        where: { saleId },
+        data: { amount: premium },
+      });
+      return tx.sale.update({
+        where: { id: saleId },
+        data: {
+          quantityKg: newQuantityKg,
+          totalRevenue: gross,
+          fairtradePremium: sale.fairtradePremium ? premium : null,
+        },
+      });
+    });
+
+    const revenueDrop = sale.totalRevenue - gross;
+    const premiumDrop = (sale.fairtradePremium ?? 0) - premium;
+    const newPayableTotal = allocations.reduce(
+      (n, a) => n + a.grossAmount + a.fairtradePremium,
+      0,
+    );
+    const obligationDrop = oldPayable - newPayableTotal;
+    if (oldTotal - (gross + premium) > 0) {
+      await this.accounting.postToLedger(
+        'SaleAdjustment',
+        saleId,
+        new Date(),
+        `Sale ${sale.invoiceNumber} reduced to ${newQuantityKg} kg`,
+        [
+          { code: '4000', debit: revenueDrop },
+          ...(premiumDrop > 0 ? [{ code: '4100', debit: premiumDrop }] : []),
+          {
+            code: '1100',
+            credit: revenueDrop + (premiumDrop > 0 ? premiumDrop : 0),
+          },
+        ],
+      );
+    }
+    if (obligationDrop > 0) {
+      await this.accounting.postToLedger(
+        'SaleAdjustmentPayables',
+        saleId,
+        new Date(),
+        `Farmer payment obligation reduced for ${sale.invoiceNumber}`,
+        [
+          { code: '2200', debit: obligationDrop },
+          { code: '5200', credit: obligationDrop },
+        ],
+      );
+    }
+    return result;
+  }
+
   async settle(id: string, paymentDate?: string) {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
@@ -543,6 +683,17 @@ export class SalesService {
     if (sale.dispatch) {
       throw new ConflictException('This sale has already been dispatched');
     }
+    // Sales that came from a sale order are released from that order, where the payment gate,
+    // the stock ledger and the audit trail are enforced. This gate pass is for older sales only.
+    const order = await this.prisma.saleOrder.findUnique({
+      where: { saleId: sale.id },
+      select: { reference: true },
+    });
+    if (order) {
+      throw new ConflictException(
+        `Release this sale from its sale order ${order.reference}`,
+      );
+    }
 
     const recordIds = sale.lot.inventoryRecords.map((r) => r.id);
 
@@ -574,11 +725,13 @@ export class SalesService {
     });
   }
 
-  findAll() {
+  findAll(actor?: TenantActor) {
     return this.prisma.sale.findMany({
+      where: actor ? tenantWhere(actor) : undefined,
       include: {
         buyer: true,
         lot: true,
+        saleOrder: { select: { reference: true } },
         _count: { select: { apportionments: true, payments: true } },
       },
       orderBy: { saleDate: 'desc' },
@@ -614,98 +767,95 @@ export class SalesService {
         sale = await this.findOne(lot.sales[0].id);
       } else if (lot || record) {
         // Pre-sale chain: lot and/or intake only.
-        const inventoryRecords =
-          lot?.id
-            ? await this.prisma.inventoryRecord.findMany({
-                where: { lotNumber: lot.lotNumber },
-                include: {
-                  farmer: {
-                    select: {
-                      id: true,
-                      controlNumber: true,
-                      firstName: true,
-                      lastName: true,
-                    },
+        const inventoryRecords = lot?.id
+          ? await this.prisma.inventoryRecord.findMany({
+              where: { lotNumber: lot.lotNumber },
+              include: {
+                farmer: {
+                  select: {
+                    id: true,
+                    controlNumber: true,
+                    firstName: true,
+                    lastName: true,
                   },
-                  farm: {
-                    select: {
-                      id: true,
-                      farmCode: true,
-                      village: true,
-                      ward: true,
-                      district: true,
-                      region: true,
-                    },
+                },
+                farm: {
+                  select: {
+                    id: true,
+                    farmCode: true,
+                    village: true,
+                    ward: true,
+                    district: true,
+                    region: true,
                   },
-                  cropCycle: {
-                    select: {
-                      id: true,
-                      season: true,
-                      riceVariety: true,
-                      status: true,
-                      activities: {
-                        orderBy: { activityDate: 'desc' },
-                        take: 8,
-                        select: {
-                          id: true,
-                          activityType: true,
-                          activityDate: true,
-                          description: true,
-                        },
+                },
+                cropCycle: {
+                  select: {
+                    id: true,
+                    season: true,
+                    riceVariety: true,
+                    status: true,
+                    activities: {
+                      orderBy: { activityDate: 'desc' },
+                      take: 8,
+                      select: {
+                        id: true,
+                        activityType: true,
+                        activityDate: true,
+                        description: true,
                       },
                     },
                   },
                 },
-              })
-            : record
-              ? [
-                  await this.prisma.inventoryRecord.findUniqueOrThrow({
-                    where: { id: record.id },
-                    include: {
-                      farmer: {
-                        select: {
-                          id: true,
-                          controlNumber: true,
-                          firstName: true,
-                          lastName: true,
-                        },
+              },
+            })
+          : record
+            ? [
+                await this.prisma.inventoryRecord.findUniqueOrThrow({
+                  where: { id: record.id },
+                  include: {
+                    farmer: {
+                      select: {
+                        id: true,
+                        controlNumber: true,
+                        firstName: true,
+                        lastName: true,
                       },
-                      farm: {
-                        select: {
-                          id: true,
-                          farmCode: true,
-                          village: true,
-                          ward: true,
-                          district: true,
-                          region: true,
-                        },
+                    },
+                    farm: {
+                      select: {
+                        id: true,
+                        farmCode: true,
+                        village: true,
+                        ward: true,
+                        district: true,
+                        region: true,
                       },
-                      cropCycle: {
-                        select: {
-                          id: true,
-                          season: true,
-                          riceVariety: true,
-                          status: true,
-                          activities: {
-                            orderBy: { activityDate: 'desc' },
-                            take: 8,
-                            select: {
-                              id: true,
-                              activityType: true,
-                              activityDate: true,
-                              description: true,
-                            },
+                    },
+                    cropCycle: {
+                      select: {
+                        id: true,
+                        season: true,
+                        riceVariety: true,
+                        status: true,
+                        activities: {
+                          orderBy: { activityDate: 'desc' },
+                          take: 8,
+                          select: {
+                            id: true,
+                            activityType: true,
+                            activityDate: true,
+                            description: true,
                           },
                         },
                       },
                     },
-                  }),
-                ]
-              : [];
+                  },
+                }),
+              ]
+            : [];
 
-        const preSaleSorter = lot
-          ? await this.lotAiQuality(lot.id)
-          : null;
+        const preSaleSorter = lot ? await this.lotAiQuality(lot.id) : null;
 
         return {
           invoiceNumber: null,
@@ -799,7 +949,7 @@ export class SalesService {
         farm: record.farm,
         farmer: record.farmer,
         cropCycle: record.cropCycleId
-          ? cycleById.get(record.cropCycleId) ?? null
+          ? (cycleById.get(record.cropCycleId) ?? null)
           : null,
       })),
       farmerAllocations: sale.apportionments,

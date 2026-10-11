@@ -28,3 +28,4 @@ mobile/*.ipa
 
 # server access credentials
 server-credentials.json
+proposal/

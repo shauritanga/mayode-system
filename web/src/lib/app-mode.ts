@@ -9,25 +9,45 @@ export type AppMode = 'farmers' | 'cooperatives' | 'admin';
 export const APP_MODE: AppMode =
   (process.env.NEXT_PUBLIC_APP_MODE as AppMode) || 'admin';
 
-/** Which roles may authenticate against each subdomain build. */
-export const APP_MODE_ROLES: Record<AppMode, string[]> = {
-  farmers: ['FARMER'],
-  cooperatives: ['MAMCOS_SECRETARY', 'FIELD_OFFICER'],
-  admin: ['SUPER_ADMIN', 'ADMIN', 'FIELD_OFFICER', 'CUSTOM', 'AUDITOR', 'BUYER', 'FINANCIAL_PROVIDER'],
+/** Built-in roles that always belong to the cooperatives portal. */
+const COOPERATIVE_STAFF_ROLES = ['MAMCOS_SECRETARY', 'FIELD_OFFICER'];
+
+/** The slice of the session user the portal check needs. */
+export interface PortalAccount {
+  role?: string | null;
+  mamcosId?: string | null;
+}
+
+/**
+ * Which portal an account may sign in to. Decided by who the account belongs to, not by a
+ * role label: farmers use the farmer portal; anyone tied to a cooperative (its admin, staff,
+ * secretary, field officers) uses the cooperatives portal; everyone else — Super Admin and
+ * platform staff — uses the admin portal. Field officers may use either.
+ */
+export function isAccountAllowedInMode(mode: AppMode, account?: PortalAccount | null): boolean {
+  const role = account?.role;
+  if (!role) return false;
+  const inCooperative = COOPERATIVE_STAFF_ROLES.includes(role) || !!account?.mamcosId;
+  switch (mode) {
+    case 'farmers':
+      return role === 'FARMER';
+    case 'cooperatives':
+      return role !== 'FARMER' && role !== 'SUPER_ADMIN' && inCooperative;
+    case 'admin':
+      return role === 'SUPER_ADMIN' || role === 'FIELD_OFFICER' || (role !== 'FARMER' && role !== 'MAMCOS_SECRETARY' && !account?.mamcosId);
+  }
+}
+
+const HOSTS: Record<AppMode, string> = {
+  farmers: 'farmers.mayodegroup.com',
+  cooperatives: 'cooperatives.mayodegroup.com',
+  admin: 'admin.mayodegroup.com',
 };
 
-/** Every subdomain a given role is permitted to use, for the rejection message. */
-export const ROLE_ALLOWED_HOSTS: Record<string, string[]> = {
-  FARMER: ['farmers.mayodegroup.com'],
-  MAMCOS_SECRETARY: ['cooperatives.mayodegroup.com'],
-  FIELD_OFFICER: ['cooperatives.mayodegroup.com', 'admin.mayodegroup.com'],
-  SUPER_ADMIN: ['admin.mayodegroup.com'],
-  ADMIN: ['admin.mayodegroup.com'],
-  CUSTOM: ['admin.mayodegroup.com'],
-  AUDITOR: ['admin.mayodegroup.com'],
-  BUYER: ['admin.mayodegroup.com'],
-  FINANCIAL_PROVIDER: ['admin.mayodegroup.com'],
-};
+/** Every subdomain an account is permitted to use, for the rejection message. */
+export function allowedHostsFor(account?: PortalAccount | null): string[] {
+  return (Object.keys(HOSTS) as AppMode[]).filter((m) => isAccountAllowedInMode(m, account)).map((m) => HOSTS[m]);
+}
 
 export const APP_MODE_LABEL: Record<AppMode, string> = {
   farmers: 'Farmer Portal',
@@ -60,7 +80,6 @@ export const APP_MODE_LOGIN_COPY: Record<
   },
 };
 
-export function isRoleAllowedInThisMode(role?: string | null): boolean {
-  if (!role) return false;
-  return APP_MODE_ROLES[APP_MODE].includes(role);
+export function isAccountAllowedInThisMode(account?: PortalAccount | null): boolean {
+  return isAccountAllowedInMode(APP_MODE, account);
 }

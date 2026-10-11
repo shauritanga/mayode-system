@@ -1,4 +1,6 @@
 'use client';
+import ErrorBanner from '@/components/ErrorBanner';
+import { apiErrorMessage } from '@/lib/api-error';
 import { Fragment, useEffect, useState } from 'react';
 import { rewardsApi } from '@/lib/api';
 import Modal from '@/components/Modal';
@@ -54,12 +56,13 @@ export default function RewardsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [selectionTarget, setSelectionTarget] = useState<Campaign | null>(null);
   const [feedback, setFeedback] = useState<FeedbackDialog | null>(null);
+  const [loadError, setLoadError] = useState('');
 
   const load = () => {
     setLoading(true);
     rewardsApi.listCampaigns()
-      .then(res => setCampaigns(res.data || []))
-      .catch(console.error)
+      .then(res => { setCampaigns(res.data || []); setLoadError(''); })
+      .catch(e => setLoadError(apiErrorMessage(e, 'Failed to load campaigns')))
       .finally(() => setLoading(false));
   };
 
@@ -102,7 +105,7 @@ export default function RewardsPage() {
     try {
       const res = await rewardsApi.getCampaign(id);
       setCampaigns(cs => cs.map(c => c.id === id ? res.data : c));
-    } catch (e) { console.error(e); }
+    } catch (e) { setLoadError(apiErrorMessage(e, 'Failed to load campaign details')); }
   };
 
   const runSelect = async (id: string) => {
@@ -149,6 +152,8 @@ export default function RewardsPage() {
           + New campaign
         </button>
       </div>
+
+      <ErrorBanner message={loadError} onDismiss={() => setLoadError('')} />
 
       {showForm && (
         <Modal

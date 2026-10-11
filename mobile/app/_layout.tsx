@@ -113,7 +113,7 @@ export default function RootLayout() {
     }
 
     const timer = setTimeout(() => {
-      const inAuthGroup = segments[0] === 'login' || segments[0] === 'register';
+      const inAuthGroup = segments[0] === 'login' || segments[0] === 'verify' || segments[0] === 'register';
       const inOnboardingGroup = segments[0] === 'splash' || segments[0] === 'onboarding' || segments[0] === 'language-select';
 
       if (!hasOnboarded && !inOnboardingGroup) {
@@ -136,6 +136,7 @@ export default function RootLayout() {
         <Stack.Screen name="language-select" options={{ headerShown: false }} />
         <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="verify" options={{ headerShown: false }} />
         <Stack.Screen name="register" options={{ headerShown: false }} />
         <Stack.Screen
           name="edit-profile"

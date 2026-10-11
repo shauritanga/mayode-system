@@ -16,6 +16,8 @@ interface User {
   language?: string;
   /** Custom Role Management id — when set, the permission matrix below narrows access. */
   roleId?: string;
+  /** Cooperative the account belongs to; set for cooperative admins and staff, empty for platform accounts. */
+  mamcosId?: string;
   customRoleName?: string;
   /** Flattened resource+action grants from GET /auth/me (mirrors the backend matrix). */
   permissions?: PermissionGrant[];

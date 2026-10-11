@@ -32,11 +32,68 @@ import { RiceProtocolsService } from './rice-protocols.service';
 @Controller('rice-protocols')
 export class RiceProtocolsController {
   constructor(private readonly protocols: RiceProtocolsService) {}
+  @Get('platform/active')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+    UserRole.FARMER,
+  )
+  @RequirePermission('rice_protocols', 'VIEW')
+  @ApiOperation({
+    summary:
+      'The platform rice calendar every farmer sees in the mobile app (read-only for everyone but Super Admin)',
+  })
+  platformCalendar(@Query('varietyId') varietyId?: string) {
+    return this.protocols.platformCalendar(varietyId || null);
+  }
+  @Get('platform')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'All versions of the platform rice calendar (Super Admin)',
+  })
+  platformVersions(
+    @CurrentUser() user: RequestUser,
+    @Query('varietyId') varietyId?: string,
+  ) {
+    return this.protocols.platformVersions(user, varietyId || null);
+  }
+  @Post('platform/bootstrap')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Create the default platform rice calendar (Super Admin)',
+  })
+  bootstrapPlatform(
+    @CurrentUser() user: RequestUser,
+    @Query('varietyId') varietyId?: string,
+    @Query('copyFrom') copyFrom?: string,
+  ) {
+    return this.protocols.bootstrapPlatform(user, {
+      varietyId: varietyId || null,
+      copyFromVarietyId: copyFrom || null,
+    });
+  }
+  @Get('mamcos/:mamcosId/upcoming')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('rice_protocols', 'VIEW')
+  @ApiOperation({
+    summary:
+      "What the cooperative's own calendar says is due soon across its members' crop cycles",
+  })
+  upcoming(
+    @Param('mamcosId') mamcosId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.protocols.upcoming(mamcosId, user);
+  }
   @Post('mamcos/:mamcosId/bootstrap')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @RequirePermission('rice_protocols', 'CREATE')
   @ApiOperation({
-    summary: 'Create the default Mbalari rice calendar for a cooperative',
+    summary:
+      "Create a cooperative's own rice calendar (never sent to the mobile app)",
   })
   bootstrap(
     @Param('mamcosId') mamcosId: string,

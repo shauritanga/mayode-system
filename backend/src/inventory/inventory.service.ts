@@ -57,7 +57,9 @@ export class InventoryService {
       select: { id: true },
     });
     if (!farmer) {
-      throw new ForbiddenException('No farmer profile is linked to this account.');
+      throw new ForbiddenException(
+        'No farmer profile is linked to this account.',
+      );
     }
     return farmer.id;
   }
@@ -88,12 +90,11 @@ export class InventoryService {
     if (!farmer) {
       throw new NotFoundException(`Farmer with ID ${farmerId} not found`);
     }
-    const protocolEnabled =
-      farm.mamcosId &&
-      (await this.prisma.riceProtocol.findFirst({
-        where: { mamcosId: farm.mamcosId, isActive: true },
-        select: { id: true },
-      }));
+    // The quality gate follows the platform rice calendar (the one farmers' tasks come from).
+    const protocolEnabled = await this.prisma.riceProtocol.findFirst({
+      where: { mamcosId: null, isActive: true },
+      select: { id: true },
+    });
     if (protocolEnabled && !cropCycleId) {
       throw new BadRequestException({
         code: 'MBALARI_QUALITY_GATE',
@@ -164,7 +165,9 @@ export class InventoryService {
       },
     });
     if (!cycle) {
-      throw new NotFoundException(`Crop cycle with ID ${dto.cropCycleId} not found`);
+      throw new NotFoundException(
+        `Crop cycle with ID ${dto.cropCycleId} not found`,
+      );
     }
     await this.ownership.assertFarmAccess(user, cycle.farmId);
 
@@ -214,7 +217,9 @@ export class InventoryService {
       },
       include: {
         farm: { select: { id: true, farmCode: true } },
-        cropCycle: { select: { id: true, season: true, riceVariety: true, status: true } },
+        cropCycle: {
+          select: { id: true, season: true, riceVariety: true, status: true },
+        },
         lot: { select: { id: true, lotNumber: true } },
       },
       orderBy: { receivedDate: 'desc' },
@@ -245,7 +250,12 @@ export class InventoryService {
       .filter((r) => r.status === 'RECEIVED' || r.status === 'IN_STORAGE')
       .reduce((sum, r) => sum + r.weightKg, 0);
     const batchedKg = records
-      .filter((r) => r.status === 'BATCHED' || r.status === 'SHIPPED' || r.status === 'SOLD')
+      .filter(
+        (r) =>
+          r.status === 'BATCHED' ||
+          r.status === 'SHIPPED' ||
+          r.status === 'SOLD',
+      )
       .reduce((sum, r) => sum + r.weightKg, 0);
     return {
       recordCount: records.length,
@@ -259,6 +269,7 @@ export class InventoryService {
   async findAllRecords() {
     return this.prisma.inventoryRecord.findMany({
       include: {
+        warehouse: { select: { name: true } },
         farm: { select: { farmCode: true } },
         farmer: {
           select: { controlNumber: true, firstName: true, lastName: true },
@@ -331,6 +342,14 @@ export class InventoryService {
       totalWeightKg += rec.weightKg;
     }
 
+    // A lot is sold from one warehouse, so records received into different warehouses cannot be mixed.
+    const warehouseIds = [...new Set(records.map((r) => r.warehouseId))];
+    if (warehouseIds.length > 1) {
+      throw new BadRequestException(
+        'These records are in different warehouses (or only some are received). Batch records from one warehouse at a time.',
+      );
+    }
+
     // Perform transaction to create Lot and assign to all records
     return this.prisma.$transaction(async (prisma) => {
       const lot = await prisma.lot.create({
@@ -338,6 +357,7 @@ export class InventoryService {
           lotNumber,
           riceVariety,
           totalWeightKg,
+          warehouseId: warehouseIds[0] ?? null,
         },
       });
 

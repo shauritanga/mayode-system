@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Linking, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { marketplaceApi } from '../../src/lib/data';
@@ -18,6 +18,11 @@ export default function LandListingDetail() {
   const [depositAmount, setDepositAmount] = useState('');
   const [depositPhone, setDepositPhone] = useState('');
   const [busy, setBusy] = useState(false);
+  // Private (Relationship) deals: OPEN | OWNER | GRANTED | NEEDS_CODE | EXPIRED_OR_TAKEN
+  const [access, setAccess] = useState<string>('OPEN');
+  const [ownerCode, setOwnerCode] = useState<{ expiresAt?: string; claimed?: boolean } | null>(null);
+  const [codeInput, setCodeInput] = useState('');
+  const [issued, setIssued] = useState<{ code: string; expiresAt?: string } | null>(null);
   const [protection, setProtection] = useState<{ mayodeProtected: boolean; note: string } | null>(null);
 
   const [offers, setOffers] = useState<any[]>([]);
@@ -33,12 +38,26 @@ export default function LandListingDetail() {
     setLoading(true);
     try {
       const res = await marketplaceApi.getLandListing(id);
-      setListing(res.data);
-      if (!depositAmount && res.data?.askingPrice) setDepositAmount(String(res.data.askingPrice));
+      let data = res.data;
+      let state = 'OPEN';
+      // A private deal's price and offers are only for the owner and the renter who entered its code.
+      if (data?.isPrivate) {
+        try {
+          const a = await marketplaceApi.accessFor(id);
+          state = a.data.state;
+          data = { ...data, ...a.data.listing };
+          setOwnerCode(state === 'OWNER' ? { expiresAt: a.data.codeExpiresAt, claimed: a.data.claimed } : null);
+        } catch {
+          state = 'NEEDS_CODE';
+        }
+      }
+      setAccess(state);
+      setListing(data);
+      if (!depositAmount && data?.askingPrice) setDepositAmount(String(data.askingPrice));
 
       marketplaceApi.getProtectionStatus(id).then((r: any) => setProtection(r.data)).catch(() => setProtection(null));
 
-      if (res.data?.leaseStatus === 'DRAFT') {
+      if (res.data?.leaseStatus === 'DRAFT' && (state === 'OPEN' || state === 'OWNER' || state === 'GRANTED')) {
         marketplaceApi.getOffers(id).then((r: any) => setOffers(r.data ?? [])).catch(() => setOffers([]));
       }
       if (res.data?.isMultiYear && res.data?.leaseStatus === 'ACTIVE') {
@@ -55,8 +74,47 @@ export default function LandListingDetail() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const isOwner = !!farmerId && listing?.ownerId === farmerId;
+  const locked = !!listing?.isPrivate && !isOwner && access !== 'GRANTED';
   const isRenter = !!farmerId && listing?.renterId === farmerId;
   const isStaff = user?.role && ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'FIELD_OFFICER'].includes(user.role);
+
+  const redeem = async () => {
+    if (!codeInput.trim()) return;
+    setBusy(true);
+    try {
+      await marketplaceApi.redeemCode(id, codeInput.trim());
+      setCodeInput('');
+      Alert.alert(t('mlaxPrivateDeal'), t('mlaxCodeAccepted'));
+      await load();
+    } catch (e: any) {
+      const msg = e?.response?.data?.message;
+      Alert.alert(t('mlaxPrivateDeal'), Array.isArray(msg) ? msg.join('\n') : msg || String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const newCode = () => {
+    const run = async () => {
+      setBusy(true);
+      try {
+        const res = await marketplaceApi.regenerateCode(id);
+        setIssued({ code: res.data.accessCode, expiresAt: res.data.accessCodeExpiresAt });
+        await load();
+      } catch (e: any) {
+        const msg = e?.response?.data?.message;
+        Alert.alert(t('mlaxPrivateDeal'), Array.isArray(msg) ? msg.join('\n') : msg || String(e?.message ?? e));
+      } finally {
+        setBusy(false);
+      }
+    };
+    // A public listing becomes private without anyone losing access; replacing a code does not.
+    if (!listing?.isPrivate) { run(); return; }
+    Alert.alert(t('mlaxNewCode'), t('mlaxNewCodeConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('mlaxNewCode'), style: 'destructive', onPress: run },
+    ]);
+  };
 
   const deposit = async () => {
     if (!farmerId) return;
@@ -194,10 +252,10 @@ export default function LandListingDetail() {
       <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <Text style={styles.farmCode}>{listing.farm?.farmCode}</Text>
-          <Text style={styles.subText}>{listing.dealType} · {listing.leaseStatus}</Text>
+          <Text style={styles.subText}>{listing.isPrivate ? `🔒 ${t('mlaxPrivateDeal')}` : listing.dealType} · {listing.leaseStatus}</Text>
           <View style={styles.priceBox}>
             <Text style={styles.priceLabel}>{t('askingPrice')}</Text>
-            <Text style={styles.priceValue}>{Number(listing.askingPrice).toLocaleString()} TZS</Text>
+            <Text style={styles.priceValue}>{listing.priceHidden || listing.askingPrice == null ? '🔒' : `${Number(listing.askingPrice).toLocaleString()} TZS`}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>{t('mlaxDealType')}</Text>
@@ -220,7 +278,63 @@ export default function LandListingDetail() {
           )}
         </View>
 
-        {listing.leaseStatus === 'DRAFT' && !isOwner && farmerId && (
+        {issued && (
+          <View style={styles.card}>
+            <Text style={styles.fieldLabel}>{t('mlaxYourCode')}</Text>
+            <Text style={styles.codeValue} selectable>{issued.code}</Text>
+            <Text style={styles.subText}>{t('mlaxCodeShownOnce')}</Text>
+            <TouchableOpacity
+              style={[styles.actionBtn, { marginTop: 12 }]}
+              onPress={() => Share.share({ message: t('mlaxShareMessage', { code: issued.code }) }).catch(() => undefined)}
+            >
+              <Text style={styles.actionBtnText}>{t('mlaxShareCode')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.linkBtn} onPress={() => setIssued(null)}>
+              <Text style={styles.linkBtnText}>{t('mlaxCodeSaved')}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {locked && farmerId && (
+          <View style={styles.card}>
+            <Text style={styles.fieldLabel}>🔒 {t('mlaxPrivateDeal')}</Text>
+            <Text style={styles.subText}>{access === 'EXPIRED_OR_TAKEN' ? t('mlaxCodeTaken') : t('mlaxPrivateHint')}</Text>
+            {access !== 'EXPIRED_OR_TAKEN' && (
+              <>
+                <Text style={styles.fieldLabel}>{t('mlaxEnterCode')}</Text>
+                <TextInput
+                  style={styles.input}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  value={codeInput}
+                  onChangeText={setCodeInput}
+                  placeholder="K7M4-QP2X"
+                  placeholderTextColor="#9CA3AF"
+                />
+                <TouchableOpacity style={[styles.actionBtn, (busy || !codeInput.trim()) && { opacity: 0.6 }]} onPress={redeem} disabled={busy || !codeInput.trim()}>
+                  <Text style={styles.actionBtnText}>{t('mlaxUnlock')}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        )}
+
+        {isOwner && listing.leaseStatus === 'DRAFT' && listing.dealType === 'RELATIONSHIP' && (
+          <View style={styles.card}>
+            <Text style={styles.subText}>
+              {listing.isPrivate
+                ? ownerCode?.claimed
+                  ? t('mlaxPrivateOwnerUsed')
+                  : t('mlaxPrivateOwnerOpen', { date: ownerCode?.expiresAt ? new Date(ownerCode.expiresAt).toLocaleDateString() : '—' })
+                : t('mlaxPublicRelationship')}
+            </Text>
+            <TouchableOpacity style={[styles.actionBtn, { marginTop: 10 }, busy && { opacity: 0.6 }]} onPress={newCode} disabled={busy}>
+              <Text style={styles.actionBtnText}>{listing.isPrivate ? t('mlaxNewCode') : t('mlaxMakePrivate')}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {listing.leaseStatus === 'DRAFT' && !isOwner && !locked && farmerId && (
           <View style={styles.card}>
             <Text style={styles.fieldLabel}>{t('mlaxDepositAmount')}</Text>
             <TextInput
@@ -245,7 +359,7 @@ export default function LandListingDetail() {
           </View>
         )}
 
-        {listing.leaseStatus === 'DRAFT' && !isOwner && farmerId && (
+        {listing.leaseStatus === 'DRAFT' && !isOwner && !locked && farmerId && (
           <View style={styles.card}>
             <Text style={styles.fieldLabel}>{t('mlaxMakeOffer')}</Text>
             <TextInput
@@ -377,6 +491,7 @@ export default function LandListingDetail() {
 }
 
 const styles = StyleSheet.create({
+  codeValue: { fontSize: 34, fontWeight: '800', letterSpacing: 4, color: '#065F46', textAlign: 'center', marginVertical: 14 },
   container: { flex: 1, backgroundColor: '#F3F4F6' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E5E7EB' },

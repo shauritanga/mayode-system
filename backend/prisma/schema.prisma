@@ -21,24 +21,29 @@ datasource db {
 // ============================================================
 
 model User {
-  id           String    @id @default(uuid())
-  email        String?   @unique
-  phone        String    @unique
-  passwordHash String    @map("password_hash")
-  firstName    String?   @map("first_name")
-  lastName     String?   @map("last_name")
-  role         UserRole
-  isActive     Boolean   @default(true) @map("is_active")
-  language     String    @default("sw") // sw = Swahili, en = English
-  pushToken    String?   @map("push_token") // Expo Push Notification Token
-  profilePhotoUrl String? @map("profile_photo_url")
-  lastLoginAt  DateTime? @map("last_login_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id              String    @id @default(uuid())
+  email           String?   @unique
+  phone           String    @unique
+  passwordHash    String    @map("password_hash")
+  firstName       String?   @map("first_name")
+  lastName        String?   @map("last_name")
+  role            UserRole
+  isActive        Boolean   @default(true) @map("is_active")
+  language        String    @default("sw") // sw = Swahili, en = English
+  pushToken       String?   @map("push_token") // Expo Push Notification Token
+  profilePhotoUrl String?   @map("profile_photo_url")
+  lastLoginAt     DateTime? @map("last_login_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  roleId String? @map("role_id")
+  roleId   String? @map("role_id")
+  // Cooperative this account belongs to (staff/admin accounts created inside an
+  // AMCOS). Null = platform account. Farmer/staff profiles may also carry an
+  // AMCOS; JwtStrategy resolves the effective tenant from all three.
+  mamcosId String? @map("mamcos_id")
 
   // Relations
+  mamcos        Mamcos?           @relation("UserMamcos", fields: [mamcosId], references: [id], onDelete: SetNull)
   farmer        Farmer?
   mamcosStaff   MamcosStaff?
   refreshTokens RefreshToken[]
@@ -46,8 +51,10 @@ model User {
   notifications Notification[]
   memberships   Membership[]
   dispatches    Dispatch[]
-  customRole    Role?          @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  keeperOf      WarehouseKeeper[] @relation("WarehouseKeeperUser")
+  customRole    Role?             @relation(fields: [roleId], references: [id], onDelete: SetNull)
 
+  @@index([mamcosId])
   @@map("users")
 }
 
@@ -61,6 +68,23 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
+}
+
+/// One-time sign-in code sent by SMS. Only a hash of the code is stored.
+model OtpCode {
+  id         String    @id @default(uuid())
+  phone      String
+  codeHash   String    @map("code_hash")
+  purpose    String    @default("LOGIN")
+  expiresAt  DateTime  @map("expires_at")
+  attempts   Int       @default(0)
+  consumedAt DateTime? @map("consumed_at")
+  ip         String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([phone, createdAt])
+  @@index([expiresAt])
+  @@map("otp_codes")
 }
 
 model PartnerApiKey {
@@ -147,6 +171,8 @@ model Farmer {
   landListings              LandListing[]                  @relation("LandOwner")
   rentals                   LandListing[]                  @relation("LandRenter")
   previousRentals           LandListing[]                  @relation("LandPreviousRenter")
+  landCodeClaims            LandListing[]                  @relation("LandCodeHolder")
+  landCodeAttempts          LandListingCodeAttempt[]
   subLeasesAsOriginalRenter LandListingSubLease[]          @relation("SubLeaseOriginalRenter")
   subLeasesAsNewRenter      LandListingSubLease[]          @relation("SubLeaseNewRenter")
   ownershipTransfersFrom    LandListingOwnershipTransfer[] @relation("TransferFromOwner")
@@ -238,12 +264,14 @@ model Mamcos {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   premiumFundEntries PremiumFundEntry[]
-  projects CommunityProject[]
-  meetings MeetingRecord[]
-  votes Vote[]
+  projects           CommunityProject[]
+  meetings           MeetingRecord[]
+  votes              Vote[]
 
   // Relations
   staff              MamcosStaff[]
+  accounts           User[]               @relation("UserMamcos")
+  roles              Role[]
   farmers            Farmer[]
   farms              Farm[]
   farmingSeasons     FarmingSeason[]
@@ -251,6 +279,8 @@ model Mamcos {
   riceProtocols      RiceProtocol[]
   irrigationSchemes  IrrigationScheme[]
   aggregationCentres AggregationCentre[]
+  buyers             Buyer[]
+  warehouses         Warehouse[]
 
   @@map("mamcos")
 }
@@ -396,6 +426,8 @@ model CropCycle {
   farmerId         String          @map("farmer_id")
   season           String // e.g., "2025/2026 Main"
   riceVariety      String?         @map("rice_variety")
+  /// The admin-managed variety the farmer chose; its calendar and maturity length drive the schedule.
+  riceVarietyId    String?         @map("rice_variety_id")
   plantingDate     DateTime?       @map("planting_date")
   expectedHarvest  DateTime?       @map("expected_harvest")
   harvestDate      DateTime?       @map("harvest_date")
@@ -418,7 +450,9 @@ model CropCycle {
   inventoryRecords     InventoryRecord[]
   aiIntegrationRecords AiIntegrationRecord[]
   insurancePolicies    InsurancePolicy[]
+  variety              RiceVariety?          @relation(fields: [riceVarietyId], references: [id])
 
+  @@index([riceVarietyId])
   @@map("crop_cycles")
 }
 
@@ -449,9 +483,33 @@ model ActivityLog {
 
 // Cooperative-owned, versioned rice calendar. Each task is copied onto the
 // crop cycle so later protocol edits never rewrite a farmer's historic plan.
+/// A rice variety the admin offers farmers. Varieties differ in how long they take to grow, so
+/// each can have its own calendar (a platform RiceProtocol with this varietyId).
+model RiceVariety {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  code         String?
+  /// Days from planting to harvest; used to work out the harvest date when the farmer gives only a planting date.
+  maturityDays Int?     @map("maturity_days")
+  description  String?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  protocols  RiceProtocol[]
+  cropCycles CropCycle[]
+
+  @@map("rice_varieties")
+}
+
 model RiceProtocol {
   id              String   @id @default(uuid())
-  mamcosId        String   @map("mamcos_id")
+  /// null = the platform rice calendar (the one every farmer's mobile app uses); set = a
+  /// cooperative's own calendar, which only that cooperative sees.
+  mamcosId        String?  @map("mamcos_id")
+  /// Platform calendars only: the rice variety this calendar is for. null on a platform calendar =
+  /// the default calendar, used for any variety that has none of its own.
+  varietyId       String?  @map("variety_id")
   name            String
   version         Int      @default(1)
   isActive        Boolean  @default(true) @map("is_active")
@@ -459,10 +517,13 @@ model RiceProtocol {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  mamcos Mamcos @relation(fields: [mamcosId], references: [id], onDelete: Cascade)
+  mamcos  Mamcos?      @relation(fields: [mamcosId], references: [id], onDelete: Cascade)
+  variety RiceVariety? @relation(fields: [varietyId], references: [id])
 
+  // Platform versions (mamcos_id NULL) are numbered by RiceProtocolsService: Postgres treats NULLs as distinct.
   @@unique([mamcosId, version])
   @@index([mamcosId, isActive])
+  @@index([varietyId])
   @@map("rice_protocols")
 }
 
@@ -483,6 +544,16 @@ model RiceCalendarTask {
   completedAt          DateTime?          @map("completed_at")
   completedByUserId    String?            @map("completed_by_user_id")
   activityLogId        String?            @map("activity_log_id")
+  // History that must survive for insurance checks: the first due date, when we reminded and
+  // marked it missed, when the system (not the phone) received the completion, and any reschedule.
+  originalDueDate      DateTime?          @map("original_due_date")
+  reminderSentAt       DateTime?          @map("reminder_sent_at")
+  missedAt             DateTime?          @map("missed_at")
+  missedNotifiedAt     DateTime?          @map("missed_notified_at")
+  recordedAt           DateTime?          @map("recorded_at")
+  rescheduleCount      Int                @default(0) @map("reschedule_count")
+  rescheduleReason     String?            @map("reschedule_reason")
+  protocolId           String?            @map("protocol_id")
   createdAt            DateTime           @default(now()) @map("created_at")
   updatedAt            DateTime           @updatedAt @map("updated_at")
 
@@ -684,6 +755,7 @@ model InventoryRecord {
   moistureContentPct Float?          @map("moisture_content_pct")
   trackingCode       String          @unique @map("tracking_code")
   warehouseLocation  String?         @map("warehouse_location")
+  warehouseId        String?         @map("warehouse_id")
   receivedDate       DateTime        @map("received_date")
   status             InventoryStatus @default(RECEIVED)
   createdAt          DateTime        @default(now()) @map("created_at")
@@ -693,7 +765,9 @@ model InventoryRecord {
   farmer    Farmer     @relation(fields: [farmerId], references: [id])
   cropCycle CropCycle? @relation(fields: [cropCycleId], references: [id])
   lot       Lot?       @relation(fields: [lotNumber], references: [lotNumber])
+  warehouse Warehouse? @relation(fields: [warehouseId], references: [id])
 
+  @@index([warehouseId])
   @@map("inventory_records")
 }
 
@@ -702,8 +776,12 @@ model Lot {
   lotNumber     String   @unique @map("lot_number") // e.g., LOT-2025-001
   totalWeightKg Float    @map("total_weight_kg")
   riceVariety   String?  @map("rice_variety")
+  /// Warehouse currently holding this lot (null for legacy lots).
+  warehouseId   String?  @map("warehouse_id")
   createdAt     DateTime @default(now()) @map("created_at")
 
+  warehouse            Warehouse?            @relation(fields: [warehouseId], references: [id])
+  saleOrders           SaleOrder[]
   inventoryRecords     InventoryRecord[]
   sales                Sale[]
   aiIntegrationRecords AiIntegrationRecord[]
@@ -723,14 +801,19 @@ model Buyer {
   contactEmail        String?  @map("contact_email")
   contactPhone        String?  @map("contact_phone")
   isCertified         Boolean  @default(false) @map("is_certified")
+  /// Owning cooperative; null = platform-level buyer (Super Admin's own customers).
+  mamcosId            String?  @map("mamcos_id")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  sales    Sale[]
-  revenues Revenue[]
-  invoices Invoice[]
-  orders   BuyerOrder[]
+  mamcos     Mamcos?      @relation(fields: [mamcosId], references: [id])
+  saleOrders SaleOrder[]
+  sales      Sale[]
+  revenues   Revenue[]
+  invoices   Invoice[]
+  orders     BuyerOrder[]
 
+  @@index([mamcosId])
   @@map("buyers")
 }
 
@@ -769,6 +852,8 @@ model Sale {
   buyerOrderReference   String?   @unique @map("buyer_order_reference")
   buyerPaymentReference String?   @map("buyer_payment_reference")
   saleDate              DateTime  @map("sale_date")
+  /// Cooperative the sale belongs to; null = platform-level sale.
+  mamcosId              String?   @map("mamcos_id")
   createdAt             DateTime  @default(now()) @map("created_at")
 
   buyer              Buyer               @relation(fields: [buyerId], references: [id])
@@ -780,7 +865,9 @@ model Sale {
   premiumFundEntries PremiumFundEntry[]
   invoice            Invoice?
   dispatch           Dispatch?
+  saleOrder          SaleOrder?
 
+  @@index([mamcosId])
   @@map("sales")
 }
 
@@ -821,9 +908,9 @@ model Dispatch {
   saleId             String                @unique @map("sale_id")
   transportMode      DispatchTransportMode @map("transport_mode")
   transportFee       Float?                @map("transport_fee")
-  vehiclePlateNumber String                @map("vehicle_plate_number")
-  driverName         String                @map("driver_name")
-  driverPhone        String                @map("driver_phone")
+  vehiclePlateNumber String?               @map("vehicle_plate_number")
+  driverName         String?               @map("driver_name")
+  driverPhone        String?               @map("driver_phone")
   releasedByUserId   String                @map("released_by_user_id")
   releasedAt         DateTime              @default(now()) @map("released_at")
   notes              String?
@@ -839,9 +926,8 @@ model Dispatch {
 // Fairtrade premium is deliberately tracked outside ordinary crop revenue so
 // members can audit fund income, expenditure and the resulting balance.
 model PremiumFundEntry {
-  mamcosId String? @map("mamcos_id")
-  mamcos Mamcos? @relation(fields: [mamcosId], references: [id])
-  @@index([mamcosId])
+  mamcosId    String?              @map("mamcos_id")
+  mamcos      Mamcos?              @relation(fields: [mamcosId], references: [id])
   id          String               @id @default(uuid())
   entryType   PremiumFundEntryType @map("entry_type")
   amount      Float
@@ -852,6 +938,7 @@ model PremiumFundEntry {
 
   sale Sale? @relation(fields: [saleId], references: [id])
 
+  @@index([mamcosId])
   @@index([entryDate])
   @@map("premium_fund_entries")
 }
@@ -951,10 +1038,8 @@ model BudgetLine {
 }
 
 model CommunityProject {
-  mamcosId String? @map("mamcos_id")
-  mamcos Mamcos? @relation(fields: [mamcosId], references: [id])
-
-  @@index([mamcosId])
+  mamcosId      String?       @map("mamcos_id")
+  mamcos        Mamcos?       @relation(fields: [mamcosId], references: [id])
   id            String        @id @default(uuid())
   name          String
   fundingSource String        @map("funding_source")
@@ -965,14 +1050,13 @@ model CommunityProject {
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
+  @@index([mamcosId])
   @@map("community_projects")
 }
 
 model MeetingRecord {
-  mamcosId String? @map("mamcos_id")
-  mamcos Mamcos? @relation(fields: [mamcosId], references: [id])
-
-  @@index([mamcosId])
+  mamcosId      String?  @map("mamcos_id")
+  mamcos        Mamcos?  @relation(fields: [mamcosId], references: [id])
   id            String   @id @default(uuid())
   meetingDate   DateTime @map("meeting_date")
   agenda        String
@@ -981,14 +1065,13 @@ model MeetingRecord {
   createdAt     DateTime @default(now()) @map("created_at")
   votes         Vote[]
 
+  @@index([mamcosId])
   @@map("meeting_records")
 }
 
 model Vote {
-  mamcosId String? @map("mamcos_id")
-  mamcos Mamcos? @relation(fields: [mamcosId], references: [id])
-
-  @@index([mamcosId])
+  mamcosId    String?        @map("mamcos_id")
+  mamcos      Mamcos?        @relation(fields: [mamcosId], references: [id])
   id          String         @id @default(uuid())
   title       String
   description String?
@@ -1001,6 +1084,7 @@ model Vote {
   responses   VoteResponse[]
   meeting     MeetingRecord? @relation(fields: [meetingId], references: [id])
 
+  @@index([mamcosId])
   @@map("votes")
 }
 
@@ -1064,10 +1148,18 @@ model LandListing {
   lastInstallmentYear  Int         @default(0) @map("last_installment_year")
   // Reward for Honesty: every M-LAX in-app deal is MAYODE-protected once escrow is secured
   mayodeProtected      Boolean     @default(false) @map("mayode_protected")
+  // Private ("Relationship") deals: only a keyed hash of the code is stored, never the code. The
+  // first renter to redeem it is recorded in claimedByFarmerId and is the only one who can take the listing.
+  accessCodeHash       String?     @map("access_code_hash")
+  accessCodeExpiresAt  DateTime?   @map("access_code_expires_at")
+  claimedByFarmerId    String?     @map("claimed_by_farmer_id")
+  claimedAt            DateTime?   @map("claimed_at")
   createdAt            DateTime    @default(now()) @map("created_at")
   updatedAt            DateTime    @updatedAt @map("updated_at")
 
   // Relations
+  claimedByFarmer    Farmer?                        @relation("LandCodeHolder", fields: [claimedByFarmerId], references: [id])
+  codeAttempts       LandListingCodeAttempt[]
   farm               Farm                           @relation(fields: [farmId], references: [id])
   owner              Farmer                         @relation("LandOwner", fields: [ownerId], references: [id])
   renter             Farmer?                        @relation("LandRenter", fields: [renterId], references: [id])
@@ -1080,6 +1172,22 @@ model LandListing {
   improvements       LandListingImprovement[]
 
   @@map("land_listings")
+}
+
+/// Every attempt to redeem a private listing's code, used to throttle guessing.
+model LandListingCodeAttempt {
+  id        String   @id @default(uuid())
+  listingId String   @map("listing_id")
+  farmerId  String   @map("farmer_id")
+  success   Boolean
+  createdAt DateTime @default(now()) @map("created_at")
+
+  listing LandListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  farmer  Farmer      @relation(fields: [farmerId], references: [id])
+
+  @@index([farmerId, createdAt])
+  @@index([listingId, farmerId, createdAt])
+  @@map("land_listing_code_attempts")
 }
 
 model LandListingOffer {
@@ -1404,11 +1512,14 @@ model AuditLog {
   oldData    Json?    @map("old_data")
   newData    Json?    @map("new_data")
   ipAddress  String?  @map("ip_address")
+  /// Cooperative of the acting user at the time; null = platform-level.
+  mamcosId   String?  @map("mamcos_id")
   createdAt  DateTime @default(now()) @map("created_at")
 
   user User? @relation(fields: [userId], references: [id])
 
   @@index([entityType, entityId])
+  @@index([mamcosId, createdAt])
   @@map("audit_logs")
 }
 
@@ -1681,31 +1792,31 @@ enum FieldConditionStatus {
 }
 
 model FieldOfficerVisit {
-  id                 String                   @id @default(uuid())
-  fieldOfficerId     String                   @map("field_officer_id")
-  farmerId           String                   @map("farmer_id")
-  farmId             String?                  @map("farm_id")
-  cropCycleId        String?                  @map("crop_cycle_id")
-  purpose            FieldOfficerVisitPurpose @default(ROUTINE_CHECK)
-  notes              String?
-  growthStage        RiceGrowthStage?         @map("growth_stage")
-  riceVariety        String?                  @map("rice_variety")
-  cropCondition      FieldConditionStatus?    @map("crop_condition")
-  waterStatus        FieldConditionStatus?    @map("water_status")
-  weedStatus         FieldConditionStatus?    @map("weed_status")
-  pestStatus         FieldConditionStatus?    @map("pest_status")
-  diseaseStatus      FieldConditionStatus?    @map("disease_status")
-  fertilizerApplied  Boolean?                 @map("fertilizer_applied")
-  inputUsed          String?                  @map("input_used")
-  inputQuantity      String?                  @map("input_quantity")
-  observations       String?
-  recommendations    String?
-  nextVisitDate      DateTime?                @map("next_visit_date")
-  photoUrls          String[]                 @map("photo_urls")
-  gpsLatitude        Float?                   @map("gps_latitude")
-  gpsLongitude       Float?                   @map("gps_longitude")
-  visitedAt          DateTime                 @map("visited_at")
-  createdAt          DateTime                 @default(now()) @map("created_at")
+  id                String                   @id @default(uuid())
+  fieldOfficerId    String                   @map("field_officer_id")
+  farmerId          String                   @map("farmer_id")
+  farmId            String?                  @map("farm_id")
+  cropCycleId       String?                  @map("crop_cycle_id")
+  purpose           FieldOfficerVisitPurpose @default(ROUTINE_CHECK)
+  notes             String?
+  growthStage       RiceGrowthStage?         @map("growth_stage")
+  riceVariety       String?                  @map("rice_variety")
+  cropCondition     FieldConditionStatus?    @map("crop_condition")
+  waterStatus       FieldConditionStatus?    @map("water_status")
+  weedStatus        FieldConditionStatus?    @map("weed_status")
+  pestStatus        FieldConditionStatus?    @map("pest_status")
+  diseaseStatus     FieldConditionStatus?    @map("disease_status")
+  fertilizerApplied Boolean?                 @map("fertilizer_applied")
+  inputUsed         String?                  @map("input_used")
+  inputQuantity     String?                  @map("input_quantity")
+  observations      String?
+  recommendations   String?
+  nextVisitDate     DateTime?                @map("next_visit_date")
+  photoUrls         String[]                 @map("photo_urls")
+  gpsLatitude       Float?                   @map("gps_latitude")
+  gpsLongitude      Float?                   @map("gps_longitude")
+  visitedAt         DateTime                 @map("visited_at")
+  createdAt         DateTime                 @default(now()) @map("created_at")
 
   fieldOfficer MamcosStaff @relation(fields: [fieldOfficerId], references: [id], onDelete: Cascade)
   farmer       Farmer      @relation(fields: [farmerId], references: [id], onDelete: Cascade)
@@ -2203,17 +2314,23 @@ enum PermissionAction {
 
 model Role {
   id          String    @id @default(uuid())
-  name        String    @unique
+  // Unique per scope: platform roles (mamcosId null) are checked in RolesService,
+  // cooperative roles by the composite index below.
+  name        String
   description String?
   isSystem    Boolean   @default(false) @map("is_system")
   systemRole  UserRole? @map("system_role")
   isActive    Boolean   @default(true) @map("is_active")
+  // Cooperative this role belongs to. Null = platform role, managed by Super Admin.
+  mamcosId    String?   @map("mamcos_id")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
+  mamcos      Mamcos?          @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
   permissions RolePermission[]
   users       User[]
 
+  @@unique([mamcosId, name])
   @@map("roles")
 }
 
@@ -2304,6 +2421,8 @@ enum CalendarTaskStatus {
   PENDING
   COMPLETED
   SKIPPED
+  /// Not done within the grace period after its due date. Stays on record even if completed late.
+  MISSED
 }
 
 enum CostCategory {
@@ -2635,13 +2754,22 @@ enum DisputeStatus {
 // ============================================================
 
 model OrgSettings {
-  id           String   @id @default(uuid())
-  orgName      String   @map("org_name")
-  logoUrl      String?  @map("logo_url")
-  contactEmail String?  @map("contact_email")
-  contactPhone String?  @map("contact_phone")
-  address      String?
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                    String   @id @default(uuid())
+  orgName               String   @map("org_name")
+  logoUrl               String?  @map("logo_url")
+  contactEmail          String?  @map("contact_email")
+  contactPhone          String?  @map("contact_phone")
+  address               String?
+  /// Allowed difference between ordered and weighed rice (percent) before an order counts as loaded.
+  loadTolerancePct      Float    @default(2) @map("load_tolerance_pct")
+  /// Unconfirmed sale orders release their reserved stock after this many days; 0 disables expiry.
+  reservationExpiryDays Int      @default(7) @map("reservation_expiry_days")
+  /// Farmers are reminded this many days before a rice-calendar activity is due.
+  reminderLeadDays      Int      @default(1) @map("reminder_lead_days")
+  /// An activity counts as missed this many days after its due date.
+  missedGraceDays       Int      @default(1) @map("missed_grace_days")
+  reminderBySms         Boolean  @default(true) @map("reminder_by_sms")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("org_settings")
 }
@@ -2679,4 +2807,202 @@ model SyncReceipt {
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@map("sync_receipts")
+}
+
+// ============================================================
+// WAREHOUSE, STOCK LEDGER, SALE ORDERS & DELIVERY
+// Workflow: salesperson reserves stock for a buyer (reference issued) ->
+// warehouse keeper confirms and releases against that reference -> transport is
+// arranged when the buyer has none. Every step records the acting user and time
+// (SaleOrderEvent), and stock only changes through append-only StockMovement rows.
+// ============================================================
+
+enum SaleOrderStatus {
+  RESERVED
+  CONFIRMED
+  PARTIALLY_RELEASED
+  RELEASED
+  COMPLETED
+  CANCELLED
+}
+
+enum StockMovementType {
+  IN
+  RESERVE
+  UNRESERVE
+  OUT
+  ADJUST
+}
+
+enum DeliveryMode {
+  BUYER_PICKUP
+  OWN_FLEET
+  HIRED
+}
+
+enum DeliveryStatus {
+  REQUESTED
+  ASSIGNED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+model Warehouse {
+  id         String   @id @default(uuid())
+  /// Owning cooperative; null = platform warehouse (Super Admin's own stock).
+  mamcosId   String?  @map("mamcos_id")
+  name       String
+  location   String?
+  capacityKg Float?   @map("capacity_kg")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  mamcos           Mamcos?           @relation(fields: [mamcosId], references: [id])
+  keepers          WarehouseKeeper[]
+  movements        StockMovement[]
+  saleOrders       SaleOrder[]
+  lots             Lot[]
+  inventoryRecords InventoryRecord[]
+
+  @@index([mamcosId])
+  @@map("warehouses")
+}
+
+/// Assigns a user as keeper of one warehouse; keepers only act on that warehouse's orders.
+model WarehouseKeeper {
+  id          String   @id @default(uuid())
+  warehouseId String   @map("warehouse_id")
+  userId      String   @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  user      User      @relation("WarehouseKeeperUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, userId])
+  @@index([userId])
+  @@map("warehouse_keepers")
+}
+
+/// Append-only. on-hand = IN + ADJUST - OUT; reserved = RESERVE - UNRESERVE; available = on-hand - reserved.
+model StockMovement {
+  id              String            @id @default(uuid())
+  warehouseId     String            @map("warehouse_id")
+  type            StockMovementType
+  quantityKg      Float             @map("quantity_kg")
+  refType         String?           @map("ref_type")
+  refId           String?           @map("ref_id")
+  note            String?
+  createdByUserId String?           @map("created_by_user_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@index([warehouseId, createdAt])
+  @@index([refType, refId])
+  @@map("stock_movements")
+}
+
+model SaleOrder {
+  id                      String          @id @default(uuid())
+  /// Customer-facing reference the buyer shows the warehouse keeper.
+  reference               String          @unique
+  mamcosId                String?         @map("mamcos_id")
+  buyerId                 String          @map("buyer_id")
+  warehouseId             String          @map("warehouse_id")
+  lotId                   String          @map("lot_id")
+  quantityKg              Float           @map("quantity_kg")
+  pricePerKg              Float           @map("price_per_kg")
+  fairtradePremium        Float?          @map("fairtrade_premium")
+  riceVariety             String?         @map("rice_variety")
+  packaging               String?
+  status                  SaleOrderStatus @default(RESERVED)
+  needsTransport          Boolean         @default(false) @map("needs_transport")
+  /// Approved credit term: stock may leave before payment is received.
+  creditTermDays          Int?            @map("credit_term_days")
+  creditApprovedByUserId  String?         @map("credit_approved_by_user_id")
+  /// Manager override that allowed release while unpaid.
+  releaseApprovedByUserId String?         @map("release_approved_by_user_id")
+  releaseApprovedAt       DateTime?       @map("release_approved_at")
+  notes                   String?
+  saleId                  String?         @unique @map("sale_id")
+  createdByUserId         String          @map("created_by_user_id")
+  confirmedByUserId       String?         @map("confirmed_by_user_id")
+  confirmedAt             DateTime?       @map("confirmed_at")
+  releasedByUserId        String?         @map("released_by_user_id")
+  releasedAt              DateTime?       @map("released_at")
+  cancelledByUserId       String?         @map("cancelled_by_user_id")
+  cancelledAt             DateTime?       @map("cancelled_at")
+  cancelReason            String?         @map("cancel_reason")
+  createdAt               DateTime        @default(now()) @map("created_at")
+  updatedAt               DateTime        @updatedAt @map("updated_at")
+
+  buyer     Buyer            @relation(fields: [buyerId], references: [id])
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
+  lot       Lot              @relation(fields: [lotId], references: [id])
+  sale      Sale?            @relation(fields: [saleId], references: [id])
+  events    SaleOrderEvent[]
+  loads     OrderLoad[]
+
+  @@index([mamcosId, status])
+  @@index([warehouseId, status])
+  @@map("sale_orders")
+}
+
+/// Who did what, when, to a sale order. Never updated or deleted.
+model SaleOrderEvent {
+  id          String           @id @default(uuid())
+  orderId     String           @map("order_id")
+  type        String // e.g. order.reserved, order.confirmed, order.released, delivery.assigned
+  actorUserId String?          @map("actor_user_id")
+  fromStatus  SaleOrderStatus? @map("from_status")
+  toStatus    SaleOrderStatus? @map("to_status")
+  note        String?
+  data        Json?
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  order SaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("sale_order_events")
+}
+
+/// Atomic per-scope, per-year counter for sale-order references (upsert + increment).
+model ReferenceCounter {
+  key   String @id
+  value Int    @default(0)
+
+  @@map("reference_counters")
+}
+
+/// One truck loaded for a sale order. Buyers usually collect a large order over several trips, so
+/// each trip is weighed on its own, and carries its own vehicle and delivery progress.
+model OrderLoad {
+  id              String         @id @default(uuid())
+  saleOrderId     String         @map("sale_order_id")
+  sequence        Int
+  /// Weighbridge weight actually loaded; the stock ledger moves by this figure.
+  weightKg        Float          @map("weight_kg")
+  bagCount        Int?           @map("bag_count")
+  vehiclePlate    String         @map("vehicle_plate")
+  driverName      String         @map("driver_name")
+  driverPhone     String?        @map("driver_phone")
+  mode            DeliveryMode
+  transporterName String?        @map("transporter_name")
+  fee             Float?
+  destination     String?
+  status          DeliveryStatus @default(ASSIGNED)
+  notes           String?
+  loadedByUserId  String         @map("loaded_by_user_id")
+  loadedAt        DateTime       @default(now()) @map("loaded_at")
+  departedAt      DateTime?      @map("departed_at")
+  deliveredAt     DateTime?      @map("delivered_at")
+  receivedBy      String?        @map("received_by")
+  proofNote       String?        @map("proof_note")
+
+  saleOrder SaleOrder @relation(fields: [saleOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([saleOrderId, sequence])
+  @@map("order_loads")
 }

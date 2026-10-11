@@ -8,7 +8,7 @@ import { ViewIcon, ViewOffSlashIcon } from '@hugeicons/core-free-icons';
 import { landingFor } from '@/lib/nav';
 import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
-import { isRoleAllowedInThisMode, ROLE_ALLOWED_HOSTS, APP_MODE_LABEL, APP_MODE, APP_MODE_LOGIN_COPY } from '@/lib/app-mode';
+import { isAccountAllowedInThisMode, allowedHostsFor, APP_MODE_LABEL, APP_MODE, APP_MODE_LOGIN_COPY } from '@/lib/app-mode';
 
 export default function LoginPage() {
   return (
@@ -38,8 +38,8 @@ function LoginForm() {
     try {
       const res = await authApi.login(phone, password);
       const { accessToken, refreshToken, user } = res.data;
-      if (!isRoleAllowedInThisMode(user.role)) {
-        const hosts = ROLE_ALLOWED_HOSTS[user.role] ?? [];
+      if (!isAccountAllowedInThisMode(user)) {
+        const hosts = allowedHostsFor(user);
         setError(
           hosts.length
             ? `This account isn't available on the ${APP_MODE_LABEL[APP_MODE]}. Sign in at ${hosts.join(' or ')} instead.`

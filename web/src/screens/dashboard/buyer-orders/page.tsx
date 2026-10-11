@@ -1,4 +1,5 @@
 'use client';
+import { apiErrorMessage } from '@/lib/api-error';
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { buyerOrdersApi, buyersApi } from '@/lib/api';
@@ -37,7 +38,7 @@ export default function BuyerOrdersPage() {
         setOrders(ordersRes.data || []);
         setBuyers(buyersRes.data || []);
       })
-      .catch(console.error)
+      .catch((e) => setMessage(`Unable to load buyer orders: ${apiErrorMessage(e, 'request failed')}`))
       .finally(() => setLoading(false));
   };
 
@@ -59,8 +60,8 @@ export default function BuyerOrdersPage() {
       setForm({ buyerId: '', riceVariety: '', quantityRequiredKg: '', qualityRequirements: '', requiredByDate: '', notes: '' });
       setMessage('Buyer order created.');
       load();
-    } catch (err: any) {
-      setMessage(err?.response?.data?.message || 'Unable to create buyer order.');
+    } catch (err) {
+      setMessage(`Unable to create buyer order: ${apiErrorMessage(err, 'request failed')}`);
     } finally {
       setSaving(false);
     }
@@ -71,7 +72,7 @@ export default function BuyerOrdersPage() {
       await buyerOrdersApi.updateStatus(order.id, status);
       setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status } : o)));
     } catch (err) {
-      console.error(err);
+      setMessage(`Unable to update order status: ${apiErrorMessage(err, 'request failed')}`);
     }
   };
 

@@ -38,6 +38,9 @@ export default function Modal({ title, subtitle, onClose, footer, children, widt
     >
       <div
         ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className="glass-card"
         style={{
           width,

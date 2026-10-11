@@ -7,17 +7,20 @@ import {
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertBuyerDto } from './dto/buyer.dto';
+import { canSeeTenantRow, tenantOwner, tenantWhere, type TenantActor } from '../common/tenant';
 
 @Injectable()
 export class BuyersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(dto: UpsertBuyerDto) {
-    return this.prisma.buyer.create({ data: dto });
+  /** Buyers belong to the cooperative that registered them; Super Admin's own buyers are platform-level. */
+  create(dto: UpsertBuyerDto, actor: TenantActor) {
+    return this.prisma.buyer.create({ data: { ...dto, mamcosId: tenantOwner(actor) } });
   }
 
-  findAll() {
+  findAll(actor: TenantActor) {
     return this.prisma.buyer.findMany({
+      where: tenantWhere(actor),
       include: { _count: { select: { sales: true } } },
       orderBy: { name: 'asc' },
     });
@@ -87,23 +90,23 @@ export class BuyersService {
     }
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actor?: TenantActor) {
     const buyer = await this.prisma.buyer.findUnique({ where: { id } });
-    if (!buyer) throw new NotFoundException(`Buyer with ID ${id} not found`);
+    if (!buyer || (actor && !canSeeTenantRow(actor, buyer.mamcosId))) throw new NotFoundException(`Buyer with ID ${id} not found`);
     return buyer;
   }
 
-  async update(id: string, dto: UpsertBuyerDto) {
-    await this.findOne(id);
+  async update(id: string, dto: UpsertBuyerDto, actor: TenantActor) {
+    await this.findOne(id, actor);
     return this.prisma.buyer.update({ where: { id }, data: dto });
   }
 
-  async remove(id: string) {
+  async remove(id: string, actor: TenantActor) {
     const buyer = await this.prisma.buyer.findUnique({
       where: { id },
       include: { _count: { select: { sales: true } } },
     });
-    if (!buyer) throw new NotFoundException(`Buyer with ID ${id} not found`);
+    if (!buyer || !canSeeTenantRow(actor, buyer.mamcosId)) throw new NotFoundException(`Buyer with ID ${id} not found`);
     if (buyer._count.sales)
       throw new ConflictException(
         'A buyer with recorded sales cannot be deleted; retain it for traceability and audit history.',

@@ -34,6 +34,12 @@ export interface NavItem {
   href: string;
   label: string;
   icon: IconData;
+  /**
+   * Built-in-role hint. Only used to keep FARMER-only items out of the
+   * admin/cooperative portals; for every other account, visibility and route
+   * access are decided solely by `resource` + the role's VIEW grant (see
+   * `itemAllowed`). Do not rely on this list for authorization.
+   */
   roles: string[];
   /**
    * Permission-catalog resource key guarding this section (mirrors the
@@ -41,6 +47,12 @@ export interface NavItem {
    * controller). Undefined = reserved for built-in navigation.
    */
   resource?: string;
+  /**
+   * Landing page built for one specific persona (see `roles`). Shown in the
+   * sidebar only to accounts whose role is listed; Super Admin and generic
+   * custom roles don't see it, though the route stays reachable by URL.
+   */
+  persona?: boolean;
 }
 
 export interface NavGroup {
@@ -53,19 +65,48 @@ export const navGroups: NavGroup[] = [
     label: '',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: Home01Icon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+    ],
+  },
+  {
+    label: 'Members & Farms',
+    items: [
       { href: '/dashboard/farmers', label: 'Farmers', icon: UserGroupIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'farmers' },
       { href: '/dashboard/mamcos', label: 'AMCOS', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'mamcos' },
       { href: '/dashboard/memberships', label: 'Membership', icon: StarIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'memberships' },
       { href: '/dashboard/farms', label: 'Farms', icon: Plant01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'farms' },
-      { href: '/dashboard/inventory', label: 'Inventory', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'inventory' },
+      { href: '/dashboard/rice-calendar', label: 'Rice Calendar', icon: BookOpen01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'rice_protocols' },
+    ],
+  },
+  {
+    label: 'Harvest & Sales',
+    items: [
+      { href: '/dashboard/inventory', label: 'Harvest & Lots', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'inventory' },
+      { href: '/dashboard/warehouse', label: 'Warehouse', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'warehouse_desk' },
+      { href: '/dashboard/sale-orders', label: 'Sale Orders', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'sale_orders' },
+      { href: '/dashboard/sales', label: 'Sales & Payments', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'sales' },
+      { href: '/dashboard/buyers', label: 'Buyers', icon: Store01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'buyers' },
       { href: '/dashboard/marketplace', label: 'MLAX', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'marketplace' },
+    ],
+  },
+  {
+    label: 'Money & Reports',
+    items: [
       { href: '/dashboard/finance', label: 'Finance and Accounting', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'finance' },
       { href: '/dashboard/reports', label: 'Reports', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'reports' },
+      { href: '/dashboard/audit-log', label: 'Audit Log', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'audit_logs' },
+      { href: '/dashboard/ai', label: 'AI Insights', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'ai_insights' },
+      { href: '/dashboard/alerts', label: 'Farm Alerts', icon: BellIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'farm_alerts' },
+    ],
+  },
+  {
+    label: 'Platform',
+    items: [
       { href: '/dashboard/users', label: 'User Accounts', icon: UserAdd01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'users' },
+      { href: '/dashboard/roles', label: 'Roles & Permissions', icon: Shield01Icon, roles: ['SUPER_ADMIN'], resource: 'roles' },
       { href: '/dashboard/settings', label: 'Settings & Integrations', icon: Shield01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'settings' },
       { href: '/dashboard/locations', label: 'Locations', icon: MapsSearchIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'locations' },
-      { href: '/dashboard/roles', label: 'Roles & Permissions', icon: Shield01Icon, roles: ['SUPER_ADMIN'] },
-      { href: '/dashboard/ai', label: 'AI Insights', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'ai_insights' },
+      { href: '/dashboard/facilities', label: 'Facilities', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'facilities' },
+      { href: '/dashboard/rewards', label: 'Rewards', icon: GiftIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'rewards' },
     ],
   },
   {
@@ -73,16 +114,15 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: Home01Icon, roles: ['MAMCOS_SECRETARY'] },
       { href: '/dashboard/farmer', label: 'Overview', icon: Home01Icon, roles: ['FARMER'] },
-      { href: '/dashboard/field-officer', label: 'Field Dashboard', icon: MapsSearchIcon, roles: ['FIELD_OFFICER'] },
-      { href: '/dashboard/auditor', label: 'Auditor Dashboard', icon: File01Icon, roles: ['AUDITOR'], resource: 'reports' },
-      { href: '/dashboard/financial-provider', label: 'Credit Dashboard', icon: Wallet01Icon, roles: ['FINANCIAL_PROVIDER'], resource: 'farmers' },
-      { href: '/dashboard/buyer', label: 'Buyer Portal', icon: DashboardSquare01Icon, roles: ['BUYER'], resource: 'buyer_portal' },
+      { href: '/dashboard/field-officer', label: 'Field Dashboard', icon: MapsSearchIcon, roles: ['FIELD_OFFICER'], persona: true },
+      { href: '/dashboard/auditor', label: 'Auditor Dashboard', icon: File01Icon, roles: ['AUDITOR'], resource: 'reports', persona: true },
+      { href: '/dashboard/financial-provider', label: 'Credit Dashboard', icon: Wallet01Icon, roles: ['FINANCIAL_PROVIDER'], resource: 'farmers', persona: true },
+      { href: '/dashboard/buyer', label: 'Buyer Portal', icon: DashboardSquare01Icon, roles: ['BUYER'], resource: 'buyer_portal', persona: true },
     ],
   },
   {
     label: 'People',
     items: [
-      { href: '/dashboard/leadership', label: 'Leadership', icon: DashboardSquare01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'governance' },
       { href: '/dashboard/staff', label: 'Staff', icon: UserAdd01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'users' },
       { href: '/dashboard/farmers', label: 'Farmers', icon: UserGroupIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER'], resource: 'farmers' },
       { href: '/dashboard/memberships', label: 'Memberships', icon: StarIcon, roles: ['MAMCOS_SECRETARY'], resource: 'memberships' },
@@ -105,12 +145,15 @@ export const navGroups: NavGroup[] = [
   {
     label: 'Business',
     items: [
-      { href: '/dashboard/inventory', label: 'Inventory', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'inventory' },
+      { href: '/dashboard/inventory', label: 'Harvest & Lots', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'inventory' },
       { href: '/dashboard/traceability', label: 'Traceability', icon: MapsSearchIcon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'], resource: 'sales' },
       { href: '/dashboard/suppliers', label: 'Suppliers', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'suppliers' },
       { href: '/dashboard/finance', label: 'Finance and Accounting', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'finance' },
       { href: '/dashboard/marketplace', label: 'M-LAX Marketplace', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], resource: 'marketplace' },
-      { href: '/dashboard/sales', label: 'Cooperative Sales', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'sales' },
+      { href: '/dashboard/sale-orders', label: 'Sale Orders', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], resource: 'sale_orders' },
+      { href: '/dashboard/warehouse', label: 'Warehouse', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'warehouse_desk' },
+      { href: '/dashboard/buyers', label: 'Buyers', icon: Store01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'buyers' },
+      { href: '/dashboard/sales', label: 'Sales & Payments', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'sales' },
       { href: '/dashboard/insurance', label: 'Insurance', icon: Shield01Icon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'], resource: 'insurance' },
       { href: '/dashboard/buyer-orders', label: 'Buyer Orders', icon: Store01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'buyer_orders' },
     ],
@@ -122,6 +165,7 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/corrections', label: 'Corrections', icon: FileEditIcon, roles: ['MAMCOS_SECRETARY'], resource: 'farm_corrections' },
       { href: '/dashboard/compliance', label: 'Compliance', icon: File01Icon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'], resource: 'reports' },
       { href: '/dashboard/reports', label: 'Reports', icon: ChartBarLineIcon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'], resource: 'reports' },
+      { href: '/dashboard/audit-log', label: 'Audit Log', icon: File01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'audit_logs' },
       { href: '/dashboard/premium-fund', label: 'Fairtrade Premium Fund', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'reports' },
       { href: '/dashboard/grantor', label: 'Grantor Impact', icon: ChartBarLineIcon, roles: ['AUDITOR', 'BUYER'], resource: 'reports' },
       { href: '/dashboard/ai', label: 'AI Insights', icon: ChartBarLineIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'], resource: 'ai_insights' },
@@ -189,7 +233,9 @@ function itemAllowed(item: NavItem, subject: AccessSubject | null | undefined): 
   if (subject.role === 'SUPER_ADMIN') return true;
   if (APP_MODE === 'farmers') return subject.role === 'FARMER' && item.roles.includes('FARMER');
   if (!subject.roleId) return false;
-  if (item.href === '/dashboard/roles') return false;
+  // Platform-wide role management is Super Admin only; cooperative admins manage their own
+  // AMCOS's roles from the cooperatives portal, gated by the `roles` grant.
+  if (item.href === '/dashboard/roles' && APP_MODE === 'admin') return false;
   if (item.href === '/dashboard') return true;
   if (item.href === '/dashboard/field-officer') return subject.role === 'FIELD_OFFICER';
   return !!item.resource && hasPermission(subject, item.resource, 'VIEW');
@@ -199,6 +245,7 @@ export function getVisibleGroups(subject: AccessSubject | null | undefined): Nav
   const seen = new Set<string>();
   return navGroups.map((group) => ({ ...group, items: group.items.filter((item) => {
     if (seen.has(item.href) || !itemAllowed(item, subject)) return false;
+    if (item.persona && !(subject?.role && item.roles.includes(subject.role))) return false;
     if (APP_MODE !== 'farmers' && item.roles.length === 1 && item.roles[0] === 'FARMER') return false;
     seen.add(item.href);
     return true;

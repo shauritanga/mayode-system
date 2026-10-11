@@ -130,3 +130,85 @@ describe('UsersService.update custom-role assignment', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe('UsersService cooperative-admin scoping', () => {
+  const admin = {
+    id: 'coop-admin',
+    role: UserRole.CUSTOM,
+    mamcosId: 'mamcos-1',
+    roleId: 'own-role',
+    customRole: {
+      isActive: true,
+      isSystem: false,
+      permissions: [
+        { action: 'VIEW', resource: { key: 'users' } },
+        { action: 'EDIT', resource: { key: 'users' } },
+        { action: 'VIEW', resource: { key: 'farmers' } },
+      ],
+    },
+  } as any;
+  const mine = { id: 'staff-1', role: UserRole.CUSTOM, mamcosId: 'mamcos-1', mamcosStaff: null };
+  const theirs = { id: 'staff-2', role: UserRole.CUSTOM, mamcosId: 'mamcos-2', mamcosStaff: null };
+  const ownRole = (over: Record<string, unknown> = {}) => ({
+    id: 'role-1', isActive: true, isSystem: false, systemRole: 'CUSTOM', mamcosId: 'mamcos-1',
+    permissions: [{ action: 'VIEW', resource: { key: 'farmers' } }], ...over,
+  });
+
+  it('lists only the admin\'s own AMCOS accounts', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const service = new UsersService({ user: { findMany } } as any);
+    await service.findAll(admin);
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { OR: [{ mamcosId: 'mamcos-1' }, { mamcosStaff: { mamcosId: 'mamcos-1' } }] } }),
+    );
+    await service.findAll({ id: 's', role: UserRole.SUPER_ADMIN } as any);
+    expect(findMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: undefined }));
+  });
+
+  it('hides accounts of other cooperatives', async () => {
+    const { service } = buildService(theirs);
+    await expect(service.findOne('staff-2', admin)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.update('staff-2', { isActive: false }, admin)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('lets the admin assign a role of their own AMCOS within their grants', async () => {
+    const { service, prisma } = buildService(mine, ownRole());
+    await service.update('staff-1', { roleId: 'role-1' }, admin);
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ roleId: 'role-1', mamcosId: 'mamcos-1' }) }),
+    );
+  });
+
+  it('refuses roles of another cooperative, platform roles and roles above their grants', async () => {
+    for (const role of [
+      ownRole({ mamcosId: 'mamcos-2' }),
+      ownRole({ mamcosId: null }),
+      ownRole({ permissions: [{ action: 'DELETE', resource: { key: 'farmers' } }] }),
+    ]) {
+      const { service, prisma } = buildService(mine, role);
+      await expect(service.update('staff-1', { roleId: 'role-1' }, admin)).rejects.toThrow();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    }
+  });
+
+  it('refuses changing their own role or deactivating themselves', async () => {
+    const self = { id: 'coop-admin', role: UserRole.CUSTOM, mamcosId: 'mamcos-1', mamcosStaff: null };
+    const { service } = buildService(self, ownRole());
+    await expect(service.update('coop-admin', { roleId: 'role-1' }, admin)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.update('coop-admin', { isActive: false }, admin)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('never lets them assign the Super Admin role', async () => {
+    const { service } = buildService(mine, null);
+    await expect(service.update('staff-1', { role: UserRole.SUPER_ADMIN }, admin)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('keeps a field officer\'s operational role when moved to a general role', async () => {
+    const officer = { id: 'staff-1', role: UserRole.FIELD_OFFICER, mamcosId: 'mamcos-1', mamcosStaff: { mamcosId: 'mamcos-1' } };
+    const { service, prisma } = buildService(officer, ownRole());
+    await service.update('staff-1', { roleId: 'role-1' }, admin);
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ role: UserRole.FIELD_OFFICER }) }),
+    );
+  });
+});

@@ -39,7 +39,7 @@ async function check(mode, port, forbidden, title) {
   try {
     // Test ports avoid disrupting development servers on 3101–3103.
     await check('farmers', 33101, '/dashboard/users', 'Farmer Portal');
-    await check('cooperatives', 33102, '/dashboard/roles', 'Cooperative Portal');
+    await check('cooperatives', 33102, '/dashboard/locations', 'Cooperative Portal');
     await check('admin', 33103, '/dashboard/farmer', 'Admin Portal');
   } finally {
     for (const child of children) child.kill('SIGTERM');

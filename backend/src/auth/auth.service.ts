@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -23,6 +23,20 @@ import {
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UserRole, MamcosStaffRole } from '@prisma/client';
 import { normalizeMsisdn } from '../messaging/sms.service';
+import { createRoleTemplates } from '../roles/role-templates';
+import {
+  assertWithinCeiling,
+  DelegatingActor,
+  grantsOfRole,
+  isSuperAdmin,
+  PLATFORM_ONLY_RESOURCES,
+  requireTenant,
+} from './delegation';
+import { resolveFarmerRole } from './farmer-role';
+import { CreateCooperativeAdminDto } from './dto/create-cooperative-admin.dto';
+
+const WEB_ONLY_ROLES = new Set<UserRole>([UserRole.BUYER, UserRole.AUDITOR, UserRole.FINANCIAL_PROVIDER]);
+const COOPERATIVE_ADMIN_ROLE = 'Cooperative Admin';
 
 @Injectable()
 export class AuthService {
@@ -83,6 +97,7 @@ export class AuthService {
       lastName?: string | null;
       profilePhotoUrl?: string | null;
       roleId?: string | null;
+      mamcosId?: string | null;
       customRole?: {
         id: string;
         name: string;
@@ -153,6 +168,7 @@ export class AuthService {
         lastName: user.lastName || undefined,
         role: user.role,
         roleId: user.roleId || undefined,
+        mamcosId: user.mamcosId || undefined,
         customRoleName: user.customRole?.name,
         permissions,
         controlNumber,
@@ -191,6 +207,7 @@ export class AuthService {
       lastName: user.lastName || undefined,
       role: user.role,
       roleId: user.roleId || undefined,
+      mamcosId: user.mamcosId || undefined,
       customRoleName: user.customRole?.name,
       permissions,
       controlNumber: user.farmer?.controlNumber,
@@ -200,22 +217,9 @@ export class AuthService {
 
   async selfRegisterFarmer(dto: FarmerSelfRegisterDto): Promise<AuthResponseDto> {
     const configuredRoleId = this.configService.get<string>('FARMER_SELF_REGISTRATION_ROLE_ID');
-    const roles = await this.prisma.role.findMany({
-      where: {
-        isActive: true,
-        isSystem: false,
-        systemRole: UserRole.FARMER,
-        ...(configuredRoleId ? { id: configuredRoleId } : {}),
-      },
-      take: 2,
-    });
-    if (roles.length !== 1) {
-      throw new BadRequestException(
-        'Farmer registration is not configured. Please contact support.',
-      );
-    }
+    const farmerRole = await resolveFarmerRole(this.prisma, configuredRoleId);
     // Only the server-selected Farmer role can be assigned through this route.
-    return this.registerFarmerAccount({ ...dto, roleId: roles[0].id });
+    return this.registerFarmerAccount({ ...dto, roleId: farmerRole.id });
   }
 
   /** Super Admin provisions a farmer using an explicitly selected custom role. */
@@ -224,14 +228,44 @@ export class AuthService {
     return this.registerFarmerAccount(registerDto);
   }
 
-  private async registerFarmerAccount(registerDto: RegisterDto): Promise<AuthResponseDto> {
+  /** Phone ownership was proved by a sign-in code: create the farmer with no usable password. */
+  async registerVerifiedFarmer(
+    dto: Omit<FarmerSelfRegisterDto, 'password'>,
+  ): Promise<AuthResponseDto> {
+    const configuredRoleId = this.configService.get<string>('FARMER_SELF_REGISTRATION_ROLE_ID');
+    const farmerRole = await resolveFarmerRole(this.prisma, configuredRoleId);
+    return this.registerFarmerAccount({ ...dto, roleId: farmerRole.id });
+  }
+
+  /** Sign in an active account whose phone was just verified by a code. Null when there is no such account. */
+  async loginVerifiedPhone(rawPhone: string): Promise<AuthResponseDto | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { phone: normalizeMsisdn(rawPhone) },
+      include: {
+        farmer: true,
+        customRole: { include: { permissions: { include: { resource: true } } } },
+      },
+    });
+    if (!user) return null;
+    if (!user.isActive) throw new UnauthorizedException('This account is inactive');
+    // Buyers, auditors and lenders use the web portals, where the password stays the credential.
+    if (WEB_ONLY_ROLES.has(user.role)) {
+      throw new ForbiddenException('This account signs in on the web portal with its password');
+    }
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    return this.generateTokens(user, user.farmer?.controlNumber);
+  }
+
+  private async registerFarmerAccount(
+    registerDto: Omit<RegisterDto, 'password'> & { password?: string },
+  ): Promise<AuthResponseDto> {
     if (!registerDto.roleId) throw new BadRequestException('A custom Farmer role is required');
     const customRole = await this.prisma.role.findUnique({
       where: { id: registerDto.roleId },
       include: { permissions: { include: { resource: true } } },
     });
-    if (!customRole || !customRole.isActive || customRole.isSystem || customRole.systemRole !== UserRole.FARMER) {
-      throw new BadRequestException('Select an active custom role with a Farmer operational profile');
+    if (!customRole || !customRole.isActive || customRole.isSystem || customRole.mamcosId) {
+      throw new BadRequestException('Select an active platform-level role for the farmer');
     }
     const { email, password, firstName, lastName, language, dataShareConsent } =
       registerDto;
@@ -250,7 +284,8 @@ export class AuthService {
     }
 
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
+    // Code-verified sign-ups have no password; the random hash can never be matched.
+    const passwordHash = await bcrypt.hash(password ?? randomBytes(32).toString('hex'), salt);
 
     let createdUser;
     let controlNumber: string | undefined = undefined;
@@ -303,33 +338,75 @@ export class AuthService {
     return this.generateTokens({ ...createdUser, customRole }, controlNumber);
   }
 
-  /** Only Super Admin can provision accounts and assign their access role. */
-  async createStaffAccount(dto: CreateStaffUserDto, creatorRole: UserRole) {
-    if (creatorRole !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException('Only Super Admin may create accounts and assign roles');
-    }
+  /**
+   * Provision a staff account. Super Admin may create any account; a cooperative
+   * admin (a non-super actor with a `mamcosId` and the `users` CREATE grant, checked
+   * by the controller) may create accounts only inside their own AMCOS, from roles
+   * of that AMCOS, and never with more permissions than they hold themselves.
+   */
+  async createStaffAccount(dto: CreateStaffUserDto, actor: DelegatingActor) {
+    const superActor = isSuperAdmin(actor);
+    const tenantId = superActor ? null : requireTenant(actor);
+
     if (dto.role && dto.role !== UserRole.SUPER_ADMIN) {
-      throw new BadRequestException('Select a custom role created by Super Admin using roleId');
+      throw new BadRequestException('Select a custom role using roleId');
     }
     if (dto.role === UserRole.SUPER_ADMIN && dto.roleId) {
       throw new BadRequestException('Choose either Super Admin or a custom role');
     }
+    if (dto.role === UserRole.SUPER_ADMIN && !superActor) {
+      throw new ForbiddenException('Only Super Admin may create a Super Admin account');
+    }
+
+    // Super Admin manages the platform team. Cooperative staff belong to the cooperative admin;
+    // the only cooperative account Super Admin creates is the admin itself (createCooperativeAdmin).
+    if (superActor && (dto.staffType || dto.mamcosId)) {
+      throw new BadRequestException(
+        'Super Admin creates platform accounts only. A cooperative’s staff are created by its cooperative administrator.',
+      );
+    }
+
     let accountProfile: UserRole = UserRole.SUPER_ADMIN;
+    let roleMamcosId: string | null = null;
     if (dto.role !== UserRole.SUPER_ADMIN) {
       if (!dto.roleId) throw new BadRequestException('A custom role is required');
-      const customRole = await this.prisma.role.findUnique({ where: { id: dto.roleId } });
+      const customRole = await this.prisma.role.findUnique({
+        where: { id: dto.roleId },
+        include: { permissions: { include: { resource: true } } },
+      });
       if (!customRole || !customRole.isActive || customRole.isSystem || customRole.systemRole === UserRole.SUPER_ADMIN) {
-        throw new BadRequestException('Select an active, non-system role created by Super Admin');
+        throw new BadRequestException('Select an active, non-system role');
       }
-      accountProfile = customRole.systemRole ?? UserRole.CUSTOM;
+      if (superActor) {
+        if (customRole.mamcosId) {
+          throw new BadRequestException('Select a platform role. A cooperative’s roles are for its own administrator to assign.');
+        }
+      } else {
+        // Roles of other cooperatives (or platform roles) don't exist as far as a cooperative admin is concerned.
+        if (customRole.mamcosId !== tenantId) throw new BadRequestException('Select a role from your cooperative');
+        assertWithinCeiling(actor, grantsOfRole(customRole));
+      }
+      roleMamcosId = customRole.mamcosId;
+      // The role only carries permissions. Field staff are marked on the account itself.
+      accountProfile = dto.staffType ?? UserRole.CUSTOM;
     }
 
-    if (accountProfile === UserRole.FARMER) {
-      throw new BadRequestException('Farmer registration is mobile-only. Use farmer self-registration or field-officer registration.');
+    // The account's cooperative: the creator's own AMCOS, else the role's AMCOS, else an explicit one.
+    if (tenantId && dto.mamcosId && dto.mamcosId !== tenantId) {
+      throw new ForbiddenException('You can only create accounts inside your own cooperative');
+    }
+    if (roleMamcosId && dto.mamcosId && dto.mamcosId !== roleMamcosId) {
+      throw new BadRequestException('This role belongs to a different cooperative');
+    }
+    const mamcosId = tenantId ?? roleMamcosId ?? dto.mamcosId ?? null;
+    if (mamcosId) {
+      const mamcos = await this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { id: true } });
+      if (!mamcos) throw new NotFoundException('AMCOS not found');
     }
 
+    const phone = normalizeMsisdn(dto.phone);
     const existingUser = await this.prisma.user.findFirst({
-      where: { OR: [{ phone: dto.phone }, { email: dto.email || undefined }] },
+      where: { OR: [{ phone }, { email: dto.email || undefined }] },
     });
     if (existingUser) {
       throw new ConflictException(
@@ -343,13 +420,14 @@ export class AuthService {
     return this.prisma.$transaction(async (prisma) => {
       const user = await prisma.user.create({
         data: {
-          phone: dto.phone,
+          phone,
           email: dto.email,
           passwordHash,
           firstName: dto.firstName,
           lastName: dto.lastName,
           role: accountProfile,
           roleId: dto.roleId,
+          mamcosId,
           language: dto.language || 'sw',
         },
         select: {
@@ -360,20 +438,16 @@ export class AuthService {
           lastName: true,
           role: true,
           roleId: true,
+          mamcosId: true,
           createdAt: true,
         },
       });
 
       if (accountProfile === UserRole.FIELD_OFFICER) {
-        if (!dto.mamcosId)
+        if (!mamcosId)
           throw new BadRequestException(
             'mamcosId is required for a Field Officer',
           );
-        const mamcos = await prisma.mamcos.findUnique({
-          where: { id: dto.mamcosId },
-          select: { id: true },
-        });
-        if (!mamcos) throw new NotFoundException('AMCOS not found');
         const employeeCode = await this.generateEmployeeCode();
         await prisma.mamcosStaff.create({
           data: {
@@ -383,21 +457,16 @@ export class AuthService {
             firstName: dto.firstName,
             lastName: dto.lastName,
             assignedArea: dto.assignedArea,
-            mamcosId: dto.mamcosId,
+            mamcosId,
           },
         });
       } else if (accountProfile === UserRole.MAMCOS_SECRETARY) {
-        if (!dto.mamcosId)
+        if (!mamcosId)
           throw new BadRequestException(
             'mamcosId is required for an AMCOS Leader',
           );
-        const mamcos = await prisma.mamcos.findUnique({
-          where: { id: dto.mamcosId },
-          select: { id: true },
-        });
-        if (!mamcos) throw new NotFoundException('AMCOS not found');
         const existing = await prisma.mamcosStaff.findFirst({
-          where: { mamcosId: dto.mamcosId, role: MamcosStaffRole.SECRETARY },
+          where: { mamcosId, role: MamcosStaffRole.SECRETARY },
         });
         if (existing)
           throw new ConflictException(
@@ -407,7 +476,7 @@ export class AuthService {
           data: {
             userId: user.id,
             role: MamcosStaffRole.SECRETARY,
-            mamcosId: dto.mamcosId,
+            mamcosId,
             firstName: dto.firstName,
             lastName: dto.lastName,
           },
@@ -415,6 +484,63 @@ export class AuthService {
       }
 
       return user;
+    });
+  }
+
+  /**
+   * Super Admin registers the administrator of a cooperative. Creates (once) an AMCOS-scoped
+   * "Cooperative Admin" role holding every grantable permission, and an account on it. That
+   * admin then creates their own roles and staff from the cooperative portal.
+   */
+  async createCooperativeAdmin(dto: CreateCooperativeAdminDto) {
+    const mamcos = await this.prisma.mamcos.findUnique({ where: { id: dto.mamcosId }, select: { id: true, name: true } });
+    if (!mamcos) throw new NotFoundException('AMCOS not found');
+
+    const phone = normalizeMsisdn(dto.phone);
+    const existingUser = await this.prisma.user.findFirst({
+      where: { OR: [{ phone }, { email: dto.email || undefined }] },
+    });
+    if (existingUser) throw new ConflictException('User with this phone number or email already exists');
+
+    const passwordHash = await bcrypt.hash(dto.password, await bcrypt.genSalt(10));
+
+    return this.prisma.$transaction(async (tx) => {
+      let role = await tx.role.findFirst({ where: { name: COOPERATIVE_ADMIN_ROLE, mamcosId: mamcos.id } });
+      if (!role) {
+        role = await tx.role.create({
+          data: {
+            name: COOPERATIVE_ADMIN_ROLE,
+            description: `Manages the roles and staff of ${mamcos.name}`,
+            systemRole: UserRole.CUSTOM,
+            mamcosId: mamcos.id,
+          },
+        });
+        const resources = await tx.resource.findMany({
+          where: { key: { notIn: [...PLATFORM_ONLY_RESOURCES] } },
+        });
+        await tx.rolePermission.createMany({
+          data: resources.flatMap((r) =>
+            (['VIEW', 'CREATE', 'EDIT', 'DELETE'] as const).map((action) => ({ roleId: role!.id, resourceId: r.id, action })),
+          ),
+        });
+        // Ready-made sale-workflow roles; the cooperative admin may edit or delete them.
+        await createRoleTemplates(tx, mamcos.id);
+      }
+      const user = await tx.user.create({
+        data: {
+          phone,
+          email: dto.email,
+          passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          role: UserRole.CUSTOM,
+          roleId: role.id,
+          mamcosId: mamcos.id,
+          language: dto.language || 'sw',
+        },
+        select: { id: true, phone: true, email: true, firstName: true, lastName: true, role: true, roleId: true, mamcosId: true, createdAt: true },
+      });
+      return { ...user, roleName: role.name, mamcosName: mamcos.name };
     });
   }
 

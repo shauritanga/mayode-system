@@ -38,7 +38,7 @@ export class MarketplaceActorGuard implements CanActivate {
       const listing = await this.prisma.landListing.findUnique({ where: { id: req.params.id }, include: { farm: { select: { mamcosId: true } } } });
       if (!listing) throw new NotFoundException('Listing not found');
       if (!farmer && user.mamcosId && listing.farm.mamcosId !== user.mamcosId) throw new ForbiddenException('Listing is outside your cooperative');
-      const ownerOnly = ['updateLandListing', 'cancelLandListing', 'respondToOffer', 'approveSubLease', 'transferOwnership'];
+      const ownerOnly = ['updateLandListing', 'cancelLandListing', 'respondToOffer', 'approveSubLease', 'transferOwnership', 'regenerateCode'];
       const renterOnly = ['payInstallment', 'logImprovement', 'requestSubLease'];
       if (farmer && ownerOnly.includes(action) && listing.ownerId !== farmer.id) throw new ForbiddenException('Only the owner can change this listing');
       if (farmer && renterOnly.includes(action) && listing.renterId !== farmer.id) throw new ForbiddenException('Only the active renter can perform this action');

@@ -1,4 +1,5 @@
 import {
+  IsUUID,
   Min,
   IsString,
   IsOptional,
@@ -53,6 +54,14 @@ export class CreateCropCycleDto {
   riceVariety?: string;
 
   @ApiPropertyOptional({
+    description:
+      "The rice variety chosen from the admin-managed list. Its calendar and maturity time decide the farmer's activities.",
+  })
+  @IsUUID()
+  @IsOptional()
+  riceVarietyId?: string;
+
+  @ApiPropertyOptional({
     example: '2026-12-15T08:00:00Z',
     description: 'Planting date',
   })
@@ -83,6 +92,14 @@ export class UpdateCropCycleDto {
   @IsString()
   @IsOptional()
   riceVariety?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Changing it swaps the pending activities to the new variety's calendar.",
+  })
+  @IsUUID()
+  @IsOptional()
+  riceVarietyId?: string;
 
   @ApiPropertyOptional({ example: '2026-12-15T08:00:00Z' })
   @IsDateString()

@@ -16,6 +16,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { RequestUser } from '../common/ownership.service';
 import { BuyersService } from './buyers.service';
 import { UpsertBuyerDto } from './dto/buyer.dto';
 
@@ -30,8 +32,8 @@ export class BuyersController {
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @RequirePermission('buyers', 'CREATE')
-  create(@Body() dto: UpsertBuyerDto) {
-    return this.buyers.create(dto);
+  create(@Body() dto: UpsertBuyerDto, @CurrentUser() user: RequestUser) {
+    return this.buyers.create(dto, user);
   }
 
   @Get()
@@ -44,8 +46,8 @@ export class BuyersController {
     UserRole.FIELD_OFFICER,
   )
   @RequirePermission('buyers', 'VIEW')
-  findAll() {
-    return this.buyers.findAll();
+  findAll(@CurrentUser() user: RequestUser) {
+    return this.buyers.findAll(user);
   }
 
   @Get(':id')
@@ -56,21 +58,21 @@ export class BuyersController {
     UserRole.AUDITOR,
   )
   @RequirePermission('buyers', 'VIEW')
-  findOne(@Param('id') id: string) {
-    return this.buyers.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.buyers.findOne(id, user);
   }
 
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   @RequirePermission('buyers', 'EDIT')
-  update(@Param('id') id: string, @Body() dto: UpsertBuyerDto) {
-    return this.buyers.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpsertBuyerDto, @CurrentUser() user: RequestUser) {
+    return this.buyers.update(id, dto, user);
   }
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @RequirePermission('buyers', 'DELETE')
-  remove(@Param('id') id: string) {
-    return this.buyers.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.buyers.remove(id, user);
   }
 }

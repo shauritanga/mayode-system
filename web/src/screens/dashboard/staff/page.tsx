@@ -1,7 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { authApi, mamcosApi } from '@/lib/api';
-import Modal from '@/components/Modal';
+import Link from 'next/link';
+import { mamcosApi } from '@/lib/api';
+import { useAuthStore } from '@/store/auth.store';
+import { hasPermission } from '@/lib/nav';
+import { apiErrorMessage } from '@/lib/api-error';
 
 interface Secretary { firstName: string; lastName: string; user?: { phone: string } }
 interface OfficerRow {
@@ -9,16 +12,13 @@ interface OfficerRow {
   assignedArea?: string; user?: { phone: string; isActive: boolean };
 }
 
-const EMPTY_OFFICER_FORM = { firstName: '', lastName: '', phone: '', password: '', assignedArea: '' };
-
 export default function StaffPage() {
   const [mamcosName, setMamcosName] = useState('');
   const [secretary, setSecretary] = useState<Secretary | null>(null);
   const [officers, setOfficers] = useState<OfficerRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showOfficerForm, setShowOfficerForm] = useState(false);
-  const [officerForm, setOfficerForm] = useState<any>({ ...EMPTY_OFFICER_FORM });
-  const [creating, setCreating] = useState(false);
+  const user = useAuthStore((st) => st.user);
+  const canAddStaff = !!user?.mamcosId && hasPermission(user, 'users', 'CREATE');
   const [message, setMessage] = useState('');
 
   const load = () => {
@@ -31,26 +31,11 @@ export default function StaffPage() {
         setSecretary(secretaryRow ? { firstName: secretaryRow.firstName, lastName: secretaryRow.lastName, user: secretaryRow.user } : null);
         setOfficers(m?.fieldOfficers ?? []);
       })
-      .catch(console.error)
+      .catch((e) => setMessage(apiErrorMessage(e, 'Could not load staff.')))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
-
-  const createOfficer = async (e: React.FormEvent) => {
-    e.preventDefault(); setCreating(true); setMessage('');
-    try {
-      await authApi.createStaff({ ...officerForm, role: 'FIELD_OFFICER' });
-      setMessage('Field Officer account created successfully.');
-      setOfficerForm({ ...EMPTY_OFFICER_FORM });
-      setShowOfficerForm(false);
-      load();
-    } catch (err: any) {
-      setMessage(err?.response?.data?.message || 'Could not create Field Officer account.');
-    } finally {
-      setCreating(false);
-    }
-  };
 
   return (
     <div>
@@ -62,7 +47,7 @@ export default function StaffPage() {
           </div>
           <p style={{ fontSize: '13px', color: 'var(--neutral-500)', marginLeft: '14px' }}>{mamcosName || 'Your AMCOS'} — leader and field officers</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowOfficerForm(true)}>+ Add Field Officer</button>
+        {canAddStaff && <Link href="/dashboard/users" className="btn-primary" style={{ textDecoration: 'none' }}>Add staff in User Accounts</Link>}
       </div>
 
       {message && <div className="glass-card" style={{ padding: '12px 16px', marginBottom: '16px', color: 'var(--accent)' }}>{message}</div>}
@@ -83,7 +68,7 @@ export default function StaffPage() {
             )}
             {officers.length === 0 ? (
               <div style={{ textAlign: 'center', color: 'var(--neutral-600)', fontSize: '14px', padding: '24px 0' }}>
-                No field officers yet — use &quot;+ Add Field Officer&quot; above to add one.
+                No field officers yet. Add one in User Accounts with the “Field officer” account type.
               </div>
             ) : officers.map((o) => (
               <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: 'var(--surface-tint)', borderRadius: '10px' }}>
@@ -103,27 +88,6 @@ export default function StaffPage() {
         </div>
       )}
 
-      {showOfficerForm && (
-        <Modal
-          title="Add Field Officer"
-          onClose={() => setShowOfficerForm(false)}
-          width="480px"
-          footer={
-            <>
-              <button className="btn-secondary" onClick={() => setShowOfficerForm(false)} disabled={creating}>Cancel</button>
-              <button className="btn-primary" onClick={createOfficer} disabled={creating}>{creating ? 'Saving…' : 'Create staff account'}</button>
-            </>
-          }
-        >
-          <form onSubmit={createOfficer} style={{ display: 'grid', gap: '9px' }}>
-            <input className="input-field" placeholder="First name" required value={officerForm.firstName} onChange={e => setOfficerForm({ ...officerForm, firstName: e.target.value })} />
-            <input className="input-field" placeholder="Last name" required value={officerForm.lastName} onChange={e => setOfficerForm({ ...officerForm, lastName: e.target.value })} />
-            <input className="input-field" placeholder="Phone +255…" required value={officerForm.phone} onChange={e => setOfficerForm({ ...officerForm, phone: e.target.value })} />
-            <input className="input-field" type="password" minLength={6} placeholder="Temporary password" required value={officerForm.password} onChange={e => setOfficerForm({ ...officerForm, password: e.target.value })} />
-            <input className="input-field" placeholder="Assigned area" value={officerForm.assignedArea} onChange={e => setOfficerForm({ ...officerForm, assignedArea: e.target.value })} />
-          </form>
-        </Modal>
-      )}
     </div>
   );
 }

@@ -35,7 +35,15 @@ export class AuditInterceptor implements NestInterceptor {
       apiIdx >= 0
         ? segments[apiIdx + 1] || 'unknown'
         : segments[0] || 'unknown';
-    const action = `${entityType}.${method.toLowerCase()}`;
+    // Name the action after the route's own verb when it has one ("confirm", "settle", "close-short"),
+    // otherwise after the HTTP method, so the audit log reads as sentences rather than "sales.post".
+    const afterEntity =
+      apiIdx >= 0 ? segments.slice(apiIdx + 2) : segments.slice(1);
+    const last = afterEntity[afterEntity.length - 1];
+    const routeVerb = last && !last.startsWith(':') ? last : undefined;
+    const methodVerb =
+      method === 'POST' ? 'create' : method === 'DELETE' ? 'delete' : 'update';
+    const action = `${entityType}.${routeVerb ?? methodVerb}`;
 
     return next.handle().pipe(
       tap((response) => {
@@ -51,6 +59,7 @@ export class AuditInterceptor implements NestInterceptor {
               action,
               entityType,
               entityId,
+              mamcosId: req.user?.mamcosId ?? null,
               newData: this.safeBody(req.body),
               ipAddress: req.ip || req.headers?.['x-forwarded-for'] || null,
             },

@@ -1,4 +1,6 @@
 'use client';
+import ErrorBanner from '@/components/ErrorBanner';
+import { apiErrorMessage } from '@/lib/api-error';
 import { useEffect, useState } from 'react';
 import { accountingApi, financeApi, farmersApi, suppliersApi, loansApi } from '@/lib/api';
 import Modal from '@/components/Modal';
@@ -107,6 +109,7 @@ export default function FinancePage() {
 // ──────────────────────────── Overview ────────────────────────────
 
 function OverviewTab() {
+  const [err, setErr] = useState('');
   const [farmerId, setFarmerId] = useState('');
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [farmers, setFarmers] = useState<{ id: string; firstName: string; lastName: string; controlNumber: string }[]>([]);
@@ -117,13 +120,13 @@ function OverviewTab() {
   useEffect(() => {
     farmersApi.getAll()
       .then(res => setFarmers(res.data?.data || res.data || []))
-      .catch(console.error);
+      .catch((e) => setErr(apiErrorMessage(e, 'Request failed')));
     accountingApi.statements()
       .then(res => setStatements(res.data))
-      .catch(console.error);
+      .catch((e) => setErr(apiErrorMessage(e, 'Request failed')));
     financeApi.getAllCosts()
       .then(res => setInputCosts(res.data || []))
-      .catch(console.error);
+      .catch((e) => setErr(apiErrorMessage(e, 'Request failed')));
   }, []);
 
   const handleSearch = async () => {
@@ -134,7 +137,7 @@ function OverviewTab() {
       const res = await financeApi.getFarmerSummary(farmerId);
       setSummary(res.data);
     } catch (e) {
-      console.error(e);
+      setErr(apiErrorMessage(e, 'Request failed'));
     } finally {
       setLoading(false);
     }
@@ -144,6 +147,7 @@ function OverviewTab() {
 
   return (
     <div>
+      <ErrorBanner message={err} onDismiss={() => setErr('')} />
       <div className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
         <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>Select Farmer to Analyse</div>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
@@ -317,6 +321,7 @@ function OverviewTab() {
 // ──────────────────────────── General Ledger ────────────────────────────
 
 function LedgerTab() {
+  const [err, setErr] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [trial, setTrial] = useState<any>(null);
@@ -326,7 +331,7 @@ function LedgerTab() {
     setLoading(true);
     accountingApi.trialBalance(from || to ? { from: from || undefined, to: to || undefined } : undefined)
       .then((res) => setTrial(res.data))
-      .catch(console.error)
+      .catch((e) => setErr(apiErrorMessage(e, 'Request failed')))
       .finally(() => setLoading(false));
   };
 
@@ -334,6 +339,7 @@ function LedgerTab() {
 
   return (
     <div>
+      <ErrorBanner message={err} onDismiss={() => setErr('')} />
       <div className="glass-card" style={{ padding: 18, marginBottom: 18, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <label className="form-label">From
           <input className="input-field" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -392,6 +398,7 @@ function LedgerTab() {
 // ──────────────────────────── Receivables ────────────────────────────
 
 function ReceivablesTab() {
+  const [err, setErr] = useState('');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -401,7 +408,7 @@ function ReceivablesTab() {
 
   const load = () => {
     setLoading(true);
-    accountingApi.receivables().then((res) => setInvoices(res.data || [])).catch(console.error).finally(() => setLoading(false));
+    accountingApi.receivables().then((res) => setInvoices(res.data || [])).catch((e) => setErr(apiErrorMessage(e, 'Request failed'))).finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
 
@@ -427,6 +434,7 @@ function ReceivablesTab() {
 
   return (
     <div>
+      <ErrorBanner message={err} onDismiss={() => setErr('')} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
         <button className="btn-primary" onClick={() => setShowForm(true)}>+ New invoice</button>
       </div>
@@ -490,6 +498,7 @@ function ReceivablesTab() {
 // ──────────────────────────── Payables ────────────────────────────
 
 function PayablesTab() {
+  const [err, setErr] = useState('');
   const [bills, setBills] = useState<Bill[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -501,11 +510,11 @@ function PayablesTab() {
 
   const load = () => {
     setLoading(true);
-    accountingApi.payables().then((res) => setBills(res.data || [])).catch(console.error).finally(() => setLoading(false));
+    accountingApi.payables().then((res) => setBills(res.data || [])).catch((e) => setErr(apiErrorMessage(e, 'Request failed'))).finally(() => setLoading(false));
   };
   useEffect(() => {
     load();
-    suppliersApi.getAll().then((res) => setSuppliers(res.data?.data || res.data || [])).catch(() => {});
+    suppliersApi.getAll().then((res) => setSuppliers(res.data?.data || res.data || [])).catch((e) => setErr(apiErrorMessage(e, 'Request failed')));
   }, []);
 
   const submit = async (e: React.FormEvent) => {
@@ -535,12 +544,13 @@ function PayablesTab() {
       await accountingApi.payBill(id);
       load();
     } catch (err) {
-      console.error(err);
+      setErr(apiErrorMessage(err, 'Request failed'));
     } finally { setPayingId(null); }
   };
 
   return (
     <div>
+      <ErrorBanner message={err} onDismiss={() => setErr('')} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
         <button className="btn-primary" onClick={() => setShowForm(true)}>+ New bill</button>
       </div>
@@ -608,6 +618,7 @@ function PayablesTab() {
 // ──────────────────────────── Budgets ────────────────────────────
 
 function BudgetsTab() {
+  const [err, setErr] = useState('');
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
@@ -621,11 +632,11 @@ function BudgetsTab() {
 
   const load = () => {
     setLoading(true);
-    accountingApi.listBudgets().then((res) => setBudgets(res.data || [])).catch(console.error).finally(() => setLoading(false));
+    accountingApi.listBudgets().then((res) => setBudgets(res.data || [])).catch((e) => setErr(apiErrorMessage(e, 'Request failed'))).finally(() => setLoading(false));
   };
   useEffect(() => {
     load();
-    accountingApi.accounts().then((res) => setAccounts(res.data || [])).catch(() => {});
+    accountingApi.accounts().then((res) => setAccounts(res.data || [])).catch((e) => setErr(apiErrorMessage(e, 'Request failed')));
   }, []);
 
   const openDetail = async (id: string) => {
@@ -634,7 +645,7 @@ function BudgetsTab() {
     try {
       const res = await accountingApi.budgetActual(id);
       setDetail(res.data);
-    } catch (e) { console.error(e); }
+    } catch (e) { setErr(apiErrorMessage(e, 'Request failed')); }
   };
 
   const updateLine = (i: number, field: 'accountId' | 'amount', value: string) => {
@@ -664,6 +675,7 @@ function BudgetsTab() {
 
   return (
     <div>
+      <ErrorBanner message={err} onDismiss={() => setErr('')} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
         <button className="btn-primary" onClick={() => setShowForm(true)}>+ New budget</button>
       </div>
@@ -756,6 +768,7 @@ function BudgetsTab() {
 // ──────────────────────────── Loans & Lenders ────────────────────────────
 
 function LoansTab() {
+  const [err, setErr] = useState('');
   const [lenders, setLenders] = useState<Lender[]>([]);
   const [loans, setLoans] = useState<LoanRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -772,7 +785,7 @@ function LoansTab() {
         setLenders(lendersRes.data || []);
         setLoans(loansRes.data || []);
       })
-      .catch(console.error)
+      .catch((e) => setErr(apiErrorMessage(e, 'Request failed')))
       .finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
@@ -810,12 +823,13 @@ function LoansTab() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error(e);
+      setErr(apiErrorMessage(e, 'Request failed'));
     } finally { setDownloading(false); }
   };
 
   return (
     <div>
+      <ErrorBanner message={err} onDismiss={() => setErr('')} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
         <button className="btn-secondary" onClick={downloadReport} disabled={downloading}>
           {downloading ? 'Preparing…' : 'Download lender payout report'}

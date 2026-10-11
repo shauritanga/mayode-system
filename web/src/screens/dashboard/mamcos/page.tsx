@@ -9,11 +9,15 @@ import {
   ArrowRight01Icon,
   Building06Icon,
   Cancel01Icon,
+  ViewIcon,
+  ViewOffIcon,
 } from '@hugeicons/core-free-icons';
 import { authApi, mamcosApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 import { useAuthStore } from '@/store/auth.store';
 import { MetricTile, MetricTileSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
+import { apiErrorMessage } from '@/lib/api-error';
+import CooperativeAdminModal from './CooperativeAdminModal';
 
 const PAGE_SIZE = 10;
 
@@ -30,7 +34,7 @@ interface Mamcos {
 }
 
 const EMPTY_FORM = {
-  name: '', location: '', district: 'Mbarali', totalHectares: '',
+  name: '', location: '', district: '', totalHectares: '',
   leaderFirstName: '', leaderLastName: '', leaderPhone: '', leaderPassword: '',
 };
 
@@ -60,10 +64,14 @@ function pageNumbers(page: number, totalPages: number): (number | '…')[] {
 export default function MamcosPage() {
   const role = useAuthStore((state) => state.user?.role);
   const isSecretary = role === 'MAMCOS_SECRETARY';
+  const isSuperAdmin = role === 'SUPER_ADMIN';
+  const [adminFor, setAdminFor] = useState<{ id: string; name: string } | null>(null);
   const [mamcos, setMamcos] = useState<Mamcos[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [showMamcosForm, setShowMamcosForm] = useState(false);
   const [form, setForm] = useState<any>({ ...EMPTY_FORM });
 
@@ -106,13 +114,12 @@ export default function MamcosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSecretary]);
 
-  // Creates the AMCOS, then — if leader details were filled in — assigns
-  // its leader in the same flow. Leader account creation happens second so
-  // a leader-creation failure (e.g. duplicate phone) doesn't lose the AMCOS
-  // that was just created; it's reported without rolling anything back,
-  // and a leader can still be assigned later from the AMCOS detail page.
+  // Creates the AMCOS, then registers its cooperative administrator in the same flow. The account is created second so a failure
+  // (e.g. duplicate phone) doesn't lose the AMCOS that was just created; it's reported without
+  // rolling anything back, and an administrator can still be added from the AMCOS list.
   const createMamcos = async (e: React.FormEvent) => {
-    e.preventDefault(); setCreating(true); setMessage('');
+    e.preventDefault(); setMessage(''); setFormError('');
+    setCreating(true);
     try {
       const res = await mamcosApi.create({
         name: form.name, location: form.location, district: form.district,
@@ -120,26 +127,24 @@ export default function MamcosPage() {
       });
       const newId = res.data?.id;
 
-      if (form.leaderFirstName && form.leaderPhone && form.leaderPassword) {
+      {
         try {
-          await authApi.createStaff({
+          await authApi.createCooperativeAdmin({
             firstName: form.leaderFirstName, lastName: form.leaderLastName,
             phone: form.leaderPhone, password: form.leaderPassword,
-            role: 'MAMCOS_SECRETARY', mamcosId: newId,
+            mamcosId: newId,
           });
-          setMessage('AMCOS created and leader assigned successfully.');
-        } catch (leaderErr: any) {
-          setMessage(`AMCOS created, but the leader account could not be created: ${leaderErr?.response?.data?.message || 'unknown error'}. You can assign one from the AMCOS detail page.`);
+          setMessage('AMCOS created and its administrator added.');
+        } catch (adminErr) {
+          setMessage(`AMCOS created, but the administrator account could not be created: ${apiErrorMessage(adminErr, 'unknown error')}. Use "Add admin" on the AMCOS list to try again.`);
         }
-      } else {
-        setMessage('AMCOS created successfully.');
       }
 
       setForm({ ...EMPTY_FORM });
       setShowMamcosForm(false);
       load();
-    } catch (e: any) {
-      setMessage(e?.response?.data?.message || 'Could not create AMCOS.');
+    } catch (e) {
+      setFormError(apiErrorMessage(e, 'Could not create AMCOS.'));
     } finally { setCreating(false); }
   };
 
@@ -197,39 +202,89 @@ export default function MamcosPage() {
         </div>
         {!isSecretary && (
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="btn-primary" onClick={() => setShowMamcosForm(true)}>+ New AMCOS</button>
+            <button className="btn-primary" onClick={() => { setFormError(''); setShowMamcosForm(true); }}>+ New AMCOS</button>
           </div>
         )}
       </div>
 
       {message && <div className="glass-card" style={{ padding: '12px 16px', color: 'var(--accent)' }}>{message}</div>}
 
+      {adminFor && (
+        <CooperativeAdminModal
+          mamcos={adminFor}
+          onClose={() => setAdminFor(null)}
+          onCreated={(text) => setMessage(text)}
+        />
+      )}
+
       {showMamcosForm && (
         <Modal
           title="Create AMCOS"
-          subtitle="Optionally assign its leader in the same step — you can also do this later from the AMCOS's own page."
+          subtitle="Register the cooperative and its administrator, who will manage its roles and team."
           onClose={() => setShowMamcosForm(false)}
-          width="480px"
+          width="560px"
           footer={
             <>
-              <button className="btn-secondary" onClick={() => setShowMamcosForm(false)} disabled={creating}>Cancel</button>
-              <button className="btn-primary" onClick={createMamcos} disabled={creating}>{creating ? 'Saving…' : 'Create AMCOS'}</button>
+              <button type="button" className="btn-secondary" onClick={() => setShowMamcosForm(false)} disabled={creating}>Cancel</button>
+              <button type="submit" form="amcos-form" className="btn-primary" disabled={creating}>{creating ? 'Saving…' : 'Create AMCOS'}</button>
             </>
           }
         >
-          <form onSubmit={createMamcos} style={{ display: 'grid', gap: '9px' }}>
-            <input className="input-field" placeholder="AMCOS name" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-            <input className="input-field" placeholder="Location" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
-            <input className="input-field" placeholder="District" value={form.district} onChange={e => setForm({ ...form, district: e.target.value })} />
-            <input className="input-field" type="number" placeholder="Hectares" value={form.totalHectares} onChange={e => setForm({ ...form, totalHectares: e.target.value })} />
-
-            <div style={{ marginTop: '10px', marginBottom: '2px', fontSize: '12px', fontWeight: 700, color: 'var(--neutral-400)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-              AMCOS Leader (optional)
+          <form id="amcos-form" className="ua-form" onSubmit={createMamcos} autoComplete="off">
+            <div className="ua-section">
+              <div className="ua-section-title">Cooperative details</div>
+              <div className="ua-field">
+                <label className="ua-label" htmlFor="am-name">AMCOS name</label>
+                <input id="am-name" name="amcos-name" className="input-field" required autoComplete="off" placeholder="e.g. Mbarali Rice Growers" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div className="ua-row">
+                <div className="ua-field">
+                  <label className="ua-label" htmlFor="am-location">Location<span className="ua-opt">optional</span></label>
+                  <input id="am-location" name="amcos-location" className="input-field" autoComplete="off" placeholder="Village or ward" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
+                </div>
+                <div className="ua-field">
+                  <label className="ua-label" htmlFor="am-district">District<span className="ua-opt">optional</span></label>
+                  <input id="am-district" name="amcos-district" className="input-field" autoComplete="off" placeholder="e.g. Mbarali" value={form.district} onChange={e => setForm({ ...form, district: e.target.value })} />
+                </div>
+              </div>
+              <div className="ua-field">
+                <label className="ua-label" htmlFor="am-ha">Total hectares<span className="ua-opt">optional</span></label>
+                <input id="am-ha" name="amcos-hectares" className="input-field" type="number" min={0} step="any" autoComplete="off" placeholder="Area under the cooperative, in hectares" value={form.totalHectares} onChange={e => setForm({ ...form, totalHectares: e.target.value })} />
+              </div>
             </div>
-            <input className="input-field" placeholder="Leader first name" value={form.leaderFirstName} onChange={e => setForm({ ...form, leaderFirstName: e.target.value })} />
-            <input className="input-field" placeholder="Leader last name" value={form.leaderLastName} onChange={e => setForm({ ...form, leaderLastName: e.target.value })} />
-            <input className="input-field" placeholder="Leader phone +255…" value={form.leaderPhone} onChange={e => setForm({ ...form, leaderPhone: e.target.value })} />
-            <input className="input-field" type="password" minLength={6} placeholder="Leader temporary password" value={form.leaderPassword} onChange={e => setForm({ ...form, leaderPassword: e.target.value })} />
+
+            <div className="ua-section">
+              <div className="ua-section-title">Cooperative administrator</div>
+              <div className="ua-role-note">
+                The administrator signs in to the Cooperative Portal with this phone number and password, then creates their own roles and team.
+              </div>
+              <div className="ua-row">
+                <div className="ua-field">
+                  <label className="ua-label" htmlFor="am-first">First name</label>
+                  <input id="am-first" required name="admin-first-name" className="input-field" autoComplete="off" value={form.leaderFirstName} onChange={e => setForm({ ...form, leaderFirstName: e.target.value })} />
+                </div>
+                <div className="ua-field">
+                  <label className="ua-label" htmlFor="am-last">Last name</label>
+                  <input id="am-last" required name="admin-last-name" className="input-field" autoComplete="off" value={form.leaderLastName} onChange={e => setForm({ ...form, leaderLastName: e.target.value })} />
+                </div>
+              </div>
+              <div className="ua-field">
+                <label className="ua-label" htmlFor="am-phone">Phone number</label>
+                <input id="am-phone" required name="admin-phone" className="input-field" type="tel" autoComplete="off" placeholder="+255 7XX XXX XXX" value={form.leaderPhone} onChange={e => setForm({ ...form, leaderPhone: e.target.value })} />
+                <span className="ua-hint">Their sign-in name.</span>
+              </div>
+              <div className="ua-field">
+                <label className="ua-label" htmlFor="am-pass">Temporary password</label>
+                <div className="ua-input-wrap">
+                  <input id="am-pass" required name="admin-temp-password" className="input-field" minLength={6} autoComplete="new-password" type={showAdminPassword ? 'text' : 'password'} value={form.leaderPassword} onChange={e => setForm({ ...form, leaderPassword: e.target.value })} />
+                  <button type="button" className="ua-reveal" onClick={() => setShowAdminPassword(v => !v)} aria-label={showAdminPassword ? 'Hide password' : 'Show password'}>
+                    <HugeiconsIcon icon={showAdminPassword ? ViewOffIcon : ViewIcon} size={18} strokeWidth={1.8} />
+                  </button>
+                </div>
+                <span className="ua-hint">At least 6 characters. Share it securely.</span>
+              </div>
+            </div>
+            {formError && <div className="ua-form-error" role="alert">{formError}</div>}
           </form>
         </Modal>
       )}
@@ -378,8 +433,11 @@ export default function MamcosPage() {
                         {m.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
                       <Link href={`/dashboard/mamcos/${m.id}`} className="btn-secondary" style={{ fontSize: 12, padding: '6px 10px', display: 'inline-block', textDecoration: 'none' }}>View</Link>
+                      {isSuperAdmin && (
+                        <button className="btn-secondary" style={{ fontSize: 12, padding: '6px 10px', marginLeft: 6 }} onClick={() => setAdminFor({ id: m.id, name: m.name })}>Add admin</button>
+                      )}
                     </td>
                   </motion.tr>
                 ))}

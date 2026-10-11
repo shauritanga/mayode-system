@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { farmsApi, marketplaceApi } from '../src/lib/data';
@@ -25,6 +25,7 @@ export default function LandListingNew() {
   const [autoDropDays, setAutoDropDays] = useState('7');
   const [suggested, setSuggested] = useState<{ suggestedPrice: number; marketGauge: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [issued, setIssued] = useState<{ code: string; expiresAt?: string } | null>(null);
 
   const loadFarms = useCallback(async () => {
     if (!farmerId) { setLoadingFarms(false); return; }
@@ -63,7 +64,7 @@ export default function LandListingNew() {
     }
     setSubmitting(true);
     try {
-      await marketplaceApi.createLandListing({
+      const res = await marketplaceApi.createLandListing({
         farmId: selectedFarm.id,
         ownerId: farmerId,
         askingPrice: price,
@@ -74,6 +75,11 @@ export default function LandListingNew() {
         autoDropPrice: isFlashDeal && autoDropPrice ? Number(autoDropPrice) : undefined,
         autoDropDays: isFlashDeal && autoDropDays ? Number(autoDropDays) : undefined,
       });
+      // A Relationship deal is private: the owner is shown the code once and gives it to one person.
+      if (res.data?.accessCode) {
+        setIssued({ code: res.data.accessCode, expiresAt: res.data.accessCodeExpiresAt });
+        return;
+      }
       Alert.alert(t('mlaxCreateListing'), t('mlaxListingCreated'), [
         { text: 'OK', onPress: () => router.back() },
       ]);
@@ -84,6 +90,30 @@ export default function LandListingNew() {
       setSubmitting(false);
     }
   };
+
+  if (issued) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <Stack.Screen options={{ headerShown: true, title: t('mlaxYourCode') }} />
+        <ScrollView contentContainerStyle={{ padding: 16 }}>
+          <View style={styles.card}>
+            <Text style={styles.codeValue} selectable>{issued.code}</Text>
+            <Text style={styles.hint}>{t('mlaxCodeShownOnce')}</Text>
+            {issued.expiresAt ? <Text style={[styles.hint, { marginTop: 8 }]}>{new Date(issued.expiresAt).toLocaleDateString()}</Text> : null}
+          </View>
+          <TouchableOpacity
+            style={styles.submitBtn}
+            onPress={() => Share.share({ message: t('mlaxShareMessage', { code: issued.code }) }).catch(() => undefined)}
+          >
+            <Text style={styles.submitText}>{t('mlaxShareCode')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.submitBtn, styles.secondaryBtn]} onPress={() => router.back()}>
+            <Text style={[styles.submitText, { color: '#065F46' }]}>{t('mlaxCodeSaved')}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -142,6 +172,7 @@ export default function LandListingNew() {
                 </TouchableOpacity>
               ))}
             </View>
+            {dealType === 'RELATIONSHIP' && <Text style={[styles.hint, { marginTop: 8 }]}>{t('mlaxRelationshipExplain')}</Text>}
 
             <Text style={styles.fieldLabel}>{t('mlaxLeaseDuration')}</Text>
             <TextInput
@@ -213,6 +244,8 @@ const styles = StyleSheet.create({
   checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: '#D1D5DB' },
   checkboxActive: { backgroundColor: '#10B981', borderColor: '#10B981' },
   toggleLabel: { fontSize: 14, color: '#111827', fontWeight: '600' },
+  codeValue: { fontSize: 34, fontWeight: '800', letterSpacing: 4, color: '#065F46', textAlign: 'center', marginVertical: 14 },
+  secondaryBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#065F46', marginTop: 10 },
   submitBtn: { backgroundColor: '#065F46', paddingVertical: 15, borderRadius: 14, alignItems: 'center', marginTop: 4 },
   submitText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });

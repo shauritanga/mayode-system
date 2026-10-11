@@ -76,7 +76,8 @@ export class CreateLandListingDto {
 
   @ApiPropertyOptional({
     example: 'MYD-00002',
-    description: 'Preferred renter control number for relationship deals',
+    description:
+      'Deprecated and ignored. A Relationship deal now gets a generated private code instead.',
   })
   @IsString()
   @IsOptional()

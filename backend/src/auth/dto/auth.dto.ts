@@ -68,7 +68,7 @@ export class RegisterDto {
   @IsEnum(UserRole)
   role?: UserRole;
 
-  @ApiProperty({ description: 'Active custom role with a Farmer operational profile, created by Super Admin' })
+  @ApiProperty({ description: 'Active platform-level role for the farmer (the configured Farmer role)' })
   @IsUUID()
   roleId: string;
 
@@ -141,6 +141,7 @@ export class AuthResponseDto {
     lastName?: string;
     role: string;
     roleId?: string;
+    mamcosId?: string;
     customRoleName?: string;
     permissions: { resource: string; action: string }[];
     controlNumber?: string;

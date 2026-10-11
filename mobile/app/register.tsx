@@ -2,22 +2,22 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Image, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Keyboard, Platform, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
-import { authApi, farmersApi } from '../src/lib/data';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { startSession } from '../src/lib/session';
+import { authApi } from '../src/lib/data';
 import { getApiErrorMessage } from '../src/lib/api-error';
 import { normalizePhone } from '../src/lib/phone';
 import { useAuthStore } from '../src/store/auth.store';
 import { SearchableSelect } from '../src/components/SearchableSelect';
 import { getRegions, getDistricts, getWards } from '../src/local/locations';
-import { PasswordInput } from '../src/components/PasswordInput';
 import { useI18n } from '../src/i18n';
 
 export default function RegisterRoute() {
   const [location, setLocation] = useState({ region: '', district: '', ward: '', village: '' });
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
+  // The number and token come from the verification screen: the phone is already proved.
+  const { phone = '', registrationToken = '' } = useLocalSearchParams<{ phone?: string; registrationToken?: string }>();
   const [dataShareConsent, setDataShareConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const { setAuth, setFarmerId } = useAuthStore();
@@ -36,7 +36,7 @@ export default function RegisterRoute() {
   }, []);
 
   const handleRegister = async () => {
-    if (!firstName || !lastName || !phone || !password || Object.values(location).some(v => !v.trim())) {
+    if (!firstName || !lastName || !phone || !registrationToken || Object.values(location).some(v => !v.trim())) {
       Alert.alert(t('validationError'), t('allFieldsRequired'));
       return;
     }
@@ -47,24 +47,16 @@ export default function RegisterRoute() {
 
     setLoading(true);
     try {
-      const res = await authApi.register({
-        phone: normalizePhone(phone),
-        password,
+      const res = await authApi.registerWithOtp({
+        phone,
+        registrationToken,
         firstName,
         lastName,
         dataShareConsent,
         ...location,
       });
-      const { accessToken, refreshToken, user } = res.data;
-      setAuth(user, accessToken, refreshToken);
-
-      // Resolve farmer profile id via /farmers/me (control-number lookup is staff-only → 403 for FARMER).
-      try {
-        const f = await farmersApi.me();
-        setFarmerId(f.data?.id ?? null);
-      } catch {
-        setFarmerId(null);
-      }
+      const ok = await startSession(res.data, { setAuth, setFarmerId });
+      if (!ok) return;
       Alert.alert(t('success'), t('farmerCreated'));
       router.replace('/(drawer)/(tabs)');
     } catch (err: unknown) {
@@ -120,16 +112,8 @@ export default function RegisterRoute() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>{t('phoneNumber')}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="+255755123456"
-                placeholderTextColor="#6B7280"
-                keyboardType="phone-pad"
-                value={phone}
-                onChangeText={setPhone}
-                autoCapitalize="none"
-              />
+              <Text style={styles.label}>{t('otpVerifiedPhone')}</Text>
+              <TextInput style={[styles.input, { opacity: 0.7 }]} value={phone} editable={false} />
             </View>
 
             <SearchableSelect label={t('region')} value={location.region} options={getRegions()} onSelect={region => setLocation({ region, district: '', ward: '', village: '' })} searchable />
@@ -142,17 +126,6 @@ export default function RegisterRoute() {
                 <Text style={styles.consentTitle}>Data-sharing consent</Text>
                 <Text style={styles.consentText}>I agree that MAYODE may share my credit-readiness data with approved financial providers. You can withdraw this in your profile at any time.</Text>
               </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>{t('password')}</Text>
-              <PasswordInput
-                boxStyle={styles.input}
-                placeholder="••••••••"
-                placeholderTextColor="#6B7280"
-                value={password}
-                onChangeText={setPassword}
-              />
             </View>
 
             <TouchableOpacity
@@ -168,7 +141,7 @@ export default function RegisterRoute() {
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.toggleFooter} onPress={() => router.replace('/login')}>
-              <Text style={styles.toggleFooterText}>{t('alreadyHaveAccount')}</Text>
+              <Text style={styles.toggleFooterText}>{t('otpChangeNumber')}</Text>
             </TouchableOpacity>
           </View>
 
