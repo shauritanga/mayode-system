@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { MamcosStaffRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
@@ -10,6 +14,7 @@ import {
   UpdateFarmDto,
   UpdateBoundaryDto,
 } from './dto/farms.dto';
+import { assertValidBoundary, findOverlap } from './boundary-overlap';
 import { QueryFarmsDto } from './dto/query-farms.dto';
 import { LinkDocumentDto } from '../farmers/dto/farmer-actions.dto';
 
@@ -160,7 +165,8 @@ export class FarmsService {
   }
 
   async findByFarmerId(farmerId: string, user?: RequestUser) {
-    if (user?.role === 'FARMER') await this.ownership.assertFarmerAccess(user, farmerId);
+    if (user?.role === 'FARMER')
+      await this.ownership.assertFarmerAccess(user, farmerId);
     return this.prisma.farm.findMany({
       where: { farmerId },
       include: {
@@ -209,6 +215,21 @@ export class FarmsService {
   async updateBoundary(id: string, dto: UpdateBoundaryDto, user: RequestUser) {
     await this.ownership.assertFarmAccess(user, id);
     const existing = await this.findOne(id);
+
+    // Two farms cannot claim the same land: refuse a boundary that overlaps another mapped farm.
+    const candidate = assertValidBoundary(dto.boundaryCoordinates);
+    const mapped = await this.prisma.farm.findMany({
+      where: { id: { not: id }, boundaryCoordinates: { not: Prisma.DbNull } },
+      select: { id: true, farmCode: true, boundaryCoordinates: true },
+    });
+    const overlap = findOverlap(candidate, mapped);
+    if (overlap) {
+      const m2 = Math.round(overlap.areaM2);
+      throw new ConflictException(
+        `This boundary overlaps farm ${overlap.farm.farmCode} by about ${m2.toLocaleString('en')} m² (${(m2 / 10000).toFixed(2)} ha). Walk only your own land, or ask the AMCOS to open a boundary dispute.`,
+      );
+    }
+
     const farm = await this.prisma.farm.update({
       where: { id },
       data: {
