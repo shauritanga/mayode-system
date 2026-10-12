@@ -36,9 +36,11 @@ export default function FarmsIndex() {
   const { t } = useI18n();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const fetchFarms = async () => {
     setLoading(true);
+    setLoadFailed(false);
     try {
       if (role && role !== 'FARMER') {
         const res = await farmsApi.getAll();
@@ -49,14 +51,18 @@ export default function FarmsIndex() {
         // Resolve the profile here as well as in the root layout. This makes
         // the screen recover immediately when an older session has no cached
         // farmerId (for example after the self-service permission fix).
-        const resolvedFarmerId = farmerId || (await farmersApi.me()).data?.id;
+        // Each source loads on its own, so a failure in one never hides the farmer's own farms.
+        const resolvedFarmerId = farmerId || (await farmersApi.me().catch(() => null))?.data?.id;
         if (!farmerId && resolvedFarmerId) setFarmerId(resolvedFarmerId);
-        const [ownedRes, assignmentsRes] = await Promise.all([
-          resolvedFarmerId ? farmsApi.getByFarmerId(resolvedFarmerId) : Promise.resolve({ data: [] }),
+        const [ownedRes, assignmentsRes] = await Promise.allSettled([
+          // Without a farmer id the server still returns only this farmer's farms.
+          resolvedFarmerId ? farmsApi.getByFarmerId(resolvedFarmerId) : farmsApi.getAll(),
           workspaceApi.context(),
         ]);
-        const owned = ownedRes.data?.data || ownedRes.data || [];
-        const assignments = assignmentsRes.data?.activeAssignments ?? [];
+        if (ownedRes.status === 'rejected' && assignmentsRes.status === 'rejected') throw ownedRes.reason;
+        const ownedData = ownedRes.status === 'fulfilled' ? (ownedRes.value.data?.data ?? ownedRes.value.data) : [];
+        const owned = Array.isArray(ownedData) ? ownedData : [];
+        const assignments = assignmentsRes.status === 'fulfilled' ? assignmentsRes.value.data?.activeAssignments ?? [] : [];
         const assignedFarms = assignments.map((assignment: any) => ({
           ...assignment.farm,
           grade: assignment.farm?.grade || 'C',
@@ -77,6 +83,7 @@ export default function FarmsIndex() {
       }
     } catch (e) {
       console.error(e);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -100,8 +107,8 @@ export default function FarmsIndex() {
         {farms.length === 0 && !loading ? (
           <View style={styles.emptyContainer}>
             <HugeiconsIcon icon={Tree02Icon} size={56} color="#D1FAE5" strokeWidth={1.5} />
-            <Text style={styles.emptyTitle}>{t('noFarmsYetTitle')}</Text>
-            <Text style={styles.emptySubtitle}>{t('noFarmsYetBody')}</Text>
+            <Text style={styles.emptyTitle}>{loadFailed ? t('somethingWentWrong') : t('noFarmsYetTitle')}</Text>
+            <Text style={styles.emptySubtitle}>{loadFailed ? t('pullToRetry') : t('noFarmsYetBody')}</Text>
             {role === 'FARMER' && (
               <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/farm-register')} activeOpacity={0.85}>
                 <Text style={styles.emptyBtnText}>{t('registerFarm')}</Text>
