@@ -1,3 +1,4 @@
+import { useLanguageStore } from '../i18n';
 import { migrateLegacyOffline } from '../services/offline-migration';
 import axios from 'axios';
 import NetInfo from '@react-native-community/netinfo';
@@ -127,6 +128,8 @@ api.interceptors.request.use(async config => {
   const requestOwner = sessionOwner;
   (config as any)._offlineOwner = requestOwner;
   if (inMemoryToken) config.headers.Authorization = `Bearer ${inMemoryToken}`;
+  // The server answers its messages in the language the app is showing.
+  config.headers['Accept-Language'] = useLanguageStore.getState().language;
   const method = String(config.method).toUpperCase();
   const originalUrl = String(config.url ?? '');
   config.url = await resolveReplayUrl(originalUrl);

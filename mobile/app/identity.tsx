@@ -73,7 +73,7 @@ export default function IdentityScreen() {
         faceCaptureUrl: selfieUp.data.url,
       });
       Alert.alert(t('identityVerification'), t('identitySubmitted'), [
-        { text: 'OK', onPress: () => router.back() },
+        { text: t('ok'), onPress: () => router.back() },
       ]);
       await load();
     } catch (e: any) {

@@ -101,7 +101,7 @@ export default function FarmsIndex() {
           <View style={styles.emptyContainer}>
             <HugeiconsIcon icon={Tree02Icon} size={56} color="#D1FAE5" strokeWidth={1.5} />
             <Text style={styles.emptyTitle}>{t('noFarmsYetTitle')}</Text>
-            <Text style={styles.emptySubtitle}>Your AMCOS will assign a farm for the active season. Once you accept, it will be verified by the field officer and it will be displayed here. Or register your own farm below.</Text>
+            <Text style={styles.emptySubtitle}>{t('noFarmsYetBody')}</Text>
             {role === 'FARMER' && (
               <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/farm-register')} activeOpacity={0.85}>
                 <Text style={styles.emptyBtnText}>{t('registerFarm')}</Text>
@@ -141,11 +141,6 @@ export default function FarmsIndex() {
                     <View style={[styles.badge, { backgroundColor: grade.bg }]}>
                       <Text style={[styles.badgeText, { color: grade.text }]}>{t('gradeValue', { grade: farm.grade })}</Text>
                     </View>
-                    <View style={[styles.badge, farm.isVerified ? styles.badgeGreen : styles.badgeGold]}>
-                      <Text style={[styles.badgeText, farm.isVerified ? styles.badgeTextGreen : styles.badgeTextGold]}>
-                        {farm.isVerified ? t('verified') : t('pending')}
-                      </Text>
-                    </View>
                   </View>
                 </View>
 
@@ -156,7 +151,7 @@ export default function FarmsIndex() {
                   </View>
                   <View style={styles.detailItem}>
                     <Text style={styles.detailLabel}>{t('actualAcres')}</Text>
-                    <Text style={styles.detailValue}>{farm.actualAcres ? `${farm.actualAcres} ac` : '—'}</Text>
+                    <Text style={styles.detailValue}>{farm.actualAcres ? `${farm.actualAcres} ${t('unitAcres')}` : '—'}</Text>
                   </View>
                   <View style={styles.detailItem}>
                     <Text style={styles.detailLabel}>{t('irrigation')}</Text>

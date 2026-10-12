@@ -264,7 +264,7 @@ function FarmerDashboardTab() {
               <View style={styles.weatherStats}>
                 <WStat label={t('humidity')} value={weather ? `${weather.humidity}%` : '—'} />
                 <WStat label={t('precipitation')} value={weather ? `${weather.precipitationMm} mm` : '—'} />
-                <WStat label={t('windSpeed')} value={weather ? `${weather.windKmh} km/h` : '—'} />
+                <WStat label={t('windSpeed')} value={weather ? `${weather.windKmh} ${t('unitKmh')}` : '—'} />
               </View>
             </View>
           </View>

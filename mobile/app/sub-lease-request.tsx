@@ -20,7 +20,7 @@ export default function SubLeaseRequest() {
         newAskingPrice: newAskingPrice ? Number(newAskingPrice) : undefined,
       });
       Alert.alert(t('mlaxSubLeaseRequest'), t('mlaxSubLeaseSent'), [
-        { text: 'OK', onPress: () => router.back() },
+        { text: t('ok'), onPress: () => router.back() },
       ]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;

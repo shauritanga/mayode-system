@@ -95,7 +95,7 @@ function FarmerDrawerContent(props: DrawerContentComponentProps) {
         />
       ))}
 
-      <Text style={styles.footer}>MAYODE Group App v1.0.0</Text>
+      <Text style={styles.footer}>{t('appVersion', { version: '1.0.0' })}</Text>
     </DrawerContentScrollView>
   );
 }
@@ -151,12 +151,13 @@ function OfficerDrawerContent(props: DrawerContentComponentProps) {
         />
       ))}
 
-      <Text style={styles.footer}>MAYODE Group App v1.0.0</Text>
+      <Text style={styles.footer}>{t('appVersion', { version: '1.0.0' })}</Text>
     </DrawerContentScrollView>
   );
 }
 
 export default function DrawerLayout() {
+  const { t } = useI18n();
   const role = useAuthStore((state) => state.user?.role);
   const isFarmer = !role || role === 'FARMER';
   const isFieldOfficer = role === 'FIELD_OFFICER';
@@ -176,7 +177,7 @@ export default function DrawerLayout() {
         name="(tabs)"
         options={{
           drawerItemStyle: { display: 'none' },
-          title: 'Home',
+          title: t('navHome'),
         }}
       />
     </Drawer>

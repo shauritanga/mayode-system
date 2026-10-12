@@ -194,7 +194,7 @@ export default function BoundaryScreen() {
       {/* Bottom panel */}
       <View style={[styles.panel, { paddingBottom: insets.bottom + 10 }]}>
         <View style={styles.metricsRow}>
-          <Metric label={t('area')} value={`${metrics.areaHa} ha`} sub={`${metrics.areaAcres} ac`} />
+          <Metric label={t('area')} value={`${metrics.areaHa} ha`} sub={`${metrics.areaAcres} ${t('unitAcres')}`} />
           <View style={styles.metricDivider} />
           <Metric label={t('perimeter')} value={`${metrics.perimeterM} m`} sub={`${metrics.pointCount} ${t('points')}`} />
         </View>

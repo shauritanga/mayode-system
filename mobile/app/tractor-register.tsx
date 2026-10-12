@@ -40,7 +40,7 @@ export default function TractorRegister() {
         location: location.trim() || undefined,
       });
       Alert.alert(t('mlaxRegisterTractor'), t('mlaxTractorRegistered'), [
-        { text: 'OK', onPress: () => router.replace({ pathname: '/my-tractors', params: { ownerId } } as any) },
+        { text: t('ok'), onPress: () => router.replace({ pathname: '/my-tractors', params: { ownerId } } as any) },
       ]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;

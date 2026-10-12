@@ -1,3 +1,4 @@
+import { DateField } from '../src/components/DateField';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
@@ -225,12 +226,12 @@ export default function InsuranceScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.label}>{t('incidentDate')}</Text>
-            <TextInput
-              style={styles.input}
+            <DateField
+              label={t('incidentDate')}
               value={form.incidentDate}
-              onChangeText={(value) => setForm((c) => ({ ...c, incidentDate: value }))}
-              placeholder="YYYY-MM-DD"
+              onChange={(value) => setForm((c) => ({ ...c, incidentDate: value }))}
+              placeholder={t('selectDate')}
+              maximumDate={new Date()}
             />
             <Text style={styles.label}>{t('incidentType')}</Text>
             <TextInput

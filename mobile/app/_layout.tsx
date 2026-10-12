@@ -207,7 +207,7 @@ export default function RootLayout() {
           name="rewards"
           options={{ headerShown: true, title: t('myRewards'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '800' } }}
         />
-        <Stack.Screen name="votes" options={{ headerShown: true, title: 'Member voting', headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff' }} />
+        <Stack.Screen name="votes" options={{ headerShown: true, title: t('memberVoting'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff' }} />
         <Stack.Screen
           name="farm-report/[id]"
           options={{ headerShown: true, title: t('farmReport'), headerStyle: { backgroundColor: '#065F46' }, headerTintColor: '#fff', headerTitleStyle: { fontWeight: '800' } }}

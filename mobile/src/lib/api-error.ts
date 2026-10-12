@@ -1,3 +1,5 @@
+import { translate, useLanguageStore } from '../i18n';
+
 /**
  * NestJS ValidationPipe often returns `message` as string[].
  * React Native Alert.alert requires a string — arrays crash with
@@ -5,7 +7,7 @@
  */
 export function getApiErrorMessage(
   error: unknown,
-  fallback = 'Something went wrong. Please try again.',
+  fallback = translate(useLanguageStore.getState().language, 'somethingWentWrong'),
 ): string {
   const data = (error as { response?: { data?: { message?: unknown } } })
     ?.response?.data;

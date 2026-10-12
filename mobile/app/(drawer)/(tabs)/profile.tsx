@@ -188,8 +188,8 @@ export default function ProfileTab() {
               </View>
               <View style={styles.consentRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.detailLabel}>Credit-data consent</Text>
-                  <Text style={styles.consentHint}>Share credit readiness with approved lenders.</Text>
+                  <Text style={styles.detailLabel}>{t('creditConsentTitle')}</Text>
+                  <Text style={styles.consentHint}>{t('creditConsentHint')}</Text>
                 </View>
                 <Switch
                   value={Boolean(farmer?.dataShareConsent)}
@@ -199,7 +199,7 @@ export default function ProfileTab() {
                       await farmersApi.update(farmerId, { dataShareConsent: value });
                       setFarmer({ ...farmer, dataShareConsent: value });
                     } catch {
-                      Alert.alert('Consent', 'Unable to update consent.');
+                      Alert.alert(t('consentTitle'), t('consentUpdateFailed'));
                     }
                   }}
                   trackColor={{ true: '#10B981' }}
@@ -270,7 +270,7 @@ export default function ProfileTab() {
             <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 0 }]} onPress={() => router.push('/votes')}>
               <View style={styles.menuItemLeft}>
                 <HugeiconsIcon icon={Agreement01Icon} size={22} color="#3B82F6" />
-                <Text style={styles.menuItemText}>Member voting</Text>
+                <Text style={styles.menuItemText}>{t('memberVoting')}</Text>
               </View>
               <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#9CA3AF" />
             </TouchableOpacity>
@@ -311,7 +311,7 @@ export default function ProfileTab() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.footerText}>MAYODE Group App v1.0.0</Text>
+        <Text style={styles.footerText}>{t('appVersion', { version: '1.0.0' })}</Text>
       </ScrollView>
     </SafeAreaView>
   );

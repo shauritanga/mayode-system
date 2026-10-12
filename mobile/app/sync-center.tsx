@@ -204,7 +204,7 @@ export default function SyncCenterScreen() {
                         hour: '2-digit',
                         minute: '2-digit',
                       })}
-                      {item.attempts > 0 ? ` · ${item.attempts} attempts` : ''}
+                      {item.attempts > 0 ? ` · ${t('syncAttempts', { count: item.attempts })}` : ''}
                     </Text>
                   </View>
 

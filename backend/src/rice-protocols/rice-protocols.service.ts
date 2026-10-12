@@ -41,7 +41,7 @@ const REQUIRED_TASK_KEYS = ['harvest', 'drying', 'bagging'];
 
 const DAY_MS = 86_400_000;
 
-const MBALARI_TASKS: ProtocolTask[] = [
+export const MBALARI_TASKS: ProtocolTask[] = [
   {
     key: 'market_plan',
     title: 'Season and market plan',

@@ -195,11 +195,11 @@ export default function FieldSurveyScreen() {
 
       if (res?.data?.queued) {
         Alert.alert(t('fieldSurvey'), t('surveyQueuedOffline'), [
-          { text: 'OK', onPress: () => router.back() },
+          { text: t('ok'), onPress: () => router.back() },
         ]);
       } else {
         Alert.alert(t('fieldSurvey'), t('surveySubmitted'), [
-          { text: 'OK', onPress: () => router.back() },
+          { text: t('ok'), onPress: () => router.back() },
         ]);
       }
     } catch (e: any) {

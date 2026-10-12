@@ -1,3 +1,4 @@
+import { translate, useLanguageStore } from '../i18n';
 import * as Location from 'expo-location';
 import { OPENWEATHER_API_KEY } from '../lib/config';
 import { getCurrentPoint } from './location.service';
@@ -47,9 +48,9 @@ async function reverseCity(lat: number, lon: number): Promise<string> {
   try {
     const g = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
     const p = g?.[0];
-    return p?.city || p?.subregion || p?.region || p?.country || 'My location';
+    return p?.city || p?.subregion || p?.region || p?.country || translate(useLanguageStore.getState().language, 'myLocation');
   } catch {
-    return 'My location';
+    return translate(useLanguageStore.getState().language, 'myLocation');
   }
 }
 

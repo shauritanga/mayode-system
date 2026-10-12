@@ -109,7 +109,7 @@ export default function LeaseNew() {
         agreementDocumentUrl: documentUrl || undefined,
       });
       Alert.alert(t('addLease'), t('leaseCreated'), [
-        { text: 'OK', onPress: () => router.back() },
+        { text: t('ok'), onPress: () => router.back() },
       ]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;

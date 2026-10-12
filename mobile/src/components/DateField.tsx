@@ -3,6 +3,7 @@ import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Calendar01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
+import { useI18n } from '../i18n';
 
 type Props = {
   label: string;
@@ -32,6 +33,7 @@ function parseDate(value: string): Date | null {
 
 /** A date chosen from the native calendar. The person cannot type, so the value is always a real date. */
 export function DateField({ label, value, onChange, placeholder, maximumDate, minimumDate, initialDate }: Props) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const current = parseDate(value);
 
@@ -44,7 +46,7 @@ export function DateField({ label, value, onChange, placeholder, maximumDate, mi
           <Text style={[styles.text, !current && styles.placeholder]}>{current ? value : (placeholder ?? '')}</Text>
         </TouchableOpacity>
         {current ? (
-          <TouchableOpacity style={styles.clear} onPress={() => onChange('')} accessibilityRole="button" accessibilityLabel="Clear date">
+          <TouchableOpacity style={styles.clear} onPress={() => onChange('')} accessibilityRole="button" accessibilityLabel={t('clearDate')}>
             <HugeiconsIcon icon={Cancel01Icon} size={16} color="#6B7280" strokeWidth={2} />
           </TouchableOpacity>
         ) : null}

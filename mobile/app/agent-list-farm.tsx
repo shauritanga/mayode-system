@@ -69,7 +69,7 @@ export default function AgentListFarm() {
         isFlashDeal: dealType === 'FLASH_DEAL',
       });
       Alert.alert(t('mlaxAgentListFarm'), t('mlaxListingCreated'), [
-        { text: 'OK', onPress: () => router.back() },
+        { text: t('ok'), onPress: () => router.back() },
       ]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;

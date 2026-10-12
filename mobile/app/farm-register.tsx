@@ -114,7 +114,7 @@ export default function RegisterFarmScreen() {
       });
       const farm = res.data;
       const queued = Boolean(farm.queued);
-      Alert.alert(t('farmRegistered'), queued ? 'Farm saved on this device and will sync automatically when you reconnect.' : t('farmCreated', { code: farm.farmCode }), [
+      Alert.alert(t('farmRegistered'), queued ? t('farmSavedOffline') : t('farmCreated', { code: farm.farmCode }), [
         {
           text: t('walkGpsBoundary'),
           onPress: () => router.replace({ pathname: '/boundary', params: { id: farm.id, label: t('farmContext', { code: farm.farmCode }) } }),

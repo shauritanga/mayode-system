@@ -2,6 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { I18nExceptionFilter } from './common/i18n/i18n-exception.filter';
+import { I18nResponseInterceptor } from './common/i18n/i18n-response.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -36,6 +38,10 @@ async function bootstrap() {
     origin: process.env.NODE_ENV === 'production' ? configuredOrigins : true,
     credentials: true,
   });
+
+  // Errors come back in the app's language (Accept-Language)
+  app.useGlobalFilters(new I18nExceptionFilter());
+  app.useGlobalInterceptors(new I18nResponseInterceptor());
 
   // Global validation pipe for DTOs
   app.useGlobalPipes(

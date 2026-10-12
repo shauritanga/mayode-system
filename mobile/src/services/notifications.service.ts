@@ -1,3 +1,4 @@
+import { translate, useLanguageStore } from '../i18n';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
@@ -71,7 +72,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('mayode-default', {
-      name: 'MAYODE Notifications',
+      name: translate(useLanguageStore.getState().language, 'notificationChannelName'),
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#10B981',

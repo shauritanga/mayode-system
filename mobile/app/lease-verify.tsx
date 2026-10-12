@@ -68,7 +68,7 @@ export default function LeaseVerify() {
         notes: notes.trim() || undefined,
       });
       Alert.alert(t('officerVerifyLease'), t('decisionSubmitted'), [
-        { text: 'OK', onPress: () => router.back() },
+        { text: t('ok'), onPress: () => router.back() },
       ]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;
@@ -108,7 +108,7 @@ export default function LeaseVerify() {
 
           <Text style={styles.fieldLabel}>{t('contactedPerson')}</Text>
           <TextInput style={styles.input} value={contactedName} onChangeText={setContactedName}
-            placeholder="e.g. Juma Mwakalinga (block leader)" placeholderTextColor="#9CA3AF" />
+            placeholder={t('contactedNameExample')} placeholderTextColor="#9CA3AF" />
 
           <Text style={[styles.fieldLabel, { marginTop: 12 }]}>{t('contactedPhone')}</Text>
           <TextInput style={styles.input} value={contactedPhone} onChangeText={setContactedPhone}

@@ -13,21 +13,21 @@ import { useI18n } from '../src/i18n';
 /** Farm fields a farmer/renter may propose a correction for — mirrors the
  * backend's EDITABLE_FARM_FIELDS whitelist (never applied automatically). */
 const EDITABLE_FIELDS = [
-  { key: 'name', label: 'Farm name' },
-  { key: 'plotNumber', label: 'Plot number' },
-  { key: 'blockNumber', label: 'Block number' },
-  { key: 'section', label: 'Section / direction' },
-  { key: 'village', label: 'Village' },
-  { key: 'ward', label: 'Ward' },
-  { key: 'district', label: 'District' },
-  { key: 'region', label: 'Region' },
-  { key: 'socialHectares', label: 'Farm size (hectares)' },
-  { key: 'ownerName', label: 'Owner name' },
-  { key: 'ownerPhone', label: 'Owner phone number' },
-  { key: 'waterSource', label: 'Water source' },
-  { key: 'soilType', label: 'Soil type' },
-  { key: 'soilCondition', label: 'Soil condition' },
-  { key: 'accessibility', label: 'Accessibility' },
+  { key: 'name', label: 'corrFarmName' as const },
+  { key: 'plotNumber', label: 'corrPlotNumber' as const },
+  { key: 'blockNumber', label: 'corrBlockNumber' as const },
+  { key: 'section', label: 'corrSection' as const },
+  { key: 'village', label: 'corrVillage' as const },
+  { key: 'ward', label: 'corrWard' as const },
+  { key: 'district', label: 'corrDistrict' as const },
+  { key: 'region', label: 'corrRegion' as const },
+  { key: 'socialHectares', label: 'corrFarmSize' as const },
+  { key: 'ownerName', label: 'corrOwnerName' as const },
+  { key: 'ownerPhone', label: 'corrOwnerPhone' as const },
+  { key: 'waterSource', label: 'corrWaterSource' as const },
+  { key: 'soilType', label: 'corrSoilType' as const },
+  { key: 'soilCondition', label: 'corrSoilCondition' as const },
+  { key: 'accessibility', label: 'corrAccessibility' as const },
 ];
 
 /** "Suggest a correction" (prompt2 §19): never overwrites farm data directly — held for officer review. */
@@ -76,7 +76,7 @@ export default function FarmCorrectionScreen() {
         evidenceUrls: photoUrl ? [photoUrl] : undefined,
       });
       Alert.alert(t('suggestCorrection'), t('correctionSubmitted'), [
-        { text: 'OK', onPress: () => router.back() },
+        { text: t('ok'), onPress: () => router.back() },
       ]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;
@@ -101,7 +101,7 @@ export default function FarmCorrectionScreen() {
                 style={[styles.chip, fieldName === f.key && styles.chipActive]}
                 onPress={() => setFieldName(f.key)}
               >
-                <Text style={[styles.chipText, fieldName === f.key && styles.chipTextActive]}>{f.label}</Text>
+                <Text style={[styles.chipText, fieldName === f.key && styles.chipTextActive]}>{t(f.label)}</Text>
               </TouchableOpacity>
             ))}
           </View>

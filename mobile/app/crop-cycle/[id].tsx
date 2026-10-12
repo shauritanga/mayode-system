@@ -7,7 +7,7 @@ import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from 'expo-rou
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Add01Icon, WheatIcon, Wallet01Icon, CoinsDollarIcon } from '@hugeicons/core-free-icons';
 import { cropCyclesApi, riceProtocolsApi, integrationsApi } from '../../src/lib/data';
-import { timeAgo, useI18n } from '../../src/i18n';
+import { hasTranslation, timeAgo, useI18n, type TranslationKey } from '../../src/i18n';
 
 interface Activity {
   id: string; activityType: string; activityDate: string; description?: string;
@@ -230,8 +230,8 @@ export default function CropCycleDetail() {
                   <View style={[styles.taskDot, rec.severity === 'HIGH' && styles.taskDotWarn]} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.taskTitle}>
-                      {String(record.sourceType || '').replace(/_/g, ' ')}
-                      {rec.severity ? ` · ${rec.severity}` : ''}
+                      {hasTranslation(`aiSource_${record.sourceType}`) ? t(`aiSource_${record.sourceType}` as TranslationKey) : String(record.sourceType || '').replace(/_/g, ' ')}
+                      {rec.severity ? ` · ${hasTranslation(`severity_${rec.severity}`) ? t(`severity_${rec.severity}` as TranslationKey) : rec.severity}` : ''}
                     </Text>
                     <Text style={styles.taskDue} numberOfLines={3}>
                       {rec.summary || t('advisoryPreview')}
@@ -310,7 +310,7 @@ export default function CropCycleDetail() {
                   {a.inputsUsed?.items?.map((input, index) => <Text key={index}>{input.name}: {input.quantity} {input.unit}</Text>)}
                   {(a.laborWorkers || a.laborHours) ? (
                     <Text style={styles.rowSub}>
-                      {a.laborWorkers ? `${a.laborWorkers} workers` : ''} {a.laborHours ? `· ${a.laborHours}h` : ''}
+                      {a.laborWorkers ? t('laborWorkersCount', { count: a.laborWorkers }) : ''} {a.laborHours ? `· ${t('laborHoursCount', { count: a.laborHours })}` : ''}
                     </Text>
                   ) : null}
                 </View>

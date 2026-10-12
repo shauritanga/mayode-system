@@ -1,3 +1,4 @@
+import { translate, useLanguageStore } from '../i18n';
 import NetInfo from "@react-native-community/netinfo";
 import { api } from "../lib/api";
 import { useAuthStore } from "../store/auth.store";
@@ -24,7 +25,7 @@ async function downloadRecords() {
     const response = await api.get(url, { params });
     if (response.statusText === "Offline cache")
       throw new Error(
-        "Connection lost. Reconnect to finish downloading field records.",
+        translate(useLanguageStore.getState().language, 'connectionLostDownload'),
       );
     return response.data;
   };

@@ -183,7 +183,7 @@ export default function ExpenseNew() {
               <Field label={t('quantityLabel')} value={quantity} onChangeText={setQuantity} keyboardType="decimal-pad" />
             </View>
             <View style={{ flex: 1 }}>
-              <Field label={t('unitLabel')} value={unit} onChangeText={setUnit} placeholder="kg, bags…" />
+              <Field label={t('unitLabel')} value={unit} onChangeText={setUnit} placeholder={t('unitPlaceholder')} />
             </View>
           </View>
 

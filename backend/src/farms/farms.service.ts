@@ -240,6 +240,8 @@ export class FarmsService {
         boundaryCoordinates: dto.boundaryCoordinates,
         centerLatitude: dto.centerLat,
         centerLongitude: dto.centerLng,
+        // A boundary that passed the overlap check is accepted as is: no separate approval step.
+        isVerified: true,
       },
     });
     await this.activities.log(

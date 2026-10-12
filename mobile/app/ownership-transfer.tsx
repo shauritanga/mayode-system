@@ -26,7 +26,7 @@ export default function OwnershipTransfer() {
         reason: reason.trim() || undefined,
       });
       Alert.alert(t('mlaxTransferOwnership'), t('mlaxTransferSent'), [
-        { text: 'OK', onPress: () => router.back() },
+        { text: t('ok'), onPress: () => router.back() },
       ]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;

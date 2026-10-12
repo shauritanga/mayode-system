@@ -55,7 +55,7 @@ export default function FarmerNew() {
         t(result.data.queued ? "savedOffline" : "farmerRegistered"),
         [
           {
-            text: "OK",
+            text: t('ok'),
             onPress: () =>
               router.replace({
                 pathname: "/officer/farmer/[id]",

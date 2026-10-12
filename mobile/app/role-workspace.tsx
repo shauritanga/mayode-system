@@ -667,11 +667,11 @@ function StaffWorkspaceFallback({
         <>
           <View style={styles.note}>
             <HugeiconsIcon icon={Alert02Icon} size={20} color="#B45309" strokeWidth={2} />
-            <Text style={styles.noteText}>Your workspace is restricted to your assigned AMCOS.</Text>
+            <Text style={styles.noteText}>{t('workspaceRestricted')}</Text>
           </View>
           <TouchableOpacity style={styles.secondary} onPress={() => router.push('/officer-new')}>
             <HugeiconsIcon icon={UserGroupIcon} size={19} color="#065F46" strokeWidth={2} />
-            <Text style={styles.secondaryText}>Create Field Officer</Text>
+            <Text style={styles.secondaryText}>{t('createFieldOfficer')}</Text>
           </TouchableOpacity>
         </>
       ) : null}

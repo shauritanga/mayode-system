@@ -31,3 +31,14 @@ export function isFarmBoundaryMapped(farm: FarmGeoLike | null | undefined): bool
 export function hasFarmCenterPin(farm: FarmGeoLike | null | undefined): boolean {
   return farm?.centerLatitude != null && farm?.centerLongitude != null;
 }
+
+/** The point to use for the farm itself: its saved centre pin, else the middle of its boundary. */
+export function farmPoint(farm: FarmGeoLike | null | undefined): { latitude: number; longitude: number } | null {
+  if (!farm) return null;
+  if (hasFarmCenterPin(farm)) return { latitude: Number(farm.centerLatitude), longitude: Number(farm.centerLongitude) };
+  const ring = asPolygonGeometry(farm.boundaryCoordinates)?.coordinates?.[0];
+  if (!Array.isArray(ring) || ring.length === 0) return null;
+  const lon = ring.reduce((a, c) => a + Number(c[0]), 0) / ring.length;
+  const lat = ring.reduce((a, c) => a + Number(c[1]), 0) / ring.length;
+  return Number.isFinite(lat) && Number.isFinite(lon) ? { latitude: lat, longitude: lon } : null;
+}

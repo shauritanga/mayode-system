@@ -75,7 +75,7 @@ function CustomBottomNav() {
     return (
       <SafeAreaView edges={['bottom']} style={styles.bottomNavContainer}>
         <View style={styles.bottomNav}>
-          <NavButton icon={Home01Icon} label="Workspace" active={pathname === '/' || pathname === '/(tabs)'} onPress={() => router.navigate('/')} />
+          <NavButton icon={Home01Icon} label={t('workspaceTab')} active={pathname === '/' || pathname === '/(tabs)'} onPress={() => router.navigate('/')} />
           <NavButton icon={UserGroupIcon} label={t('myFarmers')} active={pathname.includes('officer-farmers')} onPress={() => router.navigate('/officer-farmers')} />
           <NavButton icon={Calendar01Icon} label={t('calendar')} active={pathname.includes('officer-calendar')} onPress={() => router.navigate('/officer-calendar')} />
           <NavButton icon={TaskDaily01Icon} label={t('reports')} active={pathname.includes('officer-reports')} onPress={() => router.navigate('/officer-reports')} />
@@ -87,11 +87,11 @@ function CustomBottomNav() {
 
   if (role && role !== 'FARMER') {
     const workRoute = '/farms';
-    const workLabel = 'AMCOS farms';
+    const workLabel = t('amcosFarms');
     return (
       <SafeAreaView edges={['bottom']} style={styles.bottomNavContainer}>
         <View style={styles.bottomNav}>
-          <NavButton icon={Home01Icon} label="Workspace" active={pathname === '/' || pathname === '/(tabs)'} onPress={() => router.push('/')} />
+          <NavButton icon={Home01Icon} label={t('workspaceTab')} active={pathname === '/' || pathname === '/(tabs)'} onPress={() => router.push('/')} />
           <NavButton icon={Plant01Icon} label={workLabel} active={pathname === workRoute} onPress={() => router.push(workRoute as any)} />
           <NavButton icon={UserCircleIcon} label={t('profile')} active={pathname === '/profile' || pathname === '/(tabs)/profile'} onPress={() => router.push('/profile')} />
         </View>

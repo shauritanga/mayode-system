@@ -81,7 +81,7 @@ export default function LandListingNew() {
         return;
       }
       Alert.alert(t('mlaxCreateListing'), t('mlaxListingCreated'), [
-        { text: 'OK', onPress: () => router.back() },
+        { text: t('ok'), onPress: () => router.back() },
       ]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;

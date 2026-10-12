@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
   ActivityIndicator, Alert, Image, Modal, Pressable, Platform,
@@ -15,7 +15,8 @@ import {
 } from '@hugeicons/core-free-icons';
 import { farmsApi, ownershipApi, assignmentsApi, seasonsApi, uploadsApi, resolveMediaUrl } from '../../src/lib/data';
 import { FarmBoundaryPreview } from '../../src/components/FarmBoundaryPreview';
-import { isFarmBoundaryMapped } from '../../src/lib/farm-geo';
+import { isFarmBoundaryMapped, farmPoint } from '../../src/lib/farm-geo';
+import { fetchWeatherAt, WeatherData } from '../../src/services/weather.service';
 import { useI18n } from '../../src/i18n';
 import { useAuthStore } from '../../src/store/auth.store';
 
@@ -221,22 +222,25 @@ export default function FarmDetail() {
     }
   }, [farm, busyOwn, load, t]);
 
-  const approveBoundary = useCallback(async () => {
-    if (!farm) return;
-    try {
-      await farmsApi.reviewBoundary(farm.id);
-      Alert.alert(t('boundaryApprovedTitle'), t('boundaryApprovedMessage'));
-      await load();
-    } catch (e: any) {
-      Alert.alert(t('cannotApproveBoundary'), e?.response?.data?.message || e?.message || t('mapBoundaryFirst'));
-    }
-  }, [farm, load, t]);
-
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const confirmedOwnership = ownerships.some((o) => o.confirmationStatus === 'VERIFIED');
   const activeAssignment = assignments.find((a) => a.status === 'VERIFIED') || assignments[0];
   const hasGPS = farm ? isFarmBoundaryMapped(farm) : false;
+  const point = farm ? farmPoint(farm) : null;
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  useEffect(() => {
+    if (!point) { setWeather(null); return; }
+    let live = true;
+    setWeatherLoading(true);
+    fetchWeatherAt(point.latitude, point.longitude)
+      .then((w) => { if (live) setWeather(w); })
+      .catch(() => { if (live) setWeather(null); })
+      .finally(() => { if (live) setWeatherLoading(false); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [point?.latitude, point?.longitude]);
   const isStaff = STAFF_ROLES.includes(user?.role ?? '');
   const isSecretary = user?.role === 'MAMCOS_SECRETARY';
 
@@ -312,13 +316,6 @@ export default function FarmDetail() {
         onPress: () => router.push({ pathname: '/field-survey', params: { farmId: farm.id, farmCode: farm.farmCode } }),
       });
     }
-    if (isSecretary && !farm.isVerified) {
-      items.push({
-        key: 'approve-boundary',
-        label: t('approveBoundary'),
-        onPress: () => { void approveBoundary(); },
-      });
-    }
     if (isSecretary && farm.isVerified) {
       items.push({
         key: 'assign-renter',
@@ -331,7 +328,7 @@ export default function FarmDetail() {
   }, [
     farm, t, router, confirmedOwnership, activeAssignment, hasGPS,
     confirmOwnership, selfOperate, addPhoto, uploadingPhoto,
-    isStaff, isSecretary, approveBoundary, ownershipLoaded, assignmentsLoaded,
+    isStaff, isSecretary, ownershipLoaded, assignmentsLoaded,
   ]);
 
   if (loading && !farm) {
@@ -402,11 +399,6 @@ export default function FarmDetail() {
           )}
           <View style={styles.badgeRow}>
             <View style={[styles.badge, styles.badgeBlue]}><Text style={styles.badgeBlueText}>{t('gradeValue', { grade: farm.grade })}</Text></View>
-            <View style={[styles.badge, farm.isVerified ? styles.badgeGreen : styles.badgeGold]}>
-              <Text style={farm.isVerified ? styles.badgeGreenText : styles.badgeGoldText}>
-                {farm.isVerified ? t('verified') : t('pending')}
-              </Text>
-            </View>
             <View style={[styles.badge, hasGPS ? styles.badgeGreen : styles.badgeGray]}>
               <Text style={hasGPS ? styles.badgeGreenText : styles.badgeGrayText}>{hasGPS ? t('mappedPin') : t('notMappedWarn')}</Text>
             </View>
@@ -415,7 +407,7 @@ export default function FarmDetail() {
 
         <View style={styles.grid}>
           <Attr label={t('socialHectares')} value={`${farm.socialHectares} ha`} />
-          <Attr label={t('actualAcres')} value={farm.actualAcres ? `${farm.actualAcres} ac` : '—'} />
+          <Attr label={t('actualAcres')} value={farm.actualAcres ? `${farm.actualAcres} ${t('unitAcres')}` : '—'} />
           <Attr label={t('ownership')} value={farm.ownershipType || '—'} />
           <Attr label={t('plotNumber')} value={farm.plotNumber || '—'} />
           <Attr label={t('blockNumber')} value={farm.blockNumber || '—'} />
@@ -484,6 +476,25 @@ export default function FarmDetail() {
           )
         )}
 
+        <View style={styles.boundaryCard}>
+          <Text style={styles.sectionTitle}>{t('farmWeather')}</Text>
+          {!point ? (
+            <Text style={styles.sub}>{t('farmWeatherNoLocation')}</Text>
+          ) : weatherLoading && !weather ? (
+            <ActivityIndicator color="#10B981" />
+          ) : weather ? (
+            <View>
+              <Text style={styles.name}>{weather.icon} {weather.tempC}°C · {t(weather.condition)}</Text>
+              <Text style={styles.sub}>
+                {t('humidity')}: {weather.humidity}% · {t('precipitation')}: {weather.precipitationMm} mm · {t('windSpeed')}: {weather.windKmh} {t('unitKmh')}
+              </Text>
+              <Text style={styles.sub}>{t('liveWeatherProvider', { provider: weather.provider })}</Text>
+            </View>
+          ) : (
+            <Text style={styles.sub}>{t('weatherUnavailable')}</Text>
+          )}
+        </View>
+
         {hasGPS ? (
           <View style={styles.boundaryCard}>
             <Text style={styles.sectionTitle}>{t('farmBoundary')}</Text>
@@ -497,7 +508,7 @@ export default function FarmDetail() {
               </View>
               {!!farm.actualAcres && (
                 <Text style={styles.boundaryArea}>
-                  {farm.actualAcres} ac · {(farm.actualAcres / 2.47105).toFixed(2)} ha
+                  {farm.actualAcres} {t('unitAcres')} · {(farm.actualAcres / 2.47105).toFixed(2)} ha
                 </Text>
               )}
             </View>
@@ -525,7 +536,7 @@ export default function FarmDetail() {
                   <Text style={styles.plotCode}>{p.plotCode}</Text>
                   {p.photoUrls?.map((url, index) => <Image key={index} source={{ uri: resolveMediaUrl(url) || url }} style={{ width: 100, height: 75, borderRadius: 8, marginVertical: 8 }} />)}
                   <Text style={styles.plotSub}>
-                    {p.name || t('unnamed')} · {p.sizeAcres ? `${p.sizeAcres} ac` : t('sizeUnknown')} · {p._count?.cropCycles ?? 0} {t('cycles')}
+                    {p.name || t('unnamed')} · {p.sizeAcres ? `${p.sizeAcres} ${t('unitAcres')}` : t('sizeUnknown')} · {p._count?.cropCycles ?? 0} {t('cycles')}
                   </Text>
                 </View>
                 <TouchableOpacity

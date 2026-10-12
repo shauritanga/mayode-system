@@ -69,7 +69,7 @@ export default function FarmReportScreen() {
           <Text style={styles.name}>{report.name}</Text>
           {!!report.location && <Text style={styles.location}>{report.location}</Text>}
           <Text style={styles.sub}>
-            {report.sizeHectares} ha · {report.sizeAcres} ac · {t('gradeValue', { grade: report.grade })}
+            {report.sizeHectares} ha · {report.sizeAcres} {t('unitAcres')} · {t('gradeValue', { grade: report.grade })}
           </Text>
         </View>
 
@@ -98,9 +98,9 @@ export default function FarmReportScreen() {
               {report.soil ? (
                 <>
                   {report.soil.ph != null && <Row label={t('soilPh')} value={`${report.soil.ph}`} />}
-                  {!!report.soil.texture && <Row label="Texture" value={report.soil.texture} />}
-                  {!!report.soil.condition && <Row label="Condition" value={report.soil.condition} />}
-                  {!!report.soil.type && <Row label="Type" value={report.soil.type} />}
+                  {!!report.soil.texture && <Row label={t('reportTexture')} value={report.soil.texture} />}
+                  {!!report.soil.condition && <Row label={t('reportCondition')} value={report.soil.condition} />}
+                  {!!report.soil.type && <Row label={t('reportType')} value={report.soil.type} />}
                 </>
               ) : <Text style={styles.muted}>{t('noSoilData')}</Text>}
             </Section>
@@ -109,14 +109,14 @@ export default function FarmReportScreen() {
               {report.roadAccess?.distanceMeters != null
                 ? <Row label={t('distanceToRoad')} value={t('metersAway', { value: report.roadAccess.distanceMeters })} />
                 : <Row label={t('roadAccess')} value={report.roadAccess?.nearRoad ? t('yes') : t('no')} />}
-              {!!report.roadAccess?.quality && <Row label="Quality" value={report.roadAccess.quality} />}
+              {!!report.roadAccess?.quality && <Row label={t('reportQuality')} value={report.roadAccess.quality} />}
             </Section>
 
             <Section title={t('waterAccess')}>
-              {!!report.waterAccess?.source && <Row label="Source" value={report.waterAccess.source} />}
+              {!!report.waterAccess?.source && <Row label={t('reportSource')} value={report.waterAccess.source} />}
               {report.waterAccess?.distanceMeters != null && <Row label={t('waterAccess')} value={t('metersAway', { value: report.waterAccess.distanceMeters })} />}
-              {!!report.waterAccess?.reliability && <Row label="Reliability" value={report.waterAccess.reliability} />}
-              {report.waterAccess?.hasIrrigation != null && <Row label="Irrigation" value={report.waterAccess.hasIrrigation ? t('yes') : t('no')} />}
+              {!!report.waterAccess?.reliability && <Row label={t('reportReliability')} value={report.waterAccess.reliability} />}
+              {report.waterAccess?.hasIrrigation != null && <Row label={t('reportIrrigation')} value={report.waterAccess.hasIrrigation ? t('yes') : t('no')} />}
             </Section>
 
             {!!report.recommendations?.length && (

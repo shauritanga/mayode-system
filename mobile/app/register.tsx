@@ -41,7 +41,7 @@ export default function RegisterRoute() {
       return;
     }
     if (!dataShareConsent) {
-      Alert.alert('Data sharing consent', 'Please confirm your consent before creating your account. You can withdraw it later from your profile.');
+      Alert.alert(t('consentRequiredTitle'), t('consentRequiredBody'));
       return;
     }
 
@@ -123,8 +123,8 @@ export default function RegisterRoute() {
             <View style={styles.consentRow}>
               <Switch value={dataShareConsent} onValueChange={setDataShareConsent} trackColor={{ true: '#10B981' }} />
               <TouchableOpacity style={styles.consentCopy} onPress={() => setDataShareConsent((value) => !value)} activeOpacity={0.8}>
-                <Text style={styles.consentTitle}>Data-sharing consent</Text>
-                <Text style={styles.consentText}>I agree that MAYODE may share my credit-readiness data with approved financial providers. You can withdraw this in your profile at any time.</Text>
+                <Text style={styles.consentTitle}>{t('consentCardTitle')}</Text>
+                <Text style={styles.consentText}>{t('consentCardText')}</Text>
               </TouchableOpacity>
             </View>
 

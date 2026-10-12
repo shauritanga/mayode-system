@@ -101,7 +101,7 @@ export default function MarketplaceScreen() {
 
     const numHectares = parseFloat(hectares);
     if (isNaN(numHectares) || numHectares <= 0) {
-      Alert.alert(t('bookingFailed'), 'Please enter a valid hectare size.');
+      Alert.alert(t('bookingFailed'), t('bookingHectaresInvalid'));
       return;
     }
 
@@ -132,7 +132,7 @@ export default function MarketplaceScreen() {
   };
 
   const handleCancelBooking = async (bookingId: string) => {
-    Alert.alert(t('cancelBooking'), 'Are you sure you want to cancel this booking request?', [
+    Alert.alert(t('cancelBooking'), t('cancelBookingConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       {
         text: t('cancelBooking'),
@@ -144,7 +144,7 @@ export default function MarketplaceScreen() {
             Alert.alert(t('cancelBooking'), t('bookingCancelled'));
             fetchMarketplace();
           } catch (e: any) {
-            Alert.alert(t('bookingFailed'), e?.response?.data?.message || 'Failed to cancel');
+            Alert.alert(t('bookingFailed'), e?.response?.data?.message || t('cancelFailed'));
           } finally {
             setCancellingId(null);
           }
@@ -261,8 +261,8 @@ export default function MarketplaceScreen() {
 
                 <View style={styles.bookingDetailsBox}>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Farm:</Text>
-                    <Text style={styles.detailVal}>{b.farm?.farmCode || b.farm?.name || 'Assigned Farm'}</Text>
+                    <Text style={styles.detailLabel}>{t('farmLabelColon')}</Text>
+                    <Text style={styles.detailVal}>{b.farm?.farmCode || b.farm?.name || t('assignedFarm')}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>{t('hectaresToTill')}:</Text>
