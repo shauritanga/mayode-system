@@ -54,6 +54,7 @@ export class PlotsService {
         `Added plot ${plot.plotCode}`,
         `on ${farm.farmCode}`,
         '🧩',
+        { plotCode: plot.plotCode, farmCode: farm.farmCode },
       );
     }
     return plot;
@@ -128,6 +129,7 @@ export class PlotsService {
       `Mapped ${plot.plotCode} boundary`,
       'GPS boundary saved',
       '📍',
+      { plotCode: plot.plotCode },
     );
     return plot;
   }

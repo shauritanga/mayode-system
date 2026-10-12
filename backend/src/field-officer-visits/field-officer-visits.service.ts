@@ -133,6 +133,7 @@ export class FieldOfficerVisitsService {
       'Field officer visited you',
       visit.recommendations ?? visit.observations ?? undefined,
       'user-check',
+      { note: visit.recommendations ?? visit.observations ?? null },
     );
 
     return visit;

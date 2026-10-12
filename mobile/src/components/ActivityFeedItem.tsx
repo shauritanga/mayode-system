@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { timeAgo, useI18n } from '../i18n';
+import { activityText } from '../lib/activity-text';
 
 export type ActivityFeedItemData = {
   id: string;
@@ -8,6 +9,7 @@ export type ActivityFeedItemData = {
   subtitle?: string | null;
   icon?: string | null;
   type?: string | null;
+  params?: Record<string, unknown> | null;
   createdAt?: string | null;
 };
 
@@ -24,12 +26,6 @@ function toneFor(type?: string | null): Tone {
   return { well: '#F3F4F6', accent: '#6B7280', label: '#4B5563' };
 }
 
-function typeLabel(type?: string | null): string | null {
-  if (!type) return null;
-  const last = type.split('.').pop() || type;
-  return last.replace(/_/g, ' ');
-}
-
 type Props = {
   item: ActivityFeedItemData;
   /** Draw the timeline connector under this row (home list / feed). */
@@ -40,9 +36,10 @@ type Props = {
 
 /** Professional activity feed row — timeline icon + title/meta + relative time. */
 export function ActivityFeedItem({ item, showRail = true, isLast = false, onPress }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const tone = toneFor(item.type);
-  const tag = typeLabel(item.type);
+  const text = activityText(item, t, language);
+  const tag = text.tag;
 
   const content = (
     <>
@@ -55,21 +52,21 @@ export function ActivityFeedItem({ item, showRail = true, isLast = false, onPres
 
       <View style={[styles.body, isLast && styles.bodyLast]}>
         <View style={styles.topLine}>
-          <Text style={styles.title} numberOfLines={2}>{item.title || '—'}</Text>
+          <Text style={styles.title} numberOfLines={2}>{text.title || '—'}</Text>
           {!!item.createdAt && (
             <Text style={styles.time}>{timeAgo(item.createdAt, t)}</Text>
           )}
         </View>
 
-        {(!!item.subtitle || !!tag) && (
+        {(!!text.subtitle || !!tag) && (
           <View style={styles.metaRow}>
             {!!tag && (
               <View style={[styles.tag, { backgroundColor: tone.well }]}>
                 <Text style={[styles.tagText, { color: tone.label }]}>{tag}</Text>
               </View>
             )}
-            {!!item.subtitle && (
-              <Text style={styles.subtitle} numberOfLines={1}>{item.subtitle}</Text>
+            {!!text.subtitle && (
+              <Text style={styles.subtitle} numberOfLines={1}>{text.subtitle}</Text>
             )}
           </View>
         )}

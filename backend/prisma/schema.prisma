@@ -1754,6 +1754,8 @@ model Activity {
   title     String
   subtitle  String?
   icon      String?
+  /// Facts for the app to build the sentence in the person's language; title/subtitle stay as the English fallback.
+  params    Json?
   createdAt DateTime @default(now()) @map("created_at")
 
   farmer Farmer @relation(fields: [farmerId], references: [id], onDelete: Cascade)

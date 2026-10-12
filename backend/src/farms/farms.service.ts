@@ -96,6 +96,10 @@ export class FarmsService {
       `Registered farm ${farm.farmCode}`,
       farm.name || farm.village || 'New farm',
       '🌾',
+      {
+        farmCode: farm.farmCode,
+        place: farm.name || farm.village || null,
+      },
     );
     return farm;
   }
@@ -244,6 +248,7 @@ export class FarmsService {
       `Mapped ${farm.farmCode} boundary`,
       'GPS boundary saved',
       '📍',
+      { farmCode: farm.farmCode },
     );
     return farm;
   }
@@ -297,6 +302,10 @@ export class FarmsService {
       `Uploaded ${(dto.type || 'document').toString().replace('_', ' ')}`,
       dto.fileName || 'File attached',
       '📄',
+      {
+        docType: (dto.type || 'OTHER').toString(),
+        fileName: dto.fileName ?? null,
+      },
     );
     return document;
   }

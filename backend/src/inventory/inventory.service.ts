@@ -147,6 +147,11 @@ export class InventoryService {
       'Harvest received at warehouse',
       `${weightKg} kg · ${trackingCode}${farm.farmCode ? ` · ${farm.farmCode}` : ''}`,
       '📦',
+      {
+        weightKg,
+        trackingCode,
+        farmCode: farm.farmCode ?? null,
+      },
     );
 
     return record;

@@ -334,6 +334,10 @@ export class SalesService {
           `Cooperative sale recorded: ${invoiceNumber}`,
           `TZS ${(allocation.grossAmount + allocation.fairtradePremium).toLocaleString()} pending payment`,
           '💰',
+          {
+            invoice: invoiceNumber,
+            amount: allocation.grossAmount + allocation.fairtradePremium,
+          },
         ),
       ),
     );

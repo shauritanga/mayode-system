@@ -131,6 +131,11 @@ export class CropCyclesService {
       `Started crop cycle: ${cropCycle.season}`,
       `${farm.farmCode}${variety.riceVariety ? ` · ${variety.riceVariety}` : ''}`,
       '🌾',
+      {
+        season: cropCycle.season,
+        farmCode: farm.farmCode,
+        variety: variety.riceVariety ?? null,
+      },
     );
     await this.riceProtocols.scheduleForCycle(cropCycle.id);
     return cropCycle;
@@ -499,6 +504,11 @@ export class CropCyclesService {
         `${cropCycle.season} is now ${dto.status.toLowerCase()}`,
         cropCycle.farm?.farmCode,
         dto.status === 'HARVESTED' ? '🌾' : '🔄',
+        {
+          season: cropCycle.season,
+          status: dto.status,
+          farmCode: cropCycle.farm?.farmCode ?? null,
+        },
       );
     }
     return cropCycle;
@@ -609,6 +619,11 @@ export class CropCyclesService {
       `Logged ${label}`,
       `${cropCycle.farm.farmCode} · ${cropCycle.season}`,
       ACTIVITY_ICONS[dto.activityType] ?? '📝',
+      {
+        activityType: dto.activityType,
+        farmCode: cropCycle.farm.farmCode,
+        season: cropCycle.season,
+      },
     );
     return activity;
   }

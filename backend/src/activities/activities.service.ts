@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 
@@ -16,10 +17,11 @@ export class ActivitiesService {
     title: string,
     subtitle?: string,
     icon?: string,
+    params?: Prisma.InputJsonObject,
   ) {
     if (!farmerId) return;
     return this.prisma.activity.create({
-      data: { farmerId, type, title, subtitle, icon },
+      data: { farmerId, type, title, subtitle, icon, params },
     });
   }
 

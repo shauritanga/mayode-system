@@ -89,6 +89,11 @@ export class FinanceService {
       `Recorded expense: ${dto.itemName}`,
       `TZS ${dto.totalCost.toLocaleString()} · ${cropCycle.farm.farmCode}`,
       CATEGORY_ICONS[dto.category] ?? '💵',
+      {
+        item: dto.itemName,
+        amount: dto.totalCost,
+        farmCode: cropCycle.farm.farmCode,
+      },
     );
     await this.accounting.postToLedger(
       'InputCost',
@@ -140,6 +145,11 @@ export class FinanceService {
       `Sale recorded: ${dto.quantityKg}kg`,
       `TZS ${dto.totalRevenue.toLocaleString()} · ${cropCycle.farm.farmCode}`,
       '💰',
+      {
+        quantityKg: dto.quantityKg,
+        amount: dto.totalRevenue,
+        farmCode: cropCycle.farm.farmCode,
+      },
     );
     await this.accounting.postToLedger(
       'Revenue',
