@@ -28,7 +28,6 @@ export default function LanguageSelectRoute() {
         <Image source={require('../assets/mayode.png')} style={styles.logo} resizeMode="contain" />
         <Text style={styles.eyebrow}>MAYODE GROUP</Text>
         <Text style={styles.title}>{t('chooseLanguage')}</Text>
-        <Text style={styles.subtitle}>{t('chooseLanguageSwahili')}</Text>
         <Text style={styles.helper}>{t('languageHelper')}</Text>
 
         <View style={styles.options}>
@@ -73,7 +72,6 @@ const styles = StyleSheet.create({
   flag: { fontSize: 30 },
   eyebrow: { textAlign: 'center', color: '#087F5B', fontSize: 12, fontWeight: '800', letterSpacing: 2, marginBottom: 18 },
   title: { textAlign: 'center', color: '#064E3B', fontSize: 30, fontWeight: '800', lineHeight: 38 },
-  subtitle: { textAlign: 'center', color: '#286550', fontSize: 20, fontWeight: '600', marginTop: 8 },
   helper: { textAlign: 'center', color: '#6B7280', fontSize: 14, lineHeight: 21, marginTop: 18, marginHorizontal: 12 },
   options: { gap: 12, marginTop: 32 },
   option: { minHeight: 76, borderRadius: 18, borderWidth: 1, borderColor: '#D1D5DB', backgroundColor: '#FFFFFF', paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
