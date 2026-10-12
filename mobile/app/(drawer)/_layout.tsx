@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   Drawer,
   DrawerContentScrollView,
@@ -10,14 +10,8 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
-  Edit02Icon,
   Wallet01Icon,
   Calendar01Icon,
-  StarIcon,
-  Agreement01Icon,
-  GiftIcon,
-  QuestionIcon,
-  Logout01Icon,
   ShoppingCart02Icon,
   TaskDaily01Icon,
   MapsSearchIcon,
@@ -27,7 +21,6 @@ import {
   CloudSavingDone01Icon,
 } from '@hugeicons/core-free-icons';
 import { useAuthStore } from '../../src/store/auth.store';
-import { authApi } from '../../src/lib/data';
 import { useI18n } from '../../src/i18n';
 
 type DrawerNavItem = {
@@ -41,7 +34,7 @@ type DrawerNavItem = {
 function FarmerDrawerContent(props: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, clearAuth } = useAuthStore();
+  const { user } = useAuthStore();
   const { t } = useI18n();
 
   const name = user?.firstName
@@ -59,28 +52,7 @@ function FarmerDrawerContent(props: DrawerContentComponentProps) {
     router.push({ pathname: '/activity-select-cycle', params: { purpose } });
   };
 
-  const handleLogout = () => {
-    Alert.alert(t('signOut'), t('signOutQuestion'), [
-      { text: t('cancel'), style: 'cancel' },
-      {
-        text: t('signOut'),
-        style: 'destructive',
-        onPress: async () => {
-          props.navigation.closeDrawer();
-          try {
-            await authApi.logout();
-          } catch {
-            /* still clear local session */
-          } finally {
-            clearAuth();
-          }
-        },
-      },
-    ]);
-  };
-
   const items: DrawerNavItem[] = [
-    { key: 'edit-profile', label: t('editProfile'), icon: Edit02Icon, color: '#10B981', onPress: () => go('/edit-profile') },
     { key: 'log-activity', label: t('logActivity'), icon: TaskDaily01Icon, color: '#065F46', onPress: () => goSelectCycle('activity') },
     { key: 'add-expense', label: t('addExpense'), icon: Wallet01Icon, color: '#0F766E', onPress: () => goSelectCycle('expense') },
     { key: 'record-sale', label: t('recordSale'), icon: CoinsDollarIcon, color: '#047857', onPress: () => goSelectCycle('sale') },
@@ -90,12 +62,7 @@ function FarmerDrawerContent(props: DrawerContentComponentProps) {
     { key: 'insurance', label: t('insurance'), icon: Shield01Icon, color: '#047857', onPress: () => go('/insurance') },
     { key: 'inventory', label: t('warehouseStock'), icon: Package01Icon, color: '#0F766E', onPress: () => go('/inventory') },
     { key: 'calendar', label: t('calendar'), icon: Calendar01Icon, color: '#047857', onPress: () => go('/calendar') },
-    { key: 'membership', label: t('membershipPlans'), icon: StarIcon, color: '#D97706', onPress: () => go('/membership') },
-    { key: 'leases', label: t('myLeases'), icon: Agreement01Icon, color: '#10B981', onPress: () => go('/leases') },
-    { key: 'rewards', label: t('myRewards'), icon: GiftIcon, color: '#F59E0B', onPress: () => go('/rewards') },
-    { key: 'votes', label: 'Member voting', icon: Agreement01Icon, color: '#3B82F6', onPress: () => go('/votes') },
     { key: 'sync', label: t('syncCenter'), icon: CloudSavingDone01Icon, color: '#059669', onPress: () => go('/sync-center') },
-    { key: 'support', label: t('helpSupport'), icon: QuestionIcon, color: '#6B7280', onPress: () => go('/support') },
   ];
 
   return (
@@ -128,18 +95,6 @@ function FarmerDrawerContent(props: DrawerContentComponentProps) {
         />
       ))}
 
-      <DrawerItem
-        label={t('signOut')}
-        onPress={handleLogout}
-        icon={() => (
-          <View style={[styles.itemIcon, { backgroundColor: '#FEE2E2' }]}>
-            <HugeiconsIcon icon={Logout01Icon} size={18} color="#EF4444" strokeWidth={2} />
-          </View>
-        )}
-        labelStyle={[styles.itemLabel, { color: '#EF4444' }]}
-        style={styles.item}
-      />
-
       <Text style={styles.footer}>MAYODE Group App v1.0.0</Text>
     </DrawerContentScrollView>
   );
@@ -164,7 +119,6 @@ function OfficerDrawerContent(props: DrawerContentComponentProps) {
   const items: DrawerNavItem[] = [
     { key: 'field-survey', label: t('fieldSurvey'), icon: MapsSearchIcon, color: '#065F46', onPress: () => go('/field-survey') },
     { key: 'sync', label: t('syncCenter'), icon: CloudSavingDone01Icon, color: '#059669', onPress: () => go('/sync-center') },
-    { key: 'support', label: t('helpSupport'), icon: QuestionIcon, color: '#6B7280', onPress: () => go('/support') },
   ];
 
   return (
