@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { registryApi, mamcosApi } from '@/lib/api';
 import Modal from '@/components/Modal';
@@ -265,7 +266,7 @@ export default function FarmRegistryPage() {
       {/* Registry table */}
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading registry…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : records.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No pre-registered farms yet.</div>
         ) : (

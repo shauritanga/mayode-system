@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { Fragment, useEffect, useState } from 'react';
 import { insuranceApi, farmersApi } from '@/lib/api';
 import Modal from '@/components/Modal';
@@ -251,7 +252,7 @@ export default function InsurancePage() {
           <button className="btn-secondary" style={{ fontSize: '12px', padding: '6px 10px' }} onClick={() => setShowProviderForm(true)}>+ Add Provider</button>
         </div>
         {loading ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>Loading…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : providers.length === 0 ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>No insurance providers registered yet.</div>
         ) : (
@@ -285,7 +286,7 @@ export default function InsurancePage() {
           </div>
         </div>
         {loading ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>Loading…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : filteredPolicies.length === 0 ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>No policies match this filter.</div>
         ) : (
@@ -336,7 +337,7 @@ export default function InsurancePage() {
           </div>
         </div>
         {loading ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>Loading…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : filteredClaims.length === 0 ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>No claims match this filter.</div>
         ) : (

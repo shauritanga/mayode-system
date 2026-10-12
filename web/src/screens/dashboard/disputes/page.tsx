@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { disputesApi, mamcosApi } from '@/lib/api';
 import Modal from '@/components/Modal';
@@ -76,7 +77,7 @@ export default function DisputesPage() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : disputes.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No disputes.</div>
         ) : (

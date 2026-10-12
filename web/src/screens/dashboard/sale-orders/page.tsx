@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { saleOrdersApi, warehousesApi, buyersApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-error';
@@ -116,7 +117,7 @@ export default function SaleOrdersPage() {
           <table className="data-table ua-table">
             <thead><tr><th>Reference</th><th>Buyer</th><th>Quantity</th><th>Warehouse</th><th>Status</th><th>Created by</th><th>Date</th><th /></tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={8} className="ua-empty">Loading…</td></tr>
+              {loading ? <tr><td colSpan={8}><TableSkeleton rows={6} avatar={false} /></td></tr>
                 : rows.length === 0 ? <tr><td colSpan={8} className="ua-empty"><strong>No sale orders yet</strong>{canCreate ? 'Create one to reserve stock for a buyer.' : 'Nothing to show.'}</td></tr>
                 : rows.map((r) => (
                   <tr key={r.id}>

@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useCallback, useEffect, useState } from 'react';
 import { usersApi, warehousesApi, saleOrdersApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-error';
@@ -85,7 +86,7 @@ export default function WarehousePage() {
       {canView && (
         <section>
           <h2 className="ua-section-title" style={{ marginBottom: 12 }}>Warehouses &amp; stock</h2>
-          {loading ? <div className="ua-empty">Loading…</div> : warehouses.length === 0 ? (
+          {loading ? <TableSkeleton rows={4} avatar={false} /> : warehouses.length === 0 ? (
             <div className="ua-panel"><div className="ua-empty"><strong>No warehouses yet</strong>{can('warehouses', 'CREATE') ? 'Create the first warehouse, then receive harvest into it.' : 'Ask an administrator to create one.'}</div></div>
           ) : (
             <div className="so-cards">

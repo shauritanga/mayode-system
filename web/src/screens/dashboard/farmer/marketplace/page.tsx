@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { EmptyState, InsightPanel, money } from '@/components/role-dashboards/DashboardPrimitives';
+import { EmptyState, InsightPanel, money, TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import FarmerLandListingForm from '@/components/marketplace/FarmerLandListingForm';
 import { marketplaceApi, API_BASE_URL } from '@/lib/api';
 import { apiError } from '@/lib/download';
@@ -59,7 +59,7 @@ export default function FarmerMarketplacePage() {
     </InsightPanel>}
     <fieldset disabled={busy} style={{ border: 0, padding: 0, minWidth: 0, display: 'grid', gap: 20 }}>
       <div className="role-two-col"><InsightPanel title="Available land"><label className="form-label">Search farm, village or deal<input className="input-field" value={search} onChange={(e) => setSearch(e.target.value)} /></label><div className="role-list">{available.map((l) => <div className="role-list-item" key={l.id}><div><strong>{l.farm?.farmCode}</strong><p>{l.isPrivate ? '🔒 Private deal · enter the owner’s code to see the price' : money(l.askingPrice)} · {l.leaseDurationMonths} months · {l.isPrivate ? 'Relationship' : l.dealType}</p><p>{l.farm?.socialHectares} ha · {l.farm?.actualAcres ?? '—'} actual acres · Grade {l.farm?.grade}</p></div><button className="btn-secondary" onClick={() => void inspect(mine.find((m) => m.id === l.id) ?? l)}>{l.isPrivate && l.ownerId !== farmer?.id ? 'Enter code' : 'View terms'}</button></div>)}{!available.length && <EmptyState>No available land matches your search.</EmptyState>}</div></InsightPanel>
-      <InsightPanel title="My listings and rentals">{loading ? <p>Loading rentals…</p> : <div className="role-list">{mine.map((l) => <div className="role-list-item" key={l.id}><div><strong>{l.farm?.farmCode}</strong><p>{l.ownerId === farmer?.id ? 'Landowner' : 'Renter'} · {l.leaseStatus}</p><p>{l.leaseEndDate ? `Until ${l.leaseEndDate.slice(0, 10)}` : `${l.leaseDurationMonths} months`}</p></div><button className="btn-secondary" onClick={() => void inspect(l)}>Manage</button></div>)}{!mine.length && <EmptyState>No listings or rentals yet.</EmptyState>}</div>}</InsightPanel></div>
+      <InsightPanel title="My listings and rentals">{loading ? <TableSkeleton rows={3} avatar={false} /> : <div className="role-list">{mine.map((l) => <div className="role-list-item" key={l.id}><div><strong>{l.farm?.farmCode}</strong><p>{l.ownerId === farmer?.id ? 'Landowner' : 'Renter'} · {l.leaseStatus}</p><p>{l.leaseEndDate ? `Until ${l.leaseEndDate.slice(0, 10)}` : `${l.leaseDurationMonths} months`}</p></div><button className="btn-secondary" onClick={() => void inspect(l)}>Manage</button></div>)}{!mine.length && <EmptyState>No listings or rentals yet.</EmptyState>}</div>}</InsightPanel></div>
       {selected && <InsightPanel title={`Rental details · ${selected.farm?.farmCode}`} subtitle={`${selected.leaseStatus} · ${selected.priceHidden ? 'Private deal' : money(selected.askingPrice)} · ${selected.leaseDurationMonths} months`}>
         <button className="btn-secondary" onClick={() => setSelected(null)}>Close details</button>
         {locked && <form onSubmit={enterCode} style={{ display: 'grid', gap: 12, maxWidth: 520, margin: '12px 0' }}>

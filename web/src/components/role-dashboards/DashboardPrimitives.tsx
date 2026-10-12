@@ -35,6 +35,47 @@ export function MetricTileSkeleton() {
   );
 }
 
+export function StatGridSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <>
+      {[...Array(count)].map((_, i) => (
+        <MetricTileSkeleton key={i} />
+      ))}
+    </>
+  );
+}
+
+export function TableSkeleton({
+  rows = 8,
+  avatar = true,
+  columns = 2,
+}: {
+  rows?: number;
+  avatar?: boolean;
+  columns?: number;
+}) {
+  return (
+    <div className="farmers-skeleton" aria-hidden="true">
+      {[...Array(rows)].map((_, i) => (
+        <div key={i} className="farmers-skeleton-row">
+          {avatar && <div className="skeleton" style={{ width: 36, height: 36, borderRadius: 999 }} />}
+          <div style={{ flex: 1 }}>
+            <div className="skeleton skeleton-text" style={{ width: '38%', marginBottom: 8 }} />
+            <div className="skeleton skeleton-text" style={{ width: '22%' }} />
+          </div>
+          {[...Array(columns)].map((__, c) => (
+            <div key={c} className="skeleton skeleton-text" style={{ width: c % 2 === 0 ? 72 : 88 }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ChartSkeleton({ height = 220 }: { height?: number }) {
+  return <div className="skeleton" aria-hidden="true" style={{ height, borderRadius: 12 }} />;
+}
+
 export function InsightPanel({
   title,
   subtitle,

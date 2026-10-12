@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { apiErrorMessage } from '@/lib/api-error';
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
@@ -111,7 +112,7 @@ export default function BuyerOrdersPage() {
       <div className="table-panel">
         <div className="section-toolbar"><strong>Buyer Orders</strong><span className="muted">{orders.length} shown</span></div>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading buyer orders…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : orders.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No buyer orders yet.</div>
         ) : (

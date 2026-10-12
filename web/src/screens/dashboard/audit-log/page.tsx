@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { auditLogsApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-error';
@@ -59,7 +60,7 @@ export default function AuditLogPage() {
           <table className="data-table ua-table">
             <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Record</th><th /></tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={5} className="ua-empty">Loading…</td></tr>
+              {loading ? <tr><td colSpan={5}><TableSkeleton rows={6} avatar={false} /></td></tr>
                 : rows.length === 0 ? <tr><td colSpan={5} className="ua-empty"><strong>Nothing recorded</strong>Changes will appear here.</td></tr>
                 : rows.map((r) => (
                   <Fragment key={r.id}>

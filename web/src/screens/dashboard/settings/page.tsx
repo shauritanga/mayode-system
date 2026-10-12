@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { locationsApi, partnerApi, settingsApi } from '@/lib/api';
@@ -185,7 +186,7 @@ function OrgProfileTab() {
     } finally { setSaving(false); }
   };
 
-  if (loading) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>Loading…</div>;
+  if (loading) return <TableSkeleton rows={6} avatar={false} />;
 
   return <form onSubmit={save} className="action-panel" style={{ marginTop: 16, maxWidth: 560 }}>
     <div className="panel-header"><h2 className="panel-title">Organization profile</h2></div>
@@ -234,7 +235,7 @@ function SalesRulesTab() {
     } finally { setSaving(false); }
   };
 
-  if (loading) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>Loading…</div>;
+  if (loading) return <TableSkeleton rows={6} avatar={false} />;
 
   return <form onSubmit={save} className="action-panel" style={{ marginTop: 16, maxWidth: 560 }}>
     <div className="panel-header"><h2 className="panel-title">Sales &amp; warehouse rules</h2></div>
@@ -317,7 +318,7 @@ function NotificationTemplatesTab() {
     <div className="table-panel" style={{ marginTop: 16 }}>
       <div className="section-toolbar"><strong>Templates</strong><span className="muted">{templates.length} shown</span></div>
       {loading ? (
-        <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>Loading…</div>
+        <TableSkeleton rows={6} avatar={false} />
       ) : templates.length === 0 ? (
         <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>No notification templates yet.</div>
       ) : (
@@ -461,7 +462,7 @@ function PartnerApiTab() {
           <span className="muted">{keys.length} total</span>
         </div>
         {loading ? (
-          <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>Loading…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : keys.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>
             No partner keys yet.

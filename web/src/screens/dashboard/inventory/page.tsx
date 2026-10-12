@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -777,16 +778,7 @@ export default function InventoryPage() {
           <span className="muted">{filtered.length} shown</span>
         </div>
         {loading ? (
-          <div
-            style={{
-              padding: '48px',
-              textAlign: 'center',
-              color: 'var(--neutral-500)',
-              fontSize: '14px',
-            }}
-          >
-            Loading inventory…
-          </div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : filtered.length === 0 ? (
           <div
             style={{

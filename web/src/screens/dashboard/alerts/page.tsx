@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import ErrorBanner from '@/components/ErrorBanner';
 import { apiErrorMessage } from '@/lib/api-error';
 import { useEffect, useState } from 'react';
@@ -90,7 +91,7 @@ export default function AlertsPage() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading alerts…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : alerts.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No alerts yet. Run the generator to create rule-based alerts from crop-cycle data.</div>
         ) : (

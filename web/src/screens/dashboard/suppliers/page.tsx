@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { suppliersApi } from '@/lib/api';
@@ -262,16 +263,7 @@ export default function SuppliersPage() {
             <span className="muted">{filtered.length} shown</span>
           </div>
           {loading ? (
-            <div
-              style={{
-                padding: '48px',
-                textAlign: 'center',
-                color: 'var(--neutral-500)',
-                fontSize: '14px',
-              }}
-            >
-              Loading suppliers…
-            </div>
+            <TableSkeleton rows={6} avatar={false} />
           ) : filtered.length === 0 ? (
             <div
               style={{

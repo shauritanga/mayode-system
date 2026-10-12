@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { farmCorrectionsApi } from '@/lib/api';
 
@@ -89,7 +90,7 @@ export default function CorrectionsPage() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : tab === 'suggestions' ? (
           updates.length === 0 ? (
             <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No suggested corrections yet.</div>

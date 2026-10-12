@@ -26,7 +26,7 @@ import {
   YAxis,
 } from 'recharts';
 import { CountUpValue } from '@/components/CountUpValue';
-import { EmptyState, money } from '@/components/role-dashboards/DashboardPrimitives';
+import { ChartSkeleton, EmptyState, TableSkeleton, money } from '@/components/role-dashboards/DashboardPrimitives';
 import { CHART_PALETTE } from '@/components/role-dashboards/Charts';
 import {
   cropCyclesApi,
@@ -482,7 +482,7 @@ export default function AdminOverviewDashboard() {
             <div className="fv-production-body">
               <div className="fv-donut-wrap">
                 {loading ? (
-                  <div className="fv-chart-empty">Loading…</div>
+                  <ChartSkeleton height={180} />
                 ) : !productionLegend.some((r) => r.value > 0) ? (
                   <div className="fv-chart-empty">No production yet</div>
                 ) : (
@@ -574,8 +574,10 @@ export default function AdminOverviewDashboard() {
               <span className="fv-chip">{today.getFullYear()}</span>
             </div>
           </div>
-          {loading || !yieldTrend.length ? (
-            <div className="fv-chart-empty">{loading ? 'Loading yield trend…' : 'No yield records yet.'}</div>
+          {loading ? (
+            <ChartSkeleton height={260} />
+          ) : !yieldTrend.length ? (
+            <div className="fv-chart-empty">No yield records yet.</div>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <AreaChart data={yieldTrend} margin={{ top: 46, right: 12, left: -8, bottom: 0 }}>
@@ -704,7 +706,7 @@ export default function AdminOverviewDashboard() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={4}>Loading tasks…</td></tr>
+                  <tr><td colSpan={4}><TableSkeleton rows={4} avatar={false} /></td></tr>
                 ) : tasks.length === 0 ? (
                   <tr><td colSpan={4}>No open tasks right now.</td></tr>
                 ) : (
@@ -732,7 +734,7 @@ export default function AdminOverviewDashboard() {
           </div>
           <ul className="fv-harvest-list">
             {loading ? (
-              <li className="fv-harvest-empty">Loading harvest…</li>
+              <li className="fv-harvest-empty"><TableSkeleton rows={3} avatar={false} columns={1} /></li>
             ) : harvestSummary.length === 0 ? (
               <li className="fv-harvest-empty">No harvest records yet.</li>
             ) : (

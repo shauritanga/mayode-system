@@ -9,7 +9,7 @@ import ErrorBanner from '@/components/ErrorBanner';
 import { useAuthStore } from '@/store/auth.store';
 import { hasPermission } from '@/lib/nav';
 import Modal from '@/components/Modal';
-import { MetricTile, MetricTileSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
+import { MetricTile, MetricTileSkeleton, TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
 interface Role {
   id: string;
@@ -342,19 +342,7 @@ export default function RolesPage() {
         </div>
 
         {loading ? (
-          <div className="farmers-skeleton">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="farmers-skeleton-row">
-                <div className="skeleton" style={{ width: 36, height: 36, borderRadius: 999 }} />
-                <div style={{ flex: 1 }}>
-                  <div className="skeleton skeleton-text" style={{ width: '38%', marginBottom: 8 }} />
-                  <div className="skeleton skeleton-text" style={{ width: '22%' }} />
-                </div>
-                <div className="skeleton skeleton-text" style={{ width: 72 }} />
-                <div className="skeleton skeleton-text" style={{ width: 88 }} />
-              </div>
-            ))}
-          </div>
+          <TableSkeleton rows={6} />
         ) : filtered.length === 0 ? (
           <div className="builder-empty farmers-empty">
             <span className="icon-chip" style={{ width: 52, height: 52, borderRadius: 16 }}>

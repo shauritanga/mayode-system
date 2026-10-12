@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { facilitiesApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-error';
@@ -124,7 +125,7 @@ export default function FacilitiesPage() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)' }}>Loading…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : rows.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)' }}>No records yet.</div>
         ) : (

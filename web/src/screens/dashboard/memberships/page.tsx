@@ -12,7 +12,7 @@ import {
 import { membershipsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import Modal from '@/components/Modal';
-import { MetricTile, MetricTileSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
+import { MetricTile, MetricTileSkeleton, TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
 const PAGE_SIZE = 10;
 
@@ -369,19 +369,7 @@ export default function MembershipsPage() {
         )}
 
         {loading ? (
-          <div className="farmers-skeleton">
-            {[...Array(PAGE_SIZE)].map((_, i) => (
-              <div key={i} className="farmers-skeleton-row">
-                <div className="skeleton" style={{ width: 36, height: 36, borderRadius: 999 }} />
-                <div style={{ flex: 1 }}>
-                  <div className="skeleton skeleton-text" style={{ width: '38%', marginBottom: 8 }} />
-                  <div className="skeleton skeleton-text" style={{ width: '22%' }} />
-                </div>
-                <div className="skeleton skeleton-text" style={{ width: 72 }} />
-                <div className="skeleton skeleton-text" style={{ width: 88 }} />
-              </div>
-            ))}
-          </div>
+          <TableSkeleton rows={PAGE_SIZE} />
         ) : tab === 'members' ? (
           filtered.length === 0 ? (
             <div className="builder-empty farmers-empty">

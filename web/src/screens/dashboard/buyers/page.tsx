@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { buyersApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-error';
@@ -104,7 +105,7 @@ export default function BuyersPage() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)' }}>Loading buyers…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : rows.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)' }}>No buyers found.</div>
         ) : (

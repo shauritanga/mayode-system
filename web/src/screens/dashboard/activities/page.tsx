@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { cropCyclesApi } from '@/lib/api';
 
@@ -108,7 +109,7 @@ export default function ActivitiesPage() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading activities…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : filtered.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>
             {search || typeFilter ? 'No activities match your filters.' : 'No activity records yet.'}

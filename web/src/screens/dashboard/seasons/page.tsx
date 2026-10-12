@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { farmingSeasonsApi, mamcosApi } from '@/lib/api';
 import Modal from '@/components/Modal';
@@ -169,7 +170,7 @@ export default function SeasonsPage() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading seasons…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : seasons.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No farming seasons configured yet.</div>
         ) : (

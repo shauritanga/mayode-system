@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { marketplaceApi } from '@/lib/api';
 import Modal from '@/components/Modal';
@@ -743,7 +744,7 @@ export default function MarketplacePage() {
           footer={<button className="btn-secondary" onClick={() => setBookingsTarget(null)}>Close</button>}
         >
           {bookingsLoading ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>Loading…</div>
+            <TableSkeleton rows={4} avatar={false} />
           ) : (bookingsTarget.bookings || []).length === 0 ? (
             <div style={{ padding: '20px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>No bookings for this tractor yet.</div>
           ) : (
@@ -786,7 +787,7 @@ export default function MarketplacePage() {
         >
           <TextField label="Owner (Farmer) ID — confirms decisions on their behalf" value={offerOwnerId} onChange={setOfferOwnerId} placeholder="farmer-uuid" />
           {offersLoading ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>Loading…</div>
+            <TableSkeleton rows={4} avatar={false} />
           ) : offers.length === 0 ? (
             <div style={{ padding: '20px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>No offers yet.</div>
           ) : (
@@ -830,7 +831,7 @@ export default function MarketplacePage() {
           footer={<button className="btn-secondary" onClick={() => setScheduleTarget(null)}>Close</button>}
         >
           {scheduleLoading ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>Loading…</div>
+            <TableSkeleton rows={4} avatar={false} />
           ) : !schedule ? (
             <div style={{ padding: '20px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>No schedule available.</div>
           ) : (
@@ -858,7 +859,7 @@ export default function MarketplacePage() {
       )}
 
       {loading ? (
-        <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading marketplace data…</div>
+        <TableSkeleton rows={6} avatar={false} />
       ) : (
         <>
           {/* Land Listings */}

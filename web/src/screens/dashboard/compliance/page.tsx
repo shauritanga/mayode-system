@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
 import { useEffect, useState } from 'react';
 import { reportsApi } from '@/lib/api';
@@ -73,7 +74,7 @@ export default function CompliancePage() {
       </div>
     </div>
     {error && <p style={{ color: 'var(--red-400)' }}>{error}</p>}
-    {!summary && !error && <p style={{ color: 'var(--neutral-500)' }}>Loading compliance indicators…</p>}
+    {!summary && !error && <TableSkeleton rows={4} avatar={false} />}
     <div className="metric-grid">
       {cards.map(([label, value, sub]) => <div key={label} className="stat-card" style={{ padding: 22 }}>
         <div style={{ color: 'var(--neutral-500)', fontSize: 13 }}>{label}</div>

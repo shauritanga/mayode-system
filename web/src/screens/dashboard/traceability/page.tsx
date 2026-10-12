@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
 import { Suspense } from 'react';
 import TraceabilityClient from './TraceabilityClient';
@@ -8,7 +9,7 @@ export default function TraceabilityPage() {
     <Suspense
       fallback={
         <div className="page-shell">
-          <p className="muted">Loading traceability…</p>
+          <TableSkeleton rows={4} avatar={false} />
         </div>
       }
     >

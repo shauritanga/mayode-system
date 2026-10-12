@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
 import { useCallback, useEffect, useState } from 'react';
 import { riceProtocolsApi, riceVarietiesApi } from '@/lib/api';
@@ -113,7 +114,7 @@ export default function RiceCalendarPage() {
     return `${rule.label || 'Measurement'}${range}${rule.unit ? ` ${rule.unit}` : ''}`;
   };
 
-  if (loading) return <div style={{ padding: 32 }}>Loading rice calendar…</div>;
+  if (loading) return <div style={{ padding: 32 }}><TableSkeleton rows={6} avatar={false} /></div>;
   if (!isPlatform && !mamcosId) return <div className="page-shell"><h1 className="page-title">Rice Calendar</h1><p>Your account is not attached to a cooperative.</p></div>;
 
   return <div className="page-shell">

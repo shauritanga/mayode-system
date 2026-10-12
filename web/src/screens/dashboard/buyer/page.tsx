@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
 import { FormEvent, useEffect, useState } from 'react';
 import { buyerPortalApi } from '@/lib/api';
@@ -103,7 +104,7 @@ export default function BuyerPage() {
       )}
 
       {!data ? (
-        <p className="muted">Loading…</p>
+        <TableSkeleton rows={4} avatar={false} />
       ) : (
         <>
           {matched && metrics && (

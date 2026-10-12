@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { mamcosApi } from '@/lib/api';
@@ -53,7 +54,7 @@ export default function StaffPage() {
       {message && <div className="glass-card" style={{ padding: '12px 16px', marginBottom: '16px', color: 'var(--accent)' }}>{message}</div>}
 
       {loading ? (
-        <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading staff…</div>
+        <TableSkeleton rows={6} avatar={false} />
       ) : (
         <div className="glass-card" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -601,9 +602,7 @@ export default function AiInsightsPage() {
           </select>
         </div>
         {loading ? (
-          <p className="muted" style={{ padding: 24 }}>
-            Loading…
-          </p>
+          <TableSkeleton rows={5} avatar={false} />
         ) : !records.length ? (
           <p className="muted" style={{ padding: 24 }}>
             No AI integration records yet. Generate an advisory or store

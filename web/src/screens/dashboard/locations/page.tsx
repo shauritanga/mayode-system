@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { locationsApi } from '@/lib/api';
 
@@ -91,7 +92,7 @@ export default function LocationsPage() {
           </div>
           <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
             {loading ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>Loading…</div>
+              <TableSkeleton rows={4} avatar={false} />
             ) : filteredRegions.map(r => (
               <button
                 key={r.id}
@@ -124,7 +125,7 @@ export default function LocationsPage() {
             {!selectedRegion ? (
               <div style={{ padding: '24px', textAlign: 'center', color: 'var(--neutral-600)', fontSize: '13px' }}>← Select a region</div>
             ) : loadingDistricts ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>Loading…</div>
+              <TableSkeleton rows={4} avatar={false} />
             ) : districts.map(d => (
               <button
                 key={d.id}
@@ -157,7 +158,7 @@ export default function LocationsPage() {
             {!selectedDistrict ? (
               <div style={{ padding: '24px', textAlign: 'center', color: 'var(--neutral-600)', fontSize: '13px' }}>← Select a district</div>
             ) : loadingWards ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>Loading…</div>
+              <TableSkeleton rows={4} avatar={false} />
             ) : wards.length === 0 ? (
               <div style={{ padding: '24px', textAlign: 'center', color: 'var(--neutral-600)', fontSize: '13px' }}>No wards found.</div>
             ) : wards.map(w => (

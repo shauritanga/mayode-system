@@ -4,7 +4,7 @@ import { governanceApi } from '@/lib/api';
 import { hasPermission } from '@/lib/nav';
 import { apiError } from '@/lib/download';
 import { useAuthStore } from '@/store/auth.store';
-import { EmptyState, InsightPanel, money } from '@/components/role-dashboards/DashboardPrimitives';
+import { EmptyState, InsightPanel, money, TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
 type Milestone = { title: string; completed: boolean };
 type Project = { id: string; name: string; fundingSource: string; budget: number; spentAmount: number; status: string; milestones?: { items?: Milestone[] } };
@@ -20,7 +20,7 @@ export default function ProjectsPage() {
   return <div className="page-shell"><h1 className="page-title">Community projects</h1><p className="page-subtitle">Track funding, expenditure, delivery milestones, and decisions visible to members.</p>
     {error && <div className="alert-box alert-danger" role="alert">{error}<button className="btn-secondary" onClick={() => void load()}>Retry</button></div>}
     {hasPermission(user, 'governance', 'CREATE') && <InsightPanel title="Create project"><form className="form-grid" onSubmit={create}><label className="form-label">Project name<input className="input-field" required value={name} onChange={(e) => setName(e.target.value)} /></label><label className="form-label">Funding source<input className="input-field" required value={funding} onChange={(e) => setFunding(e.target.value)} /></label><label className="form-label">Budget (TZS)<input className="input-field" required type="number" min="0.01" step="0.01" value={budget} onChange={(e) => setBudget(e.target.value)} /></label><label className="form-label form-grid-wide">Milestones (one per line)<textarea className="input-field" value={milestones} onChange={(e) => setMilestones(e.target.value)} /></label><button className="btn-primary" disabled={busy}>Create project</button></form></InsightPanel>}
-    {loading ? <p>Loading projects…</p> : projects.map((p) => <InsightPanel key={p.id} title={p.name} subtitle={p.fundingSource}><ProjectEditor project={p} busy={busy} editable={hasPermission(user, 'governance', 'EDIT')} onSave={(data) => action(() => governanceApi.updateProject(p.id, data))} />{hasPermission(user, 'governance', 'DELETE') && <button className="btn-secondary" disabled={busy} onClick={() => { if (window.confirm(`Delete project “${p.name}”?`)) void action(() => governanceApi.removeProject(p.id)); }}>Delete project</button>}</InsightPanel>)}
+    {loading ? <TableSkeleton rows={4} avatar={false} /> : projects.map((p) => <InsightPanel key={p.id} title={p.name} subtitle={p.fundingSource}><ProjectEditor project={p} busy={busy} editable={hasPermission(user, 'governance', 'EDIT')} onSave={(data) => action(() => governanceApi.updateProject(p.id, data))} />{hasPermission(user, 'governance', 'DELETE') && <button className="btn-secondary" disabled={busy} onClick={() => { if (window.confirm(`Delete project “${p.name}”?`)) void action(() => governanceApi.removeProject(p.id)); }}>Delete project</button>}</InsightPanel>)}
     {!loading && !projects.length && <EmptyState>No community projects recorded.</EmptyState>}
   </div>;
 }

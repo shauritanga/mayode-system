@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
 import { useEffect, useState } from 'react';
 import { reportsApi } from '@/lib/api';
@@ -140,7 +141,7 @@ export default function GrantorImpactPage() {
       </div>
 
       {error && <div className="alert-box alert-danger">{error}</div>}
-      {loading && <p className="muted">Loading impact pack…</p>}
+      {loading && <TableSkeleton rows={4} avatar={false} />}
 
       {data && (
         <>

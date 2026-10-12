@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { EmptyState, InsightPanel, MetricTile, money } from '@/components/role-dashboards/DashboardPrimitives';
+import { EmptyState, InsightPanel, MetricTile, money, TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { financeApi } from '@/lib/api';
 import { downloadCsv } from '@/lib/download';
 import { CostForm, RevenueForm } from '../FarmerForms';
@@ -17,7 +17,7 @@ export default function FarmerFinancePage() {
     const date = (p.paidAt || p.createdAt).slice(0, 10);
     return (!from || date >= from) && (!to || date <= to);
   });
-  if (loading && !profile) return <p>Loading your financial history…</p>;
+  if (loading && !profile) return <TableSkeleton rows={5} avatar={false} />;
   return <div className="page-shell">
     <div><h1 className="page-title">My finances</h1><p className="page-subtitle">Production costs, sales, payment clearance, loans and premium contributions.</p></div>
     <div className="role-grid">

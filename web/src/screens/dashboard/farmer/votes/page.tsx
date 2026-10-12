@@ -1,12 +1,12 @@
 'use client';
-import { EmptyState, InsightPanel } from '@/components/role-dashboards/DashboardPrimitives';
+import { EmptyState, InsightPanel, TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { governanceApi } from '@/lib/api';
 import { useFarmerData } from '../FarmerDataContext';
 
 export default function FarmerVotesPage() {
   const { votes, run, busy, loading } = useFarmerData();
   return <InsightPanel title="Member voting" subtitle="Cast one vote on cooperative decisions and review published outcomes.">
-    {loading && <p>Loading decisions…</p>}
+    {loading && <TableSkeleton rows={3} avatar={false} />}
     <div className="role-list">{votes.map((vote) => {
       const now = Date.now();
       const open = vote.status === 'OPEN' && new Date(vote.opensAt).getTime() <= now && new Date(vote.closesAt).getTime() >= now;

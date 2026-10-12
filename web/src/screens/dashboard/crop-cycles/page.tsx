@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { cropCyclesApi } from '@/lib/api';
@@ -138,7 +139,7 @@ export default function CropCyclesPage() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading crop cycles…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : filtered.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No crop cycles found.</div>
         ) : (

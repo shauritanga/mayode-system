@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import ErrorBanner from '@/components/ErrorBanner';
 import { apiErrorMessage } from '@/lib/api-error';
 import { useEffect, useState } from 'react';
@@ -351,7 +352,7 @@ function LedgerTab() {
       </div>
 
       {loading ? (
-        <div className="glass-card" style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>Loading trial balance…</div>
+        <TableSkeleton rows={6} avatar={false} />
       ) : (
         <>
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
@@ -460,7 +461,7 @@ function ReceivablesTab() {
       )}
 
       {loading ? (
-        <div className="glass-card" style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>Loading invoices…</div>
+        <TableSkeleton rows={6} avatar={false} />
       ) : invoices.length === 0 ? (
         <div className="glass-card" style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>No open invoices.</div>
       ) : (
@@ -583,7 +584,7 @@ function PayablesTab() {
       )}
 
       {loading ? (
-        <div className="glass-card" style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>Loading bills…</div>
+        <TableSkeleton rows={6} avatar={false} />
       ) : bills.length === 0 ? (
         <div className="glass-card" style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>No open bills.</div>
       ) : (
@@ -741,7 +742,7 @@ function BudgetsTab() {
       )}
 
       {loading ? (
-        <div className="glass-card" style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>Loading budgets…</div>
+        <TableSkeleton rows={6} avatar={false} />
       ) : budgets.length === 0 ? (
         <div className="glass-card" style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>No budgets yet.</div>
       ) : (
@@ -861,7 +862,7 @@ function LoansTab() {
       )}
 
       {loading ? (
-        <div className="glass-card" style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)' }}>Loading…</div>
+        <TableSkeleton rows={6} avatar={false} />
       ) : (
         <>
           <div className="table-panel" style={{ marginBottom: 20 }}>

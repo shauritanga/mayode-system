@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { weatherApi } from '@/lib/api';
 import Modal from '@/components/Modal';
@@ -120,7 +121,7 @@ export default function WeatherPage() {
         </div>
 
         {forecastLoading ? (
-          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>Loading live forecast…</div>
+          <TableSkeleton rows={3} avatar={false} />
         ) : forecastError ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--red-400)', fontSize: '13px' }}>{forecastError}</div>
         ) : forecast ? (

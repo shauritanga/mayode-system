@@ -1,4 +1,5 @@
 'use client';
+import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import ErrorBanner from '@/components/ErrorBanner';
 import { apiErrorMessage } from '@/lib/api-error';
 import { Fragment, useEffect, useState } from 'react';
@@ -221,7 +222,7 @@ export default function RewardsPage() {
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading campaigns…</div>
+          <TableSkeleton rows={6} avatar={false} />
         ) : campaigns.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>No reward campaigns yet.</div>
         ) : (

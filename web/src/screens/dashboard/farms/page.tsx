@@ -7,7 +7,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { Search01Icon, Cancel01Icon, MapsIcon, ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import { farmsApi } from '@/lib/api';
 import { isFarmBoundaryMapped } from '@/lib/farm-geo';
-import { MetricTile, MetricTileSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
+import { MetricTile, MetricTileSkeleton, TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
 const FarmsMap = dynamic(() => import('@/components/FarmsMap'), { ssr: false, loading: () => <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>Loading map…</div> });
 
@@ -218,19 +218,7 @@ export default function FarmsPage() {
             </div>
           )
         ) : loading ? (
-          <div className="farmers-skeleton">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="farmers-skeleton-row">
-                <div className="skeleton" style={{ width: 36, height: 36, borderRadius: 999 }} />
-                <div style={{ flex: 1 }}>
-                  <div className="skeleton skeleton-text" style={{ width: '38%', marginBottom: 8 }} />
-                  <div className="skeleton skeleton-text" style={{ width: '22%' }} />
-                </div>
-                <div className="skeleton skeleton-text" style={{ width: 72 }} />
-                <div className="skeleton skeleton-text" style={{ width: 88 }} />
-              </div>
-            ))}
-          </div>
+          <TableSkeleton rows={8} />
         ) : filtered.length === 0 ? (
           <div className="builder-empty farmers-empty">
             <span className="icon-chip" style={{ width: 52, height: 52, borderRadius: 16 }}>
