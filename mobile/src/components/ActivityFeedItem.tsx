@@ -51,24 +51,22 @@ export function ActivityFeedItem({ item, showRail = true, isLast = false, onPres
       </View>
 
       <View style={[styles.body, isLast && styles.bodyLast]}>
-        <View style={styles.topLine}>
-          <Text style={styles.title} numberOfLines={2}>{text.title || '—'}</Text>
-          {!!item.createdAt && (
-            <Text style={styles.time}>{timeAgo(item.createdAt, t)}</Text>
-          )}
-        </View>
+        <Text style={styles.title} numberOfLines={3}>{text.title || '—'}</Text>
 
-        {(!!text.subtitle || !!tag) && (
+        {(!!tag || !!item.createdAt) && (
           <View style={styles.metaRow}>
             {!!tag && (
               <View style={[styles.tag, { backgroundColor: tone.well }]}>
                 <Text style={[styles.tagText, { color: tone.label }]}>{tag}</Text>
               </View>
             )}
-            {!!text.subtitle && (
-              <Text style={styles.subtitle} numberOfLines={1}>{text.subtitle}</Text>
+            {!!item.createdAt && (
+              <Text style={styles.time}>{timeAgo(item.createdAt, t)}</Text>
             )}
           </View>
+        )}
+        {!!text.subtitle && (
+          <Text style={styles.subtitle} numberOfLines={2}>{text.subtitle}</Text>
         )}
       </View>
     </>
@@ -129,7 +127,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   title: {
-    flex: 1,
     fontSize: 15,
     fontWeight: '600',
     color: '#111827',
@@ -140,7 +137,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     color: '#9CA3AF',
-    marginTop: 2,
   },
   metaRow: {
     flexDirection: 'row',
@@ -160,7 +156,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   subtitle: {
-    flex: 1,
+    marginTop: 4,
     fontSize: 12,
     color: '#6B7280',
     lineHeight: 16,

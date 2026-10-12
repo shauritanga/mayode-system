@@ -51,6 +51,67 @@ function tidy(text: string): string {
     .join(' · ');
 }
 
+const num = (s: string) => Number(s.replace(/,/g, ''));
+
+/**
+ * Activities saved before facts were stored hold a finished English sentence. The server always wrote
+ * them from the same templates, so the facts can be read back out of that sentence.
+ */
+export function legacyParams(item: ActivityLike): Record<string, unknown> | null {
+  const title = (item.title ?? '').trim();
+  const sub = (item.subtitle ?? '').trim();
+  let m: RegExpExecArray | null;
+  switch (item.type) {
+    case 'farm.created':
+      return (m = /^Registered farm (.+)$/.exec(title)) ? { farmCode: m[1], place: sub === 'New farm' ? '' : sub } : null;
+    case 'farm.mapped':
+      return (m = /^Mapped (.+) boundary$/.exec(title)) ? { farmCode: m[1] } : null;
+    case 'plot.created':
+      return (m = /^Added plot (.+)$/.exec(title)) ? { plotCode: m[1], farmCode: sub.replace(/^on /, '') } : null;
+    case 'plot.mapped':
+      return (m = /^Mapped (.+) boundary$/.exec(title)) ? { plotCode: m[1] } : null;
+    case 'document.added':
+      return (m = /^Uploaded (.+)$/.exec(title))
+        ? { docType: m[1].trim().toUpperCase().replace(/\s+/g, '_'), fileName: sub === 'File attached' ? '' : sub }
+        : null;
+    case 'crop_cycle.started': {
+      if (!(m = /^Started crop cycle: (.+)$/.exec(title))) return null;
+      const [farmCode, variety] = sub.split(' · ');
+      return { season: m[1], farmCode: farmCode ?? '', variety: variety ?? '' };
+    }
+    case 'crop_cycle.status':
+      return (m = /^(.+) is now (\w+)$/.exec(title)) ? { season: m[1], status: m[2].toUpperCase(), farmCode: sub } : null;
+    case 'crop_cycle.activity': {
+      if (!(m = /^Logged (.+)$/.exec(title))) return null;
+      const [farmCode, season] = sub.split(' · ');
+      return { activityType: m[1].trim().toUpperCase().replace(/\s+/g, '_'), farmCode: farmCode ?? '', season: season ?? '' };
+    }
+    case 'inventory.received': {
+      if (title !== 'Harvest received at warehouse' || !(m = /^([\d.,]+) kg · ([^·]+?)(?: · (.+))?$/.exec(sub))) return null;
+      return { weightKg: num(m[1]), trackingCode: m[2], farmCode: m[3] ?? '' };
+    }
+    case 'officer.visit':
+      return title === 'Field officer visited you' ? { note: sub } : null;
+    case 'expense.added': {
+      if (!(m = /^Recorded expense: (.+)$/.exec(title))) return null;
+      const s = /^TZS ([\d.,]+) · (.+)$/.exec(sub);
+      return { item: m[1], amount: s ? num(s[1]) : '', farmCode: s ? s[2] : '' };
+    }
+    case 'revenue.added': {
+      if (!(m = /^Sale recorded: ([\d.,]+)kg$/.exec(title))) return null;
+      const s = /^TZS ([\d.,]+) · (.+)$/.exec(sub);
+      return { quantityKg: num(m[1]), amount: s ? num(s[1]) : '', farmCode: s ? s[2] : '' };
+    }
+    case 'sale.apportioned': {
+      if (!(m = /^Cooperative sale recorded: (.+)$/.exec(title))) return null;
+      const s = /^TZS ([\d.,]+) pending payment$/.exec(sub);
+      return { invoice: m[1], amount: s ? num(s[1]) : '' };
+    }
+    default:
+      return null;
+  }
+}
+
 /**
  * The activity's wording in the app language. Activities saved with facts (`params`) are built from
  * translated templates; older ones fall back to the English sentence the server stored.
@@ -64,11 +125,12 @@ export function activityText(
   const base = `act_${slug(type)}`;
   const fallbackTag = type ? (type.split('.').pop() ?? type).replace(/_/g, ' ') : null;
 
-  if (!type || !item.params || !hasTranslation(`${base}_t`)) {
+  const params = item.params ?? legacyParams(item);
+  if (!type || !params || !hasTranslation(`${base}_t`)) {
     return { title: item.title ?? '', subtitle: item.subtitle ?? '', tag: hasTranslation(`act_tag_${slug(type)}`) ? t(`act_tag_${slug(type)}` as TranslationKey) : fallbackTag };
   }
 
-  const p = item.params;
+  const p = params;
   const vars: Record<string, string | number> = {};
   for (const [k, v] of Object.entries(p)) vars[k] = v == null ? '' : String(v);
   if ('amount' in p) vars.amount = formatNumber(p.amount, language);

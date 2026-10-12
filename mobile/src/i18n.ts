@@ -1615,7 +1615,7 @@ const sw: Record<keyof typeof en, string> = {
   act_document_added_s: '{fileName}',
   act_crop_cycle_started_t: 'Msimu umeanza: {season}',
   act_crop_cycle_started_s: '{farmCode} · {variety}',
-  act_crop_cycle_status_t: '{season} sasa ni {status}',
+  act_crop_cycle_status_t: 'Msimu {season} sasa {status}',
   act_crop_cycle_status_s: '{farmCode}',
   act_crop_cycle_activity_t: 'Umerekodi {activityType}',
   act_crop_cycle_activity_s: '{farmCode} · {season}',
