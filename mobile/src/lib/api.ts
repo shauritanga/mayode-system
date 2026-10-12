@@ -244,8 +244,8 @@ export const authApi = {
   register: (data: { phone: string; password: string; firstName: string; lastName: string; dataShareConsent: boolean; region?: string; district?: string; ward?: string; village?: string }) =>
     api.post('/auth/register', data),
   /** Passwordless sign-in: text a 6-digit code, then check it. A new number gets a registrationToken. */
-  requestOtp: (phone: string) =>
-    api.post<{ sent: true; resendInSeconds: number; expiresInSeconds: number; devCode?: string }>('/auth/otp/request', { phone }),
+  requestOtp: (phone: string, intent?: 'login' | 'register') =>
+    api.post<{ sent: true; resendInSeconds: number; expiresInSeconds: number; devCode?: string }>('/auth/otp/request', { phone, intent }),
   verifyOtp: (phone: string, code: string) =>
     api.post('/auth/otp/verify', { phone, code }),
   registerWithOtp: (data: { phone: string; registrationToken: string; firstName: string; lastName: string; dataShareConsent: boolean; region?: string; district?: string; ward?: string; village?: string }) =>

@@ -1,6 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OmitType } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Length, Matches } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, Length, Matches } from 'class-validator';
 import { FarmerSelfRegisterDto } from './auth.dto';
 
 const PHONE = /^\+?[0-9\s-]{9,16}$/;
@@ -10,6 +10,14 @@ export class RequestOtpDto {
   @IsString()
   @Matches(PHONE, { message: 'Enter a valid phone number' })
   phone: string;
+
+  @ApiPropertyOptional({
+    enum: ['login', 'register'],
+    description: 'What the person chose: "login" needs an existing account, "register" needs a number with none. Omit for the old combined flow.',
+  })
+  @IsOptional()
+  @IsIn(['login', 'register'])
+  intent?: 'login' | 'register';
 }
 
 export class VerifyOtpDto extends RequestOtpDto {

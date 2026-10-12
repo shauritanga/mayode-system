@@ -51,7 +51,7 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Text a 6-digit sign-in code to a phone number' })
   requestOtp(@Body() dto: RequestOtpDto, @Req() req: Request) {
-    return this.otp.request(dto.phone, req.ip);
+    return this.otp.request(dto.phone, req.ip, dto.intent);
   }
 
   @Post('otp/verify')

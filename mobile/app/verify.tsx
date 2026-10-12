@@ -14,7 +14,7 @@ const CODE_LENGTH = 6;
 
 /** Screen 2 of sign-in: the 6-digit code that was texted to the number from screen 1. */
 export default function VerifyRoute() {
-  const { phone = '', resendIn = '60' } = useLocalSearchParams<{ phone?: string; resendIn?: string }>();
+  const { phone = '', resendIn = '60', mode = 'login' } = useLocalSearchParams<{ phone?: string; resendIn?: string; mode?: string }>();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [seconds, setSeconds] = useState(Number(resendIn) || 60);
@@ -121,7 +121,7 @@ export default function VerifyRoute() {
                 {seconds > 0 ? t('otpResendIn', { seconds }) : t('otpResend')}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.link} onPress={() => router.replace('/login')}>
+            <TouchableOpacity style={styles.link} onPress={() => router.replace(mode === 'register' ? '/signup' : '/login')}>
               <Text style={styles.linkText}>{t('otpChangeNumber')}</Text>
             </TouchableOpacity>
           </View>

@@ -1,9 +1,10 @@
 import { JwtService } from '@nestjs/jwt';
 import { OtpService, OTP_MAX_ATTEMPTS } from './otp.service';
 
-function build(opts: { sms?: boolean; user?: unknown; echo?: boolean } = {}) {
+function build(opts: { sms?: boolean; user?: unknown; echo?: boolean; account?: boolean } = {}) {
   const rows: any[] = [];
   const prisma = {
+    user: { findUnique: jest.fn(async () => (opts.account ? { id: 'u1' } : null)) },
     otpCode: {
       findMany: jest.fn(async ({ where }: any) => rows.filter((r) => r.phone === where.phone).sort((a, b) => b.createdAt - a.createdAt)),
       create: jest.fn(async ({ data }: any) => { const r = { id: `o${rows.length}`, attempts: 0, consumedAt: null, createdAt: new Date(), ...data }; rows.push(r); return r; }),
@@ -27,6 +28,40 @@ function build(opts: { sms?: boolean; user?: unknown; echo?: boolean } = {}) {
 const codeFromSms = (sms: any) => /is (\d{6})\./.exec(sms.sendTransactional.mock.calls.at(-1)[1])![1];
 
 describe('OtpService', () => {
+  it('refuses to log in a number with no account, without sending a code', async () => {
+    const { svc, sms } = build({ account: false });
+    await expect(svc.request('0768680433', undefined, 'login')).rejects.toMatchObject({
+      status: 404,
+      response: { code: 'PHONE_NOT_REGISTERED' },
+    });
+    expect(sms.sendTransactional).not.toHaveBeenCalled();
+  });
+
+  it('refuses to register a number that already has an account, without sending a code', async () => {
+    const { svc, sms } = build({ account: true });
+    await expect(svc.request('0768680433', undefined, 'register')).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'PHONE_ALREADY_REGISTERED' },
+    });
+    expect(sms.sendTransactional).not.toHaveBeenCalled();
+  });
+
+  it('sends a code when the number fits the chosen path', async () => {
+    const login = build({ account: true });
+    await login.svc.request('0768680433', undefined, 'login');
+    expect(login.sms.sendTransactional).toHaveBeenCalledTimes(1);
+    const reg = build({ account: false });
+    await reg.svc.request('0768680433', undefined, 'register');
+    expect(reg.sms.sendTransactional).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the combined flow for older app versions that send no intent', async () => {
+    const { svc, sms, prisma } = build({ account: false });
+    await svc.request('0768680433');
+    expect(sms.sendTransactional).toHaveBeenCalledTimes(1);
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
   it('texts a code, stores only its hash, never logs it', async () => {
     const { svc, sms, rows } = build();
     const r = await svc.request('0768680433');

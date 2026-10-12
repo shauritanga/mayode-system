@@ -1,9 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   HttpStatus,
   Injectable,
   Logger,
+  NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -56,9 +58,28 @@ export class OtpService {
     return createHash('sha256').update(`${pepper}:${phone}:${code}`).digest('hex');
   }
 
-  async request(rawPhone: string, ip?: string): Promise<OtpRequestResult> {
+  async request(rawPhone: string, ip?: string, intent?: 'login' | 'register'): Promise<OtpRequestResult> {
     const phone = normalizeMsisdn(rawPhone);
     const now = new Date();
+
+    // Tell the person up front when the number does not fit what they chose, before any code is sent.
+    if (intent) {
+      const account = await this.prisma.user.findUnique({ where: { phone }, select: { id: true } });
+      if (intent === 'login' && !account) {
+        throw new NotFoundException({
+          statusCode: 404,
+          code: 'PHONE_NOT_REGISTERED',
+          message: 'This number is not registered. Use the correct number, or create an account.',
+        });
+      }
+      if (intent === 'register' && account) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'PHONE_ALREADY_REGISTERED',
+          message: 'This number is already registered. Log in instead.',
+        });
+      }
+    }
 
     const recent = await this.prisma.otpCode.findMany({
       where: { phone, createdAt: { gt: new Date(now.getTime() - 24 * 3_600_000) } },
