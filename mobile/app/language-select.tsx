@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
@@ -14,10 +14,10 @@ const choices: { code: Language; label: string; native: string; flag: string }[]
 export default function LanguageSelectRoute() {
   const router = useRouter();
   const { language, setLanguage, t } = useI18n();
-  const [selected, setSelected] = useState<Language>(language);
+  // The choice applies immediately, so this screen (and everything after it) follows the selected language.
+  const selected: Language = language;
 
   const continueToOnboarding = () => {
-    setLanguage(selected);
     router.replace('/onboarding');
   };
 
@@ -39,7 +39,7 @@ export default function LanguageSelectRoute() {
                 key={choice.code}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: active }}
-                onPress={() => setSelected(choice.code)}
+                onPress={() => setLanguage(choice.code)}
                 style={({ pressed }) => [styles.option, active && styles.optionActive, pressed && styles.optionPressed]}
               >
                 <View>

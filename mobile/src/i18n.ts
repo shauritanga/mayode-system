@@ -11,10 +11,20 @@ interface I18nState {
   setLanguage: (language: Language) => void;
 }
 
+/** Swahili phones start in Swahili; everything else starts in English. A saved choice always wins. */
+function detectDeviceLanguage(): Language {
+  try {
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale ?? '';
+    return locale.toLowerCase().startsWith('sw') ? 'sw' : 'en';
+  } catch {
+    return 'en';
+  }
+}
+
 export const useLanguageStore = create<I18nState>()(
   persist(
     (set) => ({
-      language: 'en',
+      language: detectDeviceLanguage(),
       setLanguage: (language) => set({ language }),
     }),
     {
