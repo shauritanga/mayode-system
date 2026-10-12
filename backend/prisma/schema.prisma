@@ -776,6 +776,8 @@ model Lot {
   lotNumber     String   @unique @map("lot_number") // e.g., LOT-2025-001
   totalWeightKg Float    @map("total_weight_kg")
   riceVariety   String?  @map("rice_variety")
+  /// One grade per lot; null only for legacy lots created before grades were enforced.
+  grade         String?
   /// Warehouse currently holding this lot (null for legacy lots).
   warehouseId   String?  @map("warehouse_id")
   createdAt     DateTime @default(now()) @map("created_at")
@@ -2916,6 +2918,8 @@ model SaleOrder {
   pricePerKg              Float           @map("price_per_kg")
   fairtradePremium        Float?          @map("fairtrade_premium")
   riceVariety             String?         @map("rice_variety")
+  /// Grade the buyer bought; always the lot's grade, so the keeper loads exactly this rice.
+  grade                   String?
   packaging               String?
   status                  SaleOrderStatus @default(RESERVED)
   needsTransport          Boolean         @default(false) @map("needs_transport")

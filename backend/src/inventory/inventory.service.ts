@@ -1,3 +1,4 @@
+import { resolveLotGrade } from '../common/rice-grade';
 import {
   Injectable,
   NotFoundException,
@@ -342,6 +343,12 @@ export class InventoryService {
       totalWeightKg += rec.weightKg;
     }
 
+    // A lot holds one grade, so buyers get exactly the rice their order names.
+    const grade = resolveLotGrade(
+      records.map((r) => r.qualityGrade),
+      createLotDto.grade,
+    );
+
     // A lot is sold from one warehouse, so records received into different warehouses cannot be mixed.
     const warehouseIds = [...new Set(records.map((r) => r.warehouseId))];
     if (warehouseIds.length > 1) {
@@ -356,6 +363,7 @@ export class InventoryService {
         data: {
           lotNumber,
           riceVariety,
+          grade,
           totalWeightKg,
           warehouseId: warehouseIds[0] ?? null,
         },

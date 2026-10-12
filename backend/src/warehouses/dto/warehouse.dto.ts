@@ -47,5 +47,7 @@ export class AdjustStockDto {
 export class MakeLotDto {
   @IsString() @MinLength(3) lotNumber: string;
   @IsOptional() @IsString() riceVariety?: string;
+  /** Required: a lot holds one grade. */
+  @IsString() @MinLength(1) grade: string;
   @IsNumber() @IsPositive() quantityKg: number;
 }

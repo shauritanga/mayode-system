@@ -1,3 +1,4 @@
+import { cleanGrade } from '../common/rice-grade';
 import {
   BadRequestException,
   ConflictException,
@@ -279,6 +280,7 @@ export class WarehousesService {
         data: {
           lotNumber,
           riceVariety: dto.riceVariety,
+          grade: cleanGrade(dto.grade),
           totalWeightKg: dto.quantityKg,
           warehouseId: id,
         },

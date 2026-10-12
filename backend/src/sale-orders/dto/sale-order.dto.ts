@@ -21,6 +21,8 @@ export class CreateSaleOrderDto {
   @IsNumber() @Min(0) pricePerKg: number;
   @IsOptional() @IsNumber() @Min(0) fairtradePremium?: number;
   @IsOptional() @IsString() riceVariety?: string;
+  /** Must match the lot's grade when given; defaults to it. */
+  @IsOptional() @IsString() grade?: string;
   @IsOptional() @IsString() packaging?: string;
   /** The buyer has no vehicle: the warehouse keeper must arrange transport. */
   @IsOptional() @IsBoolean() needsTransport?: boolean;

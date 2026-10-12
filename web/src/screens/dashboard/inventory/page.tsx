@@ -101,6 +101,7 @@ export default function InventoryPage() {
   const [lotForm, setLotForm] = useState({
     lotNumber: '',
     riceVariety: '',
+    grade: '',
     selectedIds: [] as string[],
   });
   const [readiness, setReadiness] = useState<{ ready: boolean; missing: string[] } | null>(null);
@@ -274,9 +275,10 @@ export default function InventoryPage() {
       await inventoryApi.createLot({
         lotNumber: lotForm.lotNumber.trim(),
         riceVariety: variety,
+        grade: lotForm.grade.trim() || undefined,
         inventoryRecordIds: lotForm.selectedIds,
       });
-      setLotForm({ lotNumber: '', riceVariety: '', selectedIds: [] });
+      setLotForm({ lotNumber: '', riceVariety: '', grade: '', selectedIds: [] });
       setLotMessage('Export lot created. Source receipts are now BATCHED.');
       await reload();
     } catch (exception: any) {
@@ -600,6 +602,15 @@ export default function InventoryPage() {
               placeholder="SARO 5"
               value={lotForm.riceVariety}
               onChange={(e) => setLotForm((c) => ({ ...c, riceVariety: e.target.value }))}
+            />
+          </label>
+          <label className="form-label">
+            Grade (only if the receipts are ungraded)
+            <input
+              className="input-field"
+              placeholder="Grade 1"
+              value={lotForm.grade}
+              onChange={(e) => setLotForm((c) => ({ ...c, grade: e.target.value }))}
             />
           </label>
         </div>

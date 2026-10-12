@@ -56,7 +56,8 @@ export interface OrderDetailData {
   createdAt: string;
   buyer: { name: string; contactPerson?: string | null; contactPhone?: string | null };
   warehouse: { name: string; location?: string | null };
-  lot: { lotNumber: string };
+  lot: { lotNumber: string; grade?: string | null };
+  grade?: string | null;
   sale?: { invoiceNumber: string; paymentReceived: boolean } | null;
   loads: OrderLoadRow[];
   payment: { paid: boolean; creditApproved: boolean; releaseApproved: boolean; canRelease: boolean; creditApprovedByName?: string | null; releaseApprovedByName?: string | null };
@@ -106,6 +107,7 @@ td{border:1px solid #999;padding:10px;font-size:15px}td:first-child{width:34%;ba
 <tr><td>Buyer</td><td>${esc(o.buyer.name)}</td></tr>
 <tr><td>Warehouse</td><td>${esc(o.warehouse.name)}</td></tr>
 <tr><td>Lot</td><td>${esc(o.lot.lotNumber)}</td></tr>
+<tr><td>Grade</td><td>${esc(o.grade || o.lot.grade || 'Not recorded')}</td></tr>
 <tr><td>Weight loaded</td><td>${esc(kg(l.weightKg))}${l.bagCount ? ` (${l.bagCount} bags)` : ''}</td></tr>
 <tr><td>Vehicle</td><td>${esc(l.vehiclePlate)}</td></tr>
 <tr><td>Driver</td><td>${esc(l.driverName)}${l.driverPhone ? ` &middot; ${esc(l.driverPhone)}` : ''}</td></tr>
@@ -170,7 +172,7 @@ export default function OrderDetail({ orderId, onChanged }: { orderId: string; o
 
       <dl className="so-grid">
         <div><dt>Buyer</dt><dd>{o.buyer.name}{o.buyer.contactPhone ? ` · ${o.buyer.contactPhone}` : ''}</dd></div>
-        <div><dt>Ordered</dt><dd>{kg(o.quantityKg)}{o.packaging ? ` · ${o.packaging}` : ''} · lot {o.lot.lotNumber}</dd></div>
+        <div><dt>Ordered</dt><dd>{kg(o.quantityKg)}{o.packaging ? ` · ${o.packaging}` : ''} · lot {o.lot.lotNumber}{(o.grade || o.lot.grade) ? ` · ${o.grade || o.lot.grade}` : ''}</dd></div>
         <div><dt>Amount</dt><dd>{money(o.amount)} <span className="ua-hint">({money(o.pricePerKg)}/kg)</span></dd></div>
         <div><dt>Invoice</dt><dd>{o.sale?.invoiceNumber ?? 'Created when confirmed'}</dd></div>
         <div><dt>Transport</dt><dd>{o.needsTransport ? 'We deliver to the buyer' : 'Buyer collects'}</dd></div>

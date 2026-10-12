@@ -10,12 +10,12 @@ import ErrorBanner from '@/components/ErrorBanner';
 import OrderDetail, { StatusChip, STATUS_LABEL } from './OrderDetail';
 
 interface Row {
-  id: string; reference: string; status: string; quantityKg: number; pricePerKg: number;
+  id: string; reference: string; status: string; quantityKg: number; grade?: string | null; pricePerKg: number;
   buyer: { name: string }; warehouse: { name: string }; createdByName?: string | null; createdAt: string;
   sale?: { paymentReceived: boolean } | null;
 }
 interface Option { id: string; name: string }
-interface Lot { id: string; lotNumber: string; totalWeightKg: number; remainingKg: number; riceVariety?: string | null }
+interface Lot { id: string; lotNumber: string; totalWeightKg: number; remainingKg: number; riceVariety?: string | null; grade?: string | null }
 interface Warehouse extends Option { isActive: boolean; balance: { availableKg: number } }
 
 const EMPTY = { buyerId: '', warehouseId: '', lotId: '', bags: '', bagSizeKg: '50', quantityKg: '', pricePerKg: '', packaging: '', needsTransport: false, notes: '' };
@@ -123,7 +123,7 @@ export default function SaleOrdersPage() {
                   <tr key={r.id}>
                     <td style={{ fontWeight: 700 }}>{r.reference}</td>
                     <td>{r.buyer.name}</td>
-                    <td>{r.quantityKg.toLocaleString()} kg</td>
+                    <td>{r.quantityKg.toLocaleString()} kg{r.grade ? ` · ${r.grade}` : ''}</td>
                     <td>{r.warehouse.name}</td>
                     <td><StatusChip status={r.status} /></td>
                     <td className="ua-muted">{r.createdByName ?? '—'}</td>
@@ -176,7 +176,7 @@ export default function SaleOrdersPage() {
               <label className="ua-label" htmlFor="so-lot">Lot</label>
               <select id="so-lot" className="input-field" required value={form.lotId} onChange={(e) => set('lotId', e.target.value)} disabled={!form.warehouseId}>
                 <option value="">{form.warehouseId ? 'Select a lot…' : 'Choose a warehouse first'}</option>
-                {warehouseLots.map((l) => <option key={l.id} value={l.id}>{l.lotNumber} — {l.remainingKg.toLocaleString()} kg left</option>)}
+                {warehouseLots.map((l) => <option key={l.id} value={l.id}>{l.lotNumber}{l.grade ? ` · ${l.grade}` : ''} — {l.remainingKg.toLocaleString()} kg left</option>)}
               </select>
               {form.warehouseId && warehouseLots.length === 0 && <span className="ua-hint">No lot has rice left to sell in this warehouse. Receive harvest and make a lot, or make a lot from counted stock on the Warehouse page.</span>}
             </div>

@@ -132,6 +132,15 @@ export class CreateLotDto {
   @IsNotEmpty()
   riceVariety: string;
 
+  @ApiPropertyOptional({
+    example: 'Grade 1',
+    description:
+      'Grade of the lot. Taken from the records when they are graded; required when they are not.',
+  })
+  @IsString()
+  @IsOptional()
+  grade?: string;
+
   @ApiProperty({
     example: ['inventory-record-uuid-1', 'inventory-record-uuid-2'],
     description: 'List of inventory record IDs to combine into this lot',

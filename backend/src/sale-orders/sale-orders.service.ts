@@ -1,3 +1,4 @@
+import { sameGrade } from '../common/rice-grade';
 import {
   BadRequestException,
   ConflictException,
@@ -156,6 +157,12 @@ export class SaleOrdersService {
       );
     }
 
+    if (dto.grade && lot.grade && !sameGrade(dto.grade, lot.grade)) {
+      throw new BadRequestException(
+        `Lot ${lot.lotNumber} is ${lot.grade}, not ${dto.grade}. Pick a lot of the grade the buyer ordered.`,
+      );
+    }
+
     return this.prisma.$transaction(async (tx) => {
       await lockWarehouse(tx, warehouse.id);
       const balance = await warehouseBalance(tx, warehouse.id);
@@ -187,6 +194,7 @@ export class SaleOrdersService {
           pricePerKg: dto.pricePerKg,
           fairtradePremium: dto.fairtradePremium,
           riceVariety: dto.riceVariety ?? lot.riceVariety,
+          grade: lot.grade,
           packaging: dto.packaging,
           needsTransport: dto.needsTransport ?? false,
           notes: dto.notes,
@@ -232,6 +240,7 @@ export class SaleOrdersService {
         id: true,
         lotNumber: true,
         riceVariety: true,
+        grade: true,
         totalWeightKg: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -322,7 +331,14 @@ export class SaleOrdersService {
           },
         },
         warehouse: { select: { id: true, name: true, location: true } },
-        lot: { select: { id: true, lotNumber: true, riceVariety: true } },
+        lot: {
+          select: {
+            id: true,
+            lotNumber: true,
+            riceVariety: true,
+            grade: true,
+          },
+        },
         sale: {
           select: {
             id: true,

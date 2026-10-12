@@ -207,15 +207,17 @@ function MakeLot({ warehouse, onClose, onDone }: { warehouse: Warehouse; onClose
   const free = warehouse.unlottedKg ?? 0;
   const [lotNumber, setLotNumber] = useState('');
   const [variety, setVariety] = useState('');
+  const [grade, setGrade] = useState('');
   const [qty, setQty] = useState(String(free));
   const { saving, error, submit } = useSubmit(onDone);
   return (
     <Modal title={`Make a lot — ${warehouse.name}`} subtitle="Stock that was counted in has no lot, so it can't be sold. A lot labels part of it as rice for sale." onClose={onClose} width="480px" footer={<>
       <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
       <button type="submit" form="wh-lot" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Create lot'}</button></>}>
-      <form id="wh-lot" className="ua-form" autoComplete="off" onSubmit={(e) => { e.preventDefault(); submit(() => warehousesApi.makeLot(warehouse.id, { lotNumber: lotNumber.trim(), riceVariety: variety.trim() || undefined, quantityKg: Number(qty) }), 'Could not create the lot'); }}>
+      <form id="wh-lot" className="ua-form" autoComplete="off" onSubmit={(e) => { e.preventDefault(); submit(() => warehousesApi.makeLot(warehouse.id, { lotNumber: lotNumber.trim(), riceVariety: variety.trim() || undefined, grade: grade.trim(), quantityKg: Number(qty) }), 'Could not create the lot'); }}>
         <div className="ua-role-note">{kg(free)} is counted in but not in a lot.</div>
         <div className="ua-field"><label className="ua-label" htmlFor="ml-no">Lot number</label><input id="ml-no" className="input-field" required minLength={3} placeholder="e.g. LOT-2026-001" value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} /></div>
+        <div className="ua-field"><label className="ua-label" htmlFor="ml-grade">Grade</label><input id="ml-grade" className="input-field" required placeholder="e.g. Grade 1" value={grade} onChange={(e) => setGrade(e.target.value)} /><span className="ua-hint">A lot holds one grade. Buyers are sold exactly this grade.</span></div>
         <div className="ua-row">
           <div className="ua-field"><label className="ua-label" htmlFor="ml-var">Rice variety<span className="ua-opt">optional</span></label><input id="ml-var" className="input-field" placeholder="e.g. Super" value={variety} onChange={(e) => setVariety(e.target.value)} /></div>
           <div className="ua-field"><label className="ua-label" htmlFor="ml-qty">Weight (kg)</label><input id="ml-qty" className="input-field" type="number" min={1} max={free} step="any" required value={qty} onChange={(e) => setQty(e.target.value)} /></div>
