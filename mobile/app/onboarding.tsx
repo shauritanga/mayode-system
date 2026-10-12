@@ -11,6 +11,7 @@ import Animated, {
   withDelay, withRepeat, withSpring, withTiming,
 } from 'react-native-reanimated';
 import { useI18n } from '../src/i18n';
+import { useAuthStore } from '../src/store/auth.store';
 
 // Safina's three-page composition and motion, using MAYODE's brand and content.
 const slides = [
@@ -99,6 +100,7 @@ export default function OnboardingRoute() {
   const buttonScale = useSharedValue(1);
   const { t } = useI18n();
   const router = useRouter();
+  const setOnboarded = useAuthStore((state) => state.setOnboarded);
   const last = currentIndex === slides.length - 1;
   const foreground = slides[currentIndex].foreground;
 
@@ -127,7 +129,8 @@ export default function OnboardingRoute() {
   const complete = () => {
     if (navigating.current) return;
     navigating.current = true;
-    router.replace('/language-select');
+    setOnboarded();
+    router.replace('/login');
   };
   const next = () => {
     if (last) return complete();

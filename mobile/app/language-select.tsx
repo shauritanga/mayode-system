@@ -1,36 +1,31 @@
 import React, { useState } from 'react';
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowRight01Icon, CheckmarkCircle02Icon, LanguageCircleIcon } from '@hugeicons/core-free-icons';
+import { ArrowRight01Icon, CheckmarkCircle02Icon } from '@hugeicons/core-free-icons';
 import { Language, useI18n } from '../src/i18n';
-import { useAuthStore } from '../src/store/auth.store';
 
-const choices: { code: Language; label: string; native: string }[] = [
-  { code: 'sw', label: 'Kiswahili', native: 'Kiswahili' },
-  { code: 'en', label: 'English', native: 'English' },
+const choices: { code: Language; label: string; native: string; flag: string }[] = [
+  { code: 'sw', label: 'Kiswahili', native: 'Kiswahili', flag: '🇹🇿' },
+  { code: 'en', label: 'English', native: 'English', flag: '🇬🇧' },
 ];
 
 export default function LanguageSelectRoute() {
   const router = useRouter();
   const { language, setLanguage, t } = useI18n();
-  const setOnboarded = useAuthStore((state) => state.setOnboarded);
   const [selected, setSelected] = useState<Language>(language);
 
-  const continueToLogin = () => {
+  const continueToOnboarding = () => {
     setLanguage(selected);
-    setOnboarded();
-    router.replace('/login');
+    router.replace('/onboarding');
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       <View style={styles.content}>
-        <View style={styles.iconCircle}>
-          <HugeiconsIcon icon={LanguageCircleIcon} size={48} color="#087F5B" strokeWidth={1.6} />
-        </View>
+        <Image source={require('../assets/mayode.png')} style={styles.logo} resizeMode="contain" />
         <Text style={styles.eyebrow}>MAYODE GROUP</Text>
         <Text style={styles.title}>{t('chooseLanguage')}</Text>
         <Text style={styles.subtitle}>{t('chooseLanguageSwahili')}</Text>
@@ -51,14 +46,17 @@ export default function LanguageSelectRoute() {
                   <Text style={[styles.optionLabel, active && styles.optionLabelActive]}>{choice.code === 'en' ? t('english') : t('swahili')}</Text>
                   <Text style={[styles.optionNative, active && styles.optionNativeActive]}>{choice.native}</Text>
                 </View>
-                <HugeiconsIcon icon={active ? CheckmarkCircle02Icon : LanguageCircleIcon} size={28} color={active ? '#087F5B' : '#9CA3AF'} strokeWidth={1.8} />
+                <View style={styles.flagWrap}>
+                  {active && <HugeiconsIcon icon={CheckmarkCircle02Icon} size={22} color="#087F5B" strokeWidth={2} />}
+                  <Text style={styles.flag}>{choice.flag}</Text>
+                </View>
               </Pressable>
             );
           })}
         </View>
       </View>
       <View style={styles.footer}>
-        <Pressable onPress={continueToLogin} accessibilityRole="button" style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
+        <Pressable onPress={continueToOnboarding} accessibilityRole="button" style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
           <Text style={styles.buttonText}>{t('onboardingContinue')}</Text>
           <HugeiconsIcon icon={ArrowRight01Icon} size={22} color="#FFFFFF" strokeWidth={2} />
         </Pressable>
@@ -70,7 +68,9 @@ export default function LanguageSelectRoute() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FFFC' },
   content: { flex: 1, justifyContent: 'center', paddingHorizontal: 28 },
-  iconCircle: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D1FAE5', alignSelf: 'center', marginBottom: 28 },
+  logo: { width: 104, height: 104, alignSelf: 'center', marginBottom: 24 },
+  flagWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  flag: { fontSize: 30 },
   eyebrow: { textAlign: 'center', color: '#087F5B', fontSize: 12, fontWeight: '800', letterSpacing: 2, marginBottom: 18 },
   title: { textAlign: 'center', color: '#064E3B', fontSize: 30, fontWeight: '800', lineHeight: 38 },
   subtitle: { textAlign: 'center', color: '#286550', fontSize: 20, fontWeight: '600', marginTop: 8 },

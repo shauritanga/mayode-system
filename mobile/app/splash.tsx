@@ -10,7 +10,7 @@ export default function SplashRoute() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      router.replace('/onboarding');
+      router.replace('/language-select');
     }, 2500);
 
     return () => clearTimeout(timer);
