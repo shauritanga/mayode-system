@@ -12,6 +12,7 @@ import { farmersApi, uploadsApi, resolveMediaUrl } from '../src/lib/data';
 import { useAuthStore } from '../src/store/auth.store';
 import { getCurrentPoint } from '../src/services/location.service';
 import { SearchableSelect } from '../src/components/SearchableSelect';
+import { DateField } from '../src/components/DateField';
 import { getRegions, getDistricts, getWards } from '../src/local/locations';
 import { prettyEnum, useI18n } from '../src/i18n';
 
@@ -85,12 +86,13 @@ export default function EditProfile() {
   };
 
   const addDocument = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    // Documents are photographed on the spot, never picked from the gallery.
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert(t('permissionNeeded'), t('allowPhotoAccess'));
+      Alert.alert(t('permissionNeeded'), t('cameraPermissionNeeded'));
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 });
     if (result.canceled || !result.assets?.length || !farmerId) return;
     const asset = result.assets[0];
     try {
@@ -201,7 +203,15 @@ export default function EditProfile() {
               searchable={false}
               formatLabel={prettyEnum}
             />
-            <Field label={t('dateOfBirth')} value={form.dateOfBirth} onChangeText={(v) => set('dateOfBirth', v)} placeholder="1990-05-12" />
+            <DateField
+              label={t('dateOfBirth')}
+              value={form.dateOfBirth}
+              onChange={(v) => set('dateOfBirth', v)}
+              placeholder={t('selectDate')}
+              maximumDate={new Date()}
+              minimumDate={new Date(1900, 0, 1)}
+              initialDate={new Date(1990, 0, 1)}
+            />
             <SearchableSelect
               label={t('educationLevel')}
               value={form.educationLevel}
