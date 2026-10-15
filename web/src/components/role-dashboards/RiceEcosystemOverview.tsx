@@ -1,0 +1,235 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { reportsApi } from '@/lib/api';
+import {
+  CHART_PALETTE,
+  ChartCard,
+  ChartEmptyState,
+  DonutBreakdown,
+  HorizontalBarChart,
+} from '@/components/role-dashboards/Charts';
+import {
+  EmptyState,
+  MetricTile,
+  StatGridSkeleton,
+  ChartSkeleton,
+  money,
+} from '@/components/role-dashboards/DashboardPrimitives';
+
+const tooltipStyle = {
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border)',
+  borderRadius: 12,
+  color: 'var(--text-primary)',
+  fontSize: 13,
+};
+const axisTick = { fill: 'var(--neutral-500)', fontSize: 12 };
+
+const tons = (kg: number) => `${Math.round((kg || 0) / 1000).toLocaleString()} t`;
+const num = (n: number) => (n || 0).toLocaleString();
+const pct = (part: number, whole: number) =>
+  whole ? `${Math.round((part / whole) * 100)}% of farmers` : 'No farmers yet';
+const label = (s: string) => s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ');
+
+function GroupedBars({
+  data,
+  xKey,
+  series,
+  height = 260,
+}: {
+  data: Record<string, any>[];
+  xKey: string;
+  series: { key: string; name: string; color: string }[];
+  height?: number;
+}) {
+  if (!data.length) return <ChartEmptyState>No data yet.</ChartEmptyState>;
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={data} margin={{ top: 6, right: 8, left: -12, bottom: 0 }}>
+        <CartesianGrid stroke="var(--border)" strokeDasharray="3 5" vertical={false} />
+        <XAxis dataKey={xKey} tick={axisTick} axisLine={{ stroke: 'var(--border)' }} tickLine={false} />
+        <YAxis tick={axisTick} axisLine={false} tickLine={false} width={54} />
+        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--hover-tint-2)' }} />
+        {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
+        {series.map((s) => (
+          <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[6, 6, 0, 0]} maxBarSize={36} />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export default function RiceEcosystemOverview() {
+  const [data, setData] = useState<any>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    reportsApi
+      .riceOverview()
+      .then((res) => setData(res.data))
+      .catch(() => setError('Unable to load the rice ecosystem overview.'));
+  }, []);
+
+  if (error) return <EmptyState>{error}</EmptyState>;
+  if (!data) {
+    return (
+      <div className="role-dashboard">
+        <StatGridSkeleton count={12} />
+        <ChartSkeleton height={260} />
+      </div>
+    );
+  }
+
+  const k = data.kpis;
+  const c = data.charts;
+  const loan = c.loanPerformance;
+  const ins = c.insurance;
+  const paymentColors: Record<string, string> = {
+    PAID: 'var(--green-500)',
+    PARTIAL: 'var(--gold-400)',
+    PENDING: 'var(--red-400)',
+  };
+
+  return (
+    <section className="role-dashboard" aria-label="Rice ecosystem overview">
+      <div className="role-section-label">Rice ecosystem overview</div>
+
+      <div className="role-grid">
+        <MetricTile label="Registered rice farmers" value={num(k.totalFarmers)} hint={`${num(k.verifiedFarmers)} verified`} />
+        <MetricTile label="Male farmers" value={num(k.maleFarmers)} hint={pct(k.maleFarmers, k.totalFarmers)} tone="blue" />
+        <MetricTile label="Female farmers" value={num(k.femaleFarmers)} hint={pct(k.femaleFarmers, k.totalFarmers)} tone="purple" />
+        <MetricTile label="Youth farmers" value={num(k.youthFarmers)} hint={`Aged ${k.youthMaxAge} or under`} tone="gold" />
+        <MetricTile label="Farms" value={num(k.totalFarms)} hint={`${num(k.verifiedFarms)} verified`} />
+        <MetricTile label="Plots" value={num(k.totalPlots)} hint="Across all farms" tone="blue" />
+        <MetricTile label="Rice area under cultivation" value={`${num(k.riceAreaUnderCultivationHa)} ha`} hint={`of ${num(k.totalHectares)} ha registered`} />
+        <MetricTile label="Active crop seasons" value={num(k.activeCropSeasons)} hint={`${num(k.activeCropCycles)} active crop cycles`} tone="purple" />
+        <MetricTile label="Estimated rice production" value={tons(k.estimatedProductionKg)} hint="Planned + active crop cycles" tone="gold" />
+        <MetricTile label="Rice harvested" value={tons(k.riceHarvestedKg)} hint="Recorded actual yield" />
+        <MetricTile label="Total rice aggregated" value={tons(k.riceAggregatedKg)} hint={`${num(k.aggregationRecords)} intake records`} tone="blue" />
+        <MetricTile label="Cooperatives" value={num(k.cooperatives)} hint="Active AMCOS" tone="purple" />
+        <MetricTile label="Farmers accessing finance" value={num(k.farmersAccessingFinance)} hint={pct(k.farmersAccessingFinance, k.totalFarmers)} tone="gold" />
+        <MetricTile label="Farmers insured" value={num(k.farmersInsured)} hint={pct(k.farmersInsured, k.totalFarmers)} />
+        <MetricTile
+          label="Active field officers"
+          value={num(k.activeFieldOfficers)}
+          hint={`${num(k.fieldOfficersWithRecentVisits)} visited farms in last ${k.fieldOfficerWindowDays} days`}
+          tone="blue"
+        />
+      </div>
+
+      <div className="role-two-col-even">
+        <ChartCard title="Farmer registration by district" subtitle="Registered farmers per district">
+          <HorizontalBarChart
+            data={c.farmersByDistrict.map((r: any) => ({ name: r.district, value: r.count }))}
+            height={Math.max(220, c.farmersByDistrict.length * 38)}
+          />
+        </ChartCard>
+        <ChartCard title="Rice area by region" subtitle="Registered farm area in hectares">
+          <HorizontalBarChart
+            data={c.areaByRegion.map((r: any) => ({ name: r.region, value: r.hectares }))}
+            height={Math.max(220, c.areaByRegion.length * 38)}
+            color="var(--blue-500)"
+          />
+        </ChartCard>
+      </div>
+
+      <div className="role-two-col-even">
+        <ChartCard title="Production forecast by season" subtitle="Estimated vs. actual yield, tons">
+          <GroupedBars
+            data={c.productionBySeason}
+            xKey="season"
+            series={[
+              { key: 'estimatedTons', name: 'Estimated', color: 'var(--gold-400)' },
+              { key: 'actualTons', name: 'Actual', color: 'var(--green-500)' },
+            ]}
+          />
+        </ChartCard>
+        <ChartCard title="Rice production by variety" subtitle="Actual yield, or estimate where not yet harvested (tons)">
+          <DonutBreakdown data={c.productionByVariety.map((r: any) => ({ name: r.variety, value: r.tons }))} />
+        </ChartCard>
+      </div>
+
+      <div className="role-two-col-even">
+        <ChartCard title="Farmer gender" subtitle="Share of registered farmers">
+          <DonutBreakdown data={c.gender.map((r: any) => ({ name: r.label, value: r.count }))} />
+        </ChartCard>
+        <ChartCard title="Farmer age distribution" subtitle="Farmers by age band">
+          <GroupedBars
+            data={c.ageDistribution}
+            xKey="label"
+            series={[{ key: 'count', name: 'Farmers', color: 'var(--purple-500)' }]}
+          />
+        </ChartCard>
+      </div>
+
+      <div className="role-two-col-even">
+        <ChartCard title="Input distribution status" subtitle="Inputs by category and payment status">
+          <GroupedBars
+            data={c.inputDistribution.byCategory.map((r: any) => ({ ...r, category: label(r.category) }))}
+            xKey="category"
+            series={[{ key: 'count', name: 'Items distributed', color: 'var(--green-500)' }]}
+            height={220}
+          />
+          <ul className="donut-legend" style={{ marginTop: 12 }}>
+            {c.inputDistribution.byPaymentStatus.map((r: any) => (
+              <li key={r.status}>
+                <span className="donut-legend-dot" style={{ background: paymentColors[r.status] || CHART_PALETTE[0] }} />
+                <span className="donut-legend-label">{label(r.status)}</span>
+                <span className="donut-legend-value">{num(r.count)} items · {money(r.value)}</span>
+              </li>
+            ))}
+          </ul>
+        </ChartCard>
+        <ChartCard
+          title="Loan repayment performance"
+          subtitle={`${loan.repaymentRatePct}% repaid · ${money(loan.totalRepaid)} of ${money(loan.totalLent)} · ${num(loan.activeLoans)} of ${num(loan.totalLoans)} loans active`}
+        >
+          <GroupedBars
+            data={loan.byLender}
+            xKey="lender"
+            series={[
+              { key: 'repaid', name: 'Repaid (TZS)', color: 'var(--green-500)' },
+              { key: 'owed', name: 'Outstanding (TZS)', color: 'var(--red-400)' },
+            ]}
+            height={260}
+          />
+        </ChartCard>
+      </div>
+
+      <ChartCard
+        title="Insurance coverage"
+        subtitle={`${ins.coveragePct}% of farmers covered · ${num(ins.insuredHectares)} ha insured · sum insured ${money(ins.totalSumInsured)}`}
+      >
+        <div className="role-two-col-even">
+          <div>
+            <h3 className="role-section-label">Policies by status</h3>
+            <DonutBreakdown
+              data={ins.policiesByStatus.map((r: any) => ({ name: label(r.status), value: r.count }))}
+              height={200}
+            />
+          </div>
+          <div>
+            <h3 className="role-section-label">Claims by status</h3>
+            <GroupedBars
+              data={ins.claimsByStatus.map((r: any) => ({ ...r, status: label(r.status) }))}
+              xKey="status"
+              series={[{ key: 'count', name: 'Claims', color: 'var(--blue-500)' }]}
+              height={200}
+            />
+          </div>
+        </div>
+      </ChartCard>
+    </section>
+  );
+}

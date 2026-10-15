@@ -26,6 +26,7 @@ import {
 } from './dto/reports.dto';
 import { ReportBuilderService } from './report-builder.service';
 import { ReportsService } from './reports.service';
+import { RiceOverviewService } from './rice-overview.service';
 
 const REPORT_ROLES = [
   UserRole.SUPER_ADMIN,
@@ -44,6 +45,7 @@ export class ReportsController {
     private readonly reports: ReportsService,
     private readonly exporter: ExportService,
     private readonly builder: ReportBuilderService,
+    private readonly riceOverview: RiceOverviewService,
   ) {}
 
   private scoped<T extends ReportFormatDto>(query: T, user: RequestUser): T {
@@ -252,6 +254,20 @@ export class ReportsController {
   @RequirePermission('reports', 'VIEW')
   kpis(@Query() query: ReportFormatDto, @CurrentUser() user: RequestUser) {
     return this.reports.kpis(this.scoped(query, user));
+  }
+
+  @Get('rice-overview')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
+  @RequirePermission('reports', 'VIEW')
+  riceEcosystemOverview(@CurrentUser() user: RequestUser) {
+    return this.riceOverview.overview(
+      user.role !== UserRole.SUPER_ADMIN ? user.mamcosId : null,
+    );
   }
 
   @Get('compliance-summary')

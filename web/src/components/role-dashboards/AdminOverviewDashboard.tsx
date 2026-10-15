@@ -38,6 +38,7 @@ import {
   weatherApi,
 } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
+import RiceEcosystemOverview from '@/components/role-dashboards/RiceEcosystemOverview';
 
 const WEATHER_HOME = { label: 'Mbarali', lat: -8.95, lon: 33.9 };
 
@@ -430,6 +431,8 @@ export default function AdminOverviewDashboard() {
           </Link>
         </div>
       </motion.div>
+
+      <RiceEcosystemOverview />
 
       <div className="fv-row fv-row-top">
         <motion.article

@@ -313,6 +313,7 @@ export const weatherApi = {
 };
 export const reportsApi = {
   kpis: () => api.get('/reports/kpis'),
+  riceOverview: () => api.get('/reports/rice-overview'),
   impact: () => api.get('/reports/impact'),
   complianceSummary: () => api.get('/reports/compliance-summary'),
   farmerPayments: (params?: object) => api.get('/reports/farmer-payments', { params }),
