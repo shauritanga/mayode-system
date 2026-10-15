@@ -7,6 +7,11 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  GROWTH_STAGE_LABELS,
+  GROWTH_STAGE_ORDER,
+  stageIndex,
+} from '../crop-cycles/growth-stages';
 
 const YOUTH_MAX_AGE = 35; // matches ReportsService youth breakdown
 const ACRES_PER_HECTARE = 2.47105;
@@ -103,6 +108,7 @@ export class RiceOverviewService {
           season: true,
           riceVariety: true,
           status: true,
+          growthStage: true,
           estimatedYieldKg: true,
           actualYieldKg: true,
         },
@@ -248,6 +254,21 @@ export class RiceOverviewService {
       byVariety.set(v, (byVariety.get(v) ?? 0) + yieldOf(c));
     }
 
+    // Crops still in the field, by where they are in the 10-step rice cycle.
+    const stageCounts = GROWTH_STAGE_ORDER.map(() => 0);
+    let stageNotSet = 0;
+    for (const c of cycles) {
+      if (c.status !== CropCycleStatus.ACTIVE && c.status !== CropCycleStatus.PLANNED)
+        continue;
+      if (!c.growthStage) stageNotSet += 1;
+      else stageCounts[stageIndex(c.growthStage)] += 1;
+    }
+    const cropsByStage = GROWTH_STAGE_ORDER.map((stage, i) => ({
+      stage: GROWTH_STAGE_LABELS[stage],
+      count: stageCounts[i],
+    }));
+    if (stageNotSet) cropsByStage.push({ stage: 'Not recorded', count: stageNotSet });
+
     // ── Finance ──
     const borrowers = new Set(loans.map((l) => l.farmerId));
     const totalLent = loans.reduce((s, l) => s + l.originalAmount, 0);
@@ -331,6 +352,7 @@ export class RiceOverviewService {
             farms: v.farms,
           }))
           .sort((a, b) => b.hectares - a.hectares),
+        cropsByStage,
         productionBySeason: [...bySeason.entries()]
           .map(([season, v]) => ({
             season,

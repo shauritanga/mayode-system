@@ -435,6 +435,17 @@ model CropCycle {
   estimatedYieldKg Float?          @map("estimated_yield_kg")
   actualYieldKg    Float?          @map("actual_yield_kg")
   status           CropCycleStatus @default(PLANNED)
+
+  /// The farming season (registration/verification window) this crop belongs to.
+  farmingSeasonId String?              @map("farming_season_id")
+  areaPlantedHa   Float?               @map("area_planted_ha")
+  seedQuantityKg  Float?               @map("seed_quantity_kg")
+  productionMethod ProductionMethod?   @map("production_method")
+  irrigationType  CycleIrrigationType? @map("irrigation_type")
+  /// Current stage of the crop; moved by the admin or by a field officer's visit.
+  growthStage     RiceGrowthStage?     @map("growth_stage")
+  stageUpdatedAt  DateTime?            @map("stage_updated_at")
+
   createdAt        DateTime        @default(now()) @map("created_at")
   updatedAt        DateTime        @updatedAt @map("updated_at")
 
@@ -452,9 +463,29 @@ model CropCycle {
   aiIntegrationRecords AiIntegrationRecord[]
   insurancePolicies    InsurancePolicy[]
   variety              RiceVariety?          @relation(fields: [riceVarietyId], references: [id])
+  farmingSeason        FarmingSeason?        @relation(fields: [farmingSeasonId], references: [id], onDelete: SetNull)
+  stageChanges         CropStageChange[]
 
   @@index([riceVarietyId])
+  @@index([farmingSeasonId])
   @@map("crop_cycles")
+}
+
+/// One move of a crop cycle from stage to stage, so the admin can show a timeline.
+model CropStageChange {
+  id              String           @id @default(uuid())
+  cropCycleId     String           @map("crop_cycle_id")
+  stage           RiceGrowthStage
+  /// ADMIN (set on the dashboard) or VISIT (reported by a field officer).
+  source          String
+  note            String?
+  changedByUserId String?          @map("changed_by_user_id")
+  changedAt       DateTime         @default(now()) @map("changed_at")
+
+  cropCycle CropCycle @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
+
+  @@index([cropCycleId, changedAt])
+  @@map("crop_stage_changes")
 }
 
 model ActivityLog {
@@ -1779,14 +1810,34 @@ enum FieldOfficerVisitPurpose {
 
 enum RiceGrowthStage {
   LAND_PREPARATION
+  NURSERY_PREPARATION
+  /// Transplanting / direct seeding.
   PLANTING
+  /// Legacy: older clients still send it; the admin shows it under vegetative growth.
   GERMINATION
+  VEGETATIVE_GROWTH
   TILLERING
+  /// Legacy: older clients still send it; the admin shows it under tillering.
   PANICLE_INITIATION
   FLOWERING
   GRAIN_FILLING
   MATURITY
   HARVEST
+  POST_HARVEST
+}
+
+enum ProductionMethod {
+  TRANSPLANTING
+  DIRECT_SEEDING
+  SRI
+}
+
+enum CycleIrrigationType {
+  RAIN_FED
+  CANAL_GRAVITY
+  PUMP
+  SPRINKLER
+  SUPPLEMENTAL
 }
 
 enum FieldConditionStatus {
@@ -1859,6 +1910,7 @@ model FarmingSeason {
   assignments     SeasonalFarmAssignment[]
   rewardCampaigns RewardCampaign[]
   disputes        Dispute[]
+  cropCycles      CropCycle[]
 
   @@map("farming_seasons")
 }

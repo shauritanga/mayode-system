@@ -17,6 +17,8 @@ import {
 } from '@/lib/farm-format';
 import FarmEditorModal from '@/components/FarmEditorModal';
 import PlotEditorModal from '@/components/PlotEditorModal';
+import Link from 'next/link';
+import { stageLabel } from '@/lib/crop-stages';
 import Modal from '@/components/Modal';
 
 const FarmBoundaryMap = dynamic(() => import('@/components/FarmBoundaryMap'), {
@@ -292,12 +294,14 @@ export default function FarmDetailPage() {
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
-              <thead><tr><th>Season</th><th>Rice variety</th><th>Planted</th><th>Expected harvest</th><th className="num">Est. yield (kg)</th><th className="num">Actual yield (kg)</th><th>Status</th></tr></thead>
+              <thead><tr><th>Season</th><th>Rice variety</th><th className="num">Area (ha)</th><th>Growth stage</th><th>Planted</th><th>Expected harvest</th><th className="num">Est. yield (kg)</th><th className="num">Actual yield (kg)</th><th>Status</th></tr></thead>
               <tbody>
                 {cycles.map((c) => (
                   <tr key={c.id}>
-                    <td>{c.season}</td>
+                    <td><Link href={`/dashboard/crop-cycles/${c.id}`} style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>{c.season}</Link></td>
                     <td>{c.riceVariety || '—'}</td>
+                    <td className="num">{c.areaPlantedHa ?? '—'}</td>
+                    <td>{c.growthStage ? stageLabel(c.growthStage) : '—'}</td>
                     <td>{dateFmt(c.plantingDate)}</td>
                     <td>{dateFmt(c.expectedHarvest)}</td>
                     <td className="num">{c.estimatedYieldKg?.toLocaleString() ?? '—'}</td>

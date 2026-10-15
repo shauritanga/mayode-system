@@ -1,13 +1,14 @@
 export const RICE_GROWTH_STAGES = [
   'LAND_PREPARATION',
+  'NURSERY_PREPARATION',
   'PLANTING',
-  'GERMINATION',
+  'VEGETATIVE_GROWTH',
   'TILLERING',
-  'PANICLE_INITIATION',
   'FLOWERING',
   'GRAIN_FILLING',
   'MATURITY',
   'HARVEST',
+  'POST_HARVEST',
 ] as const;
 
 export type RiceGrowthStage = (typeof RICE_GROWTH_STAGES)[number];
@@ -40,9 +41,12 @@ export type FieldVisitPayload = {
   gpsLongitude?: number;
 };
 
-export const STAGE_LABEL_KEYS: Record<RiceGrowthStage, string> = {
+/** Includes the two older stage names so visits recorded before the ten-step list still show a label. */
+export const STAGE_LABEL_KEYS: Record<RiceGrowthStage | 'GERMINATION' | 'PANICLE_INITIATION', string> = {
   LAND_PREPARATION: 'stageLandPreparation',
+  NURSERY_PREPARATION: 'stageNurseryPreparation',
   PLANTING: 'stagePlanting',
+  VEGETATIVE_GROWTH: 'stageVegetativeGrowth',
   GERMINATION: 'stageGermination',
   TILLERING: 'stageTillering',
   PANICLE_INITIATION: 'stagePanicleInitiation',
@@ -50,6 +54,7 @@ export const STAGE_LABEL_KEYS: Record<RiceGrowthStage, string> = {
   GRAIN_FILLING: 'stageGrainFilling',
   MATURITY: 'stageMaturity',
   HARVEST: 'stageHarvest',
+  POST_HARVEST: 'stagePostHarvest',
 };
 
 export const CONDITION_LABEL_KEYS: Record<FieldConditionStatus, string> = {
@@ -59,7 +64,7 @@ export const CONDITION_LABEL_KEYS: Record<FieldConditionStatus, string> = {
   NONE: 'conditionNone',
 };
 
-export function growthStageLabel(stage: RiceGrowthStage, t: (key: string) => string) {
+export function growthStageLabel(stage: keyof typeof STAGE_LABEL_KEYS, t: (key: string) => string) {
   return t(STAGE_LABEL_KEYS[stage]);
 }
 

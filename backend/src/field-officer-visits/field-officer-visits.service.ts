@@ -10,6 +10,7 @@ import { ActivitiesService } from '../activities/activities.service';
 import type { RequestUser } from '../common/ownership.service';
 import { CreateVisitDto } from './dto/create-visit.dto';
 import { CalendarQueryDto, QueryVisitsDto } from './dto/query-visits.dto';
+import { applyGrowthStage } from '../crop-cycles/growth-stages';
 
 const STAFF_CAN_VIEW_ANY_FARMER: UserRole[] = [
   UserRole.SUPER_ADMIN,
@@ -126,6 +127,15 @@ export class FieldOfficerVisitsService {
         farm: { select: { id: true, farmCode: true, name: true } },
       },
     });
+
+    // The crop's current stage follows the latest field report.
+    if (cropCycleId && dto.growthStage) {
+      await applyGrowthStage(this.prisma, cropCycleId, dto.growthStage, {
+        source: 'VISIT',
+        at: visitedAt,
+        userId,
+      });
+    }
 
     await this.activities.log(
       dto.farmerId,

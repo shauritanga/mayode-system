@@ -10,6 +10,7 @@ import {
   IsObject,
   IsDateString,
   IsNotEmpty,
+  Max,
 } from 'class-validator';
 import {
   ApiProperty,
@@ -17,7 +18,13 @@ import {
   PartialType,
   OmitType,
 } from '@nestjs/swagger';
-import { CropCycleStatus, ActivityType } from '@prisma/client';
+import {
+  CropCycleStatus,
+  ActivityType,
+  CycleIrrigationType,
+  ProductionMethod,
+  RiceGrowthStage,
+} from '@prisma/client';
 
 export class CreateCropCycleDto {
   @ApiProperty({
@@ -42,8 +49,8 @@ export class CreateCropCycleDto {
     description: 'Farming season identifier',
   })
   @IsString()
-  @IsNotEmpty()
-  season: string;
+  @IsOptional()
+  season?: string;
 
   @ApiPropertyOptional({
     example: 'SARO 5 (TXD 306)',
@@ -85,9 +92,50 @@ export class CreateCropCycleDto {
   @Min(0)
   @IsOptional()
   estimatedYieldKg?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'The farming season (registration window) this crop belongs to. Its name is used as the season when none is typed.',
+  })
+  @IsUUID()
+  @IsOptional()
+  farmingSeasonId?: string;
+
+  @ApiPropertyOptional({ example: 2.5, description: 'Area planted, hectares' })
+  @IsNumber()
+  @Min(0.01)
+  @Max(100000)
+  @IsOptional()
+  areaPlantedHa?: number;
+
+  @ApiPropertyOptional({ example: 60, description: 'Seed used, kilograms' })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  seedQuantityKg?: number;
+
+  @ApiPropertyOptional({ enum: ProductionMethod })
+  @IsEnum(ProductionMethod)
+  @IsOptional()
+  productionMethod?: ProductionMethod;
+
+  @ApiPropertyOptional({ enum: CycleIrrigationType })
+  @IsEnum(CycleIrrigationType)
+  @IsOptional()
+  irrigationType?: CycleIrrigationType;
+
+  @ApiPropertyOptional({ enum: RiceGrowthStage })
+  @IsEnum(RiceGrowthStage)
+  @IsOptional()
+  growthStage?: RiceGrowthStage;
 }
 
 export class UpdateCropCycleDto {
+  @ApiPropertyOptional({ example: '2026/2027 Masika' })
+  @IsString()
+  @IsOptional()
+  season?: string;
+
   @ApiPropertyOptional({ example: 'SARO 5 (TXD 306)' })
   @IsString()
   @IsOptional()
@@ -138,6 +186,47 @@ export class UpdateCropCycleDto {
   @IsEnum(CropCycleStatus)
   @IsOptional()
   status?: CropCycleStatus;
+
+  @ApiPropertyOptional({
+    description:
+      'The farming season (registration window) this crop belongs to. Its name is used as the season when none is typed.',
+  })
+  @IsUUID()
+  @IsOptional()
+  farmingSeasonId?: string;
+
+  @ApiPropertyOptional({ example: 2.5, description: 'Area planted, hectares' })
+  @IsNumber()
+  @Min(0.01)
+  @Max(100000)
+  @IsOptional()
+  areaPlantedHa?: number;
+
+  @ApiPropertyOptional({ example: 60, description: 'Seed used, kilograms' })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  seedQuantityKg?: number;
+
+  @ApiPropertyOptional({ enum: ProductionMethod })
+  @IsEnum(ProductionMethod)
+  @IsOptional()
+  productionMethod?: ProductionMethod;
+
+  @ApiPropertyOptional({ enum: CycleIrrigationType })
+  @IsEnum(CycleIrrigationType)
+  @IsOptional()
+  irrigationType?: CycleIrrigationType;
+
+  @ApiPropertyOptional({ enum: RiceGrowthStage })
+  @IsEnum(RiceGrowthStage)
+  @IsOptional()
+  growthStage?: RiceGrowthStage;
+
+  @ApiPropertyOptional({ description: 'Note kept with a stage change' })
+  @IsString()
+  @IsOptional()
+  stageNote?: string;
 }
 
 export class CreateActivityLogDto {

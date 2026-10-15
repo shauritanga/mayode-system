@@ -14,6 +14,7 @@ import {
   CreateActivityLogDto,
   UpdateActivityLogDto,
 } from './dto/crop-cycles.dto';
+import { applyGrowthStage } from './growth-stages';
 
 const ACTIVITY_ICONS: Record<string, string> = {
   LAND_PREPARATION: '🚜',
@@ -60,6 +61,32 @@ export class CropCyclesService {
       : { riceVariety: typed };
   }
 
+
+  /** Season name for a cycle: the one typed, else the linked farming season's name. */
+  private async resolveSeason(season?: string, farmingSeasonId?: string) {
+    let linkedName: string | undefined;
+    if (farmingSeasonId) {
+      const linked = await this.prisma.farmingSeason.findUnique({
+        where: { id: farmingSeasonId },
+        select: { name: true },
+      });
+      if (!linked) throw new BadRequestException('That farming season does not exist');
+      linkedName = linked.name;
+    }
+    const name = season?.trim() || linkedName;
+    if (!name)
+      throw new BadRequestException('Enter a season name or choose a farming season');
+    return name;
+  }
+
+  private assertAreaFitsFarm(areaPlantedHa: number | undefined, farmHectares: number) {
+    if (areaPlantedHa != null && areaPlantedHa > farmHectares + 1e-6) {
+      throw new BadRequestException(
+        `Area planted (${areaPlantedHa} ha) cannot be larger than the farm (${farmHectares} ha)`,
+      );
+    }
+  }
+
   /**
    * Start a crop cycle for a farm. `farmerId` is always derived from the farm
    * server-side for farmer-role requests, so a farmer cannot start a cycle
@@ -102,11 +129,18 @@ export class CropCyclesService {
       dto.riceVarietyId,
       dto.riceVariety,
     );
+    const season = await this.resolveSeason(dto.season, dto.farmingSeasonId);
+    this.assertAreaFitsFarm(dto.areaPlantedHa, farm.socialHectares);
     const cropCycle = await this.prisma.cropCycle.create({
       data: {
         farmId: dto.farmId,
         farmerId,
-        season: dto.season,
+        season,
+        farmingSeasonId: dto.farmingSeasonId,
+        areaPlantedHa: dto.areaPlantedHa,
+        seedQuantityKg: dto.seedQuantityKg,
+        productionMethod: dto.productionMethod,
+        irrigationType: dto.irrigationType,
         ...variety,
         plantingDate: dto.plantingDate ? new Date(dto.plantingDate) : null,
         expectedHarvest: dto.expectedHarvest
@@ -138,6 +172,23 @@ export class CropCyclesService {
       },
     );
     await this.riceProtocols.scheduleForCycle(cropCycle.id);
+    if (dto.growthStage) {
+      await applyGrowthStage(this.prisma, cropCycle.id, dto.growthStage, {
+        source: 'ADMIN',
+        userId: user.id,
+      });
+      return this.prisma.cropCycle.findUniqueOrThrow({
+        where: { id: cropCycle.id },
+        include: {
+          farm: {
+            select: { farmCode: true, socialHectares: true, isVerified: true },
+          },
+          farmer: {
+            select: { controlNumber: true, firstName: true, lastName: true },
+          },
+        },
+      });
+    }
     return cropCycle;
   }
 
@@ -150,11 +201,23 @@ export class CropCyclesService {
     return farmer.id;
   }
 
-  async findAll() {
+  async findAll(user?: RequestUser) {
+    // Cooperative staff only see their own AMCOS's crops; platform admins see everything.
+    const tenantId = user ? this.ownership.resolveTenantMamcosId(user) : null;
     return this.prisma.cropCycle.findMany({
+      where: tenantId ? { farm: { mamcosId: tenantId } } : undefined,
       orderBy: { createdAt: 'desc' },
       include: {
-        farm: { select: { id: true, farmCode: true, socialHectares: true } },
+        farm: {
+          select: {
+            id: true,
+            farmCode: true,
+            socialHectares: true,
+            hasIrrigation: true,
+            region: true,
+            district: true,
+          },
+        },
         farmer: {
           select: {
             id: true,
@@ -163,6 +226,7 @@ export class CropCyclesService {
             lastName: true,
           },
         },
+        farmingSeason: { select: { id: true, name: true } },
         _count: { select: { activities: true, costs: true, revenues: true } },
       },
     });
@@ -269,6 +333,24 @@ export class CropCyclesService {
         revenues: { orderBy: { saleDate: 'desc' } },
         calendarTasks: { orderBy: { dueDate: 'asc' } },
         harvestQuality: true,
+        farmingSeason: { select: { id: true, name: true, status: true } },
+        stageChanges: { orderBy: { changedAt: 'asc' } },
+        officerVisits: {
+          orderBy: { visitedAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            visitedAt: true,
+            growthStage: true,
+            cropCondition: true,
+            waterStatus: true,
+            pestStatus: true,
+            diseaseStatus: true,
+            observations: true,
+            recommendations: true,
+            fieldOfficer: { select: { firstName: true, lastName: true } },
+          },
+        },
       },
     });
 
@@ -473,10 +555,24 @@ export class CropCyclesService {
           'The rice variety cannot be changed after activities have been recorded. Ask your field officer.',
         );
     }
+    this.assertAreaFitsFarm(dto.areaPlantedHa, existing.farm.socialHectares);
+    const season =
+      dto.season !== undefined || dto.farmingSeasonId
+        ? await this.resolveSeason(
+            dto.season || undefined,
+            dto.farmingSeasonId ?? undefined,
+          )
+        : undefined;
     const cropCycle = await this.prisma.cropCycle.update({
       where: { id },
       data: {
         ...variety,
+        season,
+        farmingSeasonId: dto.farmingSeasonId,
+        areaPlantedHa: dto.areaPlantedHa,
+        seedQuantityKg: dto.seedQuantityKg,
+        productionMethod: dto.productionMethod,
+        irrigationType: dto.irrigationType,
         plantingDate: dto.plantingDate ? new Date(dto.plantingDate) : undefined,
         expectedHarvest: dto.expectedHarvest
           ? new Date(dto.expectedHarvest)
@@ -490,6 +586,14 @@ export class CropCyclesService {
         farm: { select: { farmCode: true, mamcosId: true } },
       },
     });
+
+    if (dto.growthStage && dto.growthStage !== existing.growthStage) {
+      await applyGrowthStage(this.prisma, id, dto.growthStage, {
+        source: 'ADMIN',
+        userId: user.id,
+        note: dto.stageNote,
+      });
+    }
 
     if (dto.plantingDate || dto.expectedHarvest || varietyChanged) {
       await this.riceProtocols.scheduleForCycle(cropCycle.id, {
@@ -511,7 +615,10 @@ export class CropCyclesService {
         },
       );
     }
-    return cropCycle;
+    return this.prisma.cropCycle.findUniqueOrThrow({
+      where: { id },
+      include: { farm: { select: { farmCode: true, mamcosId: true } } },
+    });
   }
 
   /**

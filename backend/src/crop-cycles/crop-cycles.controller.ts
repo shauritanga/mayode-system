@@ -70,9 +70,10 @@ export class CropCyclesController {
   })
   async findAll(
     @Query() query: ReportFormatDto,
+    @CurrentUser() user: RequestUser,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const rows = await this.cropCyclesService.findAll();
+    const rows = await this.cropCyclesService.findAll(user);
     if (!query.format || query.format === 'json') return rows;
     const exportRows = rows.map((cycle: any) => ({
       farmCode: cycle.farm?.farmCode ?? '',
@@ -80,8 +81,15 @@ export class CropCyclesController {
         `${cycle.farmer?.firstName ?? ''} ${cycle.farmer?.lastName ?? ''}`.trim(),
       season: cycle.season,
       riceVariety: cycle.riceVariety ?? '',
+      areaPlantedHa: cycle.areaPlantedHa ?? '',
+      seedQuantityKg: cycle.seedQuantityKg ?? '',
+      productionMethod: cycle.productionMethod ?? '',
+      irrigationType: cycle.irrigationType ?? '',
+      growthStage: cycle.growthStage ?? '',
       plantingDate: cycle.plantingDate?.toISOString?.() ?? '',
+      expectedHarvest: cycle.expectedHarvest?.toISOString?.() ?? '',
       harvestDate: cycle.harvestDate?.toISOString?.() ?? '',
+      estimatedYieldKg: cycle.estimatedYieldKg ?? '',
       actualYieldKg: cycle.actualYieldKg ?? 0,
       status: cycle.status,
     }));

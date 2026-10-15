@@ -160,6 +160,15 @@ export default function RiceEcosystemOverview() {
         </ChartCard>
       </div>
 
+      <ChartCard title="Crops by growth stage" subtitle="Active and planned rice crops at each of the ten stages">
+        <GroupedBars
+          data={c.cropsByStage}
+          xKey="stage"
+          series={[{ key: 'count', name: 'Crops', color: 'var(--green-500)' }]}
+          height={280}
+        />
+      </ChartCard>
+
       <div className="role-two-col-even">
         <ChartCard title="Farmer gender" subtitle="Share of registered farmers">
           <DonutBreakdown data={c.gender.map((r: any) => ({ name: r.label, value: r.count }))} />
