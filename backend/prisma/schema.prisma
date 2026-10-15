@@ -332,6 +332,7 @@ model Farm {
   blockNumber    String?   @map("block_number")
   section        String?
   village        String?
+  subVillage     String?   @map("sub_village") // kitongoji
   ward           String?
   district       String?
   region         String?

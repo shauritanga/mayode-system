@@ -92,8 +92,8 @@ export class FarmsController {
     summary:
       'Get farm details by ID (plots, documents, verifications, crop cycles)',
   })
-  findOne(@Param('id') id: string) {
-    return this.farmsService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.farmsService.findOne(id, user);
   }
 
   @Get(':id/productivity')

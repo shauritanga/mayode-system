@@ -61,6 +61,7 @@ export class FarmsService {
         blockNumber: dto.blockNumber,
         section: dto.section,
         village: dto.village,
+        subVillage: dto.subVillage,
         ward: dto.ward,
         district: dto.district,
         region: dto.region,
@@ -82,6 +83,8 @@ export class FarmsService {
         irrigationMethod: dto.irrigationMethod,
         accessibility: dto.accessibility,
         previousCrops: dto.previousCrops || [],
+        centerLatitude: dto.centerLatitude,
+        centerLongitude: dto.centerLongitude,
       },
       include: {
         farmer: {
@@ -105,7 +108,22 @@ export class FarmsService {
   }
 
   async findAll(query: QueryFarmsDto = {}, user?: RequestUser) {
-    const { search, mamcosId, farmerId, village, grade, isVerified } = query;
+    const {
+      search,
+      mamcosId,
+      farmerId,
+      region,
+      district,
+      ward,
+      village,
+      subVillage,
+      grade,
+      ownershipType,
+      waterSource,
+      production,
+      riceVariety,
+      isVerified,
+    } = query;
     // Cooperative staff (any role, legacy or custom) are confined to their
     // own AMCOS regardless of what mamcosId the client asks for; SUPER_ADMIN
     // /ADMIN (and roles with no cooperative attached, e.g. AUDITOR) remain
@@ -115,8 +133,18 @@ export class FarmsService {
     const where: Prisma.FarmWhereInput = {
       ...(scopedMamcosId ? { mamcosId: scopedMamcosId } : {}),
       ...(farmerId ? { farmerId } : {}),
+      ...(region ? { region } : {}),
+      ...(district ? { district } : {}),
+      ...(ward ? { ward } : {}),
       ...(village ? { village } : {}),
+      ...(subVillage ? { subVillage } : {}),
       ...(grade ? { grade } : {}),
+      ...(ownershipType ? { ownershipType } : {}),
+      ...(waterSource ? { waterSource } : {}),
+      ...(production ? { hasIrrigation: production === 'irrigated' } : {}),
+      ...(riceVariety
+        ? { cropCycles: { some: { riceVariety } } }
+        : {}),
       ...(isVerified !== undefined
         ? { isVerified: isVerified === 'true' }
         : {}),
@@ -125,6 +153,15 @@ export class FarmsService {
             OR: [
               { farmCode: { contains: search, mode: 'insensitive' } },
               { name: { contains: search, mode: 'insensitive' } },
+              {
+                farmer: {
+                  OR: [
+                    { firstName: { contains: search, mode: 'insensitive' } },
+                    { lastName: { contains: search, mode: 'insensitive' } },
+                    { controlNumber: { contains: search, mode: 'insensitive' } },
+                  ],
+                },
+              },
             ],
           }
         : {}),
@@ -137,13 +174,20 @@ export class FarmsService {
           select: { controlNumber: true, firstName: true, lastName: true },
         },
         mamcos: { select: { name: true } },
+        plots: { select: { sizeAcres: true } },
+        cropCycles: {
+          select: { riceVariety: true, season: true, status: true },
+          orderBy: { createdAt: 'desc' },
+        },
         _count: { select: { plots: true, cropCycles: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: RequestUser) {
+    // Renter phone numbers and legal-owner records are staff-only; farmers see the farm itself.
+    const staff = !!user && user.role !== 'FARMER';
     const farm = await this.prisma.farm.findUnique({
       where: { id },
       include: {
@@ -161,7 +205,36 @@ export class FarmsService {
             },
           },
         },
-        cropCycles: true,
+        cropCycles: { orderBy: { createdAt: 'desc' } },
+        ...(staff
+          ? {
+              ownerships: {
+                include: {
+                  ownerFarmer: {
+                    select: {
+                      controlNumber: true,
+                      firstName: true,
+                      lastName: true,
+                    },
+                  },
+                },
+                orderBy: { createdAt: 'desc' as const },
+              },
+              leases: {
+                orderBy: { leaseStartDate: 'desc' as const },
+                take: 5,
+                select: {
+                  id: true,
+                  renterName: true,
+                  renterPhone: true,
+                  leaseStartDate: true,
+                  leaseEndDate: true,
+                  status: true,
+                  farmingSeason: { select: { name: true } },
+                },
+              },
+            }
+          : {}),
       },
     });
     if (!farm) throw new NotFoundException(`Farm with ID ${id} not found`);
@@ -191,6 +264,7 @@ export class FarmsService {
         blockNumber: dto.blockNumber,
         section: dto.section,
         village: dto.village,
+        subVillage: dto.subVillage,
         ward: dto.ward,
         district: dto.district,
         region: dto.region,
@@ -212,6 +286,8 @@ export class FarmsService {
         irrigationMethod: dto.irrigationMethod,
         accessibility: dto.accessibility,
         previousCrops: dto.previousCrops,
+        centerLatitude: dto.centerLatitude,
+        centerLongitude: dto.centerLongitude,
       },
     });
   }

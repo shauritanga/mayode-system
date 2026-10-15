@@ -187,6 +187,20 @@ export const farmsApi = {
   addPhoto: (id: string, data: object) => api.post(`/farms/${id}/photos`, data),
   addDocument: (id: string, data: object) => api.post(`/farms/${id}/documents`, data),
   listDocuments: (id: string) => api.get(`/farms/${id}/documents`),
+  deletePhoto: (photoId: string) => api.delete(`/farms/photos/${photoId}`),
+};
+export const plotsApi = {
+  byFarm: (farmId: string) => api.get(`/plots/farm/${farmId}`),
+  create: (data: object) => api.post('/plots', data),
+  update: (id: string, data: object) => api.patch(`/plots/${id}`, data),
+  remove: (id: string) => api.delete(`/plots/${id}`),
+};
+export const uploadsApi = {
+  upload: (file: File) => {
+    const body = new FormData();
+    body.append('file', file);
+    return api.post<{ url: string }>('/uploads', body);
+  },
 };
 export const farmVerificationsApi = {
   getAll: () => api.get('/farm-verifications'),

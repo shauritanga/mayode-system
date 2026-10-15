@@ -9,6 +9,7 @@ import {
   IsObject,
   Min,
   IsNotEmpty,
+  Max,
   ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -57,6 +58,11 @@ export class CreateFarmDto {
   @IsString()
   @IsOptional()
   village?: string;
+
+  @ApiPropertyOptional({ example: 'Kitongoji cha Mlimani' })
+  @IsString()
+  @IsOptional()
+  subVillage?: string;
 
   @ApiPropertyOptional({ example: 'Madibira' })
   @IsString()
@@ -206,6 +212,20 @@ export class CreateFarmDto {
   @IsString({ each: true })
   @IsOptional()
   previousCrops?: string[];
+
+  @ApiPropertyOptional({ example: -8.8925, description: 'Farm centre latitude' })
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  @IsOptional()
+  centerLatitude?: number;
+
+  @ApiPropertyOptional({ example: 34.5035, description: 'Farm centre longitude' })
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  @IsOptional()
+  centerLongitude?: number;
 }
 
 export class UpdateFarmDto {
@@ -233,6 +253,11 @@ export class UpdateFarmDto {
   @IsString()
   @IsOptional()
   village?: string;
+
+  @ApiPropertyOptional({ example: 'Kitongoji cha Mlimani' })
+  @IsString()
+  @IsOptional()
+  subVillage?: string;
 
   @ApiPropertyOptional({ example: 'Madibira' })
   @IsString()
@@ -343,6 +368,20 @@ export class UpdateFarmDto {
   @IsString({ each: true })
   @IsOptional()
   previousCrops?: string[];
+
+  @ApiPropertyOptional({ example: -8.8925, description: 'Farm centre latitude' })
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  @IsOptional()
+  centerLatitude?: number;
+
+  @ApiPropertyOptional({ example: 34.5035, description: 'Farm centre longitude' })
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  @IsOptional()
+  centerLongitude?: number;
 }
 
 export class UpdateBoundaryDto {

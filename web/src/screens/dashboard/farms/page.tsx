@@ -6,6 +6,9 @@ import { motion, useReducedMotion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Search01Icon, Cancel01Icon, MapsIcon, ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import { farmsApi } from '@/lib/api';
+import { useAuthStore } from '@/store/auth.store';
+import FarmEditorModal from '@/components/FarmEditorModal';
+import { OWNERSHIP_LABELS, fmtHa, locationLabel, productionLabel, riceVarieties, tenureLabel, toCsv, totalPlotHectares } from '@/lib/farm-format';
 import { isFarmBoundaryMapped } from '@/lib/farm-geo';
 import { MetricTile, MetricTileSkeleton, TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
@@ -29,7 +32,17 @@ interface Farm {
   id: string;
   farmCode: string;
   name?: string;
-  village?: string;
+  region?: string | null;
+  district?: string | null;
+  ward?: string | null;
+  village?: string | null;
+  subVillage?: string | null;
+  ownershipType?: string | null;
+  landTenure?: string | null;
+  waterSource?: string | null;
+  plots?: { sizeAcres?: number | null }[];
+  cropCycles?: { riceVariety?: string | null; status?: string | null }[];
+  _count?: { plots: number; cropCycles: number };
   socialHectares: number;
   grade: string;
   isVerified: boolean;
@@ -58,14 +71,20 @@ function filterFromUrl(): FarmFilter {
   return 'all';
 }
 
-const gradeBadge = (grade: string) => ({
-  A: <span className="badge badge-green">Grade A</span>,
-  B: <span className="badge badge-gold">Grade B</span>,
-  C: <span className="badge badge-red">Grade C</span>,
-}[grade] || <span className="badge badge-gray">{grade}</span>);
+interface AttrFilters {
+  region: string; district: string; ward: string; village: string; subVillage: string;
+  ownershipType: string; production: string; waterSource: string; variety: string;
+}
+const NO_ATTR_FILTERS: AttrFilters = { region: '', district: '', ward: '', village: '', subVillage: '', ownershipType: '', production: '', waterSource: '', variety: '' };
+
+const distinct = (values: (string | null | undefined)[]) => [...new Set(values.filter((v): v is string => !!v))].sort((a, b) => a.localeCompare(b));
 
 export default function FarmsPage() {
   const reduce = useReducedMotion();
+  const role = useAuthStore((state) => state.user?.role);
+  const canRegister = role === 'SUPER_ADMIN' || role === 'FIELD_OFFICER';
+  const [attrs, setAttrs] = useState<AttrFilters>(NO_ATTR_FILTERS);
+  const [registering, setRegistering] = useState(false);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -74,12 +93,16 @@ export default function FarmsPage() {
   const [filter, setFilter] = useState<FarmFilter>('all');
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    setFilter(filterFromUrl());
+  const load = () => {
     farmsApi.getAll()
       .then((res) => setFarms(res.data?.data || res.data || []))
       .catch(console.error)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    setFilter(filterFromUrl());
+    load();
   }, []);
 
   useEffect(() => {
@@ -90,20 +113,67 @@ export default function FarmsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => { setPage(1); }, [filter]);
+  useEffect(() => { setPage(1); }, [filter, attrs]);
 
   const filtered = useMemo(() => {
     return farms.filter((f) => {
-      const matchesSearch = `${f.farmCode} ${f.name || ''} ${f.farmer?.firstName || ''} ${f.farmer?.lastName || ''}`
+      const matchesSearch = `${f.farmCode} ${f.name || ''} ${f.farmer?.firstName || ''} ${f.farmer?.lastName || ''} ${f.farmer?.controlNumber || ''} ${locationLabel(f)}`
         .toLowerCase()
         .includes(debouncedSearch);
       if (!matchesSearch) return false;
+      if (attrs.region && f.region !== attrs.region) return false;
+      if (attrs.district && f.district !== attrs.district) return false;
+      if (attrs.ward && f.ward !== attrs.ward) return false;
+      if (attrs.village && f.village !== attrs.village) return false;
+      if (attrs.subVillage && f.subVillage !== attrs.subVillage) return false;
+      if (attrs.ownershipType && f.ownershipType !== attrs.ownershipType) return false;
+      if (attrs.production && productionLabel(f) !== attrs.production) return false;
+      if (attrs.waterSource && f.waterSource !== attrs.waterSource) return false;
+      if (attrs.variety && !riceVarieties(f).includes(attrs.variety)) return false;
       if (filter === 'pending-boundary') return !f.isVerified && isFarmBoundaryMapped(f);
       if (filter === 'verified') return f.isVerified;
       if (filter === 'unmapped') return !isFarmBoundaryMapped(f);
       return true;
     });
-  }, [farms, debouncedSearch, filter]);
+  }, [farms, debouncedSearch, filter, attrs]);
+
+  // Each location level only offers values that exist under the level above it.
+  const within = (level: keyof AttrFilters, rows: Farm[]) => rows.filter((f) => !attrs[level] || (f as any)[level] === attrs[level]);
+  const regionOptions = distinct(farms.map((f) => f.region));
+  const districtOptions = distinct(within('region', farms).map((f) => f.district));
+  const wardOptions = distinct(within('district', within('region', farms)).map((f) => f.ward));
+  const villageOptions = distinct(within('ward', within('district', within('region', farms))).map((f) => f.village));
+  const subVillageOptions = distinct(within('village', within('ward', within('district', within('region', farms)))).map((f) => f.subVillage));
+  const waterOptions = distinct(farms.map((f) => f.waterSource));
+  const varietyOptions = distinct(farms.flatMap((f) => riceVarieties(f)));
+  const setAttr = (key: keyof AttrFilters, value: string) => {
+    const order: (keyof AttrFilters)[] = ['region', 'district', 'ward', 'village', 'subVillage'];
+    const idx = order.indexOf(key);
+    setAttrs((prev) => {
+      const next = { ...prev, [key]: value };
+      if (idx >= 0) order.slice(idx + 1).forEach((k) => { next[k] = ''; });
+      return next;
+    });
+  };
+
+  const exportCsv = () => {
+    const csv = toCsv(
+      ['Farm ID', 'Farmer', 'Control number', 'Region', 'District', 'Ward', 'Village', 'Sub-village', 'Latitude', 'Longitude', 'Hectares', 'Plots', 'Plot area (ha)', 'Ownership', 'Tenure', 'Production', 'Water source', 'Rice variety', 'Boundary mapped', 'Verified'],
+      filtered.map((f) => [
+        f.farmCode, f.farmer ? `${f.farmer.firstName} ${f.farmer.lastName}` : '', f.farmer?.controlNumber ?? '',
+        f.region ?? '', f.district ?? '', f.ward ?? '', f.village ?? '', f.subVillage ?? '',
+        f.centerLatitude ?? '', f.centerLongitude ?? '', f.socialHectares, f._count?.plots ?? 0, totalPlotHectares(f).toFixed(2),
+        f.ownershipType ? OWNERSHIP_LABELS[f.ownershipType] || f.ownershipType : '', f.landTenure ?? '', productionLabel(f), f.waterSource ?? '',
+        riceVarieties(f).join('; '), isFarmBoundaryMapped(f) ? 'Yes' : 'No', f.isVerified ? 'Yes' : 'No',
+      ]),
+    );
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'farms.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -123,10 +193,13 @@ export default function FarmsPage() {
       const label = FILTER_OPTIONS.find((o) => o.value === filter)?.label ?? filter;
       chips.push({ key: 'filter', label, clear: () => { setFilter('all'); setPage(1); } });
     }
+    (Object.keys(attrs) as (keyof AttrFilters)[]).forEach((key) => {
+      if (attrs[key]) chips.push({ key, label: attrs[key], clear: () => setAttr(key, '') });
+    });
     return chips;
-  }, [debouncedSearch, filter]);
+  }, [debouncedSearch, filter, attrs]);
 
-  const resetFilters = () => { setSearch(''); setFilter('all'); setPage(1); };
+  const resetFilters = () => { setSearch(''); setFilter('all'); setAttrs(NO_ATTR_FILTERS); setPage(1); };
 
   return (
     <div className="page-shell farmers-page">
@@ -141,9 +214,13 @@ export default function FarmsPage() {
             {filter === 'pending-boundary' ? ' — mapped farms awaiting official boundary approval' : ''}
           </p>
         </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={exportCsv} disabled={loading || filtered.length === 0}>Export CSV</button>
+          {canRegister && <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={() => setRegistering(true)}>+ Register farm</button>}
         <div style={{ display: 'flex', gap: '4px', background: 'var(--surface-tint)', borderRadius: 8, padding: 4 }}>
           <button className={view === 'list' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => setView('list')}>List</button>
           <button className={view === 'map' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => setView('map')}>Map</button>
+        </div>
         </div>
       </div>
 
@@ -162,7 +239,9 @@ export default function FarmsPage() {
             <MetricTile label="Verified" value={farms.filter((f) => f.isVerified).length} hint="Approved farms" tone="blue" />
             <MetricTile label="Boundary mapped" value={mappedCount} hint="Walked GPS boundary on file" tone="red" />
             <MetricTile label="Currently leased" value={farms.filter((f) => f.isLeased).length} hint="Farms under lease" tone="purple" />
-            <MetricTile label="Total hectares" value={`${totalHectares.toFixed(1)} ha`} hint="Combined social hectares" tone="blue" />
+            <MetricTile label="Total hectares" value={`${totalHectares.toFixed(1)} ha`} hint="Combined farm size" tone="blue" />
+            <MetricTile label="Plots" value={farms.reduce((a, f) => a + (f._count?.plots ?? 0), 0)} hint={`${fmtHa(farms.reduce((a, f) => a + totalPlotHectares(f), 0))} recorded plot area`} tone="green" />
+            <MetricTile label="Irrigated" value={farms.filter((f) => f.hasIrrigation).length} hint={`${farms.filter((f) => !f.hasIrrigation).length} rain-fed`} tone="blue" />
           </>
         )}
       </div>
@@ -191,6 +270,31 @@ export default function FarmsPage() {
               {FILTER_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
+            </select>
+          </div>
+          <div className="farmers-toolbar-main" style={{ flexWrap: 'wrap' }}>
+            {([
+              ['region', 'All regions', regionOptions],
+              ['district', 'All districts', districtOptions],
+              ['ward', 'All wards', wardOptions],
+              ['village', 'All villages', villageOptions],
+              ['subVillage', 'All sub-villages', subVillageOptions],
+              ['variety', 'All rice varieties', varietyOptions],
+              ['waterSource', 'All water sources', waterOptions],
+            ] as [keyof AttrFilters, string, string[]][]).map(([key, label, options]) => (
+              <select key={key} className="farmers-select" value={attrs[key]} onChange={(e) => setAttr(key, e.target.value)} aria-label={label}>
+                <option value="">{label}</option>
+                {options.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            ))}
+            <select className="farmers-select" value={attrs.ownershipType} onChange={(e) => setAttr('ownershipType', e.target.value)} aria-label="Tenure">
+              <option value="">All tenure types</option>
+              {Object.entries(OWNERSHIP_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+            </select>
+            <select className="farmers-select" value={attrs.production} onChange={(e) => setAttr('production', e.target.value)} aria-label="Production system">
+              <option value="">Irrigated &amp; rain-fed</option>
+              <option value="Irrigated">Irrigated</option>
+              <option value="Rain-fed">Rain-fed</option>
             </select>
           </div>
 
@@ -241,13 +345,17 @@ export default function FarmsPage() {
             <table className="data-table farmers-table">
               <thead>
                 <tr>
+                  <th>Farm ID</th>
                   <th>Farmer</th>
-                  <th>AMCOS</th>
-                  <th className="num">Hectares</th>
-                  <th>Grade</th>
-                  <th>Irrigation</th>
-                  <th>Verified</th>
-                  <th>Leased</th>
+                  <th>Location</th>
+                  <th>GPS</th>
+                  <th className="num">Size</th>
+                  <th className="num">Plots</th>
+                  <th>Tenure</th>
+                  <th>Production</th>
+                  <th>Water source</th>
+                  <th>Rice variety</th>
+                  <th>Status</th>
                   {filter === 'pending-boundary' && <th></th>}
                 </tr>
               </thead>
@@ -259,36 +367,37 @@ export default function FarmsPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.22, delay: Math.min(i * 0.03, 0.24), ease: [0.16, 1, 0.3, 1] }}
                   >
+                    <td className="farmers-cell">
+                      <Link href={`/dashboard/farms/${farm.id}`} style={{ fontWeight: 700, textDecoration: 'none', color: 'var(--accent)' }}>{farm.farmCode}</Link>
+                    </td>
                     <td>
-                      <Link href={`/dashboard/farms/${farm.id}`} className="farmers-person" style={{ textDecoration: 'none' }}>
+                      <div className="farmers-person">
                         <span className="avatar-circle farmers-avatar">
                           {farm.farmer ? `${farm.farmer.firstName[0] ?? ''}${farm.farmer.lastName[0] ?? ''}`.toUpperCase() : '?'}
                         </span>
                         <div className="farmers-person-text">
                           <div className="farmers-name">{farm.farmer ? `${farm.farmer.firstName} ${farm.farmer.lastName}` : '—'}</div>
-                          <div className="farmers-phone">{farm.farmer?.controlNumber ?? '—'}</div>
+                          <div className="farmers-phone">{farm.mamcos?.name || farm.farmer?.controlNumber || '—'}</div>
                         </div>
-                      </Link>
+                      </div>
                     </td>
-                    <td className="farmers-cell">{farm.mamcos?.name || '—'}</td>
+                    <td className="farmers-cell">{locationLabel(farm)}</td>
+                    <td className="farmers-cell">
+                      {farm.centerLatitude != null && farm.centerLongitude != null ? `${farm.centerLatitude.toFixed(4)}, ${farm.centerLongitude.toFixed(4)}` : '—'}
+                      {isFarmBoundaryMapped(farm) && <div><span className="badge badge-green">Boundary</span></div>}
+                    </td>
+                    <td className="num"><span className="farmers-size">{fmtHa(farm.socialHectares)}</span></td>
                     <td className="num">
-                      <span className="farmers-size">{farm.socialHectares} ha</span>
+                      {farm._count?.plots ?? 0}
+                      {totalPlotHectares(farm) > 0 && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{fmtHa(totalPlotHectares(farm))}</div>}
                     </td>
-                    <td>{gradeBadge(farm.grade)}</td>
+                    <td className="farmers-cell">{tenureLabel(farm)}</td>
+                    <td><span className={`badge ${farm.hasIrrigation ? 'badge-blue' : 'badge-gold'}`}>{productionLabel(farm)}</span></td>
+                    <td className="farmers-cell">{farm.waterSource || '—'}</td>
+                    <td className="farmers-cell">{riceVarieties(farm).join(', ') || '—'}</td>
                     <td>
-                      <span className={`badge ${farm.hasIrrigation ? 'badge-green' : 'badge-gray'}`}>
-                        {farm.hasIrrigation ? '✓ Yes' : '✕ No'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`badge ${farm.isVerified ? 'badge-green' : 'badge-gold'}`}>
-                        {farm.isVerified ? '✓ Verified' : '⏳ Pending'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`badge ${farm.isLeased ? 'badge-blue' : 'badge-gray'}`}>
-                        {farm.isLeased ? '🔒 Leased' : 'Available'}
-                      </span>
+                      <span className={`badge ${farm.isVerified ? 'badge-green' : 'badge-gold'}`}>{farm.isVerified ? '✓ Verified' : '⏳ Pending'}</span>
+                      {farm.isLeased && <div><span className="badge badge-blue">Leased</span></div>}
                     </td>
                     {filter === 'pending-boundary' && (
                       <td>
@@ -346,6 +455,12 @@ export default function FarmsPage() {
           </div>
         )}
       </section>
+      {registering && (
+        <FarmEditorModal
+          onClose={() => setRegistering(false)}
+          onSaved={() => { setRegistering(false); setLoading(true); load(); }}
+        />
+      )}
     </div>
   );
 }

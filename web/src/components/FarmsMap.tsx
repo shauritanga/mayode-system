@@ -1,8 +1,10 @@
 'use client';
-import { MapContainer, TileLayer, Polygon, Popup } from 'react-leaflet';
+import { useEffect } from 'react';
+import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { asPolygonGeometry, isFarmBoundaryMapped, type FarmGeoLike } from '@/lib/farm-geo';
+import { asPolygonGeometry, hasFarmCenterPin, isFarmBoundaryMapped, type FarmGeoLike } from '@/lib/farm-geo';
+import { locationLabel, productionLabel, riceVarieties, tenureLabel } from '@/lib/farm-format';
 
 // Default Leaflet marker icons reference bundler-relative asset paths that break under Next.js;
 // point them at unpkg's hosted copies instead of shipping/wiring our own icon assets.
@@ -19,11 +21,24 @@ export interface MappableFarm extends FarmGeoLike {
   name?: string;
   socialHectares: number;
   isVerified: boolean;
+  hasIrrigation?: boolean;
+  ownershipType?: string | null;
+  landTenure?: string | null;
+  region?: string | null;
+  district?: string | null;
+  ward?: string | null;
+  village?: string | null;
+  subVillage?: string | null;
+  cropCycles?: { riceVariety?: string | null; status?: string | null }[];
   farmer?: { firstName: string; lastName: string; controlNumber: string };
 }
 
 // Mbarali, Mbeya — the cooperative's home district — as a sensible default center.
 const DEFAULT_CENTER: [number, number] = [-8.9, 34.3];
+
+const VERIFIED = '#059669';
+const PENDING = '#D97706';
+const PIN_ONLY = '#2563EB';
 
 function boundaryLatLngs(farm: MappableFarm): [number, number][] | null {
   const poly = asPolygonGeometry(farm.boundaryCoordinates);
@@ -32,49 +47,104 @@ function boundaryLatLngs(farm: MappableFarm): [number, number][] | null {
   return ring.map(([lng, lat]) => [lat, lng]);
 }
 
+function FitToFarms({ points }: { points: [number, number][] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (points.length === 0) return;
+    map.fitBounds(L.latLngBounds(points), { padding: [28, 28], maxZoom: 15 });
+  }, [map, points]);
+  return null;
+}
+
+function FarmPopup({ farm }: { farm: MappableFarm }) {
+  const varieties = riceVarieties(farm);
+  return (
+    <div style={{ minWidth: 200, lineHeight: 1.5 }}>
+      <strong>{farm.farmCode}</strong>
+      <br />
+      {farm.farmer ? `${farm.farmer.firstName} ${farm.farmer.lastName}` : 'No farmer linked'}
+      <br />
+      {locationLabel(farm)}
+      <br />
+      {farm.socialHectares} ha · {productionLabel(farm)}
+      <br />
+      Tenure: {tenureLabel(farm)}
+      <br />
+      Rice: {varieties.length ? varieties.join(', ') : '—'}
+      <br />
+      {farm.isVerified ? 'Verified' : 'Pending verification'}
+      <br />
+      <a href={`/dashboard/farms/${farm.id}`}>Open farm →</a>
+    </div>
+  );
+}
+
+const legendDot = (color: string) => (
+  <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: color, marginRight: 6 }} />
+);
+
 export default function FarmsMap({ farms }: { farms: MappableFarm[] }) {
-  // Only farms with a real walked GPS boundary — a center pin from a seed/import
-  // isn't a mapped farm, so it doesn't belong on this map.
-  const mapped = farms
+  const polygons = farms
     .filter(isFarmBoundaryMapped)
     .map((farm) => ({ farm, positions: boundaryLatLngs(farm) }))
     .filter((entry): entry is { farm: MappableFarm; positions: [number, number][] } => entry.positions !== null);
+  const polygonIds = new Set(polygons.map((p) => p.farm.id));
+  // Registered farms with a GPS point but no walked boundary yet are shown as pins so every located farm is on the map.
+  const pins = farms.filter((f) => !polygonIds.has(f.id) && hasFarmCenterPin(f));
 
-  const center: [number, number] = mapped.length ? mapped[0].positions[0] : DEFAULT_CENTER;
+  const points: [number, number][] = [
+    ...polygons.flatMap((p) => p.positions),
+    ...pins.map((f) => [f.centerLatitude as number, f.centerLongitude as number] as [number, number]),
+  ];
+  const missing = farms.length - polygons.length - pins.length;
 
-  if (mapped.length === 0) {
+  if (points.length === 0) {
     return (
       <div style={{ padding: '48px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '14px' }}>
-        No farms with a walked GPS boundary yet.
+        None of these farms has GPS coordinates or a walked boundary yet.
       </div>
     );
   }
 
   return (
-    <MapContainer center={center} zoom={mapped.length ? 12 : 8} style={{ height: 420, width: '100%', borderRadius: 12 }}>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {mapped.map(({ farm, positions }) => (
-        <Polygon
-          key={farm.id}
-          positions={positions}
-          pathOptions={{
-            color: farm.isVerified ? '#059669' : '#D97706',
-            fillColor: farm.isVerified ? '#059669' : '#D97706',
-            fillOpacity: 0.25,
-            weight: 2,
-          }}
-        >
-          <Popup>
-            <strong>{farm.farmCode}</strong><br />
-            {farm.name || 'Unnamed farm'}<br />
-            {farm.farmer ? `${farm.farmer.firstName} ${farm.farmer.lastName}` : 'No farmer linked'}<br />
-            {farm.socialHectares} ha · {farm.isVerified ? 'Verified' : 'Pending verification'}
-          </Popup>
-        </Polygon>
-      ))}
-    </MapContainer>
+    <div style={{ position: 'relative' }}>
+      <MapContainer center={points[0] || DEFAULT_CENTER} zoom={12} style={{ height: 520, width: '100%', borderRadius: 12 }}>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <FitToFarms points={points} />
+        {polygons.map(({ farm, positions }) => {
+          const color = farm.isVerified ? VERIFIED : PENDING;
+          return (
+            <Polygon key={farm.id} positions={positions} pathOptions={{ color, fillColor: color, fillOpacity: 0.25, weight: 2 }}>
+              <Popup><FarmPopup farm={farm} /></Popup>
+            </Polygon>
+          );
+        })}
+        {pins.map((farm) => (
+          <CircleMarker
+            key={farm.id}
+            center={[farm.centerLatitude as number, farm.centerLongitude as number]}
+            radius={7}
+            pathOptions={{ color: '#fff', weight: 2, fillColor: PIN_ONLY, fillOpacity: 0.9 }}
+          >
+            <Popup><FarmPopup farm={farm} /></Popup>
+          </CircleMarker>
+        ))}
+      </MapContainer>
+      <div
+        style={{
+          position: 'absolute', left: 12, bottom: 12, zIndex: 500, background: 'var(--surface-1)', color: 'var(--text-1)',
+          border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '8px 12px', fontSize: 12, lineHeight: 1.7,
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
+        <div>{legendDot(VERIFIED)}Verified boundary ({polygons.filter((p) => p.farm.isVerified).length})</div>
+        <div>{legendDot(PENDING)}Boundary pending ({polygons.filter((p) => !p.farm.isVerified).length})</div>
+        <div>{legendDot(PIN_ONLY)}GPS point only ({pins.length})</div>
+        {missing > 0 && <div style={{ color: 'var(--text-3)' }}>{missing} farm{missing === 1 ? '' : 's'} without GPS</div>}
+      </div>
+    </div>
   );
 }
