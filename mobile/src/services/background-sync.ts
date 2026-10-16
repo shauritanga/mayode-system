@@ -2,8 +2,14 @@ import * as BackgroundTask from "expo-background-task";
 import * as TaskManager from "expo-task-manager";
 import { useAuthStore } from "../store/auth.store";
 import { syncQueue } from "./sync-queue";
+import { api } from "../lib/api";
 
 const TASK = "mayode-field-record-sync";
+// Field officers tell the server when their phone last synced, for the admin's officer dashboard.
+syncQueue.onSynced(async () => {
+  if (useAuthStore.getState().user?.role !== "FIELD_OFFICER") return;
+  await api.post("/field-officers/me/sync");
+});
 // Imported by the application entry point, including headless native launches.
 TaskManager.defineTask(TASK, async () => {
   try {

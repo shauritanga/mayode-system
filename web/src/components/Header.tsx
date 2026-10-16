@@ -36,6 +36,7 @@ const TITLE_MAP: Record<string, string> = {
   'crop-cycles': 'Crop Cycles',
   'rice-tasks': 'Rice Tasks',
   'field-officer': 'Field Dashboard',
+  'field-officers': 'Field Officers',
   'field-surveys': 'Field Surveys',
   auditor: 'Auditor Dashboard',
   'financial-provider': 'Credit Dashboard',

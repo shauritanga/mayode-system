@@ -79,6 +79,14 @@ export class FarmersService {
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const controlNumber = await this.generateControlNumber();
+    // A farmer registered by a field officer is credited to, and assigned to, that officer.
+    const registeringOfficer =
+      actor?.role === UserRole.FIELD_OFFICER
+        ? await this.prisma.mamcosStaff.findFirst({
+            where: { userId: actor.id, role: MamcosStaffRole.FIELD_OFFICER },
+            select: { id: true },
+          })
+        : null;
 
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -115,6 +123,8 @@ export class FarmersService {
           dependents: dto.dependents,
           dataShareConsent: dto.dataShareConsent ?? false,
           consentedAt: dto.dataShareConsent ? new Date() : null,
+          registeredByOfficerId: registeringOfficer?.id,
+          assignedOfficerId: registeringOfficer?.id,
         },
         include: { user: { select: { phone: true, email: true } } },
       });
@@ -335,6 +345,11 @@ export class FarmersService {
     if (officer.role !== MamcosStaffRole.FIELD_OFFICER) {
       throw new ConflictException('Assignee must be a field officer');
     }
+    // The farmer's farms that have no officer yet follow them.
+    await this.prisma.farm.updateMany({
+      where: { farmerId, assignedOfficerId: null },
+      data: { assignedOfficerId: dto.officerId },
+    });
     return this.prisma.farmer.update({
       where: { id: farmerId },
       data: { assignedOfficerId: dto.officerId },

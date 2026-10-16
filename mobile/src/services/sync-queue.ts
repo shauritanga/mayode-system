@@ -27,6 +27,9 @@ let replay: ((mutation: PendingMutation) => Promise<void>) | null = null;
 let running = false;
 let discard: ((mutation: PendingMutation) => Promise<void>) | null = null;
 let connected = true;
+let onSynced: (() => Promise<void>) | null = null;
+let lastReported = 0;
+const REPORT_EVERY_MS = 5 * 60 * 1000;
 let lock: Promise<unknown> = Promise.resolve();
 const listeners = new Set<(state: SyncState) => void>();
 const key = (id: string) => `mayode.sync.v2.${id}`;
@@ -69,6 +72,10 @@ export const syncQueue = {
   },
   onDiscard(handler: (mutation: PendingMutation) => Promise<void>) {
     discard = handler;
+  },
+  /** Called after a flush that left nothing pending, at most every few minutes (tells the server the device is in sync). */
+  onSynced(handler: () => Promise<void>) {
+    onSynced = handler;
   },
   configure(handler: (mutation: PendingMutation) => Promise<void>) {
     replay = handler;
@@ -130,6 +137,17 @@ export const syncQueue = {
           // Keep dependent records behind the failed parent until corrected/retried.
           break;
         }
+      }
+      if (
+        onSynced &&
+        owner === id &&
+        Date.now() - lastReported > REPORT_EVERY_MS &&
+        (await read(id)).length === 0
+      ) {
+        lastReported = Date.now();
+        await onSynced().catch(() => {
+          lastReported = 0;
+        });
       }
     } finally {
       running = false;

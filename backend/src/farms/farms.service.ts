@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MamcosStaffRole, Prisma } from '@prisma/client';
+import { MamcosStaffRole, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { MembershipsService } from '../memberships/memberships.service';
@@ -50,9 +50,19 @@ export class FarmsService {
     await this.ownership.assertFarmerAccess(user, dto.farmerId);
 
     const farmCode = await this.generateFarmCode(dto.farmerId);
+    // A farm mapped by a field officer is credited to that officer, who stays responsible for it.
+    const mappingOfficer =
+      user.role === UserRole.FIELD_OFFICER
+        ? await this.prisma.mamcosStaff.findFirst({
+            where: { userId: user.id, role: MamcosStaffRole.FIELD_OFFICER },
+            select: { id: true },
+          })
+        : null;
 
     const farm = await this.prisma.farm.create({
       data: {
+        registeredByOfficerId: mappingOfficer?.id,
+        assignedOfficerId: mappingOfficer?.id ?? farmer.assignedOfficerId,
         farmerId: dto.farmerId,
         mamcosId: dto.mamcosId || farmer.mamcosId,
         farmCode,

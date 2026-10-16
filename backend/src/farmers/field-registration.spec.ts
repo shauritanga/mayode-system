@@ -18,6 +18,7 @@ function setup() {
     user,
     farmer,
     role,
+    mamcosStaff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff-1' }) },
     $transaction: jest.fn(async (fn) => fn({ user, farmer })),
   };
   const ownership = {
@@ -57,6 +58,8 @@ describe('Officer registration and basic performance', () => {
         data: expect.objectContaining({
           mamcosId: 'officer-cooperative',
           village: 'Madibira',
+          registeredByOfficerId: 'staff-1',
+          assignedOfficerId: 'staff-1',
         }),
       }),
     );

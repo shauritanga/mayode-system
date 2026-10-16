@@ -33,6 +33,8 @@ model User {
   pushToken       String?   @map("push_token") // Expo Push Notification Token
   profilePhotoUrl String?   @map("profile_photo_url")
   lastLoginAt     DateTime? @map("last_login_at")
+  /// Last time the mobile app synced its offline data to the server.
+  lastSyncAt      DateTime? @map("last_sync_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
@@ -150,7 +152,9 @@ model Farmer {
   // Which field officer is responsible for following up on this farmer —
   // loose id reference (no @relation), matching the verifiedById convention
   // above. Powers the "pending tasks per officer" admin view.
-  assignedOfficerId String? @map("assigned_officer_id")
+  assignedOfficerId     String? @map("assigned_officer_id")
+  /// Field officer who registered this farmer (loose id reference to MamcosStaff).
+  registeredByOfficerId String? @map("registered_by_officer_id")
 
   membershipDate   DateTime  @default(now()) @map("membership_date")
   creditScore      Float     @default(0) @map("credit_score")
@@ -229,6 +233,8 @@ model MamcosStaff {
   // Field-officer only.
   employeeCode   String?         @unique @map("employee_code")
   assignedArea   String?         @map("assigned_area")
+  region         String?
+  district       String?
   // Secretary only.
   stabilityBonus Float           @default(0) @map("stability_bonus")
   createdAt      DateTime        @default(now()) @map("created_at")
@@ -321,29 +327,33 @@ model AggregationCentre {
 // ============================================================
 
 model Farm {
-  id             String    @id @default(uuid())
-  farmCode       String    @unique @map("farm_code") // e.g., FP-JD-01
+  id                    String    @id @default(uuid())
+  farmCode              String    @unique @map("farm_code") // e.g., FP-JD-01
+  /// Field officer who registered / mapped this farm, and the one now responsible for it
+  /// (loose id references to MamcosStaff).
+  registeredByOfficerId String?   @map("registered_by_officer_id")
+  assignedOfficerId     String?   @map("assigned_officer_id")
   // Official farms are owned by AMCOS. This remains only for legacy records;
   // a verified SeasonalFarmAssignment grants renter operating access.
-  farmerId       String?   @map("farmer_id")
-  mamcosId       String?   @map("mamcos_id")
-  name           String
-  plotNumber     String?   @map("plot_number")
-  blockNumber    String?   @map("block_number")
-  section        String?
-  village        String?
-  subVillage     String?   @map("sub_village") // kitongoji
-  ward           String?
-  district       String?
-  region         String?
-  socialHectares Float     @map("social_hectares") // The "social" unit
-  actualAcres    Float?    @map("actual_acres") // GPS-verified actual size
-  grade          FarmGrade @default(B)
-  vichuguuCount  Int       @default(0) @map("vichuguu_count")
-  hasIrrigation  Boolean   @default(false) @map("has_irrigation")
-  nearRoad       Boolean   @default(false) @map("near_road")
-  soilCondition  String?   @map("soil_condition")
-  photoUrls      String[]  @map("photo_urls")
+  farmerId              String?   @map("farmer_id")
+  mamcosId              String?   @map("mamcos_id")
+  name                  String
+  plotNumber            String?   @map("plot_number")
+  blockNumber           String?   @map("block_number")
+  section               String?
+  village               String?
+  subVillage            String?   @map("sub_village") // kitongoji
+  ward                  String?
+  district              String?
+  region                String?
+  socialHectares        Float     @map("social_hectares") // The "social" unit
+  actualAcres           Float?    @map("actual_acres") // GPS-verified actual size
+  grade                 FarmGrade @default(B)
+  vichuguuCount         Int       @default(0) @map("vichuguu_count")
+  hasIrrigation         Boolean   @default(false) @map("has_irrigation")
+  nearRoad              Boolean   @default(false) @map("near_road")
+  soilCondition         String?   @map("soil_condition")
+  photoUrls             String[]  @map("photo_urls")
 
   // Extended farm characteristics
   ownershipType      OwnershipType? @map("ownership_type")

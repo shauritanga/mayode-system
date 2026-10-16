@@ -74,6 +74,7 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/mamcos', label: 'AMCOS', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'mamcos' },
       { href: '/dashboard/memberships', label: 'Membership', icon: StarIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'memberships' },
       { href: '/dashboard/farms', label: 'Farms', icon: Plant01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'farms' },
+      { href: '/dashboard/field-officers', label: 'Field Officers', icon: UserAdd01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'users' },
       { href: '/dashboard/rice-calendar', label: 'Rice Calendar', icon: BookOpen01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'rice_protocols' },
     ],
   },
@@ -124,6 +125,7 @@ export const navGroups: NavGroup[] = [
     label: 'People',
     items: [
       { href: '/dashboard/staff', label: 'Staff', icon: UserAdd01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'users' },
+      { href: '/dashboard/field-officers', label: 'Field Officers', icon: UserGroupIcon, roles: ['MAMCOS_SECRETARY'], resource: 'users' },
       { href: '/dashboard/farmers', label: 'Farmers', icon: UserGroupIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER'], resource: 'farmers' },
       { href: '/dashboard/memberships', label: 'Memberships', icon: StarIcon, roles: ['MAMCOS_SECRETARY'], resource: 'memberships' },
     ],

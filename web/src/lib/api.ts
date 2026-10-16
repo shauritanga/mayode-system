@@ -160,6 +160,13 @@ export const mamcosApi = {
   dashboard: () => api.get('/mamcos/secretary-dashboard'),
   fieldOfficers: () => api.get('/mamcos/staff/field-officers'),
 };
+export const fieldOfficersApi = {
+  list: () => api.get('/field-officers'),
+  getOne: (id: string) => api.get(`/field-officers/${id}`),
+  update: (id: string, data: object) => api.patch(`/field-officers/${id}`, data),
+  assign: (id: string, data: { farmerIds?: string[]; farmIds?: string[]; unassign?: boolean }) => api.post(`/field-officers/${id}/assign`, data),
+  unassigned: () => api.get('/field-officers/unassigned'),
+};
 export const facilitiesApi = {
   getIrrigationSchemes: (mamcosId?: string) => api.get('/facilities/irrigation-schemes', { params: mamcosId ? { mamcosId } : undefined }),
   createIrrigationScheme: (data: object) => api.post('/facilities/irrigation-schemes', data),
