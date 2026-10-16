@@ -18,6 +18,9 @@ import { applyGrowthStage } from './growth-stages';
 
 const ACTIVITY_ICONS: Record<string, string> = {
   LAND_PREPARATION: '🚜',
+  SEED_SELECTION: '🌾',
+  NURSERY_ESTABLISHMENT: '🪴',
+  FIELD_INSPECTION: '🔍',
   PLANTING: '🌱',
   FERTILIZING: '🧪',
   WEEDING: '🌿',
@@ -232,63 +235,76 @@ export class CropCyclesService {
     });
   }
 
-  /** Platform-wide activity log list for admin reporting (field officer "crop records updated" ranking). */
-  findAllActivityLogs() {
-    return this.prisma.activityLog.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        fieldOfficer: {
+  private readonly activityInclude = {
+    fieldOfficer: {
+      select: { id: true, firstName: true, lastName: true, employeeCode: true },
+    },
+    plot: { select: { id: true, plotCode: true, name: true } },
+    cropCycle: {
+      select: {
+        id: true,
+        season: true,
+        riceVariety: true,
+        farmId: true,
+        farm: {
+          select: { id: true, farmCode: true, region: true, district: true },
+        },
+        farmer: {
           select: {
             id: true,
+            controlNumber: true,
             firstName: true,
             lastName: true,
-            employeeCode: true,
-          },
-        },
-        cropCycle: {
-          select: {
-            season: true,
-            riceVariety: true,
-            farm: { select: { farmCode: true } },
           },
         },
       },
+    },
+  } satisfies Prisma.ActivityLogInclude;
+
+  /** Activity records for the admin; cooperative staff only see their own AMCOS's farms. */
+  findAllActivityLogs(
+    user?: RequestUser,
+    filters: { cropCycleId?: string; farmId?: string } = {},
+  ) {
+    const tenantId = user ? this.ownership.resolveTenantMamcosId(user) : null;
+    return this.prisma.activityLog.findMany({
+      where: {
+        cropCycleId: filters.cropCycleId,
+        cropCycle: {
+          farmId: filters.farmId,
+          ...(tenantId ? { farm: { mamcosId: tenantId } } : {}),
+        },
+      },
+      orderBy: { activityDate: 'desc' },
+      include: this.activityInclude,
     });
   }
 
-  async findActivityLogById(id: string) {
+  async findActivityLogById(id: string, user?: RequestUser) {
     const activity = await this.prisma.activityLog.findUnique({
       where: { id },
-      include: {
-        fieldOfficer: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            employeeCode: true,
-          },
-        },
-        cropCycle: {
-          select: {
-            season: true,
-            riceVariety: true,
-            farm: { select: { farmCode: true } },
-          },
-        },
-      },
+      include: this.activityInclude,
     });
     if (!activity)
       throw new NotFoundException(`Activity log with ID ${id} not found`);
+    if (user)
+      await this.ownership.assertFarmAccess(user, activity.cropCycle.farmId);
     return activity;
   }
 
-  async updateActivityLog(id: string, dto: UpdateActivityLogDto) {
-    const existing = await this.findActivityLogById(id);
+  async updateActivityLog(
+    id: string,
+    dto: UpdateActivityLogDto,
+    user?: RequestUser,
+  ) {
+    const existing = await this.findActivityLogById(id, user);
     await this.validateActivity(
       existing.cropCycleId,
       { ...existing, ...dto },
       id,
     );
+    await this.assertPlotOnFarm(dto.plotId, existing.cropCycle.farmId);
+    await this.assertKnownOfficer(dto.fieldOfficerId);
     return this.prisma.activityLog.update({
       where: { id },
       data: {
@@ -296,23 +312,33 @@ export class CropCyclesService {
         activityDate: dto.activityDate ? new Date(dto.activityDate) : undefined,
         inputsUsed: dto.inputsUsed ?? undefined,
       },
-      include: {
-        fieldOfficer: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            employeeCode: true,
-          },
-        },
-      },
+      include: this.activityInclude,
     });
   }
 
-  async deleteActivityLog(id: string) {
-    await this.findActivityLogById(id);
+  async deleteActivityLog(id: string, user?: RequestUser) {
+    await this.findActivityLogById(id, user);
     await this.prisma.activityLog.delete({ where: { id } });
     return { deleted: true };
+  }
+
+  private async assertPlotOnFarm(plotId: string | undefined, farmId: string) {
+    if (!plotId) return;
+    const plot = await this.prisma.plot.findUnique({
+      where: { id: plotId },
+      select: { farmId: true },
+    });
+    if (!plot || plot.farmId !== farmId)
+      throw new BadRequestException('That plot does not belong to this farm');
+  }
+
+  private async assertKnownOfficer(fieldOfficerId: string | undefined) {
+    if (!fieldOfficerId) return;
+    const officer = await this.prisma.mamcosStaff.findUnique({
+      where: { id: fieldOfficerId },
+      select: { id: true },
+    });
+    if (!officer) throw new NotFoundException('Field officer not found');
   }
 
   async findOne(id: string, user?: RequestUser) {
@@ -327,6 +353,7 @@ export class CropCyclesService {
             fieldOfficer: {
               select: { employeeCode: true, firstName: true, lastName: true },
             },
+            plot: { select: { id: true, plotCode: true, name: true } },
           },
         },
         costs: { orderBy: { dateIncurred: 'desc' } },
@@ -690,10 +717,14 @@ export class CropCyclesService {
     const cropCycle = await this.findOne(dto.cropCycleId, user); // verifies existence + ownership
 
     await this.validateActivity(dto.cropCycleId, dto);
+    await this.assertPlotOnFarm(dto.plotId, cropCycle.farmId);
+    await this.assertKnownOfficer(dto.fieldOfficerId);
 
-    const fieldOfficer = await this.prisma.mamcosStaff.findFirst({
-      where: { userId: user.id, role: MamcosStaffRole.FIELD_OFFICER },
-    });
+    const fieldOfficer = dto.fieldOfficerId
+      ? { id: dto.fieldOfficerId }
+      : await this.prisma.mamcosStaff.findFirst({
+          where: { userId: user.id, role: MamcosStaffRole.FIELD_OFFICER },
+        });
 
     const activity = await this.prisma.activityLog.create({
       data: {
@@ -711,12 +742,14 @@ export class CropCyclesService {
         photoUrls: dto.photoUrls || [],
         gpsLatitude: dto.gpsLatitude,
         gpsLongitude: dto.gpsLongitude,
+        plotId: dto.plotId,
+        inputName: dto.inputName,
+        inputQuantity: dto.inputQuantity,
+        inputUnit: dto.inputUnit,
+        cost: dto.cost,
+        remarks: dto.remarks,
       },
-      include: {
-        fieldOfficer: {
-          select: { employeeCode: true, firstName: true, lastName: true },
-        },
-      },
+      include: this.activityInclude,
     });
 
     const label = dto.activityType.replace(/_/g, ' ').toLowerCase();

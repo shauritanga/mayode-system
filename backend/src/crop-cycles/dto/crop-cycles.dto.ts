@@ -336,6 +336,47 @@ export class CreateActivityLogDto {
   @IsNumber()
   @IsOptional()
   gpsLongitude?: number;
+
+  @ApiPropertyOptional({
+    description: 'Plot of the farm the work was done on; leave empty for the whole farm',
+  })
+  @IsString()
+  @IsOptional()
+  plotId?: string;
+
+  @ApiPropertyOptional({ example: 'NPK 20:10:10', description: 'Main input used' })
+  @IsString()
+  @IsOptional()
+  inputName?: string;
+
+  @ApiPropertyOptional({ example: 50 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  inputQuantity?: number;
+
+  @ApiPropertyOptional({ example: 'kg' })
+  @IsString()
+  @IsOptional()
+  inputUnit?: string;
+
+  @ApiPropertyOptional({ example: 120000, description: 'Total cost of the activity in TZS' })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  cost?: number;
+
+  @ApiPropertyOptional({ example: 'Rain delayed the work by two days.' })
+  @IsString()
+  @IsOptional()
+  remarks?: string;
+
+  @ApiPropertyOptional({
+    description: 'Field officer who did or supervised the work (staff entering on their behalf)',
+  })
+  @IsString()
+  @IsOptional()
+  fieldOfficerId?: string;
 }
 
 export class UpdateActivityLogDto extends PartialType(

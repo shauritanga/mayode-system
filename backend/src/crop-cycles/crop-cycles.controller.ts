@@ -139,8 +139,15 @@ export class CropCyclesController {
   @ApiOperation({
     summary: 'Get all activity log entries across the system (staff only)',
   })
-  findAllActivityLogs() {
-    return this.cropCyclesService.findAllActivityLogs();
+  findAllActivityLogs(
+    @CurrentUser() user: RequestUser,
+    @Query('cropCycleId') cropCycleId?: string,
+    @Query('farmId') farmId?: string,
+  ) {
+    return this.cropCyclesService.findAllActivityLogs(user, {
+      cropCycleId,
+      farmId,
+    });
   }
 
   @Get('activity/:id')
@@ -148,8 +155,8 @@ export class CropCyclesController {
   @ApiOperation({
     summary: 'Get a single activity log entry by ID (staff only)',
   })
-  findActivityLog(@Param('id') id: string) {
-    return this.cropCyclesService.findActivityLogById(id);
+  findActivityLog(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.cropCyclesService.findActivityLogById(id, user);
   }
 
   @Patch('activity/:id')
@@ -158,15 +165,16 @@ export class CropCyclesController {
   updateActivityLog(
     @Param('id') id: string,
     @Body() dto: UpdateActivityLogDto,
+    @CurrentUser() user: RequestUser,
   ) {
-    return this.cropCyclesService.updateActivityLog(id, dto);
+    return this.cropCyclesService.updateActivityLog(id, dto, user);
   }
 
   @Delete('activity/:id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.MAMCOS_SECRETARY)
   @ApiOperation({ summary: 'Delete an activity log entry (staff only)' })
-  deleteActivityLog(@Param('id') id: string) {
-    return this.cropCyclesService.deleteActivityLog(id);
+  deleteActivityLog(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.cropCyclesService.deleteActivityLog(id, user);
   }
 
   @Get('farm/:farmId')

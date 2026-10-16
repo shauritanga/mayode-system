@@ -44,6 +44,51 @@ function setup() {
   );
   return { service, prisma, cycle };
 }
+describe('Activity record fields', () => {
+  const pipe = new ValidationPipe({
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: true,
+  });
+  it.each(['SEED_SELECTION', 'NURSERY_ESTABLISHMENT', 'FIELD_INSPECTION'])(
+    'accepts the %s activity type with plot, input, cost and remarks',
+    async (activityType) => {
+      await expect(
+        pipe.transform(
+          {
+            ...activity,
+            activityType,
+            plotId: 'plot',
+            inputName: 'NPK',
+            inputQuantity: 50,
+            inputUnit: 'kg',
+            cost: 120000,
+            remarks: 'ok',
+          },
+          { type: 'body', metatype: CreateActivityLogDto },
+        ),
+      ).resolves.toBeDefined();
+    },
+  );
+  it('rejects a negative cost', async () => {
+    await expect(
+      pipe.transform(
+        { ...activity, cost: -1 },
+        { type: 'body', metatype: CreateActivityLogDto },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+  it('rejects a plot from another farm', async () => {
+    const { service, prisma } = setup();
+    (prisma as any).plot = {
+      findUnique: jest.fn().mockResolvedValue({ farmId: 'other-farm' }),
+    };
+    await expect(
+      (service as any).assertPlotOnFarm('plot', 'farm'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
 describe('Field record validation', () => {
   const pipe = new ValidationPipe({
     transform: true,

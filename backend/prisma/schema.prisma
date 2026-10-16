@@ -437,17 +437,17 @@ model CropCycle {
   status           CropCycleStatus @default(PLANNED)
 
   /// The farming season (registration/verification window) this crop belongs to.
-  farmingSeasonId String?              @map("farming_season_id")
-  areaPlantedHa   Float?               @map("area_planted_ha")
-  seedQuantityKg  Float?               @map("seed_quantity_kg")
-  productionMethod ProductionMethod?   @map("production_method")
-  irrigationType  CycleIrrigationType? @map("irrigation_type")
+  farmingSeasonId  String?              @map("farming_season_id")
+  areaPlantedHa    Float?               @map("area_planted_ha")
+  seedQuantityKg   Float?               @map("seed_quantity_kg")
+  productionMethod ProductionMethod?    @map("production_method")
+  irrigationType   CycleIrrigationType? @map("irrigation_type")
   /// Current stage of the crop; moved by the admin or by a field officer's visit.
-  growthStage     RiceGrowthStage?     @map("growth_stage")
-  stageUpdatedAt  DateTime?            @map("stage_updated_at")
+  growthStage      RiceGrowthStage?     @map("growth_stage")
+  stageUpdatedAt   DateTime?            @map("stage_updated_at")
 
-  createdAt        DateTime        @default(now()) @map("created_at")
-  updatedAt        DateTime        @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   farm                 Farm                  @relation(fields: [farmId], references: [id])
@@ -473,14 +473,14 @@ model CropCycle {
 
 /// One move of a crop cycle from stage to stage, so the admin can show a timeline.
 model CropStageChange {
-  id              String           @id @default(uuid())
-  cropCycleId     String           @map("crop_cycle_id")
+  id              String          @id @default(uuid())
+  cropCycleId     String          @map("crop_cycle_id")
   stage           RiceGrowthStage
   /// ADMIN (set on the dashboard) or VISIT (reported by a field officer).
   source          String
   note            String?
-  changedByUserId String?          @map("changed_by_user_id")
-  changedAt       DateTime         @default(now()) @map("changed_at")
+  changedByUserId String?         @map("changed_by_user_id")
+  changedAt       DateTime        @default(now()) @map("changed_at")
 
   cropCycle CropCycle @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
 
@@ -504,12 +504,23 @@ model ActivityLog {
   photoUrls        String[]     @map("photo_urls")
   gpsLatitude      Float?       @map("gps_latitude")
   gpsLongitude     Float?       @map("gps_longitude")
+  /// Plot the work was done on; empty means the whole farm.
+  plotId           String?      @map("plot_id")
+  /// Main input used (seed, fertilizer, chemical...). Several inputs can also go in inputsUsed.
+  inputName        String?      @map("input_name")
+  inputQuantity    Float?       @map("input_quantity")
+  inputUnit        String?      @map("input_unit")
+  /// Total cost of the activity in TZS (inputs, hire, fuel...).
+  cost             Float?
+  remarks          String?
   createdAt        DateTime     @default(now()) @map("created_at")
 
   // Relations
   cropCycle    CropCycle    @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
   fieldOfficer MamcosStaff? @relation(fields: [fieldOfficerId], references: [id])
+  plot         Plot?        @relation(fields: [plotId], references: [id], onDelete: SetNull)
 
+  @@index([cropCycleId, activityDate])
   @@map("activity_logs")
 }
 
@@ -1697,8 +1708,9 @@ model Plot {
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  farm       Farm        @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  cropCycles CropCycle[]
+  farm         Farm          @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  cropCycles   CropCycle[]
+  activityLogs ActivityLog[]
 
   @@map("plots")
 }
@@ -2463,11 +2475,15 @@ enum CropCycleStatus {
 
 enum ActivityType {
   LAND_PREPARATION
+  SEED_SELECTION
+  NURSERY_ESTABLISHMENT
+  /// Planting or transplanting.
   PLANTING
   FERTILIZING
   WEEDING
   PEST_CONTROL
   IRRIGATION
+  FIELD_INSPECTION
   HARVESTING
   DRYING
   STORAGE

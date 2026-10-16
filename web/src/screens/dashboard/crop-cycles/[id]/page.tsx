@@ -6,6 +6,8 @@ import { cropCyclesApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import CropCycleEditorModal from '@/components/CropCycleEditorModal';
 import CropStageStepper from '@/components/CropStageStepper';
+import ActivityEditorModal from '@/components/ActivityEditorModal';
+import { activityInputs, activityLabel } from '@/lib/activity-types';
 import { fmtHa } from '@/lib/farm-format';
 import { IRRIGATION_TYPES, PRODUCTION_METHODS, fmtDate, fmtKg, stageIndex, stageLabel, statusBadgeClass } from '@/lib/crop-stages';
 
@@ -29,6 +31,7 @@ export default function CropCycleDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
+  const [activityEditor, setActivityEditor] = useState<{ activity?: any } | null>(null);
 
   const load = () => {
     cropCyclesApi.getOne(id)
@@ -170,6 +173,45 @@ export default function CropCycleDetailPage() {
         )}
       </div>
 
+      <div className="glass-card" style={{ padding: 20, marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <h3 style={{ ...h3, margin: 0 }}>Activities ({(cycle.activities || []).length})</h3>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link href="/dashboard/activities" style={{ fontSize: 12, color: 'var(--accent)', alignSelf: 'center' }}>All activities</Link>
+            {canEdit && <button className="btn-primary" style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => setActivityEditor({})}>+ Record activity</button>}
+          </div>
+        </div>
+        {(cycle.activities || []).length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--neutral-500)' }}>No activities recorded for this crop yet.</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr><th>Date</th><th>Activity</th><th>Plot</th><th>Inputs</th><th>Cost</th><th>Officer</th><th>Photos</th><th>Remarks</th>{canEdit && <th />}</tr>
+              </thead>
+              <tbody>
+                {cycle.activities.map((a: any) => {
+                  const inp = activityInputs(a);
+                  return (
+                    <tr key={a.id}>
+                      <td style={{ whiteSpace: 'nowrap', fontSize: 12 }}>{fmtDate(a.activityDate)}</td>
+                      <td style={{ fontWeight: 600 }}>{activityLabel(a.activityType)}</td>
+                      <td style={{ fontSize: 12 }}>{a.plot?.plotCode ?? 'Whole farm'}</td>
+                      <td style={{ fontSize: 12 }}>{inp.text ? `${inp.text}${inp.quantity ? ` · ${inp.quantity}` : ''}` : '—'}</td>
+                      <td style={{ fontSize: 12 }}>{a.cost != null ? money(a.cost) : '—'}</td>
+                      <td style={{ fontSize: 12 }}>{a.fieldOfficer ? `${a.fieldOfficer.firstName} ${a.fieldOfficer.lastName}` : '—'}</td>
+                      <td style={{ fontSize: 12 }}>{a.photoUrls?.length ? a.photoUrls.map((u: string, i: number) => <a key={u} href={u} target="_blank" rel="noreferrer" style={{ marginRight: 6 }}>{i + 1}</a>) : '—'}</td>
+                      <td style={{ fontSize: 12, maxWidth: 220, color: 'var(--neutral-400)' }}>{a.remarks || a.description || '—'}</td>
+                      {canEdit && <td><button className="btn-secondary" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => setActivityEditor({ activity: { ...a, cropCycle: { id: cycle.id, season: cycle.season, farmId: cycle.farmId, farm: cycle.farm, farmer: cycle.farmer } } })}>Edit</button></td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <div className="glass-card" style={{ padding: 20 }}>
         <h3 style={h3}>Economics</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 }}>
@@ -180,6 +222,14 @@ export default function CropCycleDetailPage() {
         </div>
       </div>
 
+      {activityEditor && (
+        <ActivityEditorModal
+          activity={activityEditor.activity}
+          cropCycleId={cycle.id}
+          onClose={() => setActivityEditor(null)}
+          onSaved={() => { setActivityEditor(null); load(); }}
+        />
+      )}
       {editing && <CropCycleEditorModal cycle={cycle} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />}
     </div>
   );
