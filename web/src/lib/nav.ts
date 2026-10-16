@@ -82,6 +82,7 @@ export const navGroups: NavGroup[] = [
     label: 'Harvest & Sales',
     items: [
       { href: '/dashboard/inventory', label: 'Harvest & Lots', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'inventory' },
+      { href: '/dashboard/collection-centres', label: 'Collection Centres', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'inventory' },
       { href: '/dashboard/warehouse', label: 'Warehouse', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'warehouse_desk' },
       { href: '/dashboard/sale-orders', label: 'Sale Orders', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'sale_orders' },
       { href: '/dashboard/sales', label: 'Sales & Payments', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'sales' },
@@ -148,6 +149,7 @@ export const navGroups: NavGroup[] = [
     label: 'Business',
     items: [
       { href: '/dashboard/inventory', label: 'Harvest & Lots', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'inventory' },
+      { href: '/dashboard/collection-centres', label: 'Collection Centres', icon: Building05Icon, roles: ['MAMCOS_SECRETARY'], resource: 'inventory' },
       { href: '/dashboard/traceability', label: 'Traceability', icon: MapsSearchIcon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'], resource: 'sales' },
       { href: '/dashboard/suppliers', label: 'Suppliers', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'suppliers' },
       { href: '/dashboard/finance', label: 'Finance and Accounting', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'finance' },

@@ -7,34 +7,31 @@ import { cropCyclesApi, inventoryApi, riceProtocolsApi, warehousesApi } from '@/
 import { useAuthStore } from '@/store/auth.store';
 import { hasPermission } from '@/lib/nav';
 import { ChartCard, DonutBreakdown, HorizontalBarChart } from '@/components/role-dashboards/Charts';
+import DeliveryDetailModal from '@/components/DeliveryDetailModal';
+import { PAYMENT_BADGE, PAYMENT_LABELS, deliveryBuyers, deliveryVariety, kgs, tzs, type DeliveryRow } from '@/lib/aggregation';
 
+interface Slice { name: string; weightKg: number; count: number; value: number }
 interface DashboardSummary {
   totalReceivedKg: number;
   totalReceivedCount: number;
+  totalBags: number;
   inStockKg: number;
+  shippedKg: number;
   soldKg: number;
   currentBalanceKg: number;
-  byGrade: { grade: string; weightKg: number; count: number }[];
-  byWarehouse: { warehouseLocation: string; weightKg: number; count: number }[];
-  byStatus: { status: string; weightKg: number; count: number }[];
-  byVariety: { riceVariety: string; weightKg: number; count: number }[];
+  purchaseValue: number;
+  paidToFarmers: number;
+  owedToFarmers: number;
+  unpricedKg: number;
+  byGrade: Slice[];
+  byVariety: Slice[];
+  byWarehouse: Slice[];
+  byCentre: Slice[];
+  byStatus: Slice[];
+  byPayment: Slice[];
 }
 
-interface InventoryRecord {
-  id: string;
-  trackingCode: string;
-  weightKg: number;
-  qualityGrade?: string;
-  moistureContentPct?: number;
-  warehouseLocation?: string;
-  warehouseId?: string | null;
-  warehouse?: { name: string } | null;
-  status: string;
-  receivedDate: string;
-  lotNumber?: string | null;
-  farm?: { farmCode: string };
-  farmer?: { firstName: string; lastName: string };
-}
+type InventoryRecord = DeliveryRow;
 
 interface CropCycleOption {
   id: string;
@@ -81,6 +78,9 @@ const STEPS = ['Source cycle', 'Measures', 'Confirm'] as const;
 export default function InventoryPage() {
   const user = useAuthStore((state) => state.user);
   const canReceiveIntoWarehouse = hasPermission(user, 'warehouse_desk', 'EDIT');
+  const canManage = hasPermission(user, 'inventory', 'EDIT');
+  const [centres, setCentres] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
+  const [openRecord, setOpenRecord] = useState<string | null>(null);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
   const [records, setRecords] = useState<InventoryRecord[]>([]);
   const [lots, setLots] = useState<LotRow[]>([]);
@@ -97,6 +97,11 @@ export default function InventoryPage() {
     warehouseId: '',
     warehouseLocation: '',
     receivedDate: new Date().toISOString().slice(0, 10),
+    collectionCentreId: '',
+    riceVariety: '',
+    bags: '',
+    pricePerKg: '',
+    batchNumber: '',
   });
   const [lotForm, setLotForm] = useState({
     lotNumber: '',
@@ -113,11 +118,12 @@ export default function InventoryPage() {
 
   const reload = async () => {
     // Each part loads on its own: a person without crop-cycle access still sees stock and lots.
-    const [inventoryRes, cycleRes, summaryRes, lotsRes] = await Promise.allSettled([
+    const [inventoryRes, cycleRes, summaryRes, lotsRes, centresRes] = await Promise.allSettled([
       inventoryApi.getAll(),
       cropCyclesApi.getAll(),
       inventoryApi.dashboardSummary(),
       inventoryApi.lots(),
+      inventoryApi.centres(),
     ]);
     if (inventoryRes.status === 'rejected') throw inventoryRes.reason;
     setRecords(inventoryRes.value.data || []);
@@ -125,6 +131,7 @@ export default function InventoryPage() {
     setCyclesBlocked(cycleRes.status === 'rejected');
     setSummary(summaryRes.status === 'fulfilled' ? summaryRes.value.data || null : null);
     setLots(lotsRes.status === 'fulfilled' ? lotsRes.value.data || [] : []);
+    setCentres(centresRes.status === 'fulfilled' ? (centresRes.value.data || []).filter((c: { isActive: boolean }) => c.isActive) : []);
   };
 
   useEffect(() => {
@@ -153,7 +160,7 @@ export default function InventoryPage() {
   }, [form.cropCycleId]);
 
   const filtered = records.filter((r) =>
-    `${r.trackingCode} ${r.farmer?.firstName} ${r.farmer?.lastName} ${r.farm?.farmCode}`
+    `${r.trackingCode} ${r.farmer?.firstName} ${r.farmer?.lastName} ${r.farm?.farmCode} ${deliveryVariety(r) ?? ''} ${r.collectionCentre?.name ?? ''} ${r.lotNumber ?? ''} ${r.batchNumber ?? ''} ${deliveryBuyers(r).join(' ')}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
@@ -195,6 +202,11 @@ export default function InventoryPage() {
       warehouseId: '',
       warehouseLocation: '',
       receivedDate: new Date().toISOString().slice(0, 10),
+      collectionCentreId: '',
+      riceVariety: '',
+      bags: '',
+      pricePerKg: '',
+      batchNumber: '',
     });
     setStep(0);
     setReadiness(null);
@@ -220,6 +232,11 @@ export default function InventoryPage() {
           : undefined,
         warehouseLocation: form.warehouseLocation || undefined,
         receivedDate: new Date(form.receivedDate).toISOString(),
+        collectionCentreId: form.collectionCentreId || undefined,
+        riceVariety: form.riceVariety.trim() || undefined,
+        bags: form.bags === '' ? undefined : Number(form.bags),
+        pricePerKg: form.pricePerKg === '' ? undefined : Number(form.pricePerKg),
+        batchNumber: form.batchNumber.trim() || undefined,
       });
       const recordId = received.data?.id;
       if (recordId) {
@@ -492,6 +509,67 @@ export default function InventoryPage() {
               />
             </label>
             <label className="form-label">
+              Collection centre
+              <select
+                className="input-field"
+                value={form.collectionCentreId}
+                onChange={(event) => setForm((current) => ({ ...current, collectionCentreId: event.target.value }))}
+              >
+                <option value="">Not recorded</option>
+                {centres.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              {centres.length === 0 && (
+                <small style={{ fontWeight: 400, color: 'var(--neutral-500)' }}>
+                  No collection centres yet. <Link href="/dashboard/collection-centres">Add one</Link>.
+                </small>
+              )}
+            </label>
+            <label className="form-label">
+              Rice variety<span style={{ fontWeight: 400, color: 'var(--neutral-500)' }}> (defaults to the crop variety)</span>
+              <input
+                className="input-field"
+                placeholder={selectedCycle?.riceVariety || 'e.g. SARO 5'}
+                value={form.riceVariety}
+                onChange={(event) => setForm((current) => ({ ...current, riceVariety: event.target.value }))}
+              />
+            </label>
+            <label className="form-label">
+              Bags<span style={{ fontWeight: 400, color: 'var(--neutral-500)' }}> (optional)</span>
+              <input
+                className="input-field"
+                type="number"
+                min="0"
+                step="1"
+                value={form.bags}
+                onChange={(event) => setForm((current) => ({ ...current, bags: event.target.value }))}
+              />
+            </label>
+            <label className="form-label">
+              Purchase price per kg (TZS)<span style={{ fontWeight: 400, color: 'var(--neutral-500)' }}> (optional)</span>
+              <input
+                className="input-field"
+                type="number"
+                min="0"
+                step="any"
+                value={form.pricePerKg}
+                onChange={(event) => setForm((current) => ({ ...current, pricePerKg: event.target.value }))}
+              />
+              {form.pricePerKg !== '' && Number(form.weightKg) > 0 && (
+                <small style={{ fontWeight: 400, color: 'var(--neutral-500)' }}>
+                  Total value {tzs(Number(form.weightKg) * Number(form.pricePerKg))}
+                </small>
+              )}
+            </label>
+            <label className="form-label">
+              Storage batch number<span style={{ fontWeight: 400, color: 'var(--neutral-500)' }}> (optional)</span>
+              <input
+                className="input-field"
+                placeholder="e.g. BATCH-A-12"
+                value={form.batchNumber}
+                onChange={(event) => setForm((current) => ({ ...current, batchNumber: event.target.value }))}
+              />
+            </label>
+            <label className="form-label">
               Received date
               <input
                 className="input-field"
@@ -532,6 +610,14 @@ export default function InventoryPage() {
             <div>
               <strong>Moisture</strong> · {form.moistureContentPct || '—'}% · {warehouses.find((w) => w.id === form.warehouseId)?.name ?? 'No warehouse yet'}
               {form.warehouseLocation ? ` · ${form.warehouseLocation}` : ''}
+            </div>
+            <div>
+              <strong>Variety</strong> · {form.riceVariety || selectedCycle?.riceVariety || '—'}
+              {form.bags ? ` · ${form.bags} bags` : ''} · {centres.find((c) => c.id === form.collectionCentreId)?.name ?? 'No collection centre'}
+            </div>
+            <div>
+              <strong>Price</strong> · {form.pricePerKg ? `${tzs(Number(form.pricePerKg))}/kg · total ${tzs(Number(form.weightKg) * Number(form.pricePerKg))}` : 'Not priced yet'}
+              {form.batchNumber ? ` · batch ${form.batchNumber}` : ''}
             </div>
             <div>
               <strong>Received</strong> · {form.receivedDate}
@@ -702,82 +788,40 @@ export default function InventoryPage() {
         <>
           <div className="metric-grid">
             {[
-              {
-                label: 'Total received',
-                value: `${summary.totalReceivedKg.toFixed(0)} kg`,
-                color: 'var(--blue-500)',
-              },
-              {
-                label: 'In stock',
-                value: `${summary.inStockKg.toFixed(0)} kg`,
-                color: 'var(--gold-400)',
-              },
-              {
-                label: 'Sold',
-                value: `${summary.soldKg.toFixed(0)} kg`,
-                color: 'var(--purple-500)',
-              },
-              {
-                label: 'Current balance',
-                value: `${summary.currentBalanceKg.toFixed(0)} kg`,
-                color: 'var(--accent)',
-              },
+              { label: 'Total rice received', value: kgs(summary.totalReceivedKg), hint: `${summary.totalReceivedCount} deliveries${summary.totalBags ? ` · ${summary.totalBags.toLocaleString()} bags` : ''}`, color: 'var(--blue-500)' },
+              { label: 'Available in stock', value: kgs(summary.inStockKg), hint: 'Received, stored or batched', color: 'var(--gold-400)' },
+              { label: 'Shipped, awaiting sale', value: kgs(summary.shippedKg), hint: 'Left the warehouse', color: 'var(--neutral-400)' },
+              { label: 'Rice sold', value: kgs(summary.soldKg), hint: 'Sales completed', color: 'var(--purple-500)' },
+              { label: 'Warehouse balance', value: kgs(summary.currentBalanceKg), hint: 'Physically held now', color: 'var(--accent)' },
+              { label: 'Purchase value', value: tzs(summary.purchaseValue), hint: summary.unpricedKg ? `${kgs(summary.unpricedKg)} not priced yet` : 'All deliveries priced', color: 'var(--green-500)' },
+              { label: 'Paid to farmers', value: tzs(summary.paidToFarmers), hint: `${tzs(summary.owedToFarmers)} still owed`, color: 'var(--green-500)' },
             ].map((s) => (
               <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
-                <div
-                  style={{
-                    fontSize: '22px',
-                    fontWeight: 700,
-                    color: s.color,
-                    fontFamily: 'Outfit, sans-serif',
-                  }}
-                >
-                  {s.value}
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>
-                  {s.label}
-                </div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>
+                <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.label}</div>
+                <div style={{ fontSize: '11px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.hint}</div>
               </div>
             ))}
           </div>
 
           <div className="role-two-col">
             <ChartCard title="Rice by quality grade" subtitle="Weight received per assessed grade.">
-              <DonutBreakdown
-                data={summary.byGrade.map((row) => ({ name: row.grade, value: row.weightKg }))}
-              />
+              <DonutBreakdown data={summary.byGrade.map((row) => ({ name: row.name, value: row.weightKg }))} />
             </ChartCard>
-            <ChartCard
-              title="Warehouse balance by status"
-              subtitle="Received, in storage, batched, shipped, sold."
-            >
-              <HorizontalBarChart
-                data={summary.byStatus.map((row) => ({
-                  name: row.status.replace('_', ' '),
-                  value: row.weightKg,
-                }))}
-                color="var(--gold-400)"
-              />
+            <ChartCard title="Rice by variety" subtitle="All deliveries, batched or not.">
+              <DonutBreakdown data={summary.byVariety.map((row) => ({ name: row.name, value: row.weightKg }))} />
             </ChartCard>
-            <ChartCard
-              title="Stock by warehouse bay"
-              subtitle="Weight currently attributed to each location."
-            >
-              <HorizontalBarChart
-                data={summary.byWarehouse.map((row) => ({
-                  name: row.warehouseLocation,
-                  value: row.weightKg,
-                }))}
-                color="var(--blue-500)"
-              />
+            <ChartCard title="Rice by warehouse" subtitle="Weight attributed to each warehouse.">
+              <HorizontalBarChart data={summary.byWarehouse.map((row) => ({ name: row.name, value: row.weightKg }))} color="var(--blue-500)" />
             </ChartCard>
-            <ChartCard title="Batched lots by variety" subtitle="Export-lot weight grouped by rice variety.">
-              <DonutBreakdown
-                data={summary.byVariety.map((row) => ({
-                  name: row.riceVariety,
-                  value: row.weightKg,
-                }))}
-              />
+            <ChartCard title="Rice by collection centre" subtitle="Where farmers brought it.">
+              <HorizontalBarChart data={summary.byCentre.map((row) => ({ name: row.name, value: row.weightKg }))} color="var(--green-500)" />
+            </ChartCard>
+            <ChartCard title="Warehouse balance by status" subtitle="Received, in storage, batched, shipped, sold.">
+              <HorizontalBarChart data={summary.byStatus.map((row) => ({ name: row.name.replace('_', ' '), value: row.weightKg }))} color="var(--gold-400)" />
+            </ChartCard>
+            <ChartCard title="Farmer payment status" subtitle="Weight by whether the farmer has been paid.">
+              <DonutBreakdown data={summary.byPayment.map((row) => ({ name: PAYMENT_LABELS[row.name] ?? row.name, value: row.weightKg }))} />
             </ChartCard>
           </div>
         </>
@@ -809,13 +853,20 @@ export default function InventoryPage() {
                   <th>Tracking Code</th>
                   <th>Farmer</th>
                   <th>Farm Code</th>
+                  <th>Centre</th>
+                  <th>Variety</th>
                   <th>Weight</th>
                   <th>Quality</th>
                   <th>Moisture</th>
+                  <th>Price/kg</th>
+                  <th>Value</th>
                   <th>Warehouse</th>
-                  <th>Lot</th>
+                  <th>Batch / lot</th>
+                  <th>Buyer</th>
                   <th>Received</th>
                   <th>Status</th>
+                  <th>Farmer payment</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -850,7 +901,12 @@ export default function InventoryPage() {
                     >
                       {r.farm?.farmCode || '—'}
                     </td>
-                    <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{r.weightKg} kg</td>
+                    <td style={{ fontSize: '12px' }}>{r.collectionCentre?.name ?? '—'}</td>
+                    <td style={{ fontSize: '12px' }}>{deliveryVariety(r) ?? '—'}</td>
+                    <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {r.weightKg} kg
+                      {r.bags != null && <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--neutral-500)' }}>{r.bags} bags</div>}
+                    </td>
                     <td>
                       {r.qualityGrade ? (
                         <span className="badge badge-green">{r.qualityGrade}</span>
@@ -861,6 +917,8 @@ export default function InventoryPage() {
                     <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>
                       {r.moistureContentPct != null ? `${r.moistureContentPct}%` : '—'}
                     </td>
+                    <td style={{ fontSize: '12px' }}>{r.pricePerKg != null ? Math.round(r.pricePerKg).toLocaleString() : '—'}</td>
+                    <td style={{ fontSize: '12px', fontWeight: 600 }}>{tzs(r.totalValue)}</td>
                     <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>
                       {r.warehouse?.name ? (
                         <>
@@ -876,6 +934,7 @@ export default function InventoryPage() {
                       )}
                     </td>
                     <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+                      {!r.lotNumber && r.batchNumber ? r.batchNumber : null}
                       {r.lotNumber ? (
                         <Link
                           href={`/dashboard/traceability?q=${encodeURIComponent(r.lotNumber)}`}
@@ -887,6 +946,7 @@ export default function InventoryPage() {
                         '—'
                       )}
                     </td>
+                    <td style={{ fontSize: '12px' }}>{deliveryBuyers(r).join(', ') || '—'}</td>
                     <td style={{ color: 'var(--neutral-500)', fontSize: '12px' }}>
                       {new Date(r.receivedDate).toLocaleDateString('en-TZ', {
                         day: 'numeric',
@@ -895,6 +955,12 @@ export default function InventoryPage() {
                       })}
                     </td>
                     <td>{statusBadge(r.status)}</td>
+                    <td>
+                      <span className={`badge ${PAYMENT_BADGE[r.farmerPaymentStatus]}`}>{PAYMENT_LABELS[r.farmerPaymentStatus]}</span>
+                    </td>
+                    <td>
+                      <button type="button" className="btn-secondary" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => setOpenRecord(r.id)}>Details</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -903,6 +969,15 @@ export default function InventoryPage() {
         )}
       </div>
       </>
+      {openRecord && (
+        <DeliveryDetailModal
+          recordId={openRecord}
+          canEdit={canManage}
+          centres={centres}
+          onClose={() => setOpenRecord(null)}
+          onChanged={() => { reload().catch(console.error); }}
+        />
+      )}
     </div>
   );
 }

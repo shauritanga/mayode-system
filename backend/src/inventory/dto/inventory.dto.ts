@@ -7,6 +7,9 @@ import {
   IsDateString,
   IsNotEmpty,
   IsPositive,
+  IsInt,
+  IsBoolean,
+  Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { InventoryStatus } from '@prisma/client';
@@ -73,6 +76,36 @@ export class CreateInventoryRecordDto {
   })
   @IsDateString()
   receivedDate: string;
+
+  @ApiPropertyOptional({ description: 'Collection centre the rice was brought to' })
+  @IsString()
+  @IsOptional()
+  collectionCentreId?: string;
+
+  @ApiPropertyOptional({
+    example: 'SARO 5',
+    description: 'Rice variety; defaults to the crop season variety',
+  })
+  @IsString()
+  @IsOptional()
+  riceVariety?: string;
+
+  @ApiPropertyOptional({ example: 9, description: 'Number of bags delivered' })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  bags?: number;
+
+  @ApiPropertyOptional({ example: 1800, description: 'Purchase price per kg paid to the farmer (TZS)' })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  pricePerKg?: number;
+
+  @ApiPropertyOptional({ example: 'BATCH-A-12', description: 'Storage batch (bay or stack) number' })
+  @IsString()
+  @IsOptional()
+  batchNumber?: string;
 }
 
 /** Farmer self-reports a warehouse delivery against their own crop cycle. */
@@ -100,6 +133,58 @@ export class FarmerReportDeliveryDto {
   @IsOptional()
   @IsDateString()
   receivedDate?: string;
+
+  @IsOptional()
+  @IsString()
+  collectionCentreId?: string;
+
+  @IsOptional()
+  @IsString()
+  riceVariety?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  bags?: number;
+}
+
+/** Correct or complete a delivery after weighing and grading (price, variety, centre, batch...). */
+export class UpdateInventoryRecordDto {
+  @IsOptional() @IsNumber() @IsPositive() weightKg?: number;
+  @IsOptional() @IsString() qualityGrade?: string;
+  @IsOptional() @IsNumber() @Min(0) moistureContentPct?: number;
+  @IsOptional() @IsString() riceVariety?: string;
+  @IsOptional() @IsInt() @Min(0) bags?: number;
+  @IsOptional() @IsNumber() @Min(0) pricePerKg?: number;
+  @IsOptional() @IsString() batchNumber?: string;
+  @IsOptional() @IsString() warehouseLocation?: string;
+  @IsOptional() @IsString() collectionCentreId?: string;
+}
+
+/** Money paid to the farmer for a delivery. */
+export class RecordFarmerPaymentDto {
+  @ApiProperty({ example: 500000, description: 'Amount paid now (TZS)' })
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+}
+
+export class CollectionCentreDto {
+  @ApiProperty() @IsString() @IsNotEmpty() name: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() region?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() district?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() ward?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() village?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() contactPhone?: string;
+  @ApiPropertyOptional({ description: 'Warehouse this centre normally delivers to' })
+  @IsString()
+  @IsOptional()
+  warehouseId?: string;
+  @ApiPropertyOptional({ description: 'Super admin only: cooperative that owns the centre' })
+  @IsString()
+  @IsOptional()
+  mamcosId?: string;
+  @ApiPropertyOptional() @IsBoolean() @IsOptional() isActive?: boolean;
 }
 
 export class UpdateInventoryStatusDto {

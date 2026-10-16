@@ -6,14 +6,19 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateInventoryRecordDto,
   UpdateInventoryStatusDto,
   CreateLotDto,
   FarmerReportDeliveryDto,
+  UpdateInventoryRecordDto,
+  RecordFarmerPaymentDto,
+  CollectionCentreDto,
 } from './dto/inventory.dto';
+import { deliveryValue, paymentStatusFor } from './farmer-payment';
+import { summariseWarehouse } from './warehouse-summary';
 import { RiceProtocolsService } from '../rice-protocols/rice-protocols.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { ActivitiesService } from '../activities/activities.service';
@@ -65,7 +70,32 @@ export class InventoryService {
     return farmer.id;
   }
 
-  async receiveInventory(createInventoryRecordDto: CreateInventoryRecordDto) {
+  /** Rows of this cooperative only; platform-wide roles (no cooperative) see everything. */
+  private tenantFilter(user?: RequestUser): { mamcosId?: string } {
+    const tenantId = user ? this.ownership.resolveTenantMamcosId(user) : null;
+    return tenantId ? { mamcosId: tenantId } : {};
+  }
+
+  private async assertCentre(
+    centreId: string | undefined,
+    farmMamcosId: string | null,
+  ) {
+    if (!centreId) return;
+    const centre = await this.prisma.collectionCentre.findUnique({
+      where: { id: centreId },
+      select: { mamcosId: true, isActive: true },
+    });
+    if (!centre) throw new NotFoundException('Collection centre not found');
+    if (centre.mamcosId && farmMamcosId && centre.mamcosId !== farmMamcosId)
+      throw new BadRequestException(
+        'That collection centre belongs to another cooperative',
+      );
+  }
+
+  async receiveInventory(
+    createInventoryRecordDto: CreateInventoryRecordDto,
+    user?: RequestUser,
+  ) {
     const {
       farmId,
       farmerId,
@@ -75,7 +105,12 @@ export class InventoryService {
       moistureContentPct,
       warehouseLocation,
       receivedDate,
+      collectionCentreId,
+      bags,
+      pricePerKg,
+      batchNumber,
     } = createInventoryRecordDto;
+    if (user) await this.ownership.assertFarmAccess(user, farmId);
 
     const farm = await this.prisma.farm.findUnique({
       where: { id: farmId },
@@ -102,11 +137,13 @@ export class InventoryService {
         missing: ['crop_cycle'],
       });
     }
+    let cycleVariety: string | undefined;
     if (cropCycleId) {
       const cycle = await this.prisma.cropCycle.findFirst({
         where: { id: cropCycleId, farmId, farmerId },
-        select: { id: true },
+        select: { id: true, riceVariety: true },
       });
+      cycleVariety = cycle?.riceVariety ?? undefined;
       if (!cycle)
         throw new BadRequestException(
           'The crop cycle must belong to the supplied farm and farmer',
@@ -118,6 +155,7 @@ export class InventoryService {
       );
     }
 
+    await this.assertCentre(collectionCentreId, farm.mamcosId);
     const trackingCode = await this.generateTrackingCode();
 
     const record = await this.prisma.inventoryRecord.create({
@@ -132,9 +170,17 @@ export class InventoryService {
         warehouseLocation,
         receivedDate: new Date(receivedDate),
         status: 'RECEIVED',
+        mamcosId: farm.mamcosId,
+        collectionCentreId,
+        riceVariety: createInventoryRecordDto.riceVariety?.trim() || cycleVariety,
+        bags,
+        pricePerKg,
+        totalValue: deliveryValue(weightKg, pricePerKg),
+        batchNumber: batchNumber?.trim() || undefined,
       },
       include: {
         farm: { select: { farmCode: true, isVerified: true } },
+        collectionCentre: { select: { id: true, name: true } },
         farmer: {
           select: { controlNumber: true, firstName: true, lastName: true },
         },
@@ -211,6 +257,9 @@ export class InventoryService {
       moistureContentPct: dto.moistureContentPct,
       warehouseLocation: dto.warehouseLocation || warehouseNote,
       receivedDate: dto.receivedDate || new Date().toISOString(),
+      collectionCentreId: dto.collectionCentreId,
+      riceVariety: dto.riceVariety,
+      bags: dto.bags,
     });
   }
 
@@ -272,41 +321,74 @@ export class InventoryService {
     };
   }
 
-  async findAllRecords() {
-    return this.prisma.inventoryRecord.findMany({
-      include: {
-        warehouse: { select: { name: true } },
-        farm: { select: { farmCode: true } },
-        farmer: {
-          select: { controlNumber: true, firstName: true, lastName: true },
+  private readonly recordInclude = {
+    warehouse: { select: { id: true, name: true } },
+    collectionCentre: { select: { id: true, name: true } },
+    farm: { select: { id: true, farmCode: true } },
+    farmer: {
+      select: {
+        id: true,
+        controlNumber: true,
+        firstName: true,
+        lastName: true,
+      },
+    },
+    lot: {
+      select: {
+        lotNumber: true,
+        riceVariety: true,
+        grade: true,
+        sales: {
+          select: {
+            id: true,
+            invoiceNumber: true,
+            paymentReceived: true,
+            buyer: { select: { id: true, name: true } },
+          },
+        },
+        saleOrders: {
+          select: {
+            id: true,
+            reference: true,
+            status: true,
+            buyer: { select: { id: true, name: true } },
+          },
         },
       },
+    },
+  } satisfies Prisma.InventoryRecordInclude;
+
+  async findAllRecords(user?: RequestUser) {
+    return this.prisma.inventoryRecord.findMany({
+      where: this.tenantFilter(user),
+      include: this.recordInclude,
       orderBy: { receivedDate: 'desc' },
     });
   }
 
-  async findRecordById(id: string) {
+  async findRecordById(id: string, user?: RequestUser) {
     const record = await this.prisma.inventoryRecord.findUnique({
       where: { id },
       include: {
+        ...this.recordInclude,
         farm: true,
         farmer: true,
-        lot: true,
+        cropCycle: { select: { id: true, season: true, riceVariety: true } },
       },
     });
-
-    if (!record) {
+    const tenant = this.tenantFilter(user).mamcosId;
+    if (!record || (tenant && record.mamcosId !== tenant)) {
       throw new NotFoundException(`Inventory record with ID ${id} not found`);
     }
-
     return record;
   }
 
   async updateStatus(
     id: string,
     updateInventoryStatusDto: UpdateInventoryStatusDto,
+    user?: RequestUser,
   ) {
-    await this.findRecordById(id); // Verify existence
+    await this.findRecordById(id, user); // Verify existence and scope
 
     return this.prisma.inventoryRecord.update({
       where: { id },
@@ -314,7 +396,104 @@ export class InventoryService {
     });
   }
 
-  async createLot(createLotDto: CreateLotDto) {
+  /** Complete or correct a delivery after weighing and grading; the value and payment status follow. */
+  async updateRecord(
+    id: string,
+    dto: UpdateInventoryRecordDto,
+    user?: RequestUser,
+  ) {
+    const record = await this.findRecordById(id, user);
+    if (dto.weightKg != null && record.lotNumber)
+      throw new BadRequestException(
+        'The weight cannot change once the delivery is in a lot',
+      );
+    await this.assertCentre(dto.collectionCentreId, record.mamcosId);
+    const weightKg = dto.weightKg ?? record.weightKg;
+    const pricePerKg = dto.pricePerKg ?? record.pricePerKg;
+    const totalValue = deliveryValue(weightKg, pricePerKg);
+    return this.prisma.inventoryRecord.update({
+      where: { id },
+      data: {
+        ...dto,
+        riceVariety: dto.riceVariety?.trim() || undefined,
+        batchNumber: dto.batchNumber?.trim() || undefined,
+        totalValue,
+        farmerPaymentStatus: paymentStatusFor(totalValue, record.amountPaid),
+      },
+      include: this.recordInclude,
+    });
+  }
+
+  /** Record money paid to the farmer; the status moves from unpaid to partial to paid. */
+  async recordFarmerPayment(
+    id: string,
+    dto: RecordFarmerPaymentDto,
+    user?: RequestUser,
+  ) {
+    const record = await this.findRecordById(id, user);
+    if (record.totalValue == null)
+      throw new BadRequestException(
+        'Set the purchase price before recording a payment',
+      );
+    const amountPaid = record.amountPaid + dto.amount;
+    if (amountPaid > record.totalValue + 0.005)
+      throw new BadRequestException(
+        'That payment is more than the amount still owed to the farmer',
+      );
+    const status = paymentStatusFor(record.totalValue, amountPaid);
+    return this.prisma.inventoryRecord.update({
+      where: { id },
+      data: {
+        amountPaid,
+        farmerPaymentStatus: status,
+        paidAt: status === 'PAID' ? new Date() : null,
+      },
+      include: this.recordInclude,
+    });
+  }
+
+  // ------------------------------------------------------ collection centres
+
+  listCentres(user: RequestUser) {
+    return this.prisma.collectionCentre.findMany({
+      where: this.tenantFilter(user),
+      include: {
+        warehouse: { select: { id: true, name: true } },
+        mamcos: { select: { name: true } },
+        _count: { select: { inventoryRecords: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  private async centreOrThrow(id: string, user: RequestUser) {
+    const tenant = this.tenantFilter(user).mamcosId;
+    const centre = await this.prisma.collectionCentre.findUnique({
+      where: { id },
+    });
+    if (!centre || (tenant && centre.mamcosId !== tenant))
+      throw new NotFoundException('Collection centre not found');
+    return centre;
+  }
+
+  async createCentre(dto: CollectionCentreDto, user: RequestUser) {
+    const tenant = this.tenantFilter(user).mamcosId ?? null;
+    return this.prisma.collectionCentre.create({
+      data: { ...dto, mamcosId: tenant ?? dto.mamcosId ?? null },
+    });
+  }
+
+  async updateCentre(
+    id: string,
+    dto: Partial<CollectionCentreDto>,
+    user: RequestUser,
+  ) {
+    await this.centreOrThrow(id, user);
+    const { mamcosId: _ignored, ...data } = dto;
+    return this.prisma.collectionCentre.update({ where: { id }, data });
+  }
+
+  async createLot(createLotDto: CreateLotDto, user?: RequestUser) {
     const { lotNumber, riceVariety, inventoryRecordIds } = createLotDto;
 
     const existingLot = await this.prisma.lot.findUnique({
@@ -327,9 +506,9 @@ export class InventoryService {
       );
     }
 
-    // Verify all inventory records exist and are not already in a lot
+    // Verify all inventory records exist (in the user's cooperative) and are not already in a lot
     const records = await this.prisma.inventoryRecord.findMany({
-      where: { id: { in: inventoryRecordIds } },
+      where: { id: { in: inventoryRecordIds }, ...this.tenantFilter(user) },
     });
 
     if (records.length !== inventoryRecordIds.length) {
@@ -381,6 +560,10 @@ export class InventoryService {
           status: 'BATCHED',
         },
       });
+      await prisma.inventoryRecord.updateMany({
+        where: { id: { in: inventoryRecordIds }, riceVariety: null },
+        data: { riceVariety },
+      });
 
       return prisma.lot.findUnique({
         where: { id: lot.id },
@@ -402,82 +585,57 @@ export class InventoryService {
     });
   }
 
-  /** Warehouse dashboard: totals by grade, warehouse, status and variety (via Lot). */
-  async dashboardSummary() {
-    const [byGrade, byWarehouse, byStatus, byVariety, totals, soldTotal] =
-      await Promise.all([
-        this.prisma.inventoryRecord.groupBy({
-          by: ['qualityGrade'],
-          _sum: { weightKg: true },
-          _count: { _all: true },
-        }),
-        this.prisma.inventoryRecord.groupBy({
-          by: ['warehouseLocation'],
-          _sum: { weightKg: true },
-          _count: { _all: true },
-        }),
-        this.prisma.inventoryRecord.groupBy({
-          by: ['status'],
-          _sum: { weightKg: true },
-          _count: { _all: true },
-        }),
-        this.prisma.lot.groupBy({
-          by: ['riceVariety'],
-          _sum: { totalWeightKg: true },
-          _count: { _all: true },
-        }),
-        this.prisma.inventoryRecord.aggregate({
-          _sum: { weightKg: true },
-          _count: { _all: true },
-        }),
-        this.prisma.inventoryRecord.aggregate({
-          where: { status: 'SOLD' },
-          _sum: { weightKg: true },
-        }),
-      ]);
-
-    const totalReceivedKg = totals._sum.weightKg ?? 0;
-    const soldKg = soldTotal._sum.weightKg ?? 0;
-    const inStockKg = byStatus
-      .filter(
-        (row) =>
-          row.status === 'RECEIVED' ||
-          row.status === 'IN_STORAGE' ||
-          row.status === 'BATCHED',
-      )
-      .reduce((sum, row) => sum + (row._sum.weightKg ?? 0), 0);
-
-    return {
-      totalReceivedKg,
-      totalReceivedCount: totals._count._all,
-      inStockKg,
-      soldKg,
-      currentBalanceKg: totalReceivedKg - soldKg,
-      byGrade: byGrade.map((row) => ({
-        grade: row.qualityGrade ?? 'Ungraded',
-        weightKg: row._sum.weightKg ?? 0,
-        count: row._count._all,
+  /** Warehouse dashboard: stock, value and payments, by grade, variety, warehouse, centre and status. */
+  async dashboardSummary(
+    user?: RequestUser,
+    filter: { from?: string; to?: string; warehouseId?: string } = {},
+  ) {
+    const records = await this.prisma.inventoryRecord.findMany({
+      where: {
+        ...this.tenantFilter(user),
+        warehouseId: filter.warehouseId,
+        receivedDate: {
+          gte: filter.from ? new Date(filter.from) : undefined,
+          lte: filter.to ? new Date(filter.to) : undefined,
+        },
+      },
+      select: {
+        weightKg: true,
+        bags: true,
+        status: true,
+        qualityGrade: true,
+        riceVariety: true,
+        warehouseLocation: true,
+        totalValue: true,
+        amountPaid: true,
+        farmerPaymentStatus: true,
+        warehouse: { select: { name: true } },
+        collectionCentre: { select: { name: true } },
+        lot: { select: { riceVariety: true } },
+      },
+    });
+    return summariseWarehouse(
+      records.map((r) => ({
+        weightKg: r.weightKg,
+        bags: r.bags,
+        status: r.status,
+        qualityGrade: r.qualityGrade,
+        riceVariety: r.riceVariety,
+        lotVariety: r.lot?.riceVariety ?? null,
+        warehouseName: r.warehouse?.name ?? null,
+        warehouseLocation: r.warehouseLocation,
+        centreName: r.collectionCentre?.name ?? null,
+        totalValue: r.totalValue,
+        amountPaid: r.amountPaid,
+        farmerPaymentStatus: r.farmerPaymentStatus,
       })),
-      byWarehouse: byWarehouse.map((row) => ({
-        warehouseLocation: row.warehouseLocation ?? 'Unassigned',
-        weightKg: row._sum.weightKg ?? 0,
-        count: row._count._all,
-      })),
-      byStatus: byStatus.map((row) => ({
-        status: row.status,
-        weightKg: row._sum.weightKg ?? 0,
-        count: row._count._all,
-      })),
-      byVariety: byVariety.map((row) => ({
-        riceVariety: row.riceVariety ?? 'Unspecified',
-        weightKg: row._sum.totalWeightKg ?? 0,
-        count: row._count._all,
-      })),
-    };
+    );
   }
 
-  async findAllLots() {
+  async findAllLots(user?: RequestUser) {
+    const tenant = this.tenantFilter(user).mamcosId;
     return this.prisma.lot.findMany({
+      where: tenant ? { inventoryRecords: { some: { mamcosId: tenant } } } : undefined,
       include: {
         _count: { select: { inventoryRecords: true, sales: true } },
       },
@@ -485,7 +643,7 @@ export class InventoryService {
     });
   }
 
-  async findLotByNumber(lotNumber: string) {
+  async findLotByNumber(lotNumber: string, user?: RequestUser) {
     const lot = await this.prisma.lot.findUnique({
       where: { lotNumber },
       include: {
@@ -501,7 +659,11 @@ export class InventoryService {
       },
     });
 
-    if (!lot) {
+    const tenant = this.tenantFilter(user).mamcosId;
+    if (
+      !lot ||
+      (tenant && !lot.inventoryRecords.some((r) => r.mamcosId === tenant))
+    ) {
       throw new NotFoundException(`Lot with number ${lotNumber} not found`);
     }
 

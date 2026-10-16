@@ -16,6 +16,9 @@ import {
   UpdateInventoryStatusDto,
   CreateLotDto,
   FarmerReportDeliveryDto,
+  UpdateInventoryRecordDto,
+  RecordFarmerPaymentDto,
+  CollectionCentreDto,
 } from './dto/inventory.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -45,8 +48,14 @@ export class InventoryController {
     summary:
       'Receive harvest inventory at warehouse with auto-generated tracking code (INV-YYYY-XXXX)',
   })
-  receiveInventory(@Body() createInventoryRecordDto: CreateInventoryRecordDto) {
-    return this.inventoryService.receiveInventory(createInventoryRecordDto);
+  receiveInventory(
+    @Body() createInventoryRecordDto: CreateInventoryRecordDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.inventoryService.receiveInventory(
+      createInventoryRecordDto,
+      user,
+    );
   }
 
   @Post('records/mine')
@@ -90,8 +99,8 @@ export class InventoryController {
   )
   @RequirePermission('inventory', 'VIEW')
   @ApiOperation({ summary: 'Get all received harvest inventory records' })
-  findAllRecords() {
-    return this.inventoryService.findAllRecords();
+  findAllRecords(@CurrentUser() user: RequestUser) {
+    return this.inventoryService.findAllRecords(user);
   }
 
   @Get('dashboard-summary')
@@ -106,8 +115,17 @@ export class InventoryController {
     summary:
       'Warehouse dashboard aggregates: totals by grade, warehouse, status and variety',
   })
-  dashboardSummary() {
-    return this.inventoryService.dashboardSummary();
+  dashboardSummary(
+    @CurrentUser() user: RequestUser,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('warehouseId') warehouseId?: string,
+  ) {
+    return this.inventoryService.dashboardSummary(user, {
+      from,
+      to,
+      warehouseId,
+    });
   }
 
   @Get('records/:id')
@@ -120,8 +138,72 @@ export class InventoryController {
   )
   @RequirePermission('inventory', 'VIEW')
   @ApiOperation({ summary: 'Get inventory record details by ID' })
-  findRecordById(@Param('id') id: string) {
-    return this.inventoryService.findRecordById(id);
+  findRecordById(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.inventoryService.findRecordById(id, user);
+  }
+
+  @Patch('records/:id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('inventory', 'EDIT')
+  @ApiOperation({
+    summary:
+      'Complete a delivery after weighing and grading: price, variety, bags, centre, batch',
+  })
+  updateRecord(
+    @Param('id') id: string,
+    @Body() dto: UpdateInventoryRecordDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.inventoryService.updateRecord(id, dto, user);
+  }
+
+  @Post('records/:id/payments')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('inventory', 'EDIT')
+  @ApiOperation({ summary: 'Record a payment made to the farmer for a delivery' })
+  recordFarmerPayment(
+    @Param('id') id: string,
+    @Body() dto: RecordFarmerPaymentDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.inventoryService.recordFarmerPayment(id, dto, user);
+  }
+
+  @Get('centres')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.FIELD_OFFICER,
+    UserRole.MAMCOS_SECRETARY,
+    UserRole.AUDITOR,
+  )
+  @RequirePermission('inventory', 'VIEW')
+  @ApiOperation({ summary: 'Collection centres' })
+  listCentres(@CurrentUser() user: RequestUser) {
+    return this.inventoryService.listCentres(user);
+  }
+
+  @Post('centres')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('inventory', 'CREATE')
+  @ApiOperation({ summary: 'Add a collection centre' })
+  createCentre(
+    @Body() dto: CollectionCentreDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.inventoryService.createCentre(dto, user);
+  }
+
+  @Patch('centres/:id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('inventory', 'EDIT')
+  @ApiOperation({ summary: 'Edit or deactivate a collection centre' })
+  updateCentre(
+    @Param('id') id: string,
+    @Body() dto: CollectionCentreDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.inventoryService.updateCentre(id, dto, user);
   }
 
   @Patch('records/:id/status')
@@ -132,8 +214,13 @@ export class InventoryController {
   updateStatus(
     @Param('id') id: string,
     @Body() updateInventoryStatusDto: UpdateInventoryStatusDto,
+    @CurrentUser() user: RequestUser,
   ) {
-    return this.inventoryService.updateStatus(id, updateInventoryStatusDto);
+    return this.inventoryService.updateStatus(
+      id,
+      updateInventoryStatusDto,
+      user,
+    );
   }
 
   @Post('lots')
@@ -142,8 +229,11 @@ export class InventoryController {
     summary:
       'Combine multiple inventory records into a single Fairtrade export Lot',
   })
-  createLot(@Body() createLotDto: CreateLotDto) {
-    return this.inventoryService.createLot(createLotDto);
+  createLot(
+    @Body() createLotDto: CreateLotDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.inventoryService.createLot(createLotDto, user);
   }
 
   @Get('lots')
@@ -155,8 +245,8 @@ export class InventoryController {
     UserRole.AUDITOR,
   )
   @ApiOperation({ summary: 'Get all export Lots' })
-  findAllLots() {
-    return this.inventoryService.findAllLots();
+  findAllLots(@CurrentUser() user: RequestUser) {
+    return this.inventoryService.findAllLots(user);
   }
 
   @Get('lots/:lotNumber')
@@ -170,7 +260,10 @@ export class InventoryController {
   @ApiOperation({
     summary: 'Get Lot complete traceability details by Lot Number',
   })
-  findLotByNumber(@Param('lotNumber') lotNumber: string) {
-    return this.inventoryService.findLotByNumber(lotNumber);
+  findLotByNumber(
+    @Param('lotNumber') lotNumber: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.inventoryService.findLotByNumber(lotNumber, user);
   }
 }

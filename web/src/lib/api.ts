@@ -443,7 +443,13 @@ export const inventoryApi = {
   createLot: (data: object) => api.post('/inventory/lots', data),
   lots: () => api.get('/inventory/lots'),
   getLot: (lotNumber: string) => api.get(`/inventory/lots/${encodeURIComponent(lotNumber)}`),
-  dashboardSummary: () => api.get('/inventory/dashboard-summary'),
+  dashboardSummary: (params?: object) => api.get('/inventory/dashboard-summary', { params }),
+  getRecord: (id: string) => api.get(`/inventory/records/${id}`),
+  updateRecord: (id: string, data: object) => api.patch(`/inventory/records/${id}`, data),
+  recordPayment: (id: string, data: { amount: number }) => api.post(`/inventory/records/${id}/payments`, data),
+  centres: () => api.get('/inventory/centres'),
+  createCentre: (data: object) => api.post('/inventory/centres', data),
+  updateCentre: (id: string, data: object) => api.patch(`/inventory/centres/${id}`, data),
 };
 
 // ── Locations ──

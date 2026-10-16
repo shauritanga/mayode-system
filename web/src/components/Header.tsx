@@ -56,6 +56,7 @@ const TITLE_MAP: Record<string, string> = {
   activities: 'Crop Activities',
   'rice-calendar': 'Rice Calendar',
   inventory: 'Harvest Intake & Lots',
+  'collection-centres': 'Collection Centres',
   suppliers: 'Suppliers',
   sales: 'Sales & Payments',
   finance: 'Finance',
