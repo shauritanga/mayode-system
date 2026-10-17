@@ -2702,7 +2702,7 @@ export class MarketplaceService {
   // 📊 C. MARKET PRICE INTELLIGENCE
   // ==========================================
 
-  async createMarketPrice(createMarketPriceDto: CreateMarketPriceDto) {
+  async createMarketPrice(createMarketPriceDto: CreateMarketPriceDto, mamcosId: string | null = null) {
     const { commodity, price, market, source, recordedAt } =
       createMarketPriceDto;
 
@@ -2713,12 +2713,14 @@ export class MarketplaceService {
         market,
         source,
         recordedAt: new Date(recordedAt),
+        mamcosId,
       },
     });
   }
 
   async findAllMarketPrices(query?: { commodity?: string; market?: string }) {
-    const whereClause: any = {};
+    // Open to farmers' apps: only platform-wide prices, never a single cooperative's own readings.
+    const whereClause: any = { mamcosId: null };
 
     if (query?.commodity) {
       whereClause.commodity = {

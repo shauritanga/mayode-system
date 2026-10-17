@@ -761,8 +761,11 @@ export class MarketplaceController {
     summary:
       'Record new Market Price intelligence for agricultural commodities',
   })
-  createMarketPrice(@Body() createMarketPriceDto: CreateMarketPriceDto) {
-    return this.marketplaceService.createMarketPrice(createMarketPriceDto);
+  createMarketPrice(@Body() createMarketPriceDto: CreateMarketPriceDto, @CurrentUser() user: { role: UserRole; mamcosId?: string | null }) {
+    return this.marketplaceService.createMarketPrice(
+      createMarketPriceDto,
+      user.role === UserRole.SUPER_ADMIN ? null : (user.mamcosId ?? null),
+    );
   }
 
   @Get('prices')

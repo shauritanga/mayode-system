@@ -163,6 +163,27 @@ export class SaleOrdersService {
       );
     }
 
+    if (dto.agreementId) {
+      const agreement = await this.prisma.purchaseAgreement.findUnique({
+        where: { id: dto.agreementId },
+        select: { buyerId: true, status: true, reference: true },
+      });
+      if (!agreement || agreement.buyerId !== buyer.id)
+        throw new BadRequestException('That purchase agreement belongs to a different buyer');
+      if (agreement.status !== 'ACTIVE')
+        throw new BadRequestException(`Agreement ${agreement.reference} is not active`);
+    }
+    if (dto.buyerOrderId) {
+      const buyerOrder = await this.prisma.buyerOrder.findUnique({
+        where: { id: dto.buyerOrderId },
+        select: { buyerId: true, status: true },
+      });
+      if (!buyerOrder || buyerOrder.buyerId !== buyer.id)
+        throw new BadRequestException('That buyer order belongs to a different buyer');
+      if (buyerOrder.status === 'CANCELLED' || buyerOrder.status === 'FULFILLED')
+        throw new BadRequestException('That buyer order is already closed');
+    }
+
     return this.prisma.$transaction(async (tx) => {
       await lockWarehouse(tx, warehouse.id);
       const balance = await warehouseBalance(tx, warehouse.id);
@@ -198,6 +219,8 @@ export class SaleOrdersService {
           packaging: dto.packaging,
           needsTransport: dto.needsTransport ?? false,
           notes: dto.notes,
+          buyerOrderId: dto.buyerOrderId,
+          agreementId: dto.agreementId,
           createdByUserId: actor.id,
         },
       });
@@ -431,6 +454,8 @@ export class SaleOrdersService {
           fairtradePremium: order.fairtradePremium ?? undefined,
           riceVariety: order.riceVariety ?? undefined,
           packaging: order.packaging ?? undefined,
+          buyerOrderId: order.buyerOrderId ?? undefined,
+          agreementId: order.agreementId ?? undefined,
           saleDate: new Date().toISOString(),
         },
         { mamcosId: order.mamcosId },

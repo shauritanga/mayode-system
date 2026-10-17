@@ -18,12 +18,51 @@ export class BuyersService {
     return this.prisma.buyer.create({ data: { ...dto, mamcosId: tenantOwner(actor) } });
   }
 
-  findAll(actor: TenantActor) {
-    return this.prisma.buyer.findMany({
+  /** Buyers with their trading record: sales, value, what they still owe, and live orders. */
+  async findAll(actor: TenantActor) {
+    const buyers = await this.prisma.buyer.findMany({
       where: tenantWhere(actor),
       include: { _count: { select: { sales: true } } },
       orderBy: { name: 'asc' },
     });
+    if (!buyers.length) return [];
+    const ids = buyers.map((b) => b.id);
+    const [sales, unpaid, orders, agreements] = await Promise.all([
+      this.prisma.sale.groupBy({
+        by: ['buyerId'],
+        where: { buyerId: { in: ids } },
+        _sum: { quantityKg: true, totalRevenue: true },
+      }),
+      this.prisma.sale.groupBy({
+        by: ['buyerId'],
+        where: { buyerId: { in: ids }, paymentReceived: false },
+        _sum: { totalRevenue: true },
+      }),
+      this.prisma.buyerOrder.groupBy({
+        by: ['buyerId'],
+        where: { buyerId: { in: ids }, status: { in: ['OPEN', 'PARTIALLY_FULFILLED'] } },
+        _count: { _all: true },
+        _sum: { quantityRequiredKg: true },
+      }),
+      this.prisma.purchaseAgreement.groupBy({
+        by: ['buyerId'],
+        where: { buyerId: { in: ids }, status: 'ACTIVE' },
+        _count: { _all: true },
+      }),
+    ]);
+    const by = <T extends { buyerId: string }>(rows: T[]) => new Map(rows.map((r) => [r.buyerId, r]));
+    const s = by(sales), u = by(unpaid), o = by(orders), a = by(agreements);
+    return buyers.map((b) => ({
+      ...b,
+      stats: {
+        soldKg: s.get(b.id)?._sum.quantityKg ?? 0,
+        soldValue: s.get(b.id)?._sum.totalRevenue ?? 0,
+        outstanding: u.get(b.id)?._sum.totalRevenue ?? 0,
+        openOrders: o.get(b.id)?._count._all ?? 0,
+        requiredKg: o.get(b.id)?._sum.quantityRequiredKg ?? 0,
+        activeAgreements: a.get(b.id)?._count._all ?? 0,
+      },
+    }));
   }
 
   /** Last 9 digits — matches TZ MSISDN regardless of +255 / 0 prefix. */

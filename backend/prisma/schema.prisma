@@ -908,6 +908,15 @@ model Buyer {
   isCertified         Boolean  @default(false) @map("is_certified")
   /// Owning cooperative; null = platform-level buyer (Super Admin's own customers).
   mamcosId            String?  @map("mamcos_id")
+  businessType        BuyerBusinessType? @map("business_type")
+  region              String?
+  district            String?
+  /// Street / town the buyer operates from.
+  location            String?
+  preferredVarieties  String[] @map("preferred_varieties")
+  /// Where this buyer usually takes delivery; orders and agreements can override it.
+  deliveryLocation    String?  @map("delivery_location")
+  notes               String?
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
@@ -917,6 +926,7 @@ model Buyer {
   revenues   Revenue[]
   invoices   Invoice[]
   orders     BuyerOrder[]
+  agreements PurchaseAgreement[]
 
   @@index([mamcosId])
   @@map("buyers")
@@ -931,12 +941,19 @@ model BuyerOrder {
   status              BuyerOrderStatus @default(OPEN)
   requiredByDate      DateTime?        @map("required_by_date")
   notes               String?
+  /// Cooperative the order belongs to (the buyer's); null = platform-level.
+  mamcosId            String?          @map("mamcos_id")
+  offeredPricePerKg   Float?           @map("offered_price_per_kg")
+  deliveryLocation    String?          @map("delivery_location")
+  qualityGrade        String?          @map("quality_grade")
   createdAt           DateTime         @default(now()) @map("created_at")
   updatedAt           DateTime         @updatedAt @map("updated_at")
 
-  buyer Buyer  @relation(fields: [buyerId], references: [id])
-  sales Sale[]
+  buyer      Buyer               @relation(fields: [buyerId], references: [id])
+  sales      Sale[]
+  agreements PurchaseAgreement[]
 
+  @@index([mamcosId])
   @@map("buyer_orders")
 }
 
@@ -946,6 +963,8 @@ model Sale {
   buyerId               String    @map("buyer_id")
   lotId                 String    @map("lot_id")
   buyerOrderId          String?   @map("buyer_order_id")
+  /// Purchase agreement this delivery counts against.
+  agreementId           String?   @map("agreement_id")
   riceVariety           String?   @map("rice_variety")
   quantityKg            Float     @map("quantity_kg")
   packaging             String?
@@ -964,6 +983,7 @@ model Sale {
   buyer              Buyer               @relation(fields: [buyerId], references: [id])
   lot                Lot                 @relation(fields: [lotId], references: [id])
   fulfillsOrder      BuyerOrder?         @relation(fields: [buyerOrderId], references: [id])
+  agreement          PurchaseAgreement?  @relation(fields: [agreementId], references: [id])
   revenues           Revenue[]
   payments           Payment[]
   apportionments     SaleApportionment[]
@@ -1466,8 +1486,11 @@ model MarketPrice {
   market     String? // e.g., "Mafinga"
   source     String?
   recordedAt DateTime @map("recorded_at")
+  /// Cooperative that recorded the price; null = platform-wide (visible to everyone).
+  mamcosId   String?  @map("mamcos_id")
   createdAt  DateTime @default(now()) @map("created_at")
 
+  @@index([mamcosId])
   @@map("market_prices")
 }
 
@@ -2924,6 +2947,57 @@ enum InputPaymentStatus {
   PAID
 }
 
+enum BuyerBusinessType {
+  MILLER
+  TRADER
+  EXPORTER
+  PROCESSOR
+  RETAILER
+  WHOLESALER
+  INSTITUTION
+  NGO
+  OTHER
+}
+
+enum AgreementStatus {
+  DRAFT
+  ACTIVE
+  FULFILLED
+  CANCELLED
+}
+
+/// A written commitment to sell rice to a buyer: quantity, price, quality, delivery and dates.
+model PurchaseAgreement {
+  id               String          @id @default(uuid())
+  reference        String          @unique
+  mamcosId         String?         @map("mamcos_id")
+  buyerId          String          @map("buyer_id")
+  buyerOrderId     String?         @map("buyer_order_id")
+  riceVariety      String?         @map("rice_variety")
+  qualityTerms     String?         @map("quality_terms")
+  quantityKg       Float           @map("quantity_kg")
+  pricePerKg       Float           @map("price_per_kg")
+  deliveryLocation String?         @map("delivery_location")
+  paymentTerms     String?         @map("payment_terms")
+  startDate        DateTime        @map("start_date")
+  endDate          DateTime        @map("end_date")
+  status           AgreementStatus @default(DRAFT)
+  signedAt         DateTime?       @map("signed_at")
+  documentUrl      String?         @map("document_url")
+  notes            String?
+  createdByUserId  String          @map("created_by_user_id")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  buyer      Buyer       @relation(fields: [buyerId], references: [id])
+  buyerOrder BuyerOrder? @relation(fields: [buyerOrderId], references: [id], onDelete: SetNull)
+  sales      Sale[]
+
+  @@index([mamcosId, status])
+  @@index([buyerId])
+  @@map("purchase_agreements")
+}
+
 enum BuyerOrderStatus {
   OPEN
   PARTIALLY_FULFILLED
@@ -3063,6 +3137,9 @@ model SaleOrder {
   releaseApprovedAt       DateTime?       @map("release_approved_at")
   notes                   String?
   saleId                  String?         @unique @map("sale_id")
+  /// Buyer order / purchase agreement this reservation delivers against.
+  buyerOrderId            String?         @map("buyer_order_id")
+  agreementId             String?         @map("agreement_id")
   createdByUserId         String          @map("created_by_user_id")
   confirmedByUserId       String?         @map("confirmed_by_user_id")
   confirmedAt             DateTime?       @map("confirmed_at")

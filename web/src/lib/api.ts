@@ -436,8 +436,23 @@ export const buyerOrdersApi = {
   getAll: () => api.get('/buyer-orders'),
   getForBuyer: (buyerId: string) => api.get(`/buyer-orders/buyer/${buyerId}`),
   create: (data: object) => api.post('/buyer-orders', data),
+  update: (id: string, data: object) => api.patch(`/buyer-orders/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/buyer-orders/${id}/status`, { status }),
   remove: (id: string) => api.delete(`/buyer-orders/${id}`),
+};
+export const agreementsApi = {
+  list: (params?: object) => api.get('/purchase-agreements', { params }),
+  create: (data: object) => api.post('/purchase-agreements', data),
+  update: (id: string, data: object) => api.patch(`/purchase-agreements/${id}`, data),
+  setStatus: (id: string, status: string) => api.patch(`/purchase-agreements/${id}/status`, { status }),
+  remove: (id: string) => api.delete(`/purchase-agreements/${id}`),
+};
+export const marketApi = {
+  overview: (params?: object) => api.get('/market/overview', { params }),
+  deliveries: (params?: object) => api.get('/market/deliveries', { params }),
+  farmerSales: (params?: object) => api.get('/market/farmer-sales', { params }),
+  prices: (params?: object) => api.get('/market/prices', { params }),
+  recordPrice: (data: object) => api.post('/market/prices', data),
 };
 
 // ── Inventory ──

@@ -27,6 +27,7 @@ export const PORTAL_SECTIONS = {
     "insurance",
     "inventory",
     "leases",
+    "market",
     "marketplace",
     "memberships",
     "projects",
@@ -47,7 +48,8 @@ export const PORTAL_SECTIONS = {
     "sale-orders",
     "warehouse",
     "audit-log",
-    "buyers"
+    "buyers",
+    "market"
   ],
   "admin": [
     "premium-fund",

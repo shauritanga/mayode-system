@@ -1,7 +1,7 @@
 'use client';
 import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { saleOrdersApi, warehousesApi, buyersApi } from '@/lib/api';
+import { saleOrdersApi, warehousesApi, buyersApi, agreementsApi, buyerOrdersApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-error';
 import { useAuthStore } from '@/store/auth.store';
 import { hasPermission } from '@/lib/nav';
@@ -18,7 +18,7 @@ interface Option { id: string; name: string }
 interface Lot { id: string; lotNumber: string; totalWeightKg: number; remainingKg: number; riceVariety?: string | null; grade?: string | null }
 interface Warehouse extends Option { isActive: boolean; balance: { availableKg: number } }
 
-const EMPTY = { buyerId: '', warehouseId: '', lotId: '', bags: '', bagSizeKg: '50', quantityKg: '', pricePerKg: '', packaging: '', needsTransport: false, notes: '' };
+const EMPTY = { agreementId: '', buyerOrderId: '', buyerId: '', warehouseId: '', lotId: '', bags: '', bagSizeKg: '50', quantityKg: '', pricePerKg: '', packaging: '', needsTransport: false, notes: '' };
 
 export default function SaleOrdersPage() {
   const user = useAuthStore((s) => s.user);
@@ -64,6 +64,20 @@ export default function SaleOrdersPage() {
       .catch((e) => { if (live) { setLots([]); setFormError(apiErrorMessage(e, 'Could not load the lots')); } });
     return () => { live = false; };
   }, [form.warehouseId]);
+  // Standing commitments of the chosen buyer, so a reservation can count against them.
+  const [agreements, setAgreements] = useState<{ id: string; reference: string; pricePerKg: number; quantityKg: number }[]>([]);
+  const [buyerOrders, setBuyerOrders] = useState<{ id: string; quantityRequiredKg: number; riceVariety?: string; status: string }[]>([]);
+  useEffect(() => {
+    if (!form.buyerId) return;
+    let live = true;
+    agreementsApi.list({ buyerId: form.buyerId, status: 'ACTIVE' }).then((r) => { if (live) setAgreements(r.data ?? []); }).catch(() => { if (live) setAgreements([]); });
+    buyerOrdersApi.getForBuyer(form.buyerId)
+      .then((r) => { if (live) setBuyerOrders((r.data ?? []).filter((o: { status: string }) => o.status === 'OPEN' || o.status === 'PARTIALLY_FULFILLED')); })
+      .catch(() => { if (live) setBuyerOrders([]); });
+    return () => { live = false; };
+  }, [form.buyerId]);
+  const buyerAgreements = form.buyerId ? agreements : [];
+  const openBuyerOrders = form.buyerId ? buyerOrders : [];
   const warehouseLots = form.warehouseId ? lots : [];
   const pickedLot = warehouseLots.find((l) => l.id === form.lotId);
   const wh = warehouses.find((w) => w.id === form.warehouseId);
@@ -74,6 +88,7 @@ export default function SaleOrdersPage() {
       const res = await saleOrdersApi.reserve({
         buyerId: form.buyerId, warehouseId: form.warehouseId, lotId: form.lotId,
         quantityKg: Number(form.quantityKg), pricePerKg: Number(form.pricePerKg),
+        agreementId: form.agreementId || undefined, buyerOrderId: form.buyerOrderId || undefined,
         packaging: form.packaging.trim() || undefined, needsTransport: form.needsTransport, notes: form.notes.trim() || undefined,
       });
       setCreating(false); setIssued(res.data.reference); fetchRows();
@@ -91,7 +106,7 @@ export default function SaleOrdersPage() {
       };
     });
 
-  const set = (k: keyof typeof EMPTY, v: string | boolean) => setForm((f) => ({ ...f, [k]: v, ...(k === 'warehouseId' ? { lotId: '' } : {}) }));
+  const set = (k: keyof typeof EMPTY, v: string | boolean) => setForm((f) => ({ ...f, [k]: v, ...(k === 'warehouseId' ? { lotId: '' } : {}), ...(k === 'buyerId' ? { agreementId: '', buyerOrderId: '' } : {}) }));
 
   return (
     <div className="ua-page">
@@ -163,8 +178,26 @@ export default function SaleOrdersPage() {
                 <option value="">Select a buyer…</option>
                 {buyers.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
-              {buyers.length === 0 && <span className="ua-hint">No buyers yet. Add one on the Buyers page first.</span>}
+              {buyers.length === 0 && <span className="ua-hint">No buyers yet. Add one on the Market &amp; Buyers page first.</span>}
             </div>
+            {(buyerAgreements.length > 0 || openBuyerOrders.length > 0) && (
+              <div className="ua-field">
+                <label className="ua-label" htmlFor="so-agr">Delivers against<span className="ua-opt">optional</span></label>
+                <select id="so-agr" className="input-field" value={form.agreementId} onChange={(e) => {
+                  const a = buyerAgreements.find((x) => x.id === e.target.value);
+                  setForm((f) => ({ ...f, agreementId: e.target.value, pricePerKg: a && !f.pricePerKg ? String(a.pricePerKg) : f.pricePerKg }));
+                }}>
+                  <option value="">No purchase agreement</option>
+                  {buyerAgreements.map((a) => <option key={a.id} value={a.id}>{a.reference} · {a.quantityKg.toLocaleString()} kg @ TZS {a.pricePerKg.toLocaleString()}</option>)}
+                </select>
+                {openBuyerOrders.length > 0 && (
+                  <select aria-label="Buyer order" className="input-field" style={{ marginTop: 6 }} value={form.buyerOrderId} onChange={(e) => set('buyerOrderId', e.target.value)}>
+                    <option value="">No buyer order</option>
+                    {openBuyerOrders.map((o) => <option key={o.id} value={o.id}>Order · {o.quantityRequiredKg.toLocaleString()} kg{o.riceVariety ? ` · ${o.riceVariety}` : ''}</option>)}
+                  </select>
+                )}
+              </div>
+            )}
             <div className="ua-field">
               <label className="ua-label" htmlFor="so-wh">Warehouse</label>
               <select id="so-wh" className="input-field" required value={form.warehouseId} onChange={(e) => set('warehouseId', e.target.value)}>

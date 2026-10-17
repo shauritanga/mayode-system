@@ -99,6 +99,16 @@ export class SalesService {
     if (!lot) throw new NotFoundException(`Lot with ID ${dto.lotId} not found`);
     if (!buyer)
       throw new NotFoundException(`Buyer with ID ${dto.buyerId} not found`);
+    if (dto.agreementId) {
+      const agreement = await this.prisma.purchaseAgreement.findUnique({
+        where: { id: dto.agreementId },
+        select: { buyerId: true, status: true, reference: true },
+      });
+      if (!agreement || agreement.buyerId !== buyer.id)
+        throw new BadRequestException('That purchase agreement belongs to a different buyer');
+      if (agreement.status !== 'ACTIVE')
+        throw new BadRequestException(`Agreement ${agreement.reference} is not active, so deliveries cannot be booked against it`);
+    }
     // A lot made from counted stock (no source deliveries) is the owner's own rice: it is sold and
     // invoiced like any other, but there are no farmers to apportion revenue or payouts to.
     const ownStock = lot.inventoryRecords.length === 0;
@@ -187,6 +197,7 @@ export class SalesService {
           buyerId: dto.buyerId,
           lotId: dto.lotId,
           buyerOrderId: dto.buyerOrderId,
+          agreementId: dto.agreementId,
           riceVariety: dto.riceVariety ?? lot.riceVariety,
           packaging: dto.packaging,
           quantityKg: dto.quantityKg,
@@ -197,6 +208,21 @@ export class SalesService {
           mamcosId: opts.mamcosId ?? null,
         },
       });
+      if (dto.agreementId) {
+        const agreement = await tx.purchaseAgreement.findUnique({
+          where: { id: dto.agreementId },
+          select: { quantityKg: true, status: true },
+        });
+        if (agreement?.status === 'ACTIVE') {
+          const delivered = await tx.sale.aggregate({
+            where: { agreementId: dto.agreementId },
+            _sum: { quantityKg: true },
+          });
+          if ((delivered._sum.quantityKg ?? 0) >= agreement.quantityKg) {
+            await tx.purchaseAgreement.update({ where: { id: dto.agreementId }, data: { status: 'FULFILLED' } });
+          }
+        }
+      }
       if (dto.buyerOrderId) {
         const order = await tx.buyerOrder.findUnique({
           where: { id: dto.buyerOrderId },

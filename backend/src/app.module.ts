@@ -41,6 +41,8 @@ import { ActivitiesModule } from './activities/activities.module';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { BuyersModule } from './buyers/buyers.module';
 import { BuyerOrdersModule } from './buyer-orders/buyer-orders.module';
+import { PurchaseAgreementsModule } from './purchase-agreements/purchase-agreements.module';
+import { MarketModule } from './market/market.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { FacilitiesModule } from './facilities/facilities.module';
 import { SettingsModule } from './settings/settings.module';
@@ -111,6 +113,8 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     InventoryModule,
     BuyersModule,
     BuyerOrdersModule,
+    PurchaseAgreementsModule,
+    MarketModule,
     SuppliersModule,
     FacilitiesModule,
     SettingsModule,

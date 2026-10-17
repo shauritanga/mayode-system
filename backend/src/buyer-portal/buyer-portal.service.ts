@@ -152,7 +152,7 @@ export class BuyerPortalService {
       qualityRequirements: dto.qualityRequirements,
       requiredByDate: dto.requiredByDate,
       notes: dto.notes,
-    });
+    }, null);
   }
 
   async traceability(reference: string, user: PortalUser) {

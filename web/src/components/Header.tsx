@@ -42,6 +42,7 @@ const TITLE_MAP: Record<string, string> = {
   'financial-provider': 'Credit Dashboard',
   buyer: 'Buyer Portal',
   'buyer-orders': 'Buyer Orders',
+  market: 'Market & Buyers',
   staff: 'Staff',
   users: 'Users & Roles',
   seasons: 'Seasons',

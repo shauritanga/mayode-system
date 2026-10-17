@@ -19,8 +19,10 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { BuyersService } from '../buyers/buyers.service';
 import { BuyerOrdersService } from './buyer-orders.service';
+import type { RequestUser } from '../common/ownership.service';
 import {
   CreateBuyerOrderDto,
+  UpdateBuyerOrderDto,
   UpdateBuyerOrderStatusDto,
 } from './dto/buyer-order.dto';
 
@@ -47,16 +49,16 @@ export class BuyerOrdersController {
   async create(@Body() dto: CreateBuyerOrderDto, @CurrentUser() user: any) {
     if (user.role === UserRole.BUYER) {
       const company = await this.buyers.requireMatchedBuyer(user);
-      dto = { ...dto, buyerId: company.id };
+      return this.buyerOrders.create({ ...dto, buyerId: company.id }, null);
     }
-    return this.buyerOrders.create(dto);
+    return this.buyerOrders.create(dto, user);
   }
 
   @Get()
   @Roles(...STAFF_ROLES)
   @RequirePermission('buyer_orders', 'VIEW')
-  findAll() {
-    return this.buyerOrders.findAll();
+  findAll(@CurrentUser() user: RequestUser) {
+    return this.buyerOrders.findAll(user);
   }
 
   @Get('buyer/:buyerId')
@@ -73,24 +75,33 @@ export class BuyerOrdersController {
   @Roles(...STAFF_ROLES, UserRole.BUYER)
   @RequirePermission('buyer_orders', 'VIEW')
   async findOne(@Param('id') id: string, @CurrentUser() user: any) {
-    const order = await this.buyerOrders.findOne(id);
+    const order = await this.buyerOrders.findOne(id, user.role === UserRole.BUYER ? null : user);
     await this.buyers.assertBuyerAccess(user, order.buyerId);
     return order;
   }
 
+  @Patch(':id')
+  @Roles(...STAFF_ROLES)
+  @RequirePermission('buyer_orders', 'EDIT')
+  update(@Param('id') id: string, @Body() dto: UpdateBuyerOrderDto, @CurrentUser() user: RequestUser) {
+    return this.buyerOrders.update(id, dto, user);
+  }
+
   @Patch(':id/status')
   @Roles(...STAFF_ROLES)
+  @RequirePermission('buyer_orders', 'EDIT')
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateBuyerOrderStatusDto,
+    @CurrentUser() user: RequestUser,
   ) {
-    return this.buyerOrders.updateStatus(id, dto);
+    return this.buyerOrders.updateStatus(id, dto, user);
   }
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @RequirePermission('buyer_orders', 'DELETE')
-  remove(@Param('id') id: string) {
-    return this.buyerOrders.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.buyerOrders.remove(id, user);
   }
 }

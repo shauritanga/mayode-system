@@ -27,6 +27,9 @@ export class CreateSaleOrderDto {
   /** The buyer has no vehicle: the warehouse keeper must arrange transport. */
   @IsOptional() @IsBoolean() needsTransport?: boolean;
   @IsOptional() @IsString() notes?: string;
+  /** The buyer's standing order or purchase agreement this reservation delivers against. */
+  @IsOptional() @IsString() buyerOrderId?: string;
+  @IsOptional() @IsString() agreementId?: string;
 }
 
 export class CancelSaleOrderDto {

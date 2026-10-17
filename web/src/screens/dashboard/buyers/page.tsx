@@ -6,6 +6,7 @@ import { apiErrorMessage } from '@/lib/api-error';
 import { useAuthStore } from '@/store/auth.store';
 import { hasPermission } from '@/lib/nav';
 import Modal from '@/components/Modal';
+import { BUSINESS_TYPES, businessTypeLabel, kg, tzs } from '../market/format';
 
 interface Buyer {
   id: string;
@@ -15,11 +16,19 @@ interface Buyer {
   contactEmail?: string | null;
   contactPhone?: string | null;
   isCertified: boolean;
+  businessType?: string | null;
+  region?: string | null;
+  district?: string | null;
+  location?: string | null;
+  deliveryLocation?: string | null;
+  preferredVarieties?: string[];
+  notes?: string | null;
+  stats?: { soldKg: number; soldValue: number; outstanding: number; openOrders: number; requiredKg: number; activeAgreements: number };
 }
 
-const EMPTY = { name: '', fairtradeCertNumber: '', contactPerson: '', contactEmail: '', contactPhone: '', isCertified: false };
+const EMPTY = { name: '', businessType: '', fairtradeCertNumber: '', contactPerson: '', contactEmail: '', contactPhone: '', region: '', district: '', location: '', deliveryLocation: '', preferredVarieties: '', notes: '', isCertified: false };
 
-export default function BuyersPage() {
+export default function BuyersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const user = useAuthStore((s) => s.user);
   const canCreate = hasPermission(user, 'buyers', 'CREATE');
   const canEdit = hasPermission(user, 'buyers', 'EDIT');
@@ -46,6 +55,13 @@ export default function BuyersPage() {
     setFormError('');
     setForm(b === 'new' ? EMPTY : {
       name: b.name,
+      businessType: b.businessType ?? '',
+      region: b.region ?? '',
+      district: b.district ?? '',
+      location: b.location ?? '',
+      deliveryLocation: b.deliveryLocation ?? '',
+      preferredVarieties: (b.preferredVarieties ?? []).join(', '),
+      notes: b.notes ?? '',
       fairtradeCertNumber: b.fairtradeCertNumber ?? '',
       contactPerson: b.contactPerson ?? '',
       contactEmail: b.contactEmail ?? '',
@@ -58,9 +74,11 @@ export default function BuyersPage() {
   const save = async () => {
     if (!form.name.trim()) { setFormError('Name is required'); return; }
     // Empty optional strings would fail @IsEmail / be stored as blanks.
-    const payload = Object.fromEntries(
-      Object.entries(form).filter(([k, v]) => k === 'name' || k === 'isCertified' || (typeof v === 'string' && v.trim())),
+    const { preferredVarieties, ...rest } = form;
+    const payload: Record<string, unknown> = Object.fromEntries(
+      Object.entries(rest).filter(([k, v]) => k === 'name' || k === 'isCertified' || (typeof v === 'string' && v.trim())),
     );
+    payload.preferredVarieties = preferredVarieties.split(',').map((v) => v.trim()).filter(Boolean);
     setSaving(true); setFormError('');
     try {
       if (editing === 'new') await buyersApi.create(payload);
@@ -79,7 +97,7 @@ export default function BuyersPage() {
   };
 
   const q = search.toLowerCase();
-  const rows = buyers.filter((b) => b.name.toLowerCase().includes(q) || (b.contactPerson ?? '').toLowerCase().includes(q));
+  const rows = buyers.filter((b) => b.name.toLowerCase().includes(q) || (b.contactPerson ?? '').toLowerCase().includes(q) || (b.district ?? '').toLowerCase().includes(q) || (b.location ?? '').toLowerCase().includes(q));
   const field = (key: keyof typeof EMPTY, label: string, type = 'text') => (
     <div style={{ marginBottom: '12px' }}>
       <label style={{ fontSize: '12px', color: 'var(--neutral-500)' }}>{label}</label>
@@ -90,11 +108,11 @@ export default function BuyersPage() {
 
   return (
     <div>
-      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
+      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: embedded ? 'flex-end' : 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        {!embedded && <div>
           <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Buyers</h1>
           <p style={{ fontSize: '13px', color: 'var(--neutral-500)' }}>Buyer directory and Fairtrade certification status</p>
-        </div>
+        </div>}
         {canCreate && <button className="btn-primary" onClick={() => openForm('new')}>+ New buyer</button>}
       </div>
 
@@ -111,14 +129,18 @@ export default function BuyersPage() {
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
-              <thead><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Fairtrade cert.</th><th>Status</th><th /></tr></thead>
+              <thead><tr><th>Buyer</th><th>Business type</th><th>Contact</th><th>Location</th><th>Preferred varieties</th><th>Open orders</th><th>Sales</th><th>Owes</th><th>Status</th><th /></tr></thead>
               <tbody>
                 {rows.map((b) => (
                   <tr key={b.id}>
-                    <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{b.name}</td>
-                    <td>{b.contactPerson || '—'}<div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{b.contactEmail}</div></td>
-                    <td>{b.contactPhone || '—'}</td>
-                    <td>{b.fairtradeCertNumber || '—'}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{b.name}<div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{b.fairtradeCertNumber || ''}</div></td>
+                    <td>{businessTypeLabel(b.businessType)}</td>
+                    <td>{b.contactPerson || '—'}<div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{b.contactPhone || b.contactEmail}</div></td>
+                    <td>{[b.location, b.district, b.region].filter(Boolean).join(', ') || '—'}<div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{b.deliveryLocation ? `Delivery: ${b.deliveryLocation}` : ''}</div></td>
+                    <td>{(b.preferredVarieties ?? []).join(', ') || '—'}</td>
+                    <td>{b.stats?.openOrders ? <>{b.stats.openOrders} · {kg(b.stats.requiredKg)}</> : '—'}</td>
+                    <td>{b.stats?.soldValue ? <>{tzs(b.stats.soldValue)}<div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{kg(b.stats.soldKg)}</div></> : '—'}</td>
+                    <td style={{ color: b.stats?.outstanding ? 'var(--gold-400)' : undefined }}>{b.stats?.outstanding ? tzs(b.stats.outstanding) : '—'}</td>
                     <td><span className={`badge ${b.isCertified ? 'badge-green' : 'badge-gray'}`}>{b.isCertified ? 'Certified' : 'Not certified'}</span></td>
                     <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
                       {canEdit && <button className="btn-secondary" onClick={() => openForm(b)}>Edit</button>}{' '}
@@ -142,11 +164,24 @@ export default function BuyersPage() {
           </>}
         >
           {formError && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginBottom: '12px' }}>{formError}</div>}
-          {field('name', 'Name *')}
+          {field('name', 'Buyer / business name *')}
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '12px', color: 'var(--neutral-500)' }}>Business type</label>
+            <select className="input-field" value={form.businessType} onChange={(e) => setForm({ ...form, businessType: e.target.value })}>
+              <option value="">Select…</option>
+              {BUSINESS_TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+          </div>
           {field('contactPerson', 'Contact person')}
           {field('contactEmail', 'Contact email', 'email')}
           {field('contactPhone', 'Contact phone', 'tel')}
+          {field('region', 'Region')}
+          {field('district', 'District')}
+          {field('location', 'Location (town / address)')}
+          {field('deliveryLocation', 'Usual delivery location')}
+          {field('preferredVarieties', 'Preferred varieties (comma separated)')}
           {field('fairtradeCertNumber', 'Fairtrade certificate number')}
+          {field('notes', 'Notes')}
           <label style={{ fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
             <input type="checkbox" checked={form.isCertified} onChange={(e) => setForm({ ...form, isCertified: e.target.checked })} />
             Fairtrade certified
