@@ -147,5 +147,15 @@ export class AuthResponseDto {
     permissions: { resource: string; action: string }[];
     controlNumber?: string;
     profilePhotoUrl?: string;
+    mustChangePassword?: boolean;
   };
+}
+
+export class ChangePasswordDto {
+  @ApiProperty() @IsString() @IsNotEmpty() currentPassword: string;
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @MinLength(8, { message: 'The new password must be at least 8 characters' })
+  newPassword: string;
 }

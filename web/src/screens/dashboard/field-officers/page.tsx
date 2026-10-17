@@ -3,6 +3,9 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { fieldOfficersApi } from '@/lib/api';
 import { TableSkeleton, MetricTile } from '@/components/role-dashboards/DashboardPrimitives';
+import AddOfficerModal from '@/components/AddOfficerModal';
+import { useAuthStore } from '@/store/auth.store';
+import { hasPermission } from '@/lib/nav';
 import { toCsv } from '@/lib/farm-format';
 import { RANK_MEASURES, ago, officerName, syncTone, type OfficerRow } from '@/lib/field-officers';
 
@@ -20,13 +23,17 @@ export default function FieldOfficersPage() {
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [measure, setMeasure] = useState(RANK_MEASURES[0].key);
   const [page, setPage] = useState(1);
+  const [adding, setAdding] = useState(false);
+  const account = useAuthStore((st) => st.user);
+  const canAdd = !!account?.mamcosId && hasPermission(account, 'users', 'CREATE');
 
-  useEffect(() => {
+  const load = () =>
     fieldOfficersApi.list()
       .then((r) => setOfficers(r.data || []))
       .catch((e) => setError(e?.response?.data?.message || 'Could not load field officers.'))
       .finally(() => setLoading(false));
-  }, []);
+
+  useEffect(() => { load(); }, []);
 
   const set = (key: keyof Filters, value: string) => { setFilters((f) => ({ ...f, [key]: value })); setPage(1); };
   const rank = RANK_MEASURES.find((m) => m.key === measure)!;
@@ -92,8 +99,12 @@ export default function FieldOfficersPage() {
           </div>
           <p style={{ fontSize: 13, color: 'var(--neutral-500)', marginLeft: 14 }}>Extension officers and data collectors: assignments, registration, visits, pending work and app sync</p>
         </div>
-        <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={exportCsv} disabled={loading || filtered.length === 0}>Export CSV</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={exportCsv} disabled={loading || filtered.length === 0}>Export CSV</button>
+          {canAdd && <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={() => setAdding(true)}>+ Add field officer</button>}
+        </div>
       </div>
+      {adding && <AddOfficerModal onClose={() => setAdding(false)} onCreated={load} />}
 
       <div className="role-grid" style={{ marginBottom: 16 }}>
         <MetricTile label="Field officers" value={officers.length} hint={`${officers.filter((o) => o.isActive).length} active`} tone="green" />

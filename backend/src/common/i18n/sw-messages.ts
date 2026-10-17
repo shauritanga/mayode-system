@@ -3,6 +3,11 @@
  * and the Swahili may reorder them. Add an entry here whenever a new user-facing message is thrown.
  */
 export const SW_MESSAGES: Record<string, string> = {
+  "Field officers are created by their cooperative’s administrator, not by Super Admin": "Maafisa ugani huundwa na msimamizi wa ushirika wao, si Super Admin",
+  "Could not prepare the Field Officer role": "Imeshindikana kuandaa jukumu la Afisa Ugani",
+  "The current password is not correct": "Nenosiri la sasa si sahihi",
+  "Choose a password different from the current one": "Chagua nenosiri tofauti na la sasa",
+  "The new password must be at least 8 characters": "Nenosiri jipya liwe na angalau herufi 8",
   "Unknown report: {0}": "Ripoti haijulikani: {0}",
   "\"{0}\" and \"{1}\" each expand the row count — keep one expanding relation per report, or make the other one the primary data set": "\"{0}\" na \"{1}\" kila moja huongeza idadi ya safu — tumia uhusiano mmoja unaopanuka kwa kila ripoti, au fanya mwingine kuwa data kuu",
   "\"{0}\" is not directly related to \"{1}\". Available: {2}": "\"{0}\" haihusiani moja kwa moja na \"{1}\". Zilizopo: {2}",

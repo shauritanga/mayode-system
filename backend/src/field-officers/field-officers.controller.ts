@@ -7,6 +7,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -17,6 +18,7 @@ import type { RequestUser } from '../common/ownership.service';
 import { FieldOfficersService } from './field-officers.service';
 import {
   AssignOfficerWorkDto,
+  CreateFieldOfficerDto,
   UpdateFieldOfficerDto,
 } from './dto/field-officers.dto';
 
@@ -44,6 +46,20 @@ export class FieldOfficersController {
   @ApiOperation({ summary: 'Mobile app: record that the officer just synced' })
   recordSync(@CurrentUser() user: RequestUser) {
     return this.service.recordSync(user);
+  }
+
+  @Post()
+  @RequirePermission('users', 'CREATE')
+  @ApiOperation({ summary: 'Create a field officer, generate a temporary password and text the sign-in details' })
+  create(@Body() dto: CreateFieldOfficerDto, @CurrentUser() user: RequestUser) {
+    return this.service.create(dto, user);
+  }
+
+  @Post(':id/resend-credentials')
+  @RequirePermission('users', 'EDIT')
+  @ApiOperation({ summary: 'Issue a new temporary password and text it to the officer' })
+  resendCredentials(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.service.resendCredentials(id, user);
   }
 
   @Get()

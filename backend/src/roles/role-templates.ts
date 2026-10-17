@@ -18,7 +18,29 @@ const VCE: PermissionAction[] = ['VIEW', 'CREATE', 'EDIT'];
  * the owner of the cooperative (or the platform) may change their permissions or delete
  * them, as long as no staff member is still assigned to the role.
  */
+export const FIELD_OFFICER_ROLE = 'Field Officer';
+
 export const ROLE_TEMPLATES: RoleTemplate[] = [
+  {
+    name: FIELD_OFFICER_ROLE,
+    description:
+      'Registers and verifies farmers and farms, records crop activities and visits. No finance, sales, users or settings.',
+    grants: {
+      workspace: V,
+      farmers: VCE,
+      farms: VCE,
+      plots: VCE,
+      crop_cycles: VCE,
+      activities: VCE,
+      farm_verifications: VCE,
+      field_surveys: VCE,
+      farm_reports: VC,
+      farm_corrections: VC,
+      farm_alerts: V,
+      rice_protocols: V,
+      weather: V,
+    },
+  },
   {
     name: 'Salesperson',
     description:
@@ -86,9 +108,11 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
 export async function createRoleTemplates(
   db: Db,
   mamcosId: string | null,
+  only?: string[],
 ): Promise<string[]> {
+  const templates = only ? ROLE_TEMPLATES.filter((t) => only.includes(t.name)) : ROLE_TEMPLATES;
   const keys = [
-    ...new Set(ROLE_TEMPLATES.flatMap((t) => Object.keys(t.grants))),
+    ...new Set(templates.flatMap((t) => Object.keys(t.grants))),
   ];
   const resources = await db.resource.findMany({
     where: { key: { in: keys } },
@@ -96,7 +120,7 @@ export async function createRoleTemplates(
   });
   const idByKey = new Map(resources.map((r) => [r.key, r.id]));
   const created: string[] = [];
-  for (const template of ROLE_TEMPLATES) {
+  for (const template of templates) {
     const existing = await db.role.findFirst({
       where: { name: template.name, mamcosId },
       select: { id: true },

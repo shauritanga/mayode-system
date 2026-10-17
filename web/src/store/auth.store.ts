@@ -21,6 +21,8 @@ interface User {
   customRoleName?: string;
   /** Flattened resource+action grants from GET /auth/me (mirrors the backend matrix). */
   permissions?: PermissionGrant[];
+  /** True while the account still uses a temporary password issued by an administrator. */
+  mustChangePassword?: boolean;
 }
 
 interface AuthState {

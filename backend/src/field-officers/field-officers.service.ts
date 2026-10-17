@@ -5,12 +5,20 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { MamcosStaffRole, Prisma, UserRole } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
+import { AuthService } from '../auth/auth.service';
+import { SmsService } from '../messaging/sms.service';
+import { createRoleTemplates, FIELD_OFFICER_ROLE } from '../roles/role-templates';
+import type { DelegatingActor } from '../auth/delegation';
 import {
   AssignOfficerWorkDto,
+  CreateFieldOfficerDto,
   UpdateFieldOfficerDto,
 } from './dto/field-officers.dto';
+import { generateTemporaryPassword, redactPassword, welcomeSms } from './officer-credentials';
 
 const FARMER_COMPLETENESS_FIELDS = [
   'nationalId',
@@ -32,7 +40,109 @@ export class FieldOfficersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ownership: OwnershipService,
+    private readonly auth: AuthService,
+    private readonly sms: SmsService,
+    private readonly config: ConfigService,
   ) {}
+
+  /** Sends the sign-in details; the log keeps the text without the password. */
+  private async sendCredentials(
+    phone: string,
+    person: { firstName: string; language?: string | null },
+    password: string,
+    reissued = false,
+  ): Promise<boolean> {
+    const text = welcomeSms({
+      firstName: person.firstName,
+      phone,
+      password,
+      language: person.language,
+      portalUrl: this.config.get<string>('PORTAL_URL') || undefined,
+      appUrl: this.config.get<string>('MOBILE_APP_URL') || undefined,
+      reissued,
+    });
+    return this.sms.sendTransactional(phone, text, 'staff_credentials', redactPassword(text, password));
+  }
+
+  private async fieldOfficerRoleId(mamcosId: string): Promise<string> {
+    const find = () =>
+      this.prisma.role.findFirst({ where: { name: FIELD_OFFICER_ROLE, mamcosId }, select: { id: true } });
+    let role = await find();
+    if (!role) {
+      await this.prisma.$transaction((tx) => createRoleTemplates(tx, mamcosId, [FIELD_OFFICER_ROLE]));
+      role = await find();
+    }
+    if (!role) throw new BadRequestException('Could not prepare the Field Officer role');
+    return role.id;
+  }
+
+  /**
+   * Creates the officer's account with a generated temporary password and texts the sign-in
+   * details. If the SMS fails the password is returned once so the admin can pass it on.
+   */
+  async create(dto: CreateFieldOfficerDto, actor: RequestUser) {
+    const mamcosId = this.tenant(actor);
+    if (!mamcosId) {
+      throw new ForbiddenException(
+        'Field officers are created by their cooperative’s administrator, not by Super Admin',
+      );
+    }
+    const roleId = dto.roleId ?? (await this.fieldOfficerRoleId(mamcosId));
+    const password = generateTemporaryPassword();
+    const language = dto.language ?? 'sw';
+    const user = await this.auth.createStaffAccount(
+      {
+        firstName: dto.firstName.trim(),
+        lastName: dto.lastName.trim(),
+        phone: dto.phone,
+        email: dto.email || undefined,
+        password,
+        roleId,
+        staffType: UserRole.FIELD_OFFICER,
+        assignedArea: dto.assignedArea?.trim() || undefined,
+        language,
+      },
+      actor as unknown as DelegatingActor,
+      { mustChangePassword: true },
+    );
+    const officer = await this.prisma.mamcosStaff.update({
+      where: { userId: user.id },
+      data: { region: dto.region?.trim() || null, district: dto.district?.trim() || null },
+      select: { id: true, employeeCode: true },
+    });
+    const sent = await this.sendCredentials(user.phone, { firstName: dto.firstName, language }, password);
+    return {
+      id: officer.id,
+      employeeCode: officer.employeeCode,
+      credentialsSms: sent ? 'sent' : 'failed',
+      ...(sent ? {} : { temporaryPassword: password }),
+    };
+  }
+
+  /** Issues a fresh temporary password, signs the officer out everywhere and texts it. */
+  async resendCredentials(id: string, actor: RequestUser) {
+    const officer = await this.officerOrThrow(id, actor);
+    const account = await this.prisma.user.findUnique({
+      where: { id: officer.userId },
+      select: { id: true, phone: true, language: true, firstName: true },
+    });
+    if (!account) throw new NotFoundException('Field officer not found');
+    const password = generateTemporaryPassword();
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: account.id },
+        data: { passwordHash: await bcrypt.hash(password, 10), mustChangePassword: true },
+      }),
+      this.prisma.refreshToken.deleteMany({ where: { userId: account.id } }),
+    ]);
+    const sent = await this.sendCredentials(
+      account.phone,
+      { firstName: account.firstName ?? officer.firstName, language: account.language },
+      password,
+      true,
+    );
+    return { credentialsSms: sent ? 'sent' : 'failed', ...(sent ? {} : { temporaryPassword: password }) };
+  }
 
   private tenant(user: RequestUser) {
     return this.ownership.resolveTenantMamcosId(user);

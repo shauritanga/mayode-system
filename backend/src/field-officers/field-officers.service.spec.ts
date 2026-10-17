@@ -45,7 +45,7 @@ function setup() {
     activityLog: { groupBy: jest.fn().mockResolvedValue([{ fieldOfficerId: 'a', _count: { _all: 3 } }]) },
   };
   const ownership = { resolveTenantMamcosId: jest.fn().mockReturnValue(null) };
-  return new FieldOfficersService(prisma as any, ownership as any);
+  return new FieldOfficersService(prisma as any, ownership as any, {} as any, {} as any, { get: () => undefined } as any);
 }
 
 describe('FieldOfficersService.list', () => {
@@ -69,5 +69,67 @@ describe('FieldOfficersService.list', () => {
     expect(b.visitsCompleted).toBe(2);
     // b registered one farmer with 3 of 7 fields filled
     expect(b.dataCompleteness).toBe(43);
+  });
+});
+
+describe('FieldOfficersService credentials', () => {
+  const actor = { id: 'u1', role: 'CUSTOM', mamcosId: 'm1' } as any;
+  function build(opts: { tenant?: string | null; smsOk?: boolean } = {}) {
+    const prisma: any = {
+      role: { findFirst: jest.fn().mockResolvedValue({ id: 'role1' }) },
+      mamcosStaff: {
+        update: jest.fn().mockResolvedValue({ id: 'off1', employeeCode: 'FO-0009' }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'off1', userId: 'usr1', firstName: 'Asha' }),
+      },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'usr1', phone: '+255700000001', language: 'sw', firstName: 'Asha' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      refreshToken: { deleteMany: jest.fn().mockResolvedValue({}) },
+      $transaction: jest.fn().mockResolvedValue([]),
+    };
+    const ownership = { resolveTenantMamcosId: jest.fn().mockReturnValue(opts.tenant === undefined ? 'm1' : opts.tenant) };
+    const auth = { createStaffAccount: jest.fn().mockResolvedValue({ id: 'usr1', phone: '+255700000001' }) };
+    const sms = { sendTransactional: jest.fn().mockResolvedValue(opts.smsOk ?? true) };
+    const service = new FieldOfficersService(prisma, ownership as any, auth as any, sms as any, { get: () => undefined } as any);
+    return { service, prisma, auth, sms };
+  }
+  const dto = { firstName: 'Asha', lastName: 'Juma', phone: '0700000001', region: 'Mbeya', district: 'Mbarali' };
+
+  it('creates the account with a temporary password, forces a change, and texts the details', async () => {
+    const { service, auth, sms, prisma } = build();
+    const res = await service.create(dto as any, actor);
+    const [created, , options] = auth.createStaffAccount.mock.calls[0];
+    expect(created.staffType).toBe('FIELD_OFFICER');
+    expect(created.roleId).toBe('role1');
+    expect(created.password).toHaveLength(10);
+    expect(options).toEqual({ mustChangePassword: true });
+    expect(prisma.mamcosStaff.update.mock.calls[0][0].data).toEqual({ region: 'Mbeya', district: 'Mbarali' });
+    const [, text, type, logged] = sms.sendTransactional.mock.calls[0];
+    expect(text).toContain(created.password);
+    expect(logged).not.toContain(created.password);
+    expect(type).toBe('staff_credentials');
+    expect(res).toEqual({ id: 'off1', employeeCode: 'FO-0009', credentialsSms: 'sent' });
+  });
+
+  it('hands the password back once when the SMS could not be sent', async () => {
+    const { service, auth } = build({ smsOk: false });
+    const res: any = await service.create(dto as any, actor);
+    expect(res.credentialsSms).toBe('failed');
+    expect(res.temporaryPassword).toBe(auth.createStaffAccount.mock.calls[0][0].password);
+  });
+
+  it('refuses accounts with no cooperative (Super Admin)', async () => {
+    const { service } = build({ tenant: null });
+    await expect(service.create(dto as any, actor)).rejects.toThrow('cooperative');
+  });
+
+  it('re-issues credentials: new password, forced change, sessions revoked, SMS sent', async () => {
+    const { service, prisma, sms } = build();
+    const res = await service.resendCredentials('off1', actor);
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.user.update.mock.calls[0][0].data.mustChangePassword).toBe(true);
+    expect(sms.sendTransactional.mock.calls[0][1]).toContain('taarifa zako');
+    expect(res).toEqual({ credentialsSms: 'sent' });
   });
 });

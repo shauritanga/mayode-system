@@ -10,6 +10,7 @@ import { useIdleLogout } from '@/hooks/useIdleLogout';
 import { authApi } from '@/lib/api';
 import { isPathAllowed } from '@/lib/nav';
 import { isAccountAllowedInThisMode } from '@/lib/app-mode';
+import ChangePasswordGate from '@/components/ChangePasswordGate';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, _hasHydrated, updateUser, clearAuth } = useAuthStore();
@@ -74,6 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <PageTransition>{children}</PageTransition>
         </main>
       </div>
+      {user?.mustChangePassword && <ChangePasswordGate />}
     </div>
   );
 }

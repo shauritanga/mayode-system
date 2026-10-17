@@ -35,6 +35,7 @@ describe('Sale workflow role templates', () => {
     const { tx, created } = db();
     const names = await createRoleTemplates(tx, 'm1');
     expect(names).toEqual([
+      'Field Officer',
       'Salesperson',
       'Warehouse Keeper',
       'Sales Manager',
@@ -91,5 +92,16 @@ describe('Sale workflow role templates', () => {
         .filter((x) => x.roleId === 'role-Sales Auditor')
         .every((x) => x.action === 'VIEW'),
     ).toBe(true);
+  });
+
+  it('can create just the Field Officer role, which never includes finance, sales or user management', async () => {
+    const { tx, created, grants } = db();
+    expect(await createRoleTemplates(tx, 'm1', ['Field Officer'])).toEqual(['Field Officer']);
+    expect(created).toHaveLength(1);
+    const keys = new Set(grants.map((g) => g.resourceId.replace('res-', '')));
+    for (const forbidden of ['finance', 'sales', 'users', 'roles', 'settings', 'accounting', 'loans']) {
+      expect(keys.has(forbidden)).toBe(false);
+    }
+    expect(keys.has('farmers')).toBe(true);
   });
 });

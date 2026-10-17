@@ -26,6 +26,7 @@ import {
   LoginDto,
   RefreshTokenDto,
   AuthResponseDto,
+  ChangePasswordDto,
 } from './dto/auth.dto';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { CreateCooperativeAdminDto } from './dto/create-cooperative-admin.dto';
@@ -186,6 +187,14 @@ export class AuthController {
     @Body() refreshTokenDto: RefreshTokenDto,
   ): Promise<AuthResponseDto> {
     return this.authService.refresh(refreshTokenDto);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Choose a new password (required after receiving a temporary one)' })
+  async changePassword(@Body() dto: ChangePasswordDto, @CurrentUser() user: { id: string }) {
+    return this.authService.changePassword(user.id, dto.currentPassword, dto.newPassword);
   }
 
   @Get('me')

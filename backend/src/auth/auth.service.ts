@@ -98,6 +98,7 @@ export class AuthService {
       profilePhotoUrl?: string | null;
       roleId?: string | null;
       mamcosId?: string | null;
+      mustChangePassword?: boolean;
       customRole?: {
         id: string;
         name: string;
@@ -173,6 +174,7 @@ export class AuthService {
         permissions,
         controlNumber,
         profilePhotoUrl: user.profilePhotoUrl || undefined,
+        mustChangePassword: user.mustChangePassword ?? false,
       },
     };
   }
@@ -212,7 +214,25 @@ export class AuthService {
       permissions,
       controlNumber: user.farmer?.controlNumber,
       profilePhotoUrl: user.profilePhotoUrl || undefined,
+      mustChangePassword: user.mustChangePassword ?? false,
     };
+  }
+
+  /** A signed-in user chooses a new password; this also lifts the temporary-password lock. */
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.isActive) throw new UnauthorizedException('User is inactive or unauthorized');
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      throw new BadRequestException('The current password is not correct');
+    }
+    if (currentPassword === newPassword) {
+      throw new BadRequestException('Choose a password different from the current one');
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: await bcrypt.hash(newPassword, await bcrypt.genSalt(10)), mustChangePassword: false },
+    });
+    return { success: true };
   }
 
   async selfRegisterFarmer(dto: FarmerSelfRegisterDto): Promise<AuthResponseDto> {
@@ -331,7 +351,11 @@ export class AuthService {
    * by the controller) may create accounts only inside their own AMCOS, from roles
    * of that AMCOS, and never with more permissions than they hold themselves.
    */
-  async createStaffAccount(dto: CreateStaffUserDto, actor: DelegatingActor) {
+  async createStaffAccount(
+    dto: CreateStaffUserDto,
+    actor: DelegatingActor,
+    options: { mustChangePassword?: boolean } = {},
+  ) {
     const superActor = isSuperAdmin(actor);
     const tenantId = superActor ? null : requireTenant(actor);
 
@@ -416,6 +440,7 @@ export class AuthService {
           roleId: dto.roleId,
           mamcosId,
           language: dto.language || 'sw',
+          mustChangePassword: options.mustChangePassword ?? false,
         },
         select: {
           id: true,

@@ -35,6 +35,8 @@ model User {
   lastLoginAt     DateTime? @map("last_login_at")
   /// Last time the mobile app synced its offline data to the server.
   lastSyncAt      DateTime? @map("last_sync_at")
+  /// Set when staff are given a temporary password; cleared once they choose their own.
+  mustChangePassword Boolean @default(false) @map("must_change_password")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 

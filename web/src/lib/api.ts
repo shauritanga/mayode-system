@@ -103,6 +103,8 @@ export const authApi = {
   createCooperativeAdmin: (data: object) => api.post('/auth/cooperative-admin', data),
   /** Current-session profile: role, custom role, flattened permissions. */
   me: () => api.get('/auth/me'),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.post('/auth/change-password', { currentPassword, newPassword }),
 };
 export const usersApi = {
   getAll: () => api.get('/users'),
@@ -163,6 +165,8 @@ export const mamcosApi = {
 export const fieldOfficersApi = {
   list: () => api.get('/field-officers'),
   getOne: (id: string) => api.get(`/field-officers/${id}`),
+  create: (data: object) => api.post('/field-officers', data),
+  resendCredentials: (id: string) => api.post(`/field-officers/${id}/resend-credentials`),
   update: (id: string, data: object) => api.patch(`/field-officers/${id}`, data),
   assign: (id: string, data: { farmerIds?: string[]; farmIds?: string[]; unassign?: boolean }) => api.post(`/field-officers/${id}/assign`, data),
   unassigned: () => api.get('/field-officers/unassigned'),

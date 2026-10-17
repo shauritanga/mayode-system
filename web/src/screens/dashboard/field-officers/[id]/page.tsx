@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { fieldOfficersApi } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api-error';
 import { useAuthStore } from '@/store/auth.store';
 import Modal from '@/components/Modal';
 import { MetricTile } from '@/components/role-dashboards/DashboardPrimitives';
@@ -61,6 +62,19 @@ export default function FieldOfficerDetailPage() {
   if (loading) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)', fontSize: 14 }}>Loading field officer…</div>;
   if (error || !officer) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)', fontSize: 14 }}>{error || 'Field officer not found.'}</div>;
 
+  const resend = async () => {
+    if (!confirm(`Send ${officerName(officer)} a new temporary password by SMS? Their current password stops working and they are signed out.`)) return;
+    try {
+      const res = await fieldOfficersApi.resendCredentials(id);
+      const data = res.data as { credentialsSms: string; temporaryPassword?: string };
+      setMessage(data.credentialsSms === 'sent'
+        ? 'New sign-in details were sent by SMS.'
+        : `The SMS could not be sent. Give the officer this temporary password (shown once): ${data.temporaryPassword}`);
+    } catch (err) {
+      setMessage(`Could not reissue credentials: ${apiErrorMessage(err, 'try again')}`);
+    }
+  };
+
   const tone = syncTone(officer.lastSyncAt);
   const toggle = (list: string[], setList: (v: string[]) => void, key: string) =>
     setList(list.includes(key) ? list.filter((x) => x !== key) : [...list, key]);
@@ -81,6 +95,7 @@ export default function FieldOfficerDetailPage() {
         {canManage && (
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={() => setEditing(true)}>Edit profile</button>
+            <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={resend}>Resend credentials</button>
             <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={() => setAssigning(true)}>+ Assign farmers / farms</button>
           </div>
         )}
