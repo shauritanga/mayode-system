@@ -4,7 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PaymentStatus, PaymentType, PayoutStatus } from '@prisma/client';
+import { PaymentStatus, PaymentType, PayoutStatus, Prisma, UserRole } from '@prisma/client';
+import type { RequestUser } from '../common/ownership.service';
 import { ClickPesaService } from '../payments/clickpesa.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../messaging/sms.service';
@@ -50,16 +51,25 @@ export class LoansService {
     );
     return loan;
   }
-  listForFarmer(farmerId: string) {
+  /** Which farmers' loans this person may see: themselves, their cooperative's, or those who shared data with lenders. */
+  private async farmerScope(user: RequestUser): Promise<Prisma.FarmerWhereInput> {
+    if (user.role === UserRole.SUPER_ADMIN) return {};
+    if (user.role === UserRole.FARMER) return { userId: user.id };
+    if (user.role === UserRole.FINANCIAL_PROVIDER) return { dataShareConsent: true };
+    return { mamcosId: user.mamcosId ?? null };
+  }
+
+  async listForFarmer(farmerId: string, user: RequestUser) {
     return this.prisma.loanRecord.findMany({
-      where: { farmerId },
+      where: { farmerId, farmer: await this.farmerScope(user) },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  /** Platform-wide loan list for admin reporting (repayment performance, finance-access counts). */
-  findAll() {
+  /** Loan list for reporting (repayment performance, finance-access counts), limited to what the caller may see. */
+  async findAll(user: RequestUser) {
     return this.prisma.loanRecord.findMany({
+      where: { farmer: await this.farmerScope(user) },
       orderBy: { createdAt: 'desc' },
       include: {
         farmer: {

@@ -38,8 +38,8 @@ export class LoansController {
     UserRole.FINANCIAL_PROVIDER,
     UserRole.FARMER,
   )
-  list(@Param('farmerId') farmerId: string) {
-    return this.loans.listForFarmer(farmerId);
+  list(@Param('farmerId') farmerId: string, @CurrentUser() user: RequestUser) {
+    return this.loans.listForFarmer(farmerId, user);
   }
   @Get()
   @Roles(
@@ -49,8 +49,8 @@ export class LoansController {
     UserRole.FINANCIAL_PROVIDER,
   )
   @RequirePermission('loans', 'VIEW')
-  findAll() {
-    return this.loans.findAll();
+  findAll(@CurrentUser() user: RequestUser) {
+    return this.loans.findAll(user);
   }
   @Post('sales/:saleId/approve-payouts')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)

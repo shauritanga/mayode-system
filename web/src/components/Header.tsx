@@ -43,6 +43,7 @@ const TITLE_MAP: Record<string, string> = {
   buyer: 'Buyer Portal',
   'buyer-orders': 'Buyer Orders',
   market: 'Market & Buyers',
+  credit: 'Credit & Loans',
   staff: 'Staff',
   users: 'Users & Roles',
   seasons: 'Seasons',

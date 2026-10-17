@@ -43,6 +43,7 @@ import { BuyersModule } from './buyers/buyers.module';
 import { BuyerOrdersModule } from './buyer-orders/buyer-orders.module';
 import { PurchaseAgreementsModule } from './purchase-agreements/purchase-agreements.module';
 import { MarketModule } from './market/market.module';
+import { CreditModule } from './credit/credit.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { FacilitiesModule } from './facilities/facilities.module';
 import { SettingsModule } from './settings/settings.module';
@@ -115,6 +116,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     BuyerOrdersModule,
     PurchaseAgreementsModule,
     MarketModule,
+    CreditModule,
     SuppliersModule,
     FacilitiesModule,
     SettingsModule,

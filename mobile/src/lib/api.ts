@@ -391,6 +391,15 @@ export const riceProtocolsApi = {
 };
 
 // ── Finance (expenses & revenue per crop cycle) ──
+export const creditApi = {
+  lenders: () => api.get<{ id: string; name: string; interestRatePercent: number | null }[]>('/credit/lenders'),
+  applications: () => api.get('/credit/applications'),
+  submit: (data: { lenderId: string; amountRequested: number; termMonths: number; purpose: string; purposeNote?: string }) =>
+    api.post('/credit/applications', data),
+  withdraw: (id: string) => api.patch(`/credit/applications/${id}/withdraw`),
+  loans: () => api.get('/credit/loans'),
+};
+
 export const financeApi = {
   addCost: (data: {
     cropCycleId: string;

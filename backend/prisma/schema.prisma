@@ -189,6 +189,7 @@ model Farmer {
   tractorBookings           TractorBooking[]
   inventoryRecords          InventoryRecord[]
   loanRecords               LoanRecord[]
+  loanApplications          LoanApplication[]
   household                 Household?
   documents                 Document[]
   verifications             FarmerVerification[]
@@ -754,8 +755,89 @@ model LoanRecord {
   lender           Lender?         @relation(fields: [lenderId], references: [id])
   deductions       LoanDeduction[]
   linkedInputCosts InputCost[]
+  instalments      LoanInstalment[]
+  application      LoanApplication?
 
   @@map("loan_records")
+}
+
+enum LoanApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  DISBURSED
+  WITHDRAWN
+}
+
+enum LoanPurpose {
+  SEED_AND_INPUTS
+  LAND_PREPARATION
+  LABOUR
+  EQUIPMENT
+  IRRIGATION
+  HARVEST_AND_TRANSPORT
+  WORKING_CAPITAL
+  OTHER
+}
+
+/// A farmer's request to a lender, with the farm and production picture at the time of applying.
+model LoanApplication {
+  id                  String                @id @default(uuid())
+  reference           String                @unique
+  farmerId            String                @map("farmer_id")
+  /// The farmer's cooperative when applying; null for platform-level farmers.
+  mamcosId            String?               @map("mamcos_id")
+  lenderId            String                @map("lender_id")
+  amountRequested     Float                 @map("amount_requested")
+  termMonths          Int                   @map("term_months")
+  purpose             LoanPurpose
+  purposeNote         String?               @map("purpose_note")
+  cropCycleId         String?               @map("crop_cycle_id")
+  status              LoanApplicationStatus @default(SUBMITTED)
+  /// Farm size, history, estimated yield, expected revenue and score as they stood on the day of applying.
+  profileSnapshot     Json                  @map("profile_snapshot")
+  creditScore         Int?                  @map("credit_score")
+  submittedByUserId   String                @map("submitted_by_user_id")
+  /// True when staff applied for the farmer.
+  submittedOnBehalf   Boolean               @default(false) @map("submitted_on_behalf")
+  reviewStartedAt     DateTime?             @map("review_started_at")
+  approvedAmount      Float?                @map("approved_amount")
+  interestRatePercent Float?                @map("interest_rate_percent")
+  autoDeductPercent   Float?                @map("auto_deduct_percent")
+  decisionNote        String?               @map("decision_note")
+  decidedByUserId     String?               @map("decided_by_user_id")
+  decidedAt           DateTime?             @map("decided_at")
+  disbursedAmount     Float?                @map("disbursed_amount")
+  disbursedAt         DateTime?             @map("disbursed_at")
+  disbursementRef     String?               @map("disbursement_ref")
+  loanRecordId        String?               @unique @map("loan_record_id")
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+
+  farmer Farmer      @relation(fields: [farmerId], references: [id])
+  lender Lender      @relation(fields: [lenderId], references: [id])
+  loan   LoanRecord? @relation(fields: [loanRecordId], references: [id])
+
+  @@index([farmerId])
+  @@index([lenderId, status])
+  @@index([mamcosId, status])
+  @@map("loan_applications")
+}
+
+/// One due payment of a loan. What has been paid is worked out from the loan's repaid total, not stored.
+model LoanInstalment {
+  id           String   @id @default(uuid())
+  loanRecordId String   @map("loan_record_id")
+  number       Int
+  dueDate      DateTime @map("due_date")
+  amount       Float
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  loan LoanRecord @relation(fields: [loanRecordId], references: [id], onDelete: Cascade)
+
+  @@unique([loanRecordId, number])
+  @@map("loan_instalments")
 }
 
 model Lender {
@@ -771,7 +853,8 @@ model Lender {
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  loans LoanRecord[]
+  loans        LoanRecord[]
+  applications LoanApplication[]
 
   @@map("lenders")
 }

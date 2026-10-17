@@ -94,6 +94,7 @@ export const navGroups: NavGroup[] = [
     label: 'Money & Reports',
     items: [
       { href: '/dashboard/finance', label: 'Finance and Accounting', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'finance' },
+      { href: '/dashboard/credit', label: 'Credit & Loans', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'loans' },
       { href: '/dashboard/reports', label: 'Reports', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'reports' },
       { href: '/dashboard/audit-log', label: 'Audit Log', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'audit_logs' },
       { href: '/dashboard/ai', label: 'AI Insights', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'ai_insights' },
@@ -153,6 +154,7 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/traceability', label: 'Traceability', icon: MapsSearchIcon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'], resource: 'sales' },
       { href: '/dashboard/suppliers', label: 'Suppliers', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'suppliers' },
       { href: '/dashboard/finance', label: 'Finance and Accounting', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'finance' },
+      { href: '/dashboard/credit', label: 'Credit & Loans', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'loans' },
       { href: '/dashboard/marketplace', label: 'M-LAX Marketplace', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], resource: 'marketplace' },
       { href: '/dashboard/sale-orders', label: 'Sale Orders', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], resource: 'sale_orders' },
       { href: '/dashboard/warehouse', label: 'Warehouse', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'warehouse_desk' },
@@ -188,6 +190,7 @@ export const navGroups: NavGroup[] = [
     label: 'Services',
     items: [
       { href: '/dashboard/farmer/finance', label: 'Finance', icon: Wallet01Icon, roles: ['FARMER'] },
+      { href: '/dashboard/farmer/loans', label: 'My Loans', icon: Wallet01Icon, roles: ['FARMER'] },
       { href: '/dashboard/farmer/insurance', label: 'Insurance', icon: Shield01Icon, roles: ['FARMER'] },
       { href: '/dashboard/farmer/membership', label: 'Membership', icon: StarIcon, roles: ['FARMER'] },
       { href: '/dashboard/farmer/votes', label: 'Votes', icon: File01Icon, roles: ['FARMER'] },
@@ -266,7 +269,7 @@ export function isPathAllowed(pathname: string, subject: AccessSubject | null | 
   if (pathname === '/dashboard/profile') return !!subject?.role;
   if (APP_MODE === 'farmers' && (pathname === '/dashboard/farmer' || pathname.startsWith('/dashboard/farmer/'))) {
     const suffix = pathname.slice('/dashboard/farmer'.length);
-    return subject?.role === 'FARMER' && ['', '/farms', '/crop-cycles', '/rice-tasks', '/finance', '/insurance', '/membership', '/votes', '/alerts', '/marketplace', '/consent', '/warehouse', '/community'].includes(suffix);
+    return subject?.role === 'FARMER' && ['', '/farms', '/crop-cycles', '/rice-tasks', '/finance', '/loans', '/insurance', '/membership', '/votes', '/alerts', '/marketplace', '/consent', '/warehouse', '/community'].includes(suffix);
   }
   if (pathname === '/dashboard' || pathname === '/dashboard/forbidden') return !!subject?.role;
   // Use the most specific match so /dashboard cannot authorize every child URL.

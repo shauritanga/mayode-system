@@ -8,6 +8,8 @@ import {
   money,
 } from '@/components/role-dashboards/DashboardPrimitives';
 import { farmersApi } from '@/lib/api';
+import ApplicationsPanel from '@/components/credit/ApplicationsPanel';
+import LoansPortfolio from '@/components/credit/LoansPortfolio';
 
 function downloadBlob(filename: string, content: string, type: string) {
   const blob = new Blob([content], { type });
@@ -104,6 +106,17 @@ export default function FinancialProviderDashboardPage() {
 
   return (
     <div className="role-dashboard">
+      <InsightPanel
+        title="Loan applications"
+        subtitle="Farmers who applied to you. Review the credit profile, then approve, reject or record the money released."
+      >
+        <ApplicationsPanel mode="lender" canApply={false} />
+      </InsightPanel>
+
+      <InsightPanel title="Your loan book" subtitle="Loans you have released: balance, repayments received and what is overdue.">
+        <LoansPortfolio />
+      </InsightPanel>
+
       <InsightPanel
         title="Credit profile lookup"
         subtitle="Access farmer financial profiles only where explicit data-sharing consent has been captured."

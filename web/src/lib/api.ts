@@ -447,6 +447,22 @@ export const agreementsApi = {
   setStatus: (id: string, status: string) => api.patch(`/purchase-agreements/${id}/status`, { status }),
   remove: (id: string) => api.delete(`/purchase-agreements/${id}`),
 };
+export const creditApi = {
+  lenders: () => api.get('/credit/lenders'),
+  summary: () => api.get('/credit/summary'),
+  applications: (params?: object) => api.get('/credit/applications', { params }),
+  application: (id: string) => api.get(`/credit/applications/${id}`),
+  applicationProfile: (id: string) => api.get(`/credit/applications/${id}/profile`),
+  farmerProfile: (farmerId: string) => api.get(`/credit/farmers/${farmerId}/profile`),
+  submit: (data: object) => api.post('/credit/applications', data),
+  withdraw: (id: string) => api.patch(`/credit/applications/${id}/withdraw`),
+  review: (id: string) => api.patch(`/credit/applications/${id}/review`),
+  approve: (id: string, data: object) => api.patch(`/credit/applications/${id}/approve`, data),
+  reject: (id: string, note: string) => api.patch(`/credit/applications/${id}/reject`, { note }),
+  disburse: (id: string, data: object) => api.patch(`/credit/applications/${id}/disburse`, data),
+  loans: () => api.get('/credit/loans'),
+  schedule: (loanId: string) => api.get(`/credit/loans/${loanId}/schedule`),
+};
 export const marketApi = {
   overview: (params?: object) => api.get('/market/overview', { params }),
   deliveries: (params?: object) => api.get('/market/deliveries', { params }),

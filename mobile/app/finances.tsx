@@ -78,6 +78,10 @@ export default function FinancesScreen() {
             <Text style={styles.actionText}>{t('recordSale')}</Text>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity style={[styles.actionBtn, { marginTop: 4 }]} onPress={() => router.push('/loans')}>
+          <HugeiconsIcon icon={Wallet01Icon} size={18} color="#10B981" />
+          <Text style={styles.actionText}>{t('myLoans')}</Text>
+        </TouchableOpacity>
         <Text style={styles.actionsHint}>{t('financeRecordViaSeasonHint')}</Text>
 
         {financial?.locked ? (
