@@ -3,6 +3,7 @@
  * and the Swahili may reorder them. Add an entry here whenever a new user-facing message is thrown.
  */
 export const SW_MESSAGES: Record<string, string> = {
+  "Unknown report: {0}": "Ripoti haijulikani: {0}",
   "\"{0}\" and \"{1}\" each expand the row count — keep one expanding relation per report, or make the other one the primary data set": "\"{0}\" na \"{1}\" kila moja huongeza idadi ya safu — tumia uhusiano mmoja unaopanuka kwa kila ripoti, au fanya mwingine kuwa data kuu",
   "\"{0}\" is not directly related to \"{1}\". Available: {2}": "\"{0}\" haihusiani moja kwa moja na \"{1}\". Zilizopo: {2}",
   "A GPS boundary must be mapped before AMCOS can approve this farm": "Mipaka ya GPS lazima ipimwe kabla AMCOS haijaidhinisha shamba hili",

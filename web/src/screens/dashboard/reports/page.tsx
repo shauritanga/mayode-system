@@ -21,6 +21,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { reportsApi } from '@/lib/api';
 import Modal from '@/components/Modal';
+import StandardReports from '@/components/reports/StandardReports';
 import ReportPreviewTable, { type ReportColumn } from '@/components/reports/ReportPreviewTable';
 
 // ── Types ──
@@ -64,7 +65,7 @@ interface SavedTemplate extends ReportConfig {
 }
 
 type ExportFormat = 'csv' | 'xlsx' | 'pdf';
-type Tab = 'builder' | 'templates';
+type Tab = 'standard' | 'builder' | 'templates';
 
 // ── Static config ──
 const EMPTY_FILTERS: Filters = {
@@ -207,7 +208,7 @@ const cleanFilters = (filters: Filters) =>
   Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== '' && v !== false));
 
 export default function ReportsPage() {
-  const [tab, setTab] = useState<Tab>('builder');
+  const [tab, setTab] = useState<Tab>('standard');
   const [schema, setSchema] = useState<BuilderEntity[]>([]);
   const [entityKey, setEntityKey] = useState('');
   const [joins, setJoins] = useState<string[]>([]);
@@ -429,15 +430,15 @@ export default function ReportsPage() {
       {notice && <div className="alert-box alert-success" style={{ marginBottom: 16 }}>{notice}</div>}
 
       <div className="seg-control" style={{ marginBottom: 12 }}>
-        {(['builder', 'templates'] as Tab[]).map((t) => (
+        {(['standard', 'builder', 'templates'] as Tab[]).map((t) => (
           <button key={t} className={`seg-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
             {tab === t && <motion.span layoutId="seg-pill" className="seg-pill" transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }} />}
-            {t === 'builder' ? 'Report builder' : `Templates${savedTemplates.length ? ` · ${savedTemplates.length} saved` : ''}`}
+            {t === 'standard' ? 'Standard reports' : t === 'builder' ? 'Custom report builder' : `Templates${savedTemplates.length ? ` · ${savedTemplates.length} saved` : ''}`}
           </button>
         ))}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+      {tab !== 'standard' && <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <button className="btn-secondary" style={{ fontSize: 12, padding: '7px 12px' }} onClick={checkPhase1Datasets} disabled={healthBusy}>
           {healthBusy ? 'Checking datasets…' : 'Check Phase 1 datasets'}
         </button>
@@ -450,9 +451,11 @@ export default function ReportsPage() {
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
-      {tab === 'builder' ? (
+      {tab === 'standard' ? (
+        <StandardReports />
+      ) : tab === 'builder' ? (
         <div className="builder-grid">
           {/* ── Configuration rail ── */}
           <aside className="glass-card builder-config">

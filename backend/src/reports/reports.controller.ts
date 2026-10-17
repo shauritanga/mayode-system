@@ -5,6 +5,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Post,
   Query,
   Res,
@@ -25,6 +26,7 @@ import {
   RunBuilderDto,
 } from './dto/reports.dto';
 import { ReportBuilderService } from './report-builder.service';
+import { AnalyticsReportsService } from './analytics-reports.service';
 import { ReportsService } from './reports.service';
 import { RiceOverviewService } from './rice-overview.service';
 
@@ -46,6 +48,7 @@ export class ReportsController {
     private readonly exporter: ExportService,
     private readonly builder: ReportBuilderService,
     private readonly riceOverview: RiceOverviewService,
+    private readonly analytics: AnalyticsReportsService,
   ) {}
 
   private scoped<T extends ReportFormatDto>(query: T, user: RequestUser): T {
@@ -84,6 +87,37 @@ export class ReportsController {
       `attachment; filename="${name}.xlsx"`,
     );
     return response.send(this.exporter.xlsx(rows, name));
+  }
+
+  @Get('catalog')
+  @Roles(...REPORT_ROLES)
+  @RequirePermission('reports', 'VIEW')
+  @ApiOperation({ summary: 'The standard reports and the filters each one supports' })
+  catalog() {
+    return this.analytics.catalog();
+  }
+
+  @Get('filter-options')
+  @Roles(...REPORT_ROLES)
+  @RequirePermission('reports', 'VIEW')
+  @ApiOperation({ summary: 'Locations, cooperatives, officers, seasons and varieties for the report filters' })
+  filterOptions(@CurrentUser() user: RequestUser) {
+    return this.analytics.filterOptions(this.scoped({} as ReportFormatDto, user).mamcosId ?? null);
+  }
+
+  @Get('analytics/:key')
+  @Roles(...REPORT_ROLES)
+  @RequirePermission('reports', 'VIEW')
+  @ApiOperation({ summary: 'Run one standard report; format=csv|xlsx|pdf downloads it' })
+  async analyticsReport(
+    @Param('key') key: string,
+    @Query() query: ReportFormatDto,
+    @CurrentUser() user: RequestUser,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const report = await this.analytics.run(key, this.scoped(query, user), user);
+    if (!query.format || query.format === 'json') return report;
+    return this.send(this.analytics.exportRows(report), key, query.format, response);
   }
 
   @Get('farmer-payments')
