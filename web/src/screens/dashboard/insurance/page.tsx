@@ -3,6 +3,12 @@ import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives'
 import { Fragment, useEffect, useState } from 'react';
 import { insuranceApi, farmersApi } from '@/lib/api';
 import Modal from '@/components/Modal';
+import { useAuthStore } from '@/store/auth.store';
+import { hasPermission } from '@/lib/nav';
+import { CLAIM_PAY } from '@/lib/insurance';
+import InsuranceApplicationsPanel from '@/components/insurance/InsuranceApplicationsPanel';
+import ProductGuide from '@/components/insurance/ProductGuide';
+import ClaimInspectModal from '@/components/insurance/ClaimInspectModal';
 
 interface Provider { id: string; name: string; contactPerson?: string; phone?: string; email?: string; _count?: { policies: number } }
 interface Policy {
@@ -13,6 +19,7 @@ interface Policy {
   insuredAreaHectares: number;
   sumInsured: number;
   premiumAmount: number;
+  premiumPaidAmount: number;
   farmer?: { firstName: string; lastName: string; controlNumber: string };
   provider?: { name: string };
   _count?: { claims: number };
@@ -22,6 +29,8 @@ interface Claim {
   incidentType: string;
   claimedAmount: number;
   paidAmount?: number | null;
+  approvedAmount?: number | null;
+  paymentStatus?: string;
   status: string;
   createdAt?: string;
   inspectionDate?: string | null;
@@ -34,7 +43,7 @@ const EMPTY_PROVIDER = { name: '', contactPerson: '', phone: '', email: '' };
 const EMPTY_POLICY = { farmerId: '', providerId: '', productType: 'WEATHER_INDEX', riceVariety: '', insuredAreaHectares: '', sumInsured: '', premiumAmount: '' };
 const EMPTY_CLAIM = { policyId: '', incidentDate: '', incidentType: '', description: '', claimedAmount: '' };
 
-export default function InsurancePage() {
+function PoliciesAndClaims() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
@@ -177,36 +186,8 @@ export default function InsurancePage() {
     } catch (e) { console.error(e); } finally { setWeatherLoadingId(null); }
   };
 
-  const handleClaimStatus = async (claim: Claim, status: string) => {
-    setStatusSavingId(claim.id);
-    try {
-      const paidAmount = status === 'PAID' ? Number(window.prompt('Paid amount (TZS):', String(claim.claimedAmount)) || claim.claimedAmount) : undefined;
-      await insuranceApi.updateClaimPayment(claim.id, { status, paidAmount });
-      load();
-    } catch (e) { console.error(e); } finally { setStatusSavingId(null); }
-  };
-
-  const handleInspectClaim = async (claim: Claim) => {
-    const notes = window.prompt('Inspection notes:', claim.inspectionNotes || '');
-    if (notes == null) return;
-    const nextStatus = window.prompt(
-      'Status after inspection (INSPECTING, APPROVED, REJECTED):',
-      claim.status === 'SUBMITTED' ? 'INSPECTING' : claim.status,
-    );
-    if (!nextStatus) return;
-    setStatusSavingId(claim.id);
-    try {
-      await insuranceApi.inspectClaim(claim.id, {
-        inspectionNotes: notes,
-        status: nextStatus,
-      });
-      load();
-    } catch (e: any) {
-      setError(e?.response?.data?.message || 'Could not inspect claim.');
-    } finally {
-      setStatusSavingId(null);
-    }
-  };
+  const [inspecting, setInspecting] = useState<Claim | null>(null);
+  const [premiumFor, setPremiumFor] = useState<Policy | null>(null);
 
   const submitClaim = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true); setError('');
@@ -292,7 +273,7 @@ export default function InsurancePage() {
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
-              <thead><tr><th>Farmer</th><th>Provider</th><th>Product</th><th>Area (ha)</th><th>Sum Insured</th><th>Premium</th><th>Status</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Farmer</th><th>Provider</th><th>Product</th><th>Area (ha)</th><th>Sum Insured</th><th>Premium</th><th>Premium paid</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
                 {filteredPolicies.map((p) => (
                   <tr key={p.id}>
@@ -302,6 +283,7 @@ export default function InsurancePage() {
                     <td>{p.insuredAreaHectares}</td>
                     <td>TZS {p.sumInsured.toLocaleString()}</td>
                     <td>TZS {p.premiumAmount.toLocaleString()}</td>
+                    <td>{p.premiumPaidAmount >= p.premiumAmount ? <span className="badge badge-green">Paid</span> : p.premiumPaidAmount > 0 ? <span className="badge badge-blue">TZS {p.premiumPaidAmount.toLocaleString()}</span> : <span className="badge badge-gold">Unpaid</span>}</td>
                     <td>
                       <select
                         className="input-field"
@@ -314,6 +296,7 @@ export default function InsurancePage() {
                       </select>
                     </td>
                     <td style={{ display: 'flex', gap: 6 }}>
+                      {p.premiumPaidAmount < p.premiumAmount && <button className="btn-secondary" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => setPremiumFor(p)}>Record premium</button>}
                       <button className="btn-secondary" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => handleAmendPolicy(p)}>Amend</button>
                       <button className="btn-secondary" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => handleRenewPolicy(p)}>Renew</button>
                     </td>
@@ -343,7 +326,7 @@ export default function InsurancePage() {
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
-              <thead><tr><th>Farmer</th><th>Provider</th><th>Incident</th><th>Claimed</th><th>Paid</th><th>Status</th><th>Ops</th></tr></thead>
+              <thead><tr><th>Farmer</th><th>Provider</th><th>Incident</th><th>Claimed</th><th>Approved</th><th>Paid</th><th>Status</th><th>Ops</th></tr></thead>
               <tbody>
                 {filteredClaims.map((c) => (
                   <Fragment key={c.id}>
@@ -352,21 +335,12 @@ export default function InsurancePage() {
                       <td style={{ fontSize: '13px', color: 'var(--neutral-400)' }}>{c.policy?.provider?.name || '—'}</td>
                       <td style={{ fontSize: '13px', color: 'var(--neutral-400)' }}>{c.incidentType}</td>
                       <td>TZS {c.claimedAmount.toLocaleString()}</td>
-                      <td>{c.paidAmount ? `TZS ${c.paidAmount.toLocaleString()}` : '—'}</td>
-                      <td>
-                        <select
-                          className="input-field"
-                          style={{ fontSize: '12px', padding: '4px 6px' }}
-                          value={c.status}
-                          disabled={statusSavingId === c.id}
-                          onChange={(e) => handleClaimStatus(c, e.target.value)}
-                        >
-                          {['SUBMITTED', 'INSPECTING', 'APPROVED', 'REJECTED', 'PAID'].map((s) => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </td>
+                      <td>{c.approvedAmount != null ? `TZS ${c.approvedAmount.toLocaleString()}` : '—'}</td>
+                      <td>{c.paidAmount ? `TZS ${c.paidAmount.toLocaleString()}` : '—'}{c.paymentStatus && c.paymentStatus !== 'NOT_DUE' && <div><span className={`badge ${CLAIM_PAY[c.paymentStatus]?.[0] ?? 'badge-gray'}`}>{CLAIM_PAY[c.paymentStatus]?.[1] ?? c.paymentStatus}</span></div>}</td>
+                      <td><span className={`badge ${c.status === 'REJECTED' ? 'badge-red' : c.status === 'PAID' || c.status === 'APPROVED' ? 'badge-green' : c.status === 'INSPECTING' ? 'badge-gold' : 'badge-blue'}`}>{c.status.toLowerCase()}</span></td>
                       <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <button className="btn-secondary" style={{ fontSize: '11px', padding: '4px 8px' }} disabled={statusSavingId === c.id} onClick={() => void handleInspectClaim(c)}>
-                          Inspect
+                        <button className="btn-secondary" style={{ fontSize: '11px', padding: '4px 8px' }} disabled={statusSavingId === c.id} onClick={() => setInspecting(c)}>
+                          {c.inspectionDate ? 'Update inspection' : 'Inspect'}
                         </button>
                         <button className="btn-secondary" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => setTimelineOpen((prev) => ({ ...prev, [c.id]: !prev[c.id] }))}>
                           {timelineOpen[c.id] ? 'Hide timeline' : 'Timeline'}
@@ -378,7 +352,7 @@ export default function InsurancePage() {
                     </tr>
                     {timelineOpen[c.id] && (
                       <tr>
-                        <td colSpan={7} style={{ background: 'var(--surface-tint)', padding: '12px 16px' }}>
+                        <td colSpan={8} style={{ background: 'var(--surface-tint)', padding: '12px 16px' }}>
                           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                             {claimSteps(c).map((step) => (
                               <div key={step.key} style={{ minWidth: 120, padding: 10, borderRadius: 10, background: step.reached ? 'rgba(16,185,129,0.12)' : 'transparent', border: '1px solid var(--hover-tint-3)' }}>
@@ -393,7 +367,7 @@ export default function InsurancePage() {
                     )}
                     {weatherContext[c.id] && (
                       <tr>
-                        <td colSpan={7} style={{ background: 'var(--surface-tint)', padding: '12px 16px', fontSize: '12px', color: 'var(--neutral-400)' }}>
+                        <td colSpan={8} style={{ background: 'var(--surface-tint)', padding: '12px 16px', fontSize: '12px', color: 'var(--neutral-400)' }}>
                           {weatherContext[c.id].matchingAlerts.length === 0
                             ? `No weather alerts recorded within 14 days of the incident for ${weatherContext[c.id].farmerLocation.region || weatherContext[c.id].farmerLocation.district || 'this farmer\'s location'}.`
                             : <div style={{ display: 'grid', gap: 6 }}>
@@ -494,6 +468,49 @@ export default function InsurancePage() {
           </form>
         </Modal>
       )}
+      {inspecting && <ClaimInspectModal claim={inspecting as any} onClose={() => setInspecting(null)} onSaved={() => { setInspecting(null); load(); }} />}
+      {premiumFor && <PolicyPremiumModal policy={premiumFor} onClose={() => setPremiumFor(null)} onSaved={() => { setPremiumFor(null); load(); }} />}
+    </div>
+  );
+}
+
+function PolicyPremiumModal({ policy, onClose, onSaved }: { policy: Policy; onClose: () => void; onSaved: () => void }) {
+  const [amount, setAmount] = useState(String(Math.max(policy.premiumAmount - policy.premiumPaidAmount, 0)));
+  const [reference, setReference] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const save = async () => {
+    setBusy(true); setError('');
+    try { await insuranceApi.recordPolicyPremium(policy.id, { amount: Number(amount), reference: reference.trim() || undefined }); onSaved(); }
+    catch (e: any) { setError(e?.response?.data?.message || 'Could not record the premium.'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Modal title="Record premium paid" subtitle={`Premium due TZS ${policy.premiumAmount.toLocaleString()} · paid so far TZS ${policy.premiumPaidAmount.toLocaleString()}`} onClose={onClose}
+      footer={<><button className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button><button className="btn-primary" onClick={save} disabled={busy || !Number(amount)}>{busy ? 'Saving…' : 'Record'}</button></>}>
+      {error && <div className="alert-box alert-danger" style={{ marginBottom: 10 }}>{error}</div>}
+      <div style={{ display: 'grid', gap: 12 }}>
+        <label className="form-label">Amount collected (TZS)<input className="input-field" type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+        <label className="form-label">Receipt / reference<input className="input-field" value={reference} onChange={(e) => setReference(e.target.value)} /></label>
+      </div>
+    </Modal>
+  );
+}
+
+export default function InsurancePage() {
+  const user = useAuthStore((st) => st.user);
+  const canApply = hasPermission(user, 'insurance', 'CREATE');
+  const [tab, setTab] = useState<'applications' | 'policies' | 'products'>('applications');
+  return (
+    <div className="page-shell">
+      <div className="seg-control" style={{ marginBottom: 16 }} role="tablist">
+        {([['applications', 'Applications'], ['policies', 'Policies and claims'], ['products', 'Products']] as const).map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={tab === id} className={`seg-btn ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </div>
+      {tab === 'applications' && <InsuranceApplicationsPanel mode="staff" canApply={canApply} />}
+      {tab === 'policies' && <PoliciesAndClaims />}
+      {tab === 'products' && <ProductGuide />}
     </div>
   );
 }

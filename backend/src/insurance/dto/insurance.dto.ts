@@ -1,18 +1,17 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsDateString,
   IsEmail,
+  IsIn,
+  IsPositive,
   IsEnum,
   IsNumber,
   IsOptional,
   IsString,
   Min,
 } from 'class-validator';
-import {
-  ClaimStatus,
-  InsuranceProductType,
-  PolicyStatus,
-} from '@prisma/client';
+import { InsuranceProductType, PolicyStatus } from '@prisma/client';
 
 export class UpsertInsuranceProviderDto {
   @IsString()
@@ -151,18 +150,43 @@ export class InspectClaimDto {
   @IsString()
   inspectionNotes?: string;
 
-  @ApiPropertyOptional({ enum: ClaimStatus })
+  @ApiPropertyOptional({ type: [String], description: 'Photo URLs from the uploads service' })
   @IsOptional()
-  @IsEnum(ClaimStatus)
-  status?: ClaimStatus;
-}
-
-export class UpdateClaimPaymentDto {
-  @IsEnum(ClaimStatus)
-  status: ClaimStatus;
+  @IsArray()
+  @IsString({ each: true })
+  photoUrls?: string[];
 
   @IsOptional()
   @IsNumber()
   @Min(0)
-  paidAmount?: number;
+  assessedLossAmount?: number;
+
+  @ApiPropertyOptional({ enum: ['APPROVE', 'REJECT', 'REINSPECT'] })
+  @IsOptional()
+  @IsIn(['APPROVE', 'REJECT', 'REINSPECT'])
+  recommendation?: string;
+}
+
+export class ClaimDecisionDto {
+  @IsIn(['APPROVE', 'REJECT'])
+  decision: 'APPROVE' | 'REJECT';
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  approvedAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class ClaimPaymentDto {
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+
+  @IsOptional()
+  @IsString()
+  reference?: string;
 }

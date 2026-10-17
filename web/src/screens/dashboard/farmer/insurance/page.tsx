@@ -1,6 +1,8 @@
 'use client';
 import { EmptyState, InsightPanel } from '@/components/role-dashboards/DashboardPrimitives';
 import { useFarmerData } from '../FarmerDataContext';
+import InsuranceApplicationsPanel from '@/components/insurance/InsuranceApplicationsPanel';
+import ProductGuide from '@/components/insurance/ProductGuide';
 
 function ClaimTimeline({ claim }: { claim: any }) {
   const status = claim.status as string;
@@ -37,6 +39,17 @@ export default function FarmerInsurancePage() {
   const { policies } = useFarmerData();
 
   return (
+    <>
+    <InsightPanel
+      title="Apply for crop insurance"
+      subtitle="Choose a cover, see the risk and a suggested amount, and send it to an insurance company. Cover starts when your premium is paid at the cooperative office."
+    >
+      <InsuranceApplicationsPanel mode="farmer" canApply />
+      <details style={{ marginTop: 16 }}>
+        <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>What each cover means</summary>
+        <div style={{ marginTop: 10 }}><ProductGuide /></div>
+      </details>
+    </InsightPanel>
     <InsightPanel
       title="Insurance policies and claims"
       subtitle="Coverage history for your farms and crop cycles, including claim status timeline."
@@ -85,7 +98,10 @@ export default function FarmerInsurancePage() {
                         <p>
                           {claim.description || 'No description'} · Claimed{' '}
                           {Number(claim.claimedAmount).toLocaleString()}
+                          {claim.approvedAmount != null && <> · Approved {Number(claim.approvedAmount).toLocaleString()}</>}
+                          {claim.paidAmount ? <> · Paid {Number(claim.paidAmount).toLocaleString()}</> : null}
                         </p>
+                        {claim.decisionNote && <p>Insurer’s note: {claim.decisionNote}</p>}
                       </div>
                       <span
                         className={`badge ${
@@ -109,5 +125,6 @@ export default function FarmerInsurancePage() {
         {!policies.length && <EmptyState>No insurance policies on record yet.</EmptyState>}
       </div>
     </InsightPanel>
+    </>
   );
 }

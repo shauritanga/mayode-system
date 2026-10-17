@@ -1,26 +1,33 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { ClaimStatus, PolicyStatus, UserRole } from '@prisma/client';
+import { InsuranceAccessService } from './insurance-access.service';
+import { claimPaymentStatus, claimsRatio } from './insurance-rules';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RequestUser } from '../common/ownership.service';
 import {
   AmendPolicyDto,
   CreateInsuranceClaimDto,
   CreateInsurancePolicyDto,
+  ClaimDecisionDto,
+  ClaimPaymentDto,
   InspectClaimDto,
   RenewPolicyDto,
-  UpdateClaimPaymentDto,
   UpdatePolicyStatusDto,
   UpsertInsuranceProviderDto,
 } from './dto/insurance.dto';
 
 @Injectable()
 export class InsuranceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: InsuranceAccessService,
+  ) {}
 
   private async farmerIdForUser(user: RequestUser) {
     const farmer = await this.prisma.farmer.findUnique({
@@ -74,18 +81,19 @@ export class InsuranceService {
   }
 
   // ── Policies ──
-  async createPolicy(dto: CreateInsurancePolicyDto) {
+  async createPolicy(dto: CreateInsurancePolicyDto, user: RequestUser) {
+    const ctx = await this.access.context(user);
     const [farmer, provider] = await Promise.all([
       this.prisma.farmer.findUnique({
         where: { id: dto.farmerId },
-        select: { id: true },
+        select: { id: true, mamcosId: true },
       }),
       this.prisma.insuranceProvider.findUnique({
         where: { id: dto.providerId },
         select: { id: true },
       }),
     ]);
-    if (!farmer)
+    if (!farmer || (ctx.kind === 'staff' && !ctx.isSuper && farmer.mamcosId !== ctx.tenant))
       throw new NotFoundException(`Farmer with ID ${dto.farmerId} not found`);
     if (!provider)
       throw new NotFoundException(
@@ -103,21 +111,41 @@ export class InsuranceService {
         insuredAreaHectares: dto.insuredAreaHectares,
         sumInsured: dto.sumInsured,
         premiumAmount: dto.premiumAmount,
+        mamcosId: farmer.mamcosId,
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
       },
     });
   }
 
-  findAllPolicies() {
+  async findAllPolicies(user: RequestUser) {
+    const ctx = await this.access.context(user);
     return this.prisma.insurancePolicy.findMany({
+      where: this.access.policyWhere(ctx),
       orderBy: { createdAt: 'desc' },
       include: {
         farmer: {
           select: { firstName: true, lastName: true, controlNumber: true },
         },
         provider: { select: { name: true } },
+        farm: { select: { farmCode: true } },
         _count: { select: { claims: true } },
+      },
+    });
+  }
+
+  /** Staff record that the farmer paid the premium of a policy that was created directly. */
+  async recordPolicyPremium(id: string, dto: { amount: number; reference?: string; paidAt?: string }, user: RequestUser) {
+    const ctx = await this.access.context(user);
+    const policy = await this.findPolicyOrFail(id);
+    if (ctx.kind !== 'staff' || !this.access.canSee(ctx, policy)) throw new NotFoundException(`Insurance policy with ID ${id} not found`);
+    return this.prisma.insurancePolicy.update({
+      where: { id },
+      data: {
+        premiumPaidAmount: { increment: dto.amount },
+        premiumPaidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
+        premiumReference: dto.reference,
+        ...(policy.status === PolicyStatus.PENDING && policy.premiumPaidAmount + dto.amount >= policy.premiumAmount ? { status: PolicyStatus.ACTIVE } : {}),
       },
     });
   }
@@ -235,14 +263,17 @@ export class InsuranceService {
     });
   }
 
-  findAllClaims() {
-    return this.prisma.insuranceClaim.findMany({
+  async findAllClaims(user: RequestUser) {
+    const ctx = await this.access.context(user);
+    const claims = await this.prisma.insuranceClaim.findMany({
+      where: { policy: this.access.policyWhere(ctx) },
       orderBy: { createdAt: 'desc' },
       include: {
         policy: {
           select: {
             id: true,
             productType: true,
+            sumInsured: true,
             farmer: {
               select: { firstName: true, lastName: true, controlNumber: true },
             },
@@ -251,6 +282,7 @@ export class InsuranceService {
         },
       },
     });
+    return claims.map((c) => ({ ...c, paymentStatus: claimPaymentStatus(c) }));
   }
 
   /** Ordered status steps for UI timelines. */
@@ -323,28 +355,69 @@ export class InsuranceService {
     return claim;
   }
 
-  async inspectClaim(id: string, inspectorId: string, dto: InspectClaimDto) {
-    await this.findClaimOrFail(id);
+  private async claimFor(id: string, user: RequestUser) {
+    const ctx = await this.access.context(user);
+    const claim = await this.prisma.insuranceClaim.findUnique({ where: { id }, include: { policy: true } });
+    if (!claim || !this.access.canSee(ctx, claim.policy))
+      throw new NotFoundException(`Insurance claim with ID ${id} not found`);
+    return { claim, ctx };
+  }
+
+  /** Field inspection: notes, photos, the loss measured and a recommendation to the insurer. */
+  async inspectClaim(id: string, user: RequestUser, dto: InspectClaimDto) {
+    const { claim } = await this.claimFor(id, user);
+    if (claim.status === ClaimStatus.PAID || claim.status === ClaimStatus.REJECTED)
+      throw new ConflictException('This claim is already closed');
     return this.prisma.insuranceClaim.update({
       where: { id },
       data: {
-        inspectedById: inspectorId,
+        inspectedById: user.id,
         inspectionNotes: dto.inspectionNotes,
+        inspectionPhotoUrls: dto.photoUrls ?? undefined,
+        assessedLossAmount: dto.assessedLossAmount,
+        recommendation: dto.recommendation,
         inspectionDate: new Date(),
-        status: dto.status ?? ClaimStatus.INSPECTING,
+        // An approved claim stays approved; inspecting never undoes the insurer's decision.
+        status: claim.status === ClaimStatus.APPROVED ? ClaimStatus.APPROVED : ClaimStatus.INSPECTING,
       },
     });
   }
 
-  async updateClaimPayment(id: string, dto: UpdateClaimPaymentDto) {
-    await this.findClaimOrFail(id);
+  /** The insurer approves an amount or rejects the claim. */
+  async decideClaim(id: string, dto: ClaimDecisionDto, user: RequestUser) {
+    const { claim, ctx } = await this.claimFor(id, user);
+    if (ctx.kind !== 'insurer') throw new ForbiddenException('Only the insurance company decides a claim');
+    if (claim.status !== ClaimStatus.SUBMITTED && claim.status !== ClaimStatus.INSPECTING)
+      throw new ConflictException('This claim has already been decided');
+    if (dto.decision === 'REJECT') {
+      if (!dto.note?.trim()) throw new BadRequestException('Give a reason for rejecting the claim');
+      return this.prisma.insuranceClaim.update({ where: { id }, data: { status: ClaimStatus.REJECTED, decisionNote: dto.note, decidedAt: new Date() } });
+    }
+    const amount = dto.approvedAmount ?? 0;
+    if (amount <= 0) throw new BadRequestException('Enter the amount approved');
+    if (amount > claim.policy.sumInsured) throw new BadRequestException('The approved amount cannot be more than the sum insured');
+    return this.prisma.insuranceClaim.update({
+      where: { id },
+      data: { status: ClaimStatus.APPROVED, approvedAmount: amount, decisionNote: dto.note, decidedAt: new Date() },
+    });
+  }
+
+  /** A payment towards an approved claim; the claim is paid once the approved amount is covered. */
+  async payClaim(id: string, dto: ClaimPaymentDto, user: RequestUser) {
+    const { claim, ctx } = await this.claimFor(id, user);
+    const isAdmin = ctx.kind === 'staff' && (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN);
+    if (ctx.kind !== 'insurer' && !isAdmin) throw new ForbiddenException('Only the insurance company records a claim payment');
+    if (claim.approvedAmount == null || (claim.status !== ClaimStatus.APPROVED && claim.status !== ClaimStatus.PAID))
+      throw new ConflictException('Only an approved claim can be paid');
+    const total = (claim.paidAmount ?? 0) + dto.amount;
+    if (total > claim.approvedAmount + 0.005) throw new BadRequestException('That would pay more than the amount approved');
     return this.prisma.insuranceClaim.update({
       where: { id },
       data: {
-        status: dto.status,
-        paidAmount:
-          dto.status === ClaimStatus.PAID ? dto.paidAmount : undefined,
-        paidAt: dto.status === ClaimStatus.PAID ? new Date() : undefined,
+        paidAmount: total,
+        paidAt: new Date(),
+        paymentReference: dto.reference ?? claim.paymentReference,
+        status: total >= claim.approvedAmount - 0.005 ? ClaimStatus.PAID : ClaimStatus.APPROVED,
       },
     });
   }
@@ -355,7 +428,8 @@ export class InsuranceService {
    * read-side correlation (no FK), matching the WeatherAlert model's loose-reference convention;
    * it surfaces existing alerts as supporting evidence, it doesn't drive claim approval.
    */
-  async getWeatherContextForClaim(claimId: string) {
+  async getWeatherContextForClaim(claimId: string, user: RequestUser) {
+    await this.claimFor(claimId, user);
     const claim = await this.prisma.insuranceClaim.findUnique({
       where: { id: claimId },
       include: {
@@ -396,32 +470,41 @@ export class InsuranceService {
   }
 
   // ── Dashboard aggregate ──
-  async coverageSummary() {
-    const [byStatus, byProduct, claimsByStatus, sumInsuredAgg, premiumAgg] =
-      await Promise.all([
-        this.prisma.insurancePolicy.groupBy({ by: ['status'], _count: true }),
-        this.prisma.insurancePolicy.groupBy({
-          by: ['productType'],
-          _count: true,
-        }),
-        this.prisma.insuranceClaim.groupBy({ by: ['status'], _count: true }),
-        this.prisma.insurancePolicy.aggregate({ _sum: { sumInsured: true } }),
-        this.prisma.insurancePolicy.aggregate({
-          _sum: { premiumAmount: true },
-        }),
-      ]);
-    const insuredFarmerCount = await this.prisma.insurancePolicy.findMany({
-      where: { status: PolicyStatus.ACTIVE },
-      distinct: ['farmerId'],
-      select: { farmerId: true },
-    });
+  async coverageSummary(user: RequestUser) {
+    const ctx = await this.access.context(user);
+    const where = this.access.policyWhere(ctx);
+    const claimWhere = { policy: where };
+    const [policies, claims, applications] = await Promise.all([
+      this.prisma.insurancePolicy.findMany({
+        where,
+        select: { status: true, productType: true, farmerId: true, sumInsured: true, premiumAmount: true, premiumPaidAmount: true, insuredAreaHectares: true, endDate: true },
+      }),
+      this.prisma.insuranceClaim.findMany({ where: claimWhere, select: { status: true, claimedAmount: true, paidAmount: true } }),
+      this.prisma.insuranceApplication.groupBy({ by: ['status'], where: this.access.applicationWhere(ctx), _count: { _all: true } }),
+    ]);
+    const count = <K extends string>(rows: { [k: string]: unknown }[], key: K) => {
+      const m = new Map<string, number>();
+      for (const r of rows) m.set(String(r[key]), (m.get(String(r[key])) ?? 0) + 1);
+      return [...m.entries()].map(([k, n]) => ({ [key]: k, _count: n }));
+    };
+    const active = policies.filter((p) => p.status === PolicyStatus.ACTIVE);
+    const premiumCollected = policies.reduce((t, p) => t + p.premiumPaidAmount, 0);
+    const claimsPaid = claims.reduce((t, c) => t + (c.paidAmount ?? 0), 0);
+    const soon = Date.now() + 30 * 86_400_000;
     return {
-      byStatus,
-      byProduct,
-      claimsByStatus,
-      totalSumInsured: sumInsuredAgg._sum.sumInsured ?? 0,
-      totalPremium: premiumAgg._sum.premiumAmount ?? 0,
-      farmersCovered: insuredFarmerCount.length,
+      byStatus: count(policies, 'status'),
+      byProduct: count(policies, 'productType'),
+      claimsByStatus: count(claims, 'status'),
+      applicationsByStatus: applications.map((a) => ({ status: a.status, _count: a._count._all })),
+      totalSumInsured: policies.reduce((t, p) => t + p.sumInsured, 0),
+      totalPremium: policies.reduce((t, p) => t + p.premiumAmount, 0),
+      premiumCollected,
+      premiumOutstanding: active.reduce((t, p) => t + Math.max(p.premiumAmount - p.premiumPaidAmount, 0), 0),
+      claimsPaid,
+      claimsRatio: claimsRatio(premiumCollected, claimsPaid),
+      areaInsuredHa: Math.round(active.reduce((t, p) => t + p.insuredAreaHectares, 0) * 100) / 100,
+      farmersCovered: new Set(active.map((p) => p.farmerId)).size,
+      expiringSoon: active.filter((p) => p.endDate && p.endDate.getTime() < soon).length,
     };
   }
 }

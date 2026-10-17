@@ -190,6 +190,7 @@ model Farmer {
   inventoryRecords          InventoryRecord[]
   loanRecords               LoanRecord[]
   loanApplications          LoanApplication[]
+  insuranceApplications     InsuranceApplication[]
   household                 Household?
   documents                 Document[]
   verifications             FarmerVerification[]
@@ -1614,9 +1615,67 @@ model InsuranceProvider {
   isActive      Boolean  @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at")
 
-  policies InsurancePolicy[]
+  policies     InsurancePolicy[]
+  applications InsuranceApplication[]
 
   @@map("insurance_providers")
+}
+
+enum InsuranceApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  ACTIVATED
+  WITHDRAWN
+}
+
+/// A request for cover, decided by the insurer; becomes a policy once staff record the premium as paid.
+model InsuranceApplication {
+  id                  String                      @id @default(uuid())
+  reference           String                      @unique
+  farmerId            String                      @map("farmer_id")
+  mamcosId            String?                     @map("mamcos_id")
+  providerId          String                      @map("provider_id")
+  farmId              String?                     @map("farm_id")
+  cropCycleId         String?                     @map("crop_cycle_id")
+  productType         InsuranceProductType        @map("product_type")
+  riceVariety         String?                     @map("rice_variety")
+  insuredAreaHectares Float                       @map("insured_area_hectares")
+  /// What the applicant asked to be covered for (a guide, the insurer sets the final figure).
+  requestedSumInsured Float?                      @map("requested_sum_insured")
+  notes               String?
+  status              InsuranceApplicationStatus  @default(SUBMITTED)
+  /// Weather, claims and yield risk as it stood when applying.
+  riskSnapshot        Json                        @map("risk_snapshot")
+  riskLevel           String                      @map("risk_level")
+  submittedByUserId   String                      @map("submitted_by_user_id")
+  submittedOnBehalf   Boolean                     @default(false) @map("submitted_on_behalf")
+  reviewStartedAt     DateTime?                   @map("review_started_at")
+  /// The insurer's offer.
+  sumInsured          Float?                      @map("sum_insured")
+  premiumAmount       Float?                      @map("premium_amount")
+  startDate           DateTime?                   @map("start_date")
+  endDate             DateTime?                   @map("end_date")
+  decisionNote        String?                     @map("decision_note")
+  decidedByUserId     String?                     @map("decided_by_user_id")
+  decidedAt           DateTime?                   @map("decided_at")
+  premiumPaidAmount   Float?                      @map("premium_paid_amount")
+  premiumPaidAt       DateTime?                   @map("premium_paid_at")
+  premiumReference    String?                     @map("premium_reference")
+  recordedByUserId    String?                     @map("recorded_by_user_id")
+  policyId            String?                     @unique @map("policy_id")
+  createdAt           DateTime                    @default(now()) @map("created_at")
+  updatedAt           DateTime                    @updatedAt @map("updated_at")
+
+  farmer   Farmer            @relation(fields: [farmerId], references: [id])
+  provider InsuranceProvider @relation(fields: [providerId], references: [id])
+  policy   InsurancePolicy?  @relation(fields: [policyId], references: [id])
+
+  @@index([farmerId])
+  @@index([providerId, status])
+  @@index([mamcosId, status])
+  @@map("insurance_applications")
 }
 
 model InsurancePolicy {
@@ -1634,9 +1693,16 @@ model InsurancePolicy {
   startDate           DateTime?            @map("start_date")
   endDate             DateTime?            @map("end_date")
   renewedFromPolicyId String?              @map("renewed_from_policy_id")
+  /// The farmer's cooperative when the policy was issued; null for platform-level farmers.
+  mamcosId            String?              @map("mamcos_id")
+  /// Premium actually collected from the farmer, recorded by staff.
+  premiumPaidAmount   Float                @default(0) @map("premium_paid_amount")
+  premiumPaidAt       DateTime?            @map("premium_paid_at")
+  premiumReference    String?              @map("premium_reference")
   createdAt           DateTime             @default(now()) @map("created_at")
   updatedAt           DateTime             @updatedAt @map("updated_at")
 
+  application       InsuranceApplication?
   farmer            Farmer            @relation(fields: [farmerId], references: [id])
   farm              Farm?             @relation(fields: [farmId], references: [id])
   cropCycle         CropCycle?        @relation(fields: [cropCycleId], references: [id])
@@ -1662,6 +1728,15 @@ model InsuranceClaim {
   inspectionDate  DateTime?   @map("inspection_date")
   paidAmount      Float?      @map("paid_amount")
   paidAt          DateTime?   @map("paid_at")
+  /// Field inspection: photos, the loss the inspector measured and what they recommend (APPROVE, REJECT, REINSPECT).
+  inspectionPhotoUrls String[] @map("inspection_photo_urls")
+  assessedLossAmount  Float?   @map("assessed_loss_amount")
+  recommendation      String?
+  /// The insurer's decision.
+  approvedAmount  Float?      @map("approved_amount")
+  decisionNote    String?     @map("decision_note")
+  decidedAt       DateTime?   @map("decided_at")
+  paymentReference String?    @map("payment_reference")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 

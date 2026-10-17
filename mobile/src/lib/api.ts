@@ -450,6 +450,16 @@ export const inventoryApi = {
   }) => api.post('/inventory/records/mine', data),
 };
 
+export const insuranceApplicationsApi = {
+  insurers: () => api.get<{ id: string; name: string }[]>('/insurance/insurers'),
+  risk: () => api.get<{ level: 'LOW' | 'MEDIUM' | 'HIGH'; factors: { label: string; detail: string }[] }>('/insurance/risk'),
+  suggestion: (product: string, areaHa: number) => api.get<{ suggestedSumInsured: number | null }>('/insurance/suggestion', { params: { product, areaHa } }),
+  list: () => api.get('/insurance/applications'),
+  submit: (data: { providerId: string; productType: string; insuredAreaHectares: number; requestedSumInsured?: number; riceVariety?: string }) =>
+    api.post('/insurance/applications', data),
+  withdraw: (id: string) => api.patch(`/insurance/applications/${id}/withdraw`),
+};
+
 export const insuranceApi = {
   myPolicies: () => api.get('/insurance/policies/me'),
   getPoliciesForFarmer: (farmerId: string) => api.get(`/insurance/policies/farmer/${farmerId}`),

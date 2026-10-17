@@ -5,7 +5,7 @@ import {
   Alert, TextInput, Modal, Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, useFocusEffect } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Shield01Icon, Add01Icon } from '@hugeicons/core-free-icons';
 import { insuranceApi } from '../src/lib/data';
@@ -74,6 +74,7 @@ function ClaimTimeline({ claim }: { claim: Claim }) {
 
 export default function InsuranceScreen() {
   const { t } = useI18n();
+  const router = useRouter();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loading, setLoading] = useState(true);
   const [claimOpen, setClaimOpen] = useState(false);
@@ -147,6 +148,9 @@ export default function InsuranceScreen() {
         <View style={styles.center}><ActivityIndicator color="#10B981" size="large" /></View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
+          <TouchableOpacity style={[styles.claimBtn, { alignSelf: 'flex-start', marginBottom: 12 }]} onPress={() => router.push('/insurance-apply')}>
+            <Text style={styles.claimBtnText}>{t('applyForInsurance')}</Text>
+          </TouchableOpacity>
           <View style={styles.headerRow}>
             <Text style={styles.intro}>{t('insuranceIntro')}</Text>
             {activePolicies.length > 0 && (

@@ -18,14 +18,20 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { InsuranceService } from './insurance.service';
+import { InsuranceApplicationsService } from './insurance-applications.service';
+import { InsuranceAccessService } from './insurance-access.service';
+import { ApproveInsuranceApplicationDto, RecordPremiumDto, RejectInsuranceApplicationDto, SubmitInsuranceApplicationDto } from './dto/insurance-application.dto';
+import { Query } from '@nestjs/common';
+import { InsuranceProductType } from '@prisma/client';
 import { FarmingHistoryService } from '../rice-protocols/farming-history.service';
 import {
   AmendPolicyDto,
+  ClaimDecisionDto,
+  ClaimPaymentDto,
   CreateInsuranceClaimDto,
   CreateInsurancePolicyDto,
   InspectClaimDto,
   RenewPolicyDto,
-  UpdateClaimPaymentDto,
   UpdatePolicyStatusDto,
   UpsertInsuranceProviderDto,
 } from './dto/insurance.dto';
@@ -45,6 +51,8 @@ const STAFF_ROLES = [
 export class InsuranceController {
   constructor(
     private readonly insurance: InsuranceService,
+    private readonly applications: InsuranceApplicationsService,
+    private readonly access: InsuranceAccessService,
     private readonly history: FarmingHistoryService,
   ) {}
 
@@ -78,8 +86,8 @@ export class InsuranceController {
   @ApiOperation({
     summary: 'Register a new crop insurance policy for a farmer',
   })
-  createPolicy(@Body() dto: CreateInsurancePolicyDto) {
-    return this.insurance.createPolicy(dto);
+  createPolicy(@Body() dto: CreateInsurancePolicyDto, @CurrentUser() user: RequestUser) {
+    return this.insurance.createPolicy(dto, user);
   }
 
   @Get('policies')
@@ -88,8 +96,8 @@ export class InsuranceController {
   @ApiOperation({
     summary: 'Get all insurance policies across the system (staff only)',
   })
-  findAllPolicies() {
-    return this.insurance.findAllPolicies();
+  findAllPolicies(@CurrentUser() user: RequestUser) {
+    return this.insurance.findAllPolicies(user);
   }
 
   @Get('policies/me')
@@ -164,27 +172,147 @@ export class InsuranceController {
   @ApiOperation({
     summary: 'Get all insurance claims across the system (staff only)',
   })
-  findAllClaims() {
-    return this.insurance.findAllClaims();
+  findAllClaims(@CurrentUser() user: RequestUser) {
+    return this.insurance.findAllClaims(user);
   }
 
   @Patch('claims/:id/inspect')
-  @Roles(UserRole.FIELD_OFFICER, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Roles(UserRole.FIELD_OFFICER, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
   inspectClaim(
     @Param('id') id: string,
     @CurrentUser() user: RequestUser,
     @Body() dto: InspectClaimDto,
   ) {
-    return this.insurance.inspectClaim(id, user.id, dto);
+    return this.insurance.inspectClaim(id, user, dto);
+  }
+
+  @Patch('claims/:id/decision')
+  @Roles(UserRole.FINANCIAL_PROVIDER)
+  @ApiOperation({ summary: 'The insurer approves an amount or rejects the claim' })
+  decideClaim(@Param('id') id: string, @Body() dto: ClaimDecisionDto, @CurrentUser() user: RequestUser) {
+    return this.insurance.decideClaim(id, dto, user);
   }
 
   @Patch('claims/:id/payment')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  updateClaimPayment(
-    @Param('id') id: string,
-    @Body() dto: UpdateClaimPaymentDto,
+  @Roles(UserRole.FINANCIAL_PROVIDER, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Record a payment towards an approved claim' })
+  payClaim(@Param('id') id: string, @Body() dto: ClaimPaymentDto, @CurrentUser() user: RequestUser) {
+    return this.insurance.payClaim(id, dto, user);
+  }
+
+  @Post('policies/:id/premium')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('insurance', 'EDIT')
+  @ApiOperation({ summary: 'Staff record premium collected from the farmer' })
+  recordPremium(@Param('id') id: string, @Body() dto: RecordPremiumDto, @CurrentUser() user: RequestUser) {
+    return this.insurance.recordPolicyPremium(id, dto, user);
+  }
+
+  // ── Products, risk, applications ──
+
+  @Get('products')
+  @Roles(...STAFF_ROLES, UserRole.FARMER, UserRole.FIELD_OFFICER)
+  products() {
+    return this.applications.guide();
+  }
+
+  @Get('insurers')
+  @Roles(...STAFF_ROLES, UserRole.FARMER, UserRole.FIELD_OFFICER)
+  insurers() {
+    return this.applications.insurers();
+  }
+
+  @Get('risk')
+  @Roles(...STAFF_ROLES, UserRole.FARMER, UserRole.FIELD_OFFICER)
+  async risk(@CurrentUser() user: RequestUser, @Query('farmerId') farmerId?: string, @Query('farmId') farmId?: string) {
+    return this.applications.risk(await this.applications.farmerIdFor(user, farmerId), farmId);
+  }
+
+  @Get('suggestion')
+  @Roles(...STAFF_ROLES, UserRole.FARMER, UserRole.FIELD_OFFICER)
+  async suggestion(
+    @CurrentUser() user: RequestUser,
+    @Query('product') product: InsuranceProductType,
+    @Query('areaHa') areaHa: string,
+    @Query('farmerId') farmerId?: string,
   ) {
-    return this.insurance.updateClaimPayment(id, dto);
+    return this.applications.suggestion(await this.applications.farmerIdFor(user, farmerId), product, Number(areaHa) || 0);
+  }
+
+  @Get('applications')
+  @Roles(...STAFF_ROLES, UserRole.FARMER, UserRole.FIELD_OFFICER, UserRole.FINANCIAL_PROVIDER)
+  listApplications(@CurrentUser() user: RequestUser, @Query('status') status?: string) {
+    return this.applications.list(user, { status });
+  }
+
+  @Post('applications')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  submitApplication(@Body() dto: SubmitInsuranceApplicationDto, @CurrentUser() user: RequestUser) {
+    return this.applications.submit(dto, user);
+  }
+
+  @Get('applications/:id')
+  @Roles(...STAFF_ROLES, UserRole.FARMER, UserRole.FIELD_OFFICER, UserRole.FINANCIAL_PROVIDER)
+  application(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.applications.detail(id, user);
+  }
+
+  @Patch('applications/:id/withdraw')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY, UserRole.FIELD_OFFICER, UserRole.FARMER)
+  withdrawApplication(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.applications.withdraw(id, user);
+  }
+
+  @Patch('applications/:id/review')
+  @Roles(UserRole.FINANCIAL_PROVIDER)
+  reviewApplication(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.applications.startReview(id, user);
+  }
+
+  @Patch('applications/:id/approve')
+  @Roles(UserRole.FINANCIAL_PROVIDER)
+  approveApplication(@Param('id') id: string, @Body() dto: ApproveInsuranceApplicationDto, @CurrentUser() user: RequestUser) {
+    return this.applications.approve(id, dto, user);
+  }
+
+  @Patch('applications/:id/reject')
+  @Roles(UserRole.FINANCIAL_PROVIDER)
+  rejectApplication(@Param('id') id: string, @Body() dto: RejectInsuranceApplicationDto, @CurrentUser() user: RequestUser) {
+    return this.applications.reject(id, dto, user);
+  }
+
+  @Post('applications/:id/premium')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @ApiOperation({ summary: 'Staff record the premium paid; the policy then starts' })
+  premiumForApplication(@Param('id') id: string, @Body() dto: RecordPremiumDto, @CurrentUser() user: RequestUser) {
+    return this.applications.recordPremium(id, dto, user);
+  }
+
+  // ── Insurer's own view ──
+
+  @Get('desk/me')
+  @Roles(UserRole.FINANCIAL_PROVIDER)
+  @ApiOperation({ summary: 'The insurance company this login belongs to, or null' })
+  async deskMe(@CurrentUser() user: RequestUser) {
+    return (await this.access.providerFor(user.id)) ?? null;
+  }
+
+  @Get('desk/policies')
+  @Roles(UserRole.FINANCIAL_PROVIDER)
+  deskPolicies(@CurrentUser() user: RequestUser) {
+    return this.insurance.findAllPolicies(user);
+  }
+
+  @Get('desk/claims')
+  @Roles(UserRole.FINANCIAL_PROVIDER)
+  deskClaims(@CurrentUser() user: RequestUser) {
+    return this.insurance.findAllClaims(user);
+  }
+
+  @Get('desk/summary')
+  @Roles(UserRole.FINANCIAL_PROVIDER)
+  deskSummary(@CurrentUser() user: RequestUser) {
+    return this.insurance.coverageSummary(user);
   }
 
   @Get('claims/:id/weather-context')
@@ -193,8 +321,8 @@ export class InsuranceController {
     summary:
       "Weather alerts issued near this claim's incident date/location — supporting evidence, not a decision rule",
   })
-  getWeatherContextForClaim(@Param('id') id: string) {
-    return this.insurance.getWeatherContextForClaim(id);
+  getWeatherContextForClaim(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.insurance.getWeatherContextForClaim(id, user);
   }
 
   @Get('coverage-summary')
@@ -202,7 +330,7 @@ export class InsuranceController {
   @ApiOperation({
     summary: 'Aggregate insurance coverage stats for the admin dashboard',
   })
-  coverageSummary() {
-    return this.insurance.coverageSummary();
+  coverageSummary(@CurrentUser() user: RequestUser) {
+    return this.insurance.coverageSummary(user);
   }
 }

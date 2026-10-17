@@ -7,7 +7,11 @@ import {
   MetricTile,
   money,
 } from '@/components/role-dashboards/DashboardPrimitives';
-import { farmersApi } from '@/lib/api';
+import { farmersApi, creditApi, insuranceApi } from '@/lib/api';
+import InsuranceApplicationsPanel from '@/components/insurance/InsuranceApplicationsPanel';
+import InsurerClaimsPanel from '@/components/insurance/InsurerClaimsPanel';
+import { tzs } from '@/lib/credit';
+import { useEffect } from 'react';
 import ApplicationsPanel from '@/components/credit/ApplicationsPanel';
 import LoansPortfolio from '@/components/credit/LoansPortfolio';
 
@@ -31,7 +35,39 @@ function factorsToRows(factors: Record<string, any> | undefined) {
   }));
 }
 
+/** Insurance side of the dashboard, shown only when this login belongs to an insurance company. */
+function InsurerSection({ name }: { name: string }) {
+  const [summary, setSummary] = useState<any>(null);
+  useEffect(() => { insuranceApi.deskSummary().then((r) => setSummary(r.data)).catch(() => undefined); }, []);
+  return (
+    <>
+      <InsightPanel title={`Insurance applications — ${name}`} subtitle="Farmers who applied to you. Check the risk, then make an offer or reject. Cover starts when the cooperative records the premium.">
+        {summary && (
+          <div className="role-grid" style={{ marginBottom: 14 }}>
+            <MetricTile label="Active farmers covered" value={summary.farmersCovered} hint={`${summary.areaInsuredHa} ha insured`} tone="green" />
+            <MetricTile label="Sum insured" value={tzs(summary.totalSumInsured)} tone="blue" />
+            <MetricTile label="Premium collected" value={tzs(summary.premiumCollected)} hint={`${tzs(summary.premiumOutstanding)} still due`} tone="gold" />
+            <MetricTile label="Claims paid" value={tzs(summary.claimsPaid)} hint={`${summary.claimsRatio}% of premium`} tone={summary.claimsRatio > 100 ? 'red' : 'purple'} />
+            <MetricTile label="Policies ending in 30 days" value={summary.expiringSoon} tone="gold" />
+          </div>
+        )}
+        <InsuranceApplicationsPanel mode="insurer" canApply={false} />
+      </InsightPanel>
+      <InsightPanel title="Insurance claims" subtitle="Read the field inspection, approve an amount or reject, then record payments.">
+        <InsurerClaimsPanel />
+      </InsightPanel>
+    </>
+  );
+}
+
 export default function FinancialProviderDashboardPage() {
+  const [lenderLinked, setLenderLinked] = useState<boolean | null>(null);
+  const [insurer, setInsurer] = useState<{ id: string; name: string } | null | undefined>(undefined);
+  useEffect(() => {
+    creditApi.summary().then((r) => setLenderLinked(!!r.data?.lenderLinked)).catch(() => setLenderLinked(false));
+    insuranceApi.deskMe().then((r) => setInsurer(r.data || null)).catch(() => setInsurer(null));
+  }, []);
+  const showLender = lenderLinked !== false || !insurer;
   const [query, setQuery] = useState('');
   const [profile, setProfile] = useState<any>(null);
   const [error, setError] = useState('');
@@ -106,16 +142,22 @@ export default function FinancialProviderDashboardPage() {
 
   return (
     <div className="role-dashboard">
-      <InsightPanel
-        title="Loan applications"
-        subtitle="Farmers who applied to you. Review the credit profile, then approve, reject or record the money released."
-      >
-        <ApplicationsPanel mode="lender" canApply={false} />
-      </InsightPanel>
+      {insurer && <InsurerSection name={insurer.name} />}
 
-      <InsightPanel title="Your loan book" subtitle="Loans you have released: balance, repayments received and what is overdue.">
-        <LoansPortfolio />
-      </InsightPanel>
+      {showLender && (
+        <>
+          <InsightPanel
+            title="Loan applications"
+            subtitle="Farmers who applied to you. Review the credit profile, then approve, reject or record the money released."
+          >
+            <ApplicationsPanel mode="lender" canApply={false} />
+          </InsightPanel>
+
+          <InsightPanel title="Your loan book" subtitle="Loans you have released: balance, repayments received and what is overdue.">
+            <LoansPortfolio />
+          </InsightPanel>
+        </>
+      )}
 
       <InsightPanel
         title="Credit profile lookup"
