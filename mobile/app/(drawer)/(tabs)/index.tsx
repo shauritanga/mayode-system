@@ -237,6 +237,7 @@ function FarmerDashboardTab() {
               </TouchableOpacity>
             </View>
 
+            <TouchableOpacity activeOpacity={0.9} onPress={() => router.push('/weather-warnings')}>
             <View style={styles.weatherCard}>
               <View style={styles.weatherTop}>
                 <View style={styles.locRow}>
@@ -267,6 +268,7 @@ function FarmerDashboardTab() {
                 <WStat label={t('windSpeed')} value={weather ? `${weather.windKmh} ${t('unitKmh')}` : '—'} />
               </View>
             </View>
+            </TouchableOpacity>
           </View>
 
           {/* Top half on green, bottom half on gray */}

@@ -1,5 +1,7 @@
 import { Type } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsLatitude,
@@ -38,6 +40,34 @@ export class CreateWeatherAlertDto {
   @IsOptional()
   @IsDateString()
   validUntil?: string;
+
+  @ApiPropertyOptional({ description: 'Swahili wording, used for farmers whose language is Swahili' })
+  @IsOptional()
+  @IsString()
+  titleSw?: string;
+
+  @IsOptional()
+  @IsString()
+  messageSw?: string;
+
+  @ApiPropertyOptional({ description: 'Super Admin only: limit to one cooperative. Cooperative staff always send to their own.' })
+  @IsOptional()
+  @IsString()
+  mamcosId?: string;
+
+  @ApiPropertyOptional({ description: 'false keeps the alert as a draft for review' })
+  @IsOptional()
+  @IsBoolean()
+  sendNow?: boolean;
+}
+
+export class UpdateWeatherAlertDto {
+  @IsOptional() @IsString() title?: string;
+  @IsOptional() @IsString() message?: string;
+  @IsOptional() @IsString() titleSw?: string;
+  @IsOptional() @IsString() messageSw?: string;
+  @IsOptional() @IsEnum(WeatherAlertSeverity) severity?: WeatherAlertSeverity;
+  @IsOptional() @IsDateString() validUntil?: string;
 }
 
 export class ForecastQueryDto {

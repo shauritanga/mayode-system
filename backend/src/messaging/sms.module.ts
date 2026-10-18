@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { SmsService } from './sms.service';
+import { WhatsappService } from './whatsapp.service';
 
 /**
  * Global so any feature service (leases, memberships) can inject SmsService to
@@ -8,7 +9,7 @@ import { SmsService } from './sms.service';
  */
 @Global()
 @Module({
-  providers: [SmsService],
-  exports: [SmsService],
+  providers: [SmsService, WhatsappService],
+  exports: [SmsService, WhatsappService],
 })
 export class SmsModule {}

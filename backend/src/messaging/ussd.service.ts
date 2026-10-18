@@ -4,6 +4,10 @@ import { MembershipsService } from '../memberships/memberships.service';
 import { FarmLeasesService } from '../farm-leases/farm-leases.service';
 import { FarmRegistryService } from '../farm-registry/farm-registry.service';
 import { normalizeMsisdn } from './sms.service';
+import { WeatherAlertsService } from '../weather/weather-alerts.service';
+import { WeatherAdviceService } from '../weather/weather-advice.service';
+import { fitUssd, ussdOutlook } from '../weather/weather-rules';
+import { UserRole } from '@prisma/client';
 
 export interface UssdRequest {
   sessionId: string;
@@ -31,6 +35,8 @@ export class UssdService {
     private readonly memberships: MembershipsService,
     private readonly leases: FarmLeasesService,
     private readonly registry: FarmRegistryService,
+    private readonly weatherAlerts: WeatherAlertsService,
+    private readonly weatherAdvice: WeatherAdviceService,
   ) {}
 
   async handle(req: UssdRequest): Promise<string> {
@@ -40,7 +46,7 @@ export class UssdService {
     // Root menu
     if (parts.length === 0) {
       return con(
-        'Welcome to MAYOData\n1. My leases\n2. Confirm farm ownership\n3. Membership\n4. Help',
+        'Welcome to MAYOData\n1. My leases\n2. Confirm farm ownership\n3. Membership\n4. Help\n5. Weather and alerts',
       );
     }
 
@@ -162,6 +168,42 @@ export class UssdService {
       return end('MAYOData support: support@mayodegroup.com');
     }
 
+    // 5 — Weather and early warnings (pull: the farmer dials in)
+    if (parts[0] === '5') return this.weather(phone, parts);
+
+    return end('Invalid choice.');
+  }
+
+  /** Latest alert, a 3-day outlook, or advice for the crop; in the farmer's own language. */
+  private async weather(phone: string, parts: string[]): Promise<string> {
+    const user = await this.prisma.user.findUnique({ where: { phone }, select: { id: true, language: true } });
+    const sw = user?.language !== 'en';
+    if (!user) return end(sw ? 'Namba hii haijasajiliwa MAYOData.' : 'This number is not registered with MAYOData.');
+    if (parts.length === 1) {
+      return con(sw ? 'Hali ya hewa\n1. Tahadhari za karibuni\n2. Utabiri wa siku 3\n3. Ushauri wa zao langu' : 'Weather\n1. Latest alerts\n2. 3-day forecast\n3. Advice for my crop');
+    }
+    const asFarmer = { id: user.id, role: UserRole.FARMER };
+    try {
+      if (parts[1] === '1') {
+        const [latest] = await this.weatherAlerts.list(asFarmer);
+        if (!latest) return end(sw ? 'Hakuna tahadhari kwa sasa.' : 'No active alerts right now.');
+        const title = sw ? (latest.titleSw ?? latest.title) : latest.title;
+        const message = sw ? (latest.messageSw ?? latest.message) : latest.message;
+        return end(fitUssd(`${title}. ${message}`));
+      }
+      const advice = await this.weatherAdvice.forUser(user.id);
+      if (parts[1] === '2') {
+        if (!advice.forecast) return end(sw ? 'Utabiri haupatikani sasa.' : 'No forecast is available yet.');
+        return end(fitUssd(ussdOutlook(advice.forecast.days, sw), 160));
+      }
+      if (parts[1] === '3') {
+        const crop = advice.crops.find((c) => c.advice.en.length > 0);
+        if (!crop) return end(sw ? 'Hakuna zao linalokua lililorekodiwa.' : 'No growing crop is recorded for you.');
+        return end(fitUssd((sw ? crop.advice.sw : crop.advice.en).slice(0, 2).join(' ')));
+      }
+    } catch {
+      return end(sw ? 'Imeshindikana kupata taarifa sasa.' : 'Could not get the information now.');
+    }
     return end('Invalid choice.');
   }
 }

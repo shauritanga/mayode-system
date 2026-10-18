@@ -161,6 +161,8 @@ model Farmer {
   membershipDate   DateTime  @default(now()) @map("membership_date")
   creditScore      Float     @default(0) @map("credit_score")
   dataShareConsent Boolean   @default(false) @map("data_share_consent")
+  /// Agreed to receive weather alerts on WhatsApp.
+  whatsappOptIn    Boolean   @default(false) @map("whatsapp_opt_in")
   consentedAt      DateTime? @map("consented_at")
   isBlacklisted    Boolean   @default(false) @map("is_blacklisted")
   blacklistReason  String?   @map("blacklist_reason")
@@ -1749,6 +1751,50 @@ model InsuranceClaim {
 // WEATHER & EARLY WARNING
 // ============================================================
 
+enum WeatherAlertStatus {
+  DRAFT
+  SENT
+  DISMISSED
+}
+
+enum AlertChannel {
+  SMS
+  APP
+  WHATSAPP
+  OFFICER
+}
+
+/// One message of one alert to one person on one channel, so staff can see who was reached.
+model AlertDelivery {
+  id        String        @id @default(uuid())
+  alertId   String        @map("alert_id")
+  userId    String?       @map("user_id")
+  farmerId  String?       @map("farmer_id")
+  channel   AlertChannel
+  status    String // SENT, FAILED, SKIPPED
+  detail    String?
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  alert WeatherAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@index([alertId, channel])
+  @@map("alert_deliveries")
+}
+
+/// The latest 7-day forecast for an area, so apps, USSD and the daily check never wait on the weather service.
+model WeatherSnapshot {
+  id        String   @id @default(uuid())
+  areaKey   String   @unique @map("area_key")
+  region    String?
+  district  String?
+  latitude  Float
+  longitude Float
+  days      Json
+  fetchedAt DateTime @map("fetched_at")
+
+  @@map("weather_snapshots")
+}
+
 enum WeatherAlertType {
   FLOOD
   DROUGHT
@@ -1781,7 +1827,24 @@ model WeatherAlert {
   validUntil   DateTime?            @map("valid_until")
   smsSentCount Int                  @default(0) @map("sms_sent_count")
   createdAt    DateTime             @default(now()) @map("created_at")
+  /// Cooperative whose farmers get the alert; null = every farmer in the area (issued by Super Admin).
+  mamcosId     String?              @map("mamcos_id")
+  /// Drafts wait for staff to review and send; manual alerts go out straight away.
+  status       WeatherAlertStatus   @default(DRAFT)
+  /// MANUAL (a person wrote it) or AUTO (drafted from the forecast).
+  source       String               @default("MANUAL")
+  titleSw      String?              @map("title_sw")
+  messageSw    String?              @map("message_sw")
+  /// What the forecast showed when an automatic draft was made.
+  evidence     Json?
+  reviewedByUserId String?          @map("reviewed_by_user_id")
+  sentAt       DateTime?            @map("sent_at")
+  appSentCount Int                  @default(0) @map("app_sent_count")
+  whatsappSentCount Int             @default(0) @map("whatsapp_sent_count")
+  officersNotified Int              @default(0) @map("officers_notified")
+  deliveries   AlertDelivery[]
 
+  @@index([mamcosId, status])
   @@map("weather_alerts")
 }
 

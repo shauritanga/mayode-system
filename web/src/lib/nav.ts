@@ -95,6 +95,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: '/dashboard/finance', label: 'Finance and Accounting', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'finance' },
       { href: '/dashboard/credit', label: 'Credit & Loans', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'loans' },
+      { href: '/dashboard/weather', label: 'Weather', icon: CloudSunRainIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'weather' },
       { href: '/dashboard/reports', label: 'Reports', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'reports' },
       { href: '/dashboard/audit-log', label: 'Audit Log', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'audit_logs' },
       { href: '/dashboard/ai', label: 'AI Insights', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'ai_insights' },
@@ -189,6 +190,7 @@ export const navGroups: NavGroup[] = [
   {
     label: 'Services',
     items: [
+      { href: '/dashboard/farmer/weather', label: 'Weather', icon: CloudSunRainIcon, roles: ['FARMER'] },
       { href: '/dashboard/farmer/finance', label: 'Finance', icon: Wallet01Icon, roles: ['FARMER'] },
       { href: '/dashboard/farmer/loans', label: 'My Loans', icon: Wallet01Icon, roles: ['FARMER'] },
       { href: '/dashboard/farmer/insurance', label: 'Insurance', icon: Shield01Icon, roles: ['FARMER'] },
@@ -269,7 +271,7 @@ export function isPathAllowed(pathname: string, subject: AccessSubject | null | 
   if (pathname === '/dashboard/profile') return !!subject?.role;
   if (APP_MODE === 'farmers' && (pathname === '/dashboard/farmer' || pathname.startsWith('/dashboard/farmer/'))) {
     const suffix = pathname.slice('/dashboard/farmer'.length);
-    return subject?.role === 'FARMER' && ['', '/farms', '/crop-cycles', '/rice-tasks', '/finance', '/loans', '/insurance', '/membership', '/votes', '/alerts', '/marketplace', '/consent', '/warehouse', '/community'].includes(suffix);
+    return subject?.role === 'FARMER' && ['', '/farms', '/crop-cycles', '/rice-tasks', '/finance', '/loans', '/weather', '/insurance', '/membership', '/votes', '/alerts', '/marketplace', '/consent', '/warehouse', '/community'].includes(suffix);
   }
   if (pathname === '/dashboard' || pathname === '/dashboard/forbidden') return !!subject?.role;
   // Use the most specific match so /dashboard cannot authorize every child URL.

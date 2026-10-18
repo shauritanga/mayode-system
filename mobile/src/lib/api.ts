@@ -450,6 +450,13 @@ export const inventoryApi = {
   }) => api.post('/inventory/records/mine', data),
 };
 
+export const weatherWarningsApi = {
+  advice: () => api.get('/weather/advice/me'),
+  alerts: () => api.get('/weather/alerts'),
+  preferences: () => api.get<{ whatsappOptIn: boolean }>('/weather/preferences/me'),
+  setWhatsapp: (whatsappOptIn: boolean) => api.patch('/weather/preferences/me', { whatsappOptIn }),
+};
+
 export const insuranceApplicationsApi = {
   insurers: () => api.get<{ id: string; name: string }[]>('/insurance/insurers'),
   risk: () => api.get<{ level: 'LOW' | 'MEDIUM' | 'HIGH'; factors: { label: string; detail: string }[] }>('/insurance/risk'),

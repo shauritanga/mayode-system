@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { FarmLeasesModule } from '../farm-leases/farm-leases.module';
 import { FarmRegistryModule } from '../farm-registry/farm-registry.module';
+import { WeatherModule } from '../weather/weather.module';
 import { MessagingController } from './messaging.controller';
 import { UssdService } from './ussd.service';
 import { WebhookSecretGuard } from './webhook-secret.guard';
@@ -11,7 +12,7 @@ import { WebhookSecretGuard } from './webhook-secret.guard';
  * from their global modules.
  */
 @Module({
-  imports: [FarmLeasesModule, FarmRegistryModule],
+  imports: [FarmLeasesModule, FarmRegistryModule, WeatherModule],
   controllers: [MessagingController],
   providers: [UssdService, WebhookSecretGuard],
 })
