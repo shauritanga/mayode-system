@@ -71,7 +71,7 @@ export function setOfflineOwner(id: string | null) {
   syncQueue.setOwner(id);
 }
 function isFieldMutation(url: string, method: string) {
-  return ['POST', 'PATCH', 'PUT'].includes(method) && /^\/(farmers|farms|plots|crop-cycles|finance|field-surveys|field-officer-visits)(\/|$)/.test(url);
+  return ['POST', 'PATCH', 'PUT'].includes(method) && /^\/(farmers|farms|plots|crop-cycles|finance|field-surveys|field-officer-visits|ops\/farm\/my-tasks)(\/|$)/.test(url);
 }
 async function sendFile(file: LocalUpload) {
   const form = new FormData();
@@ -448,6 +448,18 @@ export const inventoryApi = {
     warehouseLocation?: string;
     receivedDate?: string;
   }) => api.post('/inventory/records/mine', data),
+};
+
+/** Work assigned to the signed-in employee on Mayode farms. Writes are queued offline and replayed with the same client key. */
+export const fieldWorkApi = {
+  tasks: (params?: object) => api.get('/ops/farm/my-tasks', { params }),
+  task: (id: string) => api.get(`/ops/farm/my-tasks/${id}`),
+  inputs: () => api.get('/ops/farm/my-tasks/inputs'),
+  acknowledge: (id: string) => api.post(`/ops/farm/my-tasks/${id}/acknowledge`),
+  checkIn: (id: string, data: object) => api.post(`/ops/farm/my-tasks/${id}/check-in`, data),
+  startWithoutGps: (id: string, reason: string) => api.post(`/ops/farm/my-tasks/${id}/start-without-gps`, { reason }),
+  report: (id: string, data: object) => api.post(`/ops/farm/my-tasks/${id}/report`, data),
+  inspection: (id: string, data: object) => api.post(`/ops/farm/my-tasks/${id}/inspection`, data),
 };
 
 export const weatherWarningsApi = {

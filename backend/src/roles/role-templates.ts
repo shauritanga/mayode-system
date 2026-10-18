@@ -2,7 +2,7 @@ import { Prisma, PermissionAction, UserRole } from '@prisma/client';
 
 type Db = Prisma.TransactionClient;
 
-interface RoleTemplate {
+export interface RoleTemplate {
   name: string;
   description: string;
   grants: Record<string, PermissionAction[]>;
@@ -109,8 +109,9 @@ export async function createRoleTemplates(
   db: Db,
   mamcosId: string | null,
   only?: string[],
+  source: RoleTemplate[] = ROLE_TEMPLATES,
 ): Promise<string[]> {
-  const templates = only ? ROLE_TEMPLATES.filter((t) => only.includes(t.name)) : ROLE_TEMPLATES;
+  const templates = only ? source.filter((t) => only.includes(t.name)) : source;
   const keys = [
     ...new Set(templates.flatMap((t) => Object.keys(t.grants))),
   ];

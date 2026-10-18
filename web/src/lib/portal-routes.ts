@@ -6,6 +6,10 @@ export const PORTAL_SECTIONS = {
     "forbidden"
   ],
   "cooperatives": [
+    "ops-orders",
+    "ops-warehouse",
+    "ops-farm",
+    "ops-field-work",
     "premium-fund",
     "grantor",
     "activities",
@@ -54,6 +58,10 @@ export const PORTAL_SECTIONS = {
     "credit"
   ],
   "admin": [
+    "ops-orders",
+    "ops-warehouse",
+    "ops-farm",
+    "ops-field-work",
     "premium-fund",
     "activities",
     "ai",

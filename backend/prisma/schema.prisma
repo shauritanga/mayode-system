@@ -21,24 +21,24 @@ datasource db {
 // ============================================================
 
 model User {
-  id              String    @id @default(uuid())
-  email           String?   @unique
-  phone           String    @unique
-  passwordHash    String    @map("password_hash")
-  firstName       String?   @map("first_name")
-  lastName        String?   @map("last_name")
-  role            UserRole
-  isActive        Boolean   @default(true) @map("is_active")
-  language        String    @default("sw") // sw = Swahili, en = English
-  pushToken       String?   @map("push_token") // Expo Push Notification Token
-  profilePhotoUrl String?   @map("profile_photo_url")
-  lastLoginAt     DateTime? @map("last_login_at")
+  id                 String    @id @default(uuid())
+  email              String?   @unique
+  phone              String    @unique
+  passwordHash       String    @map("password_hash")
+  firstName          String?   @map("first_name")
+  lastName           String?   @map("last_name")
+  role               UserRole
+  isActive           Boolean   @default(true) @map("is_active")
+  language           String    @default("sw") // sw = Swahili, en = English
+  pushToken          String?   @map("push_token") // Expo Push Notification Token
+  profilePhotoUrl    String?   @map("profile_photo_url")
+  lastLoginAt        DateTime? @map("last_login_at")
   /// Last time the mobile app synced its offline data to the server.
-  lastSyncAt      DateTime? @map("last_sync_at")
+  lastSyncAt         DateTime? @map("last_sync_at")
   /// Set when staff are given a temporary password; cleared once they choose their own.
-  mustChangePassword Boolean @default(false) @map("must_change_password")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
   roleId   String? @map("role_id")
   // Cooperative this account belongs to (staff/admin accounts created inside an
@@ -209,6 +209,7 @@ model Farmer {
   consentRecords            ConsentRecord[]
   questionnaires            FarmerQuestionnaire[]
   insurancePolicies         InsurancePolicy[]
+  goodsReceipts             GoodsReceipt[]
 
   @@map("farmers")
 }
@@ -373,6 +374,10 @@ model Farm {
   irrigationMethod   String?        @map("irrigation_method")
   accessibility      String?
   previousCrops      String[]       @map("previous_crops")
+  /// Mayode Farms operations: the person who runs this farm, whether it is one of Mayode's own, and whether it is in use.
+  managerUserId      String?        @map("manager_user_id")
+  isMayodeFarm       Boolean        @default(false) @map("is_mayode_farm")
+  isActive           Boolean        @default(true) @map("is_active")
   isVerified         Boolean        @default(false) @map("is_verified")
   isAvailableForRent Boolean        @default(false) @map("is_available_for_rent")
   isLeased           Boolean        @default(false) @map("is_leased")
@@ -409,6 +414,9 @@ model Farm {
   questionnaires       FarmerQuestionnaire[]
   aiIntegrationRecords AiIntegrationRecord[]
   insurancePolicies    InsurancePolicy[]
+  goodsReceipts        GoodsReceipt[]
+  farmTasks            FarmTask[]
+  harvestRecords       HarvestRecord[]
 
   @@map("farms")
 }
@@ -482,6 +490,9 @@ model CropCycle {
   variety              RiceVariety?          @relation(fields: [riceVarietyId], references: [id])
   farmingSeason        FarmingSeason?        @relation(fields: [farmingSeasonId], references: [id], onDelete: SetNull)
   stageChanges         CropStageChange[]
+  goodsReceipts        GoodsReceipt[]
+  farmTasks            FarmTask[]
+  harvestRecords       HarvestRecord[]
 
   @@index([riceVarietyId])
   @@index([farmingSeasonId])
@@ -754,8 +765,8 @@ model LoanRecord {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  farmer           Farmer          @relation(fields: [farmerId], references: [id])
-  lender           Lender?         @relation(fields: [lenderId], references: [id])
+  farmer           Farmer           @relation(fields: [farmerId], references: [id])
+  lender           Lender?          @relation(fields: [lenderId], references: [id])
   deductions       LoanDeduction[]
   linkedInputCosts InputCost[]
   instalments      LoanInstalment[]
@@ -985,28 +996,28 @@ model Lot {
 // ============================================================
 
 model Buyer {
-  id                  String   @id @default(uuid())
+  id                  String             @id @default(uuid())
   name                String
-  fairtradeCertNumber String?  @unique @map("fairtrade_cert_number")
-  contactPerson       String?  @map("contact_person")
-  contactEmail        String?  @map("contact_email")
-  contactPhone        String?  @map("contact_phone")
-  isCertified         Boolean  @default(false) @map("is_certified")
+  fairtradeCertNumber String?            @unique @map("fairtrade_cert_number")
+  contactPerson       String?            @map("contact_person")
+  contactEmail        String?            @map("contact_email")
+  contactPhone        String?            @map("contact_phone")
+  isCertified         Boolean            @default(false) @map("is_certified")
   /// Owning cooperative; null = platform-level buyer (Super Admin's own customers).
-  mamcosId            String?  @map("mamcos_id")
+  mamcosId            String?            @map("mamcos_id")
   businessType        BuyerBusinessType? @map("business_type")
   region              String?
   district            String?
   /// Street / town the buyer operates from.
   location            String?
-  preferredVarieties  String[] @map("preferred_varieties")
+  preferredVarieties  String[]           @map("preferred_varieties")
   /// Where this buyer usually takes delivery; orders and agreements can override it.
-  deliveryLocation    String?  @map("delivery_location")
+  deliveryLocation    String?            @map("delivery_location")
   notes               String?
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
 
-  mamcos     Mamcos?      @relation(fields: [mamcosId], references: [id])
+  mamcos     Mamcos?             @relation(fields: [mamcosId], references: [id])
   saleOrders SaleOrder[]
   sales      Sale[]
   revenues   Revenue[]
@@ -1634,41 +1645,41 @@ enum InsuranceApplicationStatus {
 
 /// A request for cover, decided by the insurer; becomes a policy once staff record the premium as paid.
 model InsuranceApplication {
-  id                  String                      @id @default(uuid())
-  reference           String                      @unique
-  farmerId            String                      @map("farmer_id")
-  mamcosId            String?                     @map("mamcos_id")
-  providerId          String                      @map("provider_id")
-  farmId              String?                     @map("farm_id")
-  cropCycleId         String?                     @map("crop_cycle_id")
-  productType         InsuranceProductType        @map("product_type")
-  riceVariety         String?                     @map("rice_variety")
-  insuredAreaHectares Float                       @map("insured_area_hectares")
+  id                  String                     @id @default(uuid())
+  reference           String                     @unique
+  farmerId            String                     @map("farmer_id")
+  mamcosId            String?                    @map("mamcos_id")
+  providerId          String                     @map("provider_id")
+  farmId              String?                    @map("farm_id")
+  cropCycleId         String?                    @map("crop_cycle_id")
+  productType         InsuranceProductType       @map("product_type")
+  riceVariety         String?                    @map("rice_variety")
+  insuredAreaHectares Float                      @map("insured_area_hectares")
   /// What the applicant asked to be covered for (a guide, the insurer sets the final figure).
-  requestedSumInsured Float?                      @map("requested_sum_insured")
+  requestedSumInsured Float?                     @map("requested_sum_insured")
   notes               String?
-  status              InsuranceApplicationStatus  @default(SUBMITTED)
+  status              InsuranceApplicationStatus @default(SUBMITTED)
   /// Weather, claims and yield risk as it stood when applying.
-  riskSnapshot        Json                        @map("risk_snapshot")
-  riskLevel           String                      @map("risk_level")
-  submittedByUserId   String                      @map("submitted_by_user_id")
-  submittedOnBehalf   Boolean                     @default(false) @map("submitted_on_behalf")
-  reviewStartedAt     DateTime?                   @map("review_started_at")
+  riskSnapshot        Json                       @map("risk_snapshot")
+  riskLevel           String                     @map("risk_level")
+  submittedByUserId   String                     @map("submitted_by_user_id")
+  submittedOnBehalf   Boolean                    @default(false) @map("submitted_on_behalf")
+  reviewStartedAt     DateTime?                  @map("review_started_at")
   /// The insurer's offer.
-  sumInsured          Float?                      @map("sum_insured")
-  premiumAmount       Float?                      @map("premium_amount")
-  startDate           DateTime?                   @map("start_date")
-  endDate             DateTime?                   @map("end_date")
-  decisionNote        String?                     @map("decision_note")
-  decidedByUserId     String?                     @map("decided_by_user_id")
-  decidedAt           DateTime?                   @map("decided_at")
-  premiumPaidAmount   Float?                      @map("premium_paid_amount")
-  premiumPaidAt       DateTime?                   @map("premium_paid_at")
-  premiumReference    String?                     @map("premium_reference")
-  recordedByUserId    String?                     @map("recorded_by_user_id")
-  policyId            String?                     @unique @map("policy_id")
-  createdAt           DateTime                    @default(now()) @map("created_at")
-  updatedAt           DateTime                    @updatedAt @map("updated_at")
+  sumInsured          Float?                     @map("sum_insured")
+  premiumAmount       Float?                     @map("premium_amount")
+  startDate           DateTime?                  @map("start_date")
+  endDate             DateTime?                  @map("end_date")
+  decisionNote        String?                    @map("decision_note")
+  decidedByUserId     String?                    @map("decided_by_user_id")
+  decidedAt           DateTime?                  @map("decided_at")
+  premiumPaidAmount   Float?                     @map("premium_paid_amount")
+  premiumPaidAt       DateTime?                  @map("premium_paid_at")
+  premiumReference    String?                    @map("premium_reference")
+  recordedByUserId    String?                    @map("recorded_by_user_id")
+  policyId            String?                    @unique @map("policy_id")
+  createdAt           DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                   @updatedAt @map("updated_at")
 
   farmer   Farmer            @relation(fields: [farmerId], references: [id])
   provider InsuranceProvider @relation(fields: [providerId], references: [id])
@@ -1705,42 +1716,42 @@ model InsurancePolicy {
   updatedAt           DateTime             @updatedAt @map("updated_at")
 
   application       InsuranceApplication?
-  farmer            Farmer            @relation(fields: [farmerId], references: [id])
-  farm              Farm?             @relation(fields: [farmId], references: [id])
-  cropCycle         CropCycle?        @relation(fields: [cropCycleId], references: [id])
-  provider          InsuranceProvider @relation(fields: [providerId], references: [id])
+  farmer            Farmer                @relation(fields: [farmerId], references: [id])
+  farm              Farm?                 @relation(fields: [farmId], references: [id])
+  cropCycle         CropCycle?            @relation(fields: [cropCycleId], references: [id])
+  provider          InsuranceProvider     @relation(fields: [providerId], references: [id])
   claims            InsuranceClaim[]
-  renewedFromPolicy InsurancePolicy?  @relation("PolicyRenewal", fields: [renewedFromPolicyId], references: [id])
-  renewals          InsurancePolicy[] @relation("PolicyRenewal")
+  renewedFromPolicy InsurancePolicy?      @relation("PolicyRenewal", fields: [renewedFromPolicyId], references: [id])
+  renewals          InsurancePolicy[]     @relation("PolicyRenewal")
 
   @@map("insurance_policies")
 }
 
 model InsuranceClaim {
-  id              String      @id @default(uuid())
-  policyId        String      @map("policy_id")
-  incidentDate    DateTime    @map("incident_date")
-  incidentType    String      @map("incident_type") // e.g., flood, drought, pest, disease
-  description     String?
-  claimedAmount   Float       @map("claimed_amount")
-  status          ClaimStatus @default(SUBMITTED)
+  id                  String      @id @default(uuid())
+  policyId            String      @map("policy_id")
+  incidentDate        DateTime    @map("incident_date")
+  incidentType        String      @map("incident_type") // e.g., flood, drought, pest, disease
+  description         String?
+  claimedAmount       Float       @map("claimed_amount")
+  status              ClaimStatus @default(SUBMITTED)
   // Loose id reference (no @relation), matching Farmer.verifiedById/assignedOfficerId convention.
-  inspectedById   String?     @map("inspected_by_id")
-  inspectionNotes String?     @map("inspection_notes")
-  inspectionDate  DateTime?   @map("inspection_date")
-  paidAmount      Float?      @map("paid_amount")
-  paidAt          DateTime?   @map("paid_at")
+  inspectedById       String?     @map("inspected_by_id")
+  inspectionNotes     String?     @map("inspection_notes")
+  inspectionDate      DateTime?   @map("inspection_date")
+  paidAmount          Float?      @map("paid_amount")
+  paidAt              DateTime?   @map("paid_at")
   /// Field inspection: photos, the loss the inspector measured and what they recommend (APPROVE, REJECT, REINSPECT).
-  inspectionPhotoUrls String[] @map("inspection_photo_urls")
-  assessedLossAmount  Float?   @map("assessed_loss_amount")
+  inspectionPhotoUrls String[]    @map("inspection_photo_urls")
+  assessedLossAmount  Float?      @map("assessed_loss_amount")
   recommendation      String?
   /// The insurer's decision.
-  approvedAmount  Float?      @map("approved_amount")
-  decisionNote    String?     @map("decision_note")
-  decidedAt       DateTime?   @map("decided_at")
-  paymentReference String?    @map("payment_reference")
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  approvedAmount      Float?      @map("approved_amount")
+  decisionNote        String?     @map("decision_note")
+  decidedAt           DateTime?   @map("decided_at")
+  paymentReference    String?     @map("payment_reference")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
 
   policy InsurancePolicy @relation(fields: [policyId], references: [id])
 
@@ -1766,14 +1777,14 @@ enum AlertChannel {
 
 /// One message of one alert to one person on one channel, so staff can see who was reached.
 model AlertDelivery {
-  id        String        @id @default(uuid())
-  alertId   String        @map("alert_id")
-  userId    String?       @map("user_id")
-  farmerId  String?       @map("farmer_id")
+  id        String       @id @default(uuid())
+  alertId   String       @map("alert_id")
+  userId    String?      @map("user_id")
+  farmerId  String?      @map("farmer_id")
   channel   AlertChannel
   status    String // SENT, FAILED, SKIPPED
   detail    String?
-  createdAt DateTime      @default(now()) @map("created_at")
+  createdAt DateTime     @default(now()) @map("created_at")
 
   alert WeatherAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
 
@@ -1813,36 +1824,36 @@ enum WeatherAlertSeverity {
 }
 
 model WeatherAlert {
-  id           String               @id @default(uuid())
-  region       String?
-  district     String?
-  ward         String?
-  alertType    WeatherAlertType     @map("alert_type")
-  severity     WeatherAlertSeverity @default(MEDIUM)
-  title        String
-  message      String
+  id                String               @id @default(uuid())
+  region            String?
+  district          String?
+  ward              String?
+  alertType         WeatherAlertType     @map("alert_type")
+  severity          WeatherAlertSeverity @default(MEDIUM)
+  title             String
+  message           String
   // Loose id reference (no @relation), matching Farmer.verifiedById convention.
-  issuedById   String?              @map("issued_by_id")
-  validFrom    DateTime             @default(now()) @map("valid_from")
-  validUntil   DateTime?            @map("valid_until")
-  smsSentCount Int                  @default(0) @map("sms_sent_count")
-  createdAt    DateTime             @default(now()) @map("created_at")
+  issuedById        String?              @map("issued_by_id")
+  validFrom         DateTime             @default(now()) @map("valid_from")
+  validUntil        DateTime?            @map("valid_until")
+  smsSentCount      Int                  @default(0) @map("sms_sent_count")
+  createdAt         DateTime             @default(now()) @map("created_at")
   /// Cooperative whose farmers get the alert; null = every farmer in the area (issued by Super Admin).
-  mamcosId     String?              @map("mamcos_id")
+  mamcosId          String?              @map("mamcos_id")
   /// Drafts wait for staff to review and send; manual alerts go out straight away.
-  status       WeatherAlertStatus   @default(DRAFT)
+  status            WeatherAlertStatus   @default(DRAFT)
   /// MANUAL (a person wrote it) or AUTO (drafted from the forecast).
-  source       String               @default("MANUAL")
-  titleSw      String?              @map("title_sw")
-  messageSw    String?              @map("message_sw")
+  source            String               @default("MANUAL")
+  titleSw           String?              @map("title_sw")
+  messageSw         String?              @map("message_sw")
   /// What the forecast showed when an automatic draft was made.
-  evidence     Json?
-  reviewedByUserId String?          @map("reviewed_by_user_id")
-  sentAt       DateTime?            @map("sent_at")
-  appSentCount Int                  @default(0) @map("app_sent_count")
-  whatsappSentCount Int             @default(0) @map("whatsapp_sent_count")
-  officersNotified Int              @default(0) @map("officers_notified")
-  deliveries   AlertDelivery[]
+  evidence          Json?
+  reviewedByUserId  String?              @map("reviewed_by_user_id")
+  sentAt            DateTime?            @map("sent_at")
+  appSentCount      Int                  @default(0) @map("app_sent_count")
+  whatsappSentCount Int                  @default(0) @map("whatsapp_sent_count")
+  officersNotified  Int                  @default(0) @map("officers_notified")
+  deliveries        AlertDelivery[]
 
   @@index([mamcosId, status])
   @@map("weather_alerts")
@@ -2012,9 +2023,12 @@ model Plot {
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  farm         Farm          @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  cropCycles   CropCycle[]
-  activityLogs ActivityLog[]
+  farm           Farm            @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  cropCycles     CropCycle[]
+  activityLogs   ActivityLog[]
+  goodsReceipts  GoodsReceipt[]
+  farmTasks      FarmTask[]
+  harvestRecords HarvestRecord[]
 
   @@map("plots")
 }
@@ -3294,6 +3308,10 @@ model Warehouse {
   lots              Lot[]
   inventoryRecords  InventoryRecord[]
   collectionCentres CollectionCentre[]
+  stockBatches      StockBatch[]
+  goodsReceipts     GoodsReceipt[]
+  processingRuns    ProcessingRun[]
+  opsDispatches     OpsDispatch[]
 
   @@index([mamcosId])
   @@map("warehouses")
@@ -3439,4 +3457,918 @@ model OrderLoad {
 
   @@unique([saleOrderId, sequence])
   @@map("order_loads")
+}
+
+// ============================================================
+// MAYODE OPERATIONS: products, warehouse batches, processing, customer
+// orders, invoices, payments, dispatch, and Mayode Farms field work.
+// Quantities are always in kilograms; stock is the sum of ledger rows.
+// ============================================================
+
+enum ProductCategory {
+  PADDY
+  PROCESSED
+  BROKEN
+  BYPRODUCT
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  BUSINESS
+}
+
+enum ReceiptSource {
+  MAYODE_FARM
+  EXTERNAL_FARMER
+}
+
+enum ReceiptStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum InspectionResult {
+  NOT_REQUIRED
+  PASSED
+  PARTIAL
+  FAILED
+}
+
+enum LedgerType {
+  RECEIPT
+  PROCESS_OUT
+  PROCESS_IN
+  DISPATCH
+  ADJUSTMENT
+  TRANSFER_OUT
+  TRANSFER_IN
+  WRITE_OFF
+}
+
+enum ProcessingKind {
+  MILLING
+  PACKAGING
+}
+
+enum ProcessingStatus {
+  COMPLETED
+  REVERSED
+}
+
+enum OutputKind {
+  PRODUCT
+  BROKEN
+  BRAN
+  HUSK
+  OTHER
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+  CONVERTED
+}
+
+enum OpsOrderStatus {
+  PENDING_ACCOUNTS_REVIEW
+  RETURNED_TO_SALES
+  APPROVED_FOR_INVOICING
+  INVOICED
+  CANCELLED
+  COMPLETED
+}
+
+enum PayState {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
+enum FulfilState {
+  NOT_AUTHORIZED
+  AUTHORIZED
+  SHORTAGE
+  ALLOCATED
+  PARTIALLY_DISPATCHED
+  DISPATCHED
+}
+
+enum OpsInvoiceStatus {
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum OpsPaymentStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum OpsPaymentMethod {
+  CONTROL_NUMBER
+  MOBILE_MONEY
+  BANK_TRANSFER
+  CASH
+  OTHER
+}
+
+enum OpsDispatchStatus {
+  PREPARED
+  RELEASED
+  CANCELLED
+}
+
+enum OpsDeliveryState {
+  NOT_DELIVERED
+  DELIVERED
+  EXCEPTION
+}
+
+enum FarmTaskType {
+  TASK
+  INSPECTION
+}
+
+enum FarmTaskStatus {
+  ASSIGNED
+  ACKNOWLEDGED
+  IN_PROGRESS
+  PENDING_REVIEW
+  RETURNED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum FarmInputType {
+  SEED
+  FERTILIZER
+  PESTICIDE
+  HERBICIDE
+  FUEL
+  OTHER
+}
+
+enum InputMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+enum HarvestStatus {
+  DRAFT
+  SUBMITTED
+  CLOSED
+}
+
+/// What Mayode sells and stores. Brands and sizes are data, never code.
+model Product {
+  id             String          @id @default(uuid())
+  mamcosId       String?         @map("mamcos_id")
+  code           String          @unique
+  name           String
+  brand          String?
+  riceVariety    String?         @map("rice_variety")
+  category       ProductCategory
+  grade          String?
+  packSizeKg     Float?          @map("pack_size_kg")
+  unit           String          @default("kg")
+  unitPrice      Float?          @map("unit_price")
+  taxRatePercent Float           @default(0) @map("tax_rate_percent")
+  reorderLevelKg Float?          @map("reorder_level_kg")
+  isActive       Boolean         @default(true) @map("is_active")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  batches        StockBatch[]
+  receipts       GoodsReceipt[]
+  outputs        ProcessingOutput[]
+  quotationLines QuotationLine[]
+  orderLines     OpsOrderLine[]
+
+  @@index([mamcosId, category])
+  @@map("products")
+}
+
+model Customer {
+  id             String       @id @default(uuid())
+  mamcosId       String?      @map("mamcos_id")
+  reference      String       @unique
+  type           CustomerType
+  /// Full name for an individual, registered name for a business.
+  name           String
+  phone          String
+  email          String?
+  address        String?
+  idNumber       String?      @map("id_number")
+  contactPerson  String?      @map("contact_person")
+  businessRegNo  String?      @map("business_reg_no")
+  tin            String?
+  vrn            String?
+  billingAddress String?      @map("billing_address")
+  notes          String?
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  quotations Quotation[]
+  orders     OpsOrder[]
+
+  @@index([mamcosId, name])
+  @@index([phone])
+  @@map("customers")
+}
+
+/// One identifiable quantity of rice: a delivery received, or something produced by processing.
+model StockBatch {
+  id              String      @id @default(uuid())
+  mamcosId        String?     @map("mamcos_id")
+  reference       String      @unique
+  productId       String      @map("product_id")
+  warehouseId     String      @map("warehouse_id")
+  /// Bay or stack inside the warehouse.
+  storageLocation String?     @map("storage_location")
+  riceVariety     String?     @map("rice_variety")
+  grade           String?
+  /// Set for paddy received from a farmer or Mayode farm.
+  receiptId       String?     @unique @map("receipt_id")
+  /// Set for rice produced by a processing run.
+  processingRunId String?     @map("processing_run_id")
+  outputKind      OutputKind? @map("output_kind")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  product     Product            @relation(fields: [productId], references: [id])
+  warehouse   Warehouse          @relation(fields: [warehouseId], references: [id])
+  receipt     GoodsReceipt?      @relation(fields: [receiptId], references: [id])
+  run         ProcessingRun?     @relation("RunOutputs", fields: [processingRunId], references: [id])
+  ledger      StockLedgerEntry[]
+  inputs      ProcessingInput[]
+  allocations OrderAllocation[]
+  dispatches  OpsDispatchLine[]
+
+  @@index([productId, warehouseId])
+  @@index([mamcosId])
+  @@map("stock_batches")
+}
+
+/// The source of truth for physical stock. Rows are only ever added; a mistake is corrected by a new row.
+model StockLedgerEntry {
+  id               String     @id @default(uuid())
+  batchId          String     @map("batch_id")
+  warehouseId      String     @map("warehouse_id")
+  type             LedgerType
+  /// Signed: positive adds to the warehouse, negative removes.
+  quantityKg       Float      @map("quantity_kg")
+  refType          String?    @map("ref_type")
+  refId            String?    @map("ref_id")
+  reason           String?
+  approvedByUserId String?    @map("approved_by_user_id")
+  reversalOfId     String?    @unique @map("reversal_of_id")
+  createdByUserId  String?    @map("created_by_user_id")
+  createdAt        DateTime   @default(now()) @map("created_at")
+
+  batch StockBatch @relation(fields: [batchId], references: [id])
+
+  @@index([batchId])
+  @@index([warehouseId, createdAt])
+  @@index([refType, refId])
+  @@map("stock_ledger")
+}
+
+model GoodsReceipt {
+  id                String           @id @default(uuid())
+  mamcosId          String?          @map("mamcos_id")
+  reference         String           @unique
+  warehouseId       String           @map("warehouse_id")
+  productId         String           @map("product_id")
+  sourceType        ReceiptSource    @map("source_type")
+  farmerId          String?          @map("farmer_id")
+  /// Walk-in seller who is not a registered farmer.
+  sellerName        String?          @map("seller_name")
+  sellerPhone       String?          @map("seller_phone")
+  farmId            String?          @map("farm_id")
+  plotId            String?          @map("plot_id")
+  cropCycleId       String?          @map("crop_cycle_id")
+  harvestRecordId   String?          @map("harvest_record_id")
+  harvestBatchRef   String?          @map("harvest_batch_ref")
+  riceVariety       String?          @map("rice_variety")
+  receivedAt        DateTime         @map("received_at")
+  grossKg           Float            @map("gross_kg")
+  bags              Int?
+  bagWeightKg       Float?           @map("bag_weight_kg")
+  moisturePct       Float?           @map("moisture_pct")
+  qualityGrade      String?          @map("quality_grade")
+  inspection        InspectionResult @default(NOT_REQUIRED)
+  rejectedKg        Float            @default(0) @map("rejected_kg")
+  inspectionNotes   String?          @map("inspection_notes")
+  notes             String?
+  attachments       String[]
+  status            ReceiptStatus    @default(DRAFT)
+  receivedByUserId  String           @map("received_by_user_id")
+  confirmedByUserId String?          @map("confirmed_by_user_id")
+  confirmedAt       DateTime?        @map("confirmed_at")
+  cancelReason      String?          @map("cancel_reason")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  warehouse Warehouse      @relation(fields: [warehouseId], references: [id])
+  product   Product        @relation(fields: [productId], references: [id])
+  farmer    Farmer?        @relation(fields: [farmerId], references: [id])
+  farm      Farm?          @relation(fields: [farmId], references: [id])
+  plot      Plot?          @relation(fields: [plotId], references: [id])
+  cropCycle CropCycle?     @relation(fields: [cropCycleId], references: [id])
+  harvest   HarvestRecord? @relation(fields: [harvestRecordId], references: [id])
+  batch     StockBatch?
+
+  @@index([mamcosId, status])
+  @@index([farmerId])
+  @@index([harvestRecordId])
+  @@map("goods_receipts")
+}
+
+/// One milling or packaging job: batches in, products out, and whatever was lost.
+model ProcessingRun {
+  id               String           @id @default(uuid())
+  mamcosId         String?          @map("mamcos_id")
+  reference        String           @unique
+  kind             ProcessingKind
+  warehouseId      String           @map("warehouse_id")
+  processedAt      DateTime         @map("processed_at")
+  machine          String?
+  operatorName     String?          @map("operator_name")
+  operatorUserId   String?          @map("operator_user_id")
+  inputKg          Float            @map("input_kg")
+  outputKg         Float            @map("output_kg")
+  /// Input minus every recorded output: unexplained loss or gain.
+  lossKg           Float            @map("loss_kg")
+  lossNote         String?          @map("loss_note")
+  status           ProcessingStatus @default(COMPLETED)
+  reversedAt       DateTime?        @map("reversed_at")
+  reversedByUserId String?          @map("reversed_by_user_id")
+  reverseReason    String?          @map("reverse_reason")
+  createdByUserId  String           @map("created_by_user_id")
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  warehouse Warehouse          @relation(fields: [warehouseId], references: [id])
+  inputs    ProcessingInput[]
+  outputs   ProcessingOutput[]
+  batches   StockBatch[]       @relation("RunOutputs")
+
+  @@index([mamcosId, processedAt])
+  @@map("processing_runs")
+}
+
+model ProcessingInput {
+  id         String @id @default(uuid())
+  runId      String @map("run_id")
+  batchId    String @map("batch_id")
+  quantityKg Float  @map("quantity_kg")
+
+  run   ProcessingRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  batch StockBatch    @relation(fields: [batchId], references: [id])
+
+  @@index([runId])
+  @@index([batchId])
+  @@map("processing_inputs")
+}
+
+model ProcessingOutput {
+  id                  String     @id @default(uuid())
+  runId               String     @map("run_id")
+  batchId             String?    @map("batch_id")
+  productId           String?    @map("product_id")
+  kind                OutputKind
+  quantityKg          Float      @map("quantity_kg")
+  destinationLocation String?    @map("destination_location")
+  note                String?
+
+  run     ProcessingRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  product Product?      @relation(fields: [productId], references: [id])
+
+  @@index([runId])
+  @@map("processing_outputs")
+}
+
+model Quotation {
+  id              String          @id @default(uuid())
+  mamcosId        String?         @map("mamcos_id")
+  reference       String          @unique
+  customerId      String          @map("customer_id")
+  status          QuotationStatus @default(DRAFT)
+  validUntil      DateTime?       @map("valid_until")
+  deliveryMode    String?         @map("delivery_mode")
+  deliveryNote    String?         @map("delivery_note")
+  notes           String?
+  subtotal        Float           @default(0)
+  discountTotal   Float           @default(0) @map("discount_total")
+  taxTotal        Float           @default(0) @map("tax_total")
+  total           Float           @default(0)
+  createdByUserId String          @map("created_by_user_id")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  customer Customer        @relation(fields: [customerId], references: [id])
+  lines    QuotationLine[]
+  order    OpsOrder?
+
+  @@index([mamcosId, status])
+  @@map("quotations")
+}
+
+model QuotationLine {
+  id              String @id @default(uuid())
+  quotationId     String @map("quotation_id")
+  productId       String @map("product_id")
+  quantity        Float
+  unitPrice       Float  @map("unit_price")
+  discountPercent Float  @default(0) @map("discount_percent")
+  taxRatePercent  Float  @default(0) @map("tax_rate_percent")
+  lineTotal       Float  @map("line_total")
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@map("quotation_lines")
+}
+
+model OpsOrder {
+  id                    String         @id @default(uuid())
+  mamcosId              String?        @map("mamcos_id")
+  reference             String         @unique
+  customerId            String         @map("customer_id")
+  quotationId           String?        @unique @map("quotation_id")
+  status                OpsOrderStatus @default(PENDING_ACCOUNTS_REVIEW)
+  paymentStatus         PayState       @default(UNPAID) @map("payment_status")
+  fulfilState           FulfilState    @default(NOT_AUTHORIZED) @map("fulfil_state")
+  deliveryMode          String?        @map("delivery_mode")
+  deliveryNote          String?        @map("delivery_note")
+  notes                 String?
+  subtotal              Float          @default(0)
+  discountTotal         Float          @default(0) @map("discount_total")
+  taxTotal              Float          @default(0) @map("tax_total")
+  total                 Float          @default(0)
+  amountPaid            Float          @default(0) @map("amount_paid")
+  createdByUserId       String         @map("created_by_user_id")
+  reviewedByUserId      String?        @map("reviewed_by_user_id")
+  reviewDecision        String?        @map("review_decision")
+  reviewComment         String?        @map("review_comment")
+  reviewedAt            DateTime?      @map("reviewed_at")
+  authorizedByUserId    String?        @map("authorized_by_user_id")
+  authorizedAt          DateTime?      @map("authorized_at")
+  /// Set when accounts released goods before full payment.
+  authorizationOverride String?        @map("authorization_override")
+  shortageNote          String?        @map("shortage_note")
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+
+  customer    Customer          @relation(fields: [customerId], references: [id])
+  quotation   Quotation?        @relation(fields: [quotationId], references: [id])
+  lines       OpsOrderLine[]
+  events      OpsOrderEvent[]
+  invoices    OpsInvoice[]
+  payments    OpsPayment[]
+  allocations OrderAllocation[]
+  dispatches  OpsDispatch[]
+
+  @@index([mamcosId, status])
+  @@index([customerId])
+  @@map("ops_orders")
+}
+
+model OpsOrderLine {
+  id              String @id @default(uuid())
+  orderId         String @map("order_id")
+  productId       String @map("product_id")
+  quantity        Float
+  unitPrice       Float  @map("unit_price")
+  discountPercent Float  @default(0) @map("discount_percent")
+  taxRatePercent  Float  @default(0) @map("tax_rate_percent")
+  lineTotal       Float  @map("line_total")
+  dispatchedQty   Float  @default(0) @map("dispatched_qty")
+
+  order         OpsOrder          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product           @relation(fields: [productId], references: [id])
+  allocations   OrderAllocation[]
+  dispatchLines OpsDispatchLine[]
+
+  @@index([orderId])
+  @@map("ops_order_lines")
+}
+
+/// Who did what to an order, and when. Never updated or deleted.
+model OpsOrderEvent {
+  id          String   @id @default(uuid())
+  orderId     String   @map("order_id")
+  type        String
+  actorUserId String?  @map("actor_user_id")
+  fromStatus  String?  @map("from_status")
+  toStatus    String?  @map("to_status")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  order OpsOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("ops_order_events")
+}
+
+/// Stock set aside for an order line. Reserved = quantity - dispatched - released.
+model OrderAllocation {
+  id              String   @id @default(uuid())
+  orderId         String   @map("order_id")
+  orderLineId     String   @map("order_line_id")
+  batchId         String   @map("batch_id")
+  warehouseId     String   @map("warehouse_id")
+  quantityKg      Float    @map("quantity_kg")
+  dispatchedKg    Float    @default(0) @map("dispatched_kg")
+  releasedKg      Float    @default(0) @map("released_kg")
+  createdByUserId String   @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  order OpsOrder     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  line  OpsOrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+  batch StockBatch   @relation(fields: [batchId], references: [id])
+
+  @@index([batchId])
+  @@index([orderId])
+  @@map("order_allocations")
+}
+
+model OpsInvoice {
+  id                  String           @id @default(uuid())
+  mamcosId            String?          @map("mamcos_id")
+  invoiceNumber       String           @unique @map("invoice_number")
+  orderId             String           @map("order_id")
+  customerId          String           @map("customer_id")
+  customerName        String           @map("customer_name")
+  customerDetails     Json             @map("customer_details")
+  status              OpsInvoiceStatus @default(ISSUED)
+  subtotal            Float
+  discountTotal       Float            @map("discount_total")
+  taxTotal            Float            @map("tax_total")
+  total               Float
+  amountPaid          Float            @default(0) @map("amount_paid")
+  invoiceDate         DateTime         @default(now()) @map("invoice_date")
+  dueDate             DateTime?        @map("due_date")
+  paymentInstructions String?          @map("payment_instructions")
+  controlNumber       String?          @unique @map("control_number")
+  controlNumberAt     DateTime?        @map("control_number_at")
+  controlNumberSource String?          @map("control_number_source")
+  voidReason          String?          @map("void_reason")
+  issuedByUserId      String           @map("issued_by_user_id")
+  sharedAt            DateTime?        @map("shared_at")
+  createdAt           DateTime         @default(now()) @map("created_at")
+
+  order    OpsOrder         @relation(fields: [orderId], references: [id])
+  lines    OpsInvoiceLine[]
+  payments OpsPayment[]
+
+  @@index([orderId])
+  @@index([mamcosId, status])
+  @@map("ops_invoices")
+}
+
+model OpsInvoiceLine {
+  id              String  @id @default(uuid())
+  invoiceId       String  @map("invoice_id")
+  description     String
+  brand           String?
+  quantity        Float
+  unit            String
+  unitPrice       Float   @map("unit_price")
+  discountPercent Float   @default(0) @map("discount_percent")
+  taxRatePercent  Float   @default(0) @map("tax_rate_percent")
+  lineTotal       Float   @map("line_total")
+
+  invoice OpsInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("ops_invoice_lines")
+}
+
+/// Money received against an invoice. A provider reference can only ever be recorded once.
+model OpsPayment {
+  id                String           @id @default(uuid())
+  mamcosId          String?          @map("mamcos_id")
+  invoiceId         String           @map("invoice_id")
+  orderId           String           @map("order_id")
+  amount            Float
+  method            OpsPaymentMethod
+  provider          String           @default("MANUAL")
+  providerReference String           @map("provider_reference")
+  status            OpsPaymentStatus @default(PENDING)
+  paidAt            DateTime?        @map("paid_at")
+  source            String           @default("MANUAL") // CALLBACK, RECONCILED or MANUAL
+  payerName         String?          @map("payer_name")
+  rawPayload        Json?            @map("raw_payload")
+  recordedByUserId  String?          @map("recorded_by_user_id")
+  confirmedByUserId String?          @map("confirmed_by_user_id")
+  rejectReason      String?          @map("reject_reason")
+  createdAt         DateTime         @default(now()) @map("created_at")
+
+  invoice OpsInvoice @relation(fields: [invoiceId], references: [id])
+  order   OpsOrder   @relation(fields: [orderId], references: [id])
+
+  @@unique([provider, providerReference])
+  @@index([orderId])
+  @@map("ops_payments")
+}
+
+model OpsDispatch {
+  id                 String            @id @default(uuid())
+  mamcosId           String?           @map("mamcos_id")
+  reference          String            @unique
+  orderId            String            @map("order_id")
+  invoiceId          String?           @map("invoice_id")
+  warehouseId        String            @map("warehouse_id")
+  status             OpsDispatchStatus @default(PREPARED)
+  vehiclePlate       String            @map("vehicle_plate")
+  driverName         String            @map("driver_name")
+  driverPhone        String?           @map("driver_phone")
+  transporter        String?
+  dispatchAt         DateTime          @map("dispatch_at")
+  releasedAt         DateTime?         @map("released_at")
+  releasingOfficerId String            @map("releasing_officer_id")
+  supervisorUserId   String?           @map("supervisor_user_id")
+  supervisorName     String?           @map("supervisor_name")
+  destination        String?
+  notes              String?
+  attachments        String[]
+  releaseNoteNumber  String?           @unique @map("release_note_number")
+  shareToken         String?           @unique @map("share_token")
+  deliveryState      OpsDeliveryState  @default(NOT_DELIVERED) @map("delivery_state")
+  deliveredAt        DateTime?         @map("delivered_at")
+  receivedBy         String?           @map("received_by")
+  deliveryNote       String?           @map("delivery_note")
+  cancelReason       String?           @map("cancel_reason")
+  createdAt          DateTime          @default(now()) @map("created_at")
+
+  order     OpsOrder          @relation(fields: [orderId], references: [id])
+  warehouse Warehouse         @relation(fields: [warehouseId], references: [id])
+  lines     OpsDispatchLine[]
+
+  @@index([orderId])
+  @@index([mamcosId, status])
+  @@map("ops_dispatches")
+}
+
+model OpsDispatchLine {
+  id          String @id @default(uuid())
+  dispatchId  String @map("dispatch_id")
+  orderLineId String @map("order_line_id")
+  productId   String @map("product_id")
+  batchId     String @map("batch_id")
+  quantityKg  Float  @map("quantity_kg")
+  packages    Int?
+
+  dispatch  OpsDispatch  @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  orderLine OpsOrderLine @relation(fields: [orderLineId], references: [id])
+  batch     StockBatch   @relation(fields: [batchId], references: [id])
+
+  @@index([dispatchId])
+  @@index([batchId])
+  @@map("ops_dispatch_lines")
+}
+
+/// Stock sent between two warehouses; it is in transit until the other end receives it.
+model StockTransfer {
+  id               String    @id @default(uuid())
+  mamcosId         String?   @map("mamcos_id")
+  reference        String    @unique
+  batchId          String    @map("batch_id")
+  fromWarehouseId  String    @map("from_warehouse_id")
+  toWarehouseId    String    @map("to_warehouse_id")
+  quantityKg       Float     @map("quantity_kg")
+  status           String    @default("IN_TRANSIT") // IN_TRANSIT, RECEIVED, CANCELLED
+  receivedKg       Float?    @map("received_kg")
+  note             String?
+  sentByUserId     String    @map("sent_by_user_id")
+  receivedByUserId String?   @map("received_by_user_id")
+  sentAt           DateTime  @default(now()) @map("sent_at")
+  receivedAt       DateTime? @map("received_at")
+
+  @@index([mamcosId, status])
+  @@map("stock_transfers")
+}
+
+// ---------------- Mayode Farms ----------------
+
+model FarmTask {
+  id                  String         @id @default(uuid())
+  mamcosId            String?        @map("mamcos_id")
+  reference           String         @unique
+  type                FarmTaskType   @default(TASK)
+  farmId              String         @map("farm_id")
+  plotId              String?        @map("plot_id")
+  cropCycleId         String?        @map("crop_cycle_id")
+  activityType        String         @map("activity_type")
+  title               String
+  instructions        String?
+  assigneeUserId      String         @map("assignee_user_id")
+  assignedByUserId    String         @map("assigned_by_user_id")
+  /// The person who reviews the work; never the assignee.
+  reviewerUserId      String?        @map("reviewer_user_id")
+  plannedStart        DateTime?      @map("planned_start")
+  deadline            DateTime?
+  expectedOutput      String?        @map("expected_output")
+  requiredInputs      String?        @map("required_inputs")
+  priority            TaskPriority   @default(NORMAL)
+  attachments         String[]
+  requireGps          Boolean        @default(true) @map("require_gps")
+  geofenceM           Int            @default(300) @map("geofence_m")
+  status              FarmTaskStatus @default(ASSIGNED)
+  parentTaskId        String?        @map("parent_task_id")
+  inspectionObjective String?        @map("inspection_objective")
+  reviewDecision      String?        @map("review_decision")
+  reviewComment       String?        @map("review_comment")
+  reviewedAt          DateTime?      @map("reviewed_at")
+  completedAt         DateTime?      @map("completed_at")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  farm           Farm                @relation(fields: [farmId], references: [id])
+  plot           Plot?               @relation(fields: [plotId], references: [id])
+  cropCycle      CropCycle?          @relation(fields: [cropCycleId], references: [id])
+  parent         FarmTask?           @relation("FollowUps", fields: [parentTaskId], references: [id])
+  followUps      FarmTask[]          @relation("FollowUps")
+  checkIns       TaskCheckIn[]
+  reports        TaskReport[]
+  events         TaskEvent[]
+  inspection     InspectionReport?
+  inputMovements FarmInputMovement[]
+
+  @@index([assigneeUserId, status])
+  @@index([mamcosId, status])
+  @@index([farmId, plotId])
+  @@map("farm_tasks")
+}
+
+/// GPS evidence of a visit. Written once; there is no way to edit it.
+model TaskCheckIn {
+  id             String   @id @default(uuid())
+  taskId         String   @map("task_id")
+  userId         String   @map("user_id")
+  kind           String   @default("CHECK_IN") // CHECK_IN or CHECK_OUT
+  latitude       Float
+  longitude      Float
+  accuracyM      Float?   @map("accuracy_m")
+  /// The phone's clock (may be offline) versus when the server received it.
+  deviceTime     DateTime @map("device_time")
+  serverTime     DateTime @default(now()) @map("server_time")
+  referenceLat   Float?   @map("reference_lat")
+  referenceLon   Float?   @map("reference_lon")
+  distanceM      Float?   @map("distance_m")
+  withinGeofence Boolean? @map("within_geofence")
+  photoUrls      String[] @map("photo_urls")
+  note           String?
+  clientKey      String?  @unique @map("client_key")
+
+  task FarmTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId, serverTime])
+  @@map("task_check_ins")
+}
+
+/// What the worker says was done. Each resubmission after a return is a new row.
+model TaskReport {
+  id                String    @id @default(uuid())
+  taskId            String    @map("task_id")
+  submittedByUserId String    @map("submitted_by_user_id")
+  actualStart       DateTime? @map("actual_start")
+  actualEnd         DateTime? @map("actual_end")
+  workDoneQty       Float?    @map("work_done_qty")
+  workDoneUnit      String?   @map("work_done_unit")
+  equipment         String?
+  observations      String?
+  incompleteReason  String?   @map("incomplete_reason")
+  photoUrls         String[]  @map("photo_urls")
+  inputs            Json?
+  submittedAt       DateTime  @default(now()) @map("submitted_at")
+
+  task FarmTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("task_reports")
+}
+
+model TaskEvent {
+  id          String   @id @default(uuid())
+  taskId      String   @map("task_id")
+  type        String
+  actorUserId String?  @map("actor_user_id")
+  fromStatus  String?  @map("from_status")
+  toStatus    String?  @map("to_status")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  task FarmTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("task_events")
+}
+
+model InspectionReport {
+  id              String   @id @default(uuid())
+  taskId          String   @unique @map("task_id")
+  cropCondition   String?  @map("crop_condition")
+  growthStage     String?  @map("growth_stage")
+  pests           String?
+  diseases        String?
+  soilWater       String?  @map("soil_water")
+  observations    String?
+  photoUrls       String[] @map("photo_urls")
+  recommendations Json?
+  submittedAt     DateTime @default(now()) @map("submitted_at")
+
+  task FarmTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("inspection_reports")
+}
+
+model FarmInputItem {
+  id           String        @id @default(uuid())
+  mamcosId     String?       @map("mamcos_id")
+  name         String
+  type         FarmInputType
+  unit         String        @default("kg")
+  unitCost     Float?        @map("unit_cost")
+  reorderLevel Float?        @map("reorder_level")
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  movements FarmInputMovement[]
+
+  @@unique([mamcosId, name])
+  @@map("farm_input_items")
+}
+
+model FarmInputMovement {
+  id              String            @id @default(uuid())
+  itemId          String            @map("item_id")
+  type            InputMovementType
+  /// Signed: stock in is positive, use is negative.
+  quantity        Float
+  taskId          String?           @map("task_id")
+  farmId          String?           @map("farm_id")
+  plotId          String?           @map("plot_id")
+  cropCycleId     String?           @map("crop_cycle_id")
+  employeeUserId  String?           @map("employee_user_id")
+  note            String?
+  createdByUserId String            @map("created_by_user_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  item FarmInputItem @relation(fields: [itemId], references: [id])
+  task FarmTask?     @relation(fields: [taskId], references: [id])
+
+  @@index([itemId])
+  @@index([taskId])
+  @@index([plotId, cropCycleId])
+  @@map("farm_input_movements")
+}
+
+model HarvestRecord {
+  id                String        @id @default(uuid())
+  mamcosId          String?       @map("mamcos_id")
+  reference         String        @unique
+  batchRef          String        @unique @map("batch_ref")
+  farmId            String        @map("farm_id")
+  plotId            String?       @map("plot_id")
+  cropCycleId       String        @map("crop_cycle_id")
+  riceVariety       String?       @map("rice_variety")
+  harvestDate       DateTime      @map("harvest_date")
+  estimatedKg       Float?        @map("estimated_kg")
+  actualKg          Float         @map("actual_kg")
+  unit              String        @default("kg")
+  team              String?
+  responsibleUserId String?       @map("responsible_user_id")
+  qualityNotes      String?       @map("quality_notes")
+  destination       String        @default("WAREHOUSE")
+  /// Declared when the load leaves the field for the warehouse.
+  transportedKg     Float         @default(0) @map("transported_kg")
+  transportNote     String?       @map("transport_note")
+  status            HarvestStatus @default(SUBMITTED)
+  createdByUserId   String        @map("created_by_user_id")
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  farm      Farm           @relation(fields: [farmId], references: [id])
+  plot      Plot?          @relation(fields: [plotId], references: [id])
+  cropCycle CropCycle      @relation(fields: [cropCycleId], references: [id])
+  receipts  GoodsReceipt[]
+
+  @@index([mamcosId, harvestDate])
+  @@index([cropCycleId])
+  @@map("harvest_records")
 }

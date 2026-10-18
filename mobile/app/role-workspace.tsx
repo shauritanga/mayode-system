@@ -49,6 +49,7 @@ const HERO_GREEN = '#065F46';
 
 const COPY: Record<string, { primary: string; route: string; icon: any }> = {
   FIELD_OFFICER: { primary: 'Open field surveys', route: '/field-survey', icon: MapsSearchIcon },
+  CUSTOM: { primary: 'My field work', route: '/field-work', icon: TaskDaily01Icon },
   MAMCOS_SECRETARY: { primary: 'Manage farms', route: '/farms', icon: ClipboardIcon },
   ADMIN: { primary: 'Open web dashboard', route: '/profile', icon: UserGroupIcon },
   SUPER_ADMIN: { primary: 'Open web dashboard', route: '/profile', icon: UserGroupIcon },

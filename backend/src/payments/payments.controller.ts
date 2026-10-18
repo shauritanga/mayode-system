@@ -19,6 +19,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { UserRole } from '@prisma/client';
+import { ModuleRef } from '@nestjs/core';
+import { BillingService } from '../ops/billing.service';
 
 interface ClickPesaWebhookBody {
   event?: string; // "PAYMENT RECEIVED" | "PAYMENT FAILED"
@@ -42,6 +44,7 @@ export class PaymentsController {
     private readonly marketplace: MarketplaceService,
     private readonly sales: SalesService,
     private readonly paymentsService: PaymentsService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   @Get('mine')
@@ -89,6 +92,14 @@ export class PaymentsController {
         matched = true;
       } catch (e) {
         this.logger.debug(`Not a cooperative sale order: ${orderReference}`);
+      }
+      try {
+        // Mayode operations invoices (looked up lazily: that module also depends on this one).
+        const billing = this.moduleRef.get(BillingService, { strict: false });
+        const r = await billing.reconcileClickPesa(orderReference);
+        if (r.matched) matched = true;
+      } catch (e) {
+        this.logger.debug(`Not an operations invoice payment: ${orderReference}`);
       }
       if (!matched) {
         this.logger.error(
