@@ -1,10 +1,28 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { Actor, assertVisible, nextRef, owner, scope, Tx } from './ops-common';
 import { CreateMayodeFarmDto, NewCropCycleDto, UpsertFarmDto } from './dto/farm.dto';
 
 type User = Actor & { id: string };
+
+/**
+ * A farm boundary drawn on the map: a GeoJSON Polygon with at least three corners, every point a valid
+ * [longitude, latitude]. The ring is closed if the caller left it open. Returns undefined when none was given.
+ */
+export function cleanBoundary(raw: unknown): { type: 'Polygon'; coordinates: number[][][] } | null | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null) return null;
+  const ring = (raw as { type?: string; coordinates?: unknown })?.type === 'Polygon' ? (raw as { coordinates: unknown[][] }).coordinates?.[0] : undefined;
+  const bad = 'Draw at least three corners for the farm boundary';
+  if (!Array.isArray(ring)) throw new BadRequestException(bad);
+  const points = ring.map((pt) => (Array.isArray(pt) ? [Number(pt[0]), Number(pt[1])] : [NaN, NaN]));
+  if (points.some(([lng, lat]) => !Number.isFinite(lng) || !Number.isFinite(lat) || Math.abs(lng) > 180 || Math.abs(lat) > 90)) throw new BadRequestException(bad);
+  const [first, last] = [points[0], points[points.length - 1]];
+  const closed = first && last && first[0] === last[0] && first[1] === last[1] ? points : [...points, first];
+  if (closed.length < 4) throw new BadRequestException(bad);
+  return { type: 'Polygon', coordinates: [closed] };
+}
 
 /** Mayode's own farms: registered apart from external farmers' land, with plots, a manager and crop-cycle history. */
 @Injectable()
@@ -32,7 +50,7 @@ export class FarmOpsService {
         ...(f.q ? { OR: [{ name: { contains: f.q, mode: 'insensitive' } }, { farmCode: { contains: f.q, mode: 'insensitive' } }] } : {}),
       },
       include: {
-        plots: { select: { id: true, plotCode: true, name: true, sizeAcres: true, currentStage: true } },
+        plots: { select: { id: true, plotCode: true, name: true, sizeAcres: true, currentStage: true, centerLatitude: true, centerLongitude: true, boundaryCoordinates: true } },
         cropCycles: { select: { id: true, plotId: true, season: true, riceVariety: true, status: true, growthStage: true, actualYieldKg: true, estimatedYieldKg: true }, orderBy: { createdAt: 'desc' } },
       },
       orderBy: { name: 'asc' },
@@ -54,7 +72,7 @@ export class FarmOpsService {
       const created = await tx.farm.create({
         data: {
           farmCode, name: dto.name.trim(), mamcosId: owner(actor), socialHectares: dto.socialHectares, region: dto.region, district: dto.district, ward: dto.ward, village: dto.village,
-          centerLatitude: dto.centerLatitude, centerLongitude: dto.centerLongitude, soilType: dto.soilType, soilFertility: dto.soilFertility, waterSource: dto.waterSource,
+          centerLatitude: dto.centerLatitude, centerLongitude: dto.centerLongitude, boundaryCoordinates: cleanBoundary(dto.boundaryCoordinates) ?? undefined, soilType: dto.soilType, soilFertility: dto.soilFertility, waterSource: dto.waterSource,
           irrigationMethod: dto.irrigationMethod, hasIrrigation: dto.hasIrrigation ?? false, ownershipType: 'OWNED', ownerName: 'Mayode', isMayodeFarm: true, managerUserId: dto.managerUserId ?? null,
         },
       });
@@ -82,7 +100,14 @@ export class FarmOpsService {
     const f = await this.prisma.farm.findUnique({ where: { id } });
     assertVisible(actor, f, 'Farm');
     await this.managerCheck(dto.managerUserId, actor);
-    await this.prisma.farm.update({ where: { id }, data: { managerUserId: dto.managerUserId, isMayodeFarm: dto.isMayodeFarm, isActive: dto.isActive } });
+    const boundary = cleanBoundary(dto.boundaryCoordinates);
+    await this.prisma.farm.update({
+      where: { id },
+      data: {
+        managerUserId: dto.managerUserId, isMayodeFarm: dto.isMayodeFarm, isActive: dto.isActive, centerLatitude: dto.centerLatitude, centerLongitude: dto.centerLongitude,
+        ...(boundary === undefined ? {} : { boundaryCoordinates: boundary === null ? Prisma.DbNull : boundary }),
+      },
+    });
     return this.farm(id, actor);
   }
 
@@ -133,14 +158,17 @@ export class FarmOpsService {
     return { warehouses, farmers, mayodeFarms };
   }
 
-  /** Farmers matching a search, for the receiving screen. */
+  /** Farmers for the receiving screen's dropdown: everyone in scope by name, or those matching a search. */
   async searchFarmers(actor: Actor, q: string) {
     const term = q.trim();
-    if (term.length < 2) return [];
     return this.prisma.farmer.findMany({
-      where: { ...scope(actor), OR: [{ firstName: { contains: term, mode: 'insensitive' } }, { lastName: { contains: term, mode: 'insensitive' } }, { controlNumber: { contains: term, mode: 'insensitive' } }, { nationalId: { contains: term } }] },
+      where: {
+        ...scope(actor),
+        ...(term ? { OR: [{ firstName: { contains: term, mode: 'insensitive' } }, { lastName: { contains: term, mode: 'insensitive' } }, { controlNumber: { contains: term, mode: 'insensitive' } }, { nationalId: { contains: term } }] } : {}),
+      },
       select: { id: true, controlNumber: true, firstName: true, lastName: true, village: true, district: true },
-      take: 20,
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+      take: 1000,
     });
   }
 

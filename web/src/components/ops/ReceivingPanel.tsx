@@ -68,7 +68,7 @@ function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean
   const { data: products } = useLoad<any[]>(() => opsApi.products({ category: 'PADDY' }));
   const [source, setSource] = useState<'EXTERNAL_FARMER' | 'MAYODE_FARM'>('EXTERNAL_FARMER');
   const [farmerQ, setFarmerQ] = useState('');
-  const [farmers, setFarmers] = useState<any[]>([]);
+  const [allFarmers, setAllFarmers] = useState<any[]>([]);
   const [farmer, setFarmer] = useState<any>(null);
   const [cycles, setCycles] = useState<any[]>([]);
   const [harvests, setHarvests] = useState<any[]>([]);
@@ -77,10 +77,10 @@ function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean
   const { busy, error, run } = useAction();
 
   useEffect(() => {
-    if (farmerQ.trim().length < 2) { setFarmers([]); return; }
-    const t = setTimeout(() => { opsApi.searchFarmers(farmerQ).then((r) => setFarmers(r.data)).catch(() => setFarmers([])); }, 250);
-    return () => clearTimeout(t);
-  }, [farmerQ]);
+    opsApi.searchFarmers('').then((r) => setAllFarmers(r.data)).catch(() => setAllFarmers([]));
+  }, []);
+  const farmerLabel = (x: any) => `${x.firstName} ${x.lastName} · ${x.controlNumber}${x.village || x.district ? ` · ${x.village ?? x.district}` : ''}`;
+  const farmers = allFarmers.filter((x) => !farmerQ.trim() || farmerLabel(x).toLowerCase().includes(farmerQ.trim().toLowerCase()));
   useEffect(() => {
     if (!farmer) { setCycles([]); return; }
     opsApi.farmerRecords(farmer.id).then((r) => setCycles(r.data.cycles)).catch(() => setCycles([]));
@@ -134,13 +134,16 @@ function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean
           ) : (
             <>
               <FormGrid>
-                <Field label="Find the farmer" hint="Name, control number or national ID"><input className="input-field" value={farmerQ} onChange={(e) => setFarmerQ(e.target.value)} /></Field>
+                <Field label="Farmer" hint={allFarmers.length >= 1000 ? 'Showing the first 1,000. Type below to narrow the list.' : 'Choose from the list, or type below to narrow it.'}>
+                  <select className="input-field" value="" onChange={(e) => { const x = allFarmers.find((y) => y.id === e.target.value); if (x) { setFarmer(x); setFarmerQ(''); } }}>
+                    <option value="">{farmers.length ? 'Choose a farmer…' : 'No farmer matches'}</option>
+                    {farmers.map((x) => <option key={x.id} value={x.id}>{farmerLabel(x)}</option>)}
+                  </select>
+                </Field>
+                <Field label="Narrow the list"><input className="input-field" placeholder="Name, control number or village" value={farmerQ} onChange={(e) => setFarmerQ(e.target.value)} /></Field>
                 <Field label="Or a seller who is not registered"><input className="input-field" placeholder="Seller’s name" value={f.sellerName} onChange={(e) => set('sellerName', e.target.value)} /></Field>
                 <Field label="Seller’s phone"><input className="input-field" value={f.sellerPhone} onChange={(e) => set('sellerPhone', e.target.value)} /></Field>
               </FormGrid>
-              {farmers.length > 0 && <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, border: '1px solid var(--neutral-200)', borderRadius: 8 }}>
-                {farmers.map((x) => <li key={x.id}><button className="btn-secondary" style={{ width: '100%', textAlign: 'left', border: 0, borderRadius: 0 }} onClick={() => { setFarmer(x); setFarmers([]); setFarmerQ(''); }}>{x.firstName} {x.lastName} · {x.controlNumber} · {x.village ?? x.district ?? ''}</button></li>)}
-              </ul>}
             </>
           )}
           {farmer && cycles.length > 0 && (

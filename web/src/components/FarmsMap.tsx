@@ -1,6 +1,7 @@
 'use client';
 import { useEffect } from 'react';
-import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, useMap } from 'react-leaflet';
+import type { ReactNode } from 'react';
+import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { asPolygonGeometry, hasFarmCenterPin, isFarmBoundaryMapped, type FarmGeoLike } from '@/lib/farm-geo';
@@ -30,6 +31,8 @@ export interface MappableFarm extends FarmGeoLike {
   village?: string | null;
   subVillage?: string | null;
   cropCycles?: { riceVariety?: string | null; status?: string | null }[];
+  /** When given, each plot with a walked boundary (or a GPS point) is drawn on top of its farm. */
+  plots?: (FarmGeoLike & { id?: string; plotCode?: string; name?: string | null; sizeAcres?: number | null })[];
   farmer?: { firstName: string; lastName: string; controlNumber: string };
 }
 
@@ -49,10 +52,13 @@ function boundaryLatLngs(farm: MappableFarm): [number, number][] | null {
 
 function FitToFarms({ points }: { points: [number, number][] }) {
   const map = useMap();
+  // `points` is rebuilt on every render; only re-fit when the farms themselves change, so opening a popup never moves the map.
+  const key = points.map((p) => p.join(',')).join(';');
   useEffect(() => {
     if (points.length === 0) return;
     map.fitBounds(L.latLngBounds(points), { padding: [28, 28], maxZoom: 15 });
-  }, [map, points]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, key]);
   return null;
 }
 
@@ -83,7 +89,9 @@ const legendDot = (color: string) => (
   <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: color, marginRight: 6 }} />
 );
 
-export default function FarmsMap({ farms }: { farms: MappableFarm[] }) {
+/** `renderPopup` replaces the default farmer-oriented popup, for farms that have no farmer (Mayode's own). */
+export default function FarmsMap({ farms, renderPopup, ownFarms = false }: { farms: MappableFarm[]; renderPopup?: (farm: MappableFarm) => ReactNode; ownFarms?: boolean }) {
+  const popup = (farm: MappableFarm) => (renderPopup ? renderPopup(farm) : <FarmPopup farm={farm} />);
   const polygons = farms
     .filter(isFarmBoundaryMapped)
     .map((farm) => ({ farm, positions: boundaryLatLngs(farm) }))
@@ -118,7 +126,7 @@ export default function FarmsMap({ farms }: { farms: MappableFarm[] }) {
           const color = farm.isVerified ? VERIFIED : PENDING;
           return (
             <Polygon key={farm.id} positions={positions} pathOptions={{ color, fillColor: color, fillOpacity: 0.25, weight: 2 }}>
-              <Popup><FarmPopup farm={farm} /></Popup>
+              <Popup>{popup(farm)}</Popup>
             </Polygon>
           );
         })}
@@ -129,9 +137,17 @@ export default function FarmsMap({ farms }: { farms: MappableFarm[] }) {
             radius={7}
             pathOptions={{ color: '#fff', weight: 2, fillColor: PIN_ONLY, fillOpacity: 0.9 }}
           >
-            <Popup><FarmPopup farm={farm} /></Popup>
+            <Popup>{popup(farm)}</Popup>
           </CircleMarker>
         ))}
+        {farms.flatMap((farm) => (farm.plots ?? []).map((plot) => {
+          const ring = boundaryLatLngs({ ...farm, boundaryCoordinates: plot.boundaryCoordinates });
+          const label = plot.name ?? plot.plotCode ?? 'Plot';
+          const key = plot.id ?? `${farm.id}-${plot.plotCode}`;
+          if (ring) return <Polygon key={key} positions={ring} pathOptions={{ color: '#2563EB', fillColor: '#2563EB', fillOpacity: 0.25, weight: 2 }}><Tooltip sticky>{farm.farmCode} · {label}</Tooltip></Polygon>;
+          if (!hasFarmCenterPin(plot) || (plot.centerLatitude === farm.centerLatitude && plot.centerLongitude === farm.centerLongitude)) return null;
+          return <CircleMarker key={key} center={[plot.centerLatitude as number, plot.centerLongitude as number]} radius={5} pathOptions={{ color: '#fff', weight: 1.5, fillColor: '#2563EB', fillOpacity: 0.9 }}><Tooltip>{farm.farmCode} · {label}</Tooltip></CircleMarker>;
+        }))}
       </MapContainer>
       <div
         style={{
@@ -140,9 +156,16 @@ export default function FarmsMap({ farms }: { farms: MappableFarm[] }) {
           boxShadow: 'var(--shadow-sm)',
         }}
       >
-        <div>{legendDot(VERIFIED)}Verified boundary ({polygons.filter((p) => p.farm.isVerified).length})</div>
-        <div>{legendDot(PENDING)}Boundary pending ({polygons.filter((p) => !p.farm.isVerified).length})</div>
+        {ownFarms ? (
+          <div>{legendDot(VERIFIED)}Farm boundary ({polygons.length})</div>
+        ) : (
+          <>
+            <div>{legendDot(VERIFIED)}Verified boundary ({polygons.filter((p) => p.farm.isVerified).length})</div>
+            <div>{legendDot(PENDING)}Boundary pending ({polygons.filter((p) => !p.farm.isVerified).length})</div>
+          </>
+        )}
         <div>{legendDot(PIN_ONLY)}GPS point only ({pins.length})</div>
+        {farms.some((f) => f.plots?.length) && <div>{legendDot('#2563EB')}Plots</div>}
         {missing > 0 && <div style={{ color: 'var(--text-3)' }}>{missing} farm{missing === 1 ? '' : 's'} without GPS</div>}
       </div>
     </div>

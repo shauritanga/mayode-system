@@ -137,6 +137,10 @@ export class TransportDto {
 
 export class UpsertFarmDto {
   @IsOptional() @IsString() managerUserId?: string;
+  @IsOptional() @IsNumber() centerLatitude?: number;
+  @IsOptional() @IsNumber() centerLongitude?: number;
+  /** GeoJSON Polygon of the farm's boundary, or null to clear it. Checked in the service. */
+  @IsOptional() boundaryCoordinates?: Record<string, unknown> | null;
   @IsOptional() @IsBoolean() isMayodeFarm?: boolean;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
@@ -151,6 +155,8 @@ export class CreateMayodeFarmDto {
   @IsOptional() @IsString() village?: string;
   @IsOptional() @IsNumber() centerLatitude?: number;
   @IsOptional() @IsNumber() centerLongitude?: number;
+  /** GeoJSON Polygon of the farm's boundary. Checked in the service. */
+  @IsOptional() boundaryCoordinates?: Record<string, unknown> | null;
   @IsOptional() @IsString() soilType?: string;
   @IsOptional() @IsString() soilFertility?: string;
   @IsOptional() @IsString() waterSource?: string;

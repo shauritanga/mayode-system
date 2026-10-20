@@ -102,6 +102,7 @@ export const SW_MESSAGES: Record<string, string> = {
   "Choose the product for each rice output": "Chagua bidhaa kwa kila mchele uliotoka",
   "Choose who will review the inspection": "Chagua atakayekagua ukaguzi",
   "Choose who will review this work": "Chagua atakayekagua kazi hii",
+  "Draw at least three corners for the farm boundary": "Weka angalau pembe tatu za mpaka wa shamba",
   "Customer not found": "Mteja hajapatikana",
   "Describe the crop condition or your observations": "Eleza hali ya zao au uliyoona",
   "Describe the problem": "Eleza tatizo",
