@@ -3,15 +3,17 @@ import { compliance } from '@/content';
 
 export default function Compliance() {
   return (
-    <section className="compliance" id="compliance">
+    <section className="sec sec--grid" id="compliance">
       <div className="wrap">
-        <header className="sec-head">
-          <p className="eyebrow" data-reveal>Our compliances and legal standing</p>
-          <h2 className="h2" data-reveal>Doing business in the open.</h2>
+        <header className="sec-head" data-reveal>
+          <div>
+            <p className="eyebrow">Our compliances and legal standing</p>
+            <h2 className="h2">Doing business in the open.</h2>
+          </div>
         </header>
-        <div className="compliance__grid">
-          <div className="compliance__text">
-            {compliance.paragraphs.map((p, i) => (<p key={i} data-reveal>{p}</p>))}
+        <div className="split split--flip">
+          <div className="copy" data-reveal>
+            {compliance.paragraphs.map((p, i) => (<p key={i}>{p}</p>))}
           </div>
           <div className="docs" data-reveal>
             {compliance.documents.map(([label, file]) => (
@@ -22,10 +24,10 @@ export default function Compliance() {
             ))}
           </div>
         </div>
-        <div className="policies">
+        <div className="cards" style={{ marginTop: '3rem' }}>
           {compliance.policies.map((p) => (
-            <article key={p.title} data-reveal>
-              <h3>{p.title}</h3>
+            <article className="card" key={p.title} data-reveal>
+              <h3 style={{ marginBottom: 10 }}>{p.title}</h3>
               <p>{p.text}</p>
             </article>
           ))}

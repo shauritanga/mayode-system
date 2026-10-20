@@ -3,11 +3,13 @@ import { partners } from '@/content';
 
 export default function Partners() {
   return (
-    <section className="partners" id="partners">
+    <section className="sec" id="partners">
       <div className="wrap">
-        <header className="sec-head">
-          <p className="eyebrow" data-reveal>Some of our partners</p>
-          <h2 className="h2" data-reveal>People and institutions we build with.</h2>
+        <header className="sec-head" data-reveal>
+          <div>
+            <p className="eyebrow">Some of our partners</p>
+            <h2 className="h2">People and institutions we build with.</h2>
+          </div>
         </header>
         <ul className="logos" data-reveal>
           {partners.logos.map(([name, file]) => (
@@ -16,13 +18,16 @@ export default function Partners() {
             </li>
           ))}
         </ul>
-        <div className="partners__text">
+        <div className="two">
           {partners.paragraphs.map((p, i) => (<p key={i} data-reveal>{p}</p>))}
         </div>
-        <div className="growth">
-          {partners.growth.map(([t, p]) => (
-            <article key={t} data-reveal>
-              <h3>{t}</h3>
+        <div className="cards cards--3">
+          {partners.growth.map(([t, p], i) => (
+            <article className="card" key={t} data-reveal>
+              <div className="card__head">
+                <span className="card__ico">0{i + 1}</span>
+                <h3>{t}</h3>
+              </div>
               <p>{p}</p>
             </article>
           ))}

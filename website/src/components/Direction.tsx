@@ -1,43 +1,49 @@
-import Image from 'next/image';
 import { direction, values } from '@/content';
 
 export default function Direction() {
   return (
-    <section className="direction" id="direction">
-      <div className="wrap direction__grid">
-        <div className="direction__sticky">
-          <p className="eyebrow eyebrow--gold" data-reveal>Strategic direction</p>
-          <h2 className="h2 h2--light" data-reveal>Where we are heading, and what we promise on the way.</h2>
-          <figure className="direction__photo" data-clip>
-            <Image src="/images/photos/rice-bowl.jpg" alt="Polished white rice heaped in a bowl" width={1327} height={1871} sizes="(max-width: 900px) 100vw, 36vw" data-parallax />
-          </figure>
+    <>
+      <section className="sec sec--dark" id="direction">
+        <div className="wrap">
+          <header className="sec-head" data-reveal>
+            <div>
+              <p className="eyebrow">Strategic direction</p>
+              <h2 className="h2">Where we are heading, and what we promise on the way.</h2>
+            </div>
+          </header>
+          <div className="glass">
+            {direction.map((d, i) => (
+              <article className="glass__card" key={d.label} data-reveal>
+                <div className="glass__n">0{i + 1}</div>
+                <h3>{d.label}</h3>
+                <p>{d.text}</p>
+              </article>
+            ))}
+          </div>
         </div>
-        <ol className="direction__list">
-          {direction.map((d, i) => (
-            <li key={d.label} data-reveal>
-              <span className="direction__n">0{i + 1}</span>
-              <h3>{d.label}</h3>
-              <p>{d.text}</p>
-            </li>
-          ))}
-        </ol>
-      </div>
+      </section>
 
-      <div className="wrap values" id="values">
-        <header className="values__head">
-          <p className="eyebrow eyebrow--gold" data-reveal>Our core values</p>
-          <h2 className="h2 h2--light" data-reveal>What we hold ourselves to.</h2>
-        </header>
-        <div className="values__grid">
-          {values.map((v, i) => (
-            <article className="value" key={v.title} data-reveal>
-              <span className="value__n">{String(i + 1).padStart(2, '0')}</span>
-              <h3>{v.title}</h3>
-              <p>{v.text}</p>
-            </article>
-          ))}
+      <section className="sec" id="values">
+        <div className="wrap">
+          <header className="sec-head" data-reveal>
+            <div>
+              <p className="eyebrow">Our core values</p>
+              <h2 className="h2">What we hold ourselves to.</h2>
+            </div>
+          </header>
+          <div className="cards cards--3">
+            {values.map((v, i) => (
+              <article className="card" key={v.title} data-reveal>
+                <div className="card__head">
+                  <span className="card__ico">{String(i + 1).padStart(2, '0')}</span>
+                  <h3>{v.title}</h3>
+                </div>
+                <p>{v.text}</p>
+              </article>
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

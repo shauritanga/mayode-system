@@ -1,16 +1,8 @@
 import type { Metadata, Viewport } from 'next';
-import { Fraunces, Hanken_Grotesk } from 'next/font/google';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 
-const display = Fraunces({
-  subsets: ['latin'],
-  variable: '--font-display',
-  axes: ['opsz'],
-  style: ['normal', 'italic'],
-  display: 'swap',
-});
-
-const body = Hanken_Grotesk({
+const body = Plus_Jakarta_Sans({
   subsets: ['latin'],
   variable: '--font-body',
   display: 'swap',
@@ -40,7 +32,7 @@ const ARM_MOTION = `(function(){try{var d=document.documentElement;if(!window.ma
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>
+    <html lang="en" className={body.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: ARM_MOTION }} />
       </head>

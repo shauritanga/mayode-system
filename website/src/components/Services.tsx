@@ -3,36 +3,41 @@ import { services } from '@/content';
 
 export default function Services() {
   return (
-    <section className="services" id="services">
+    <section className="sec sec--grid" id="services">
       <div className="wrap">
-        <header className="sec-head">
-          <p className="eyebrow eyebrow--gold" data-reveal>Our services</p>
-          <h2 className="h2" data-reveal>Six ways we work, from the paddy field to the buyer.</h2>
+        <header className="sec-head" data-reveal>
+          <div>
+            <p className="eyebrow">What we do</p>
+            <h2 className="h2">Six ways we work, from the paddy field to the buyer.</h2>
+          </div>
+          <div className="sec-head__actions">
+            <a className="btn btn--solid" href="#contact">Work with us →</a>
+            <a className="btn btn--line" href="#digital">Digital Kilimo</a>
+          </div>
         </header>
-        <ol className="svc-list">
-          {services.map((s) => (
-            <li className="svc" key={s.n} data-svc>
-              <span className="svc__rule" data-svc-rule />
-              <span className="svc__n">{s.n}</span>
-              <div className="svc__body">
-                <h3 className="svc__title">{s.title}</h3>
-                <p className="svc__text">{s.text}</p>
-              </div>
-              <div className="svc__pics" aria-hidden="true">
-                {s.images.map((img) => (
-                  <span className="svc__pic" key={img} data-svc-pic>
-                    <Image src={`/images/services/${img}.jpg`} alt="" width={330} height={235} sizes="200px" />
-                  </span>
-                ))}
-                {s.photo && (
-                  <span className="svc__pic svc__pic--wide" data-svc-pic>
-                    <Image src={`/images/photos/${s.photo}.jpg`} alt="" width={420} height={280} sizes="240px" />
-                  </span>
+        <div className="cards">
+          {services.map((s) => {
+            const pic = s.photo ? `/images/photos/${s.photo}.jpg` : s.images[0] ? `/images/services/${s.images[0]}.jpg` : null;
+            return (
+              <article className="card" key={s.n} data-reveal>
+                {pic && (
+                  <div className="card__photo">
+                    <Image src={pic} alt="" width={560} height={315} sizes="(max-width: 640px) 100vw, 40vw" />
+                  </div>
                 )}
-              </div>
-            </li>
-          ))}
-        </ol>
+                <div className="card__head">
+                  <span className="card__ico">{s.n}</span>
+                  <div>
+                    <span className="card__tag">Service {s.n}</span>
+                    <h3>{s.title}</h3>
+                  </div>
+                </div>
+                <p>{s.text}</p>
+                <a className="link" href="#contact">Talk to us about this →</a>
+              </article>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

@@ -1,9 +1,7 @@
 import Nav from '@/components/Nav';
 import Hero from '@/components/Hero';
-import Marquee from '@/components/Marquee';
 import About from '@/components/About';
 import Services from '@/components/Services';
-import Band from '@/components/Band';
 import Leadership from '@/components/Leadership';
 import Direction from '@/components/Direction';
 import Markets from '@/components/Markets';
@@ -15,8 +13,7 @@ import Compliance from '@/components/Compliance';
 import Partners from '@/components/Partners';
 import Contact from '@/components/Contact';
 import Footer from '@/components/Footer';
-import Stem from '@/components/Stem';
-import Motion from '@/components/Motion';
+import Reveal from '@/components/Reveal';
 
 export default function Home() {
   return (
@@ -24,10 +21,8 @@ export default function Home() {
       <Nav />
       <main>
         <Hero />
-        <Marquee />
         <About />
         <Services />
-        <Band />
         <Leadership />
         <Direction />
         <Markets />
@@ -40,8 +35,7 @@ export default function Home() {
         <Contact />
       </main>
       <Footer />
-      <Stem />
-      <Motion />
+      <Reveal />
     </>
   );
 }
