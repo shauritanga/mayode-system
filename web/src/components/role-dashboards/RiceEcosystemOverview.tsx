@@ -133,33 +133,39 @@ export default function RiceEcosystemOverview({ part = 'all' }: { part?: 'all' |
 
       {part !== 'rest' && (
       <div className="role-grid role-grid-fill">
-        <StatCard icon={UserGroupIcon} label="Registered rice farmers" value={num(k.totalFarmers)} hint={`${num(k.verifiedFarmers)} verified`} />
-        <StatCard icon={Male02Icon} label="Male farmers" value={num(k.maleFarmers)} hint={pct(k.maleFarmers, k.totalFarmers)} tone="blue" />
-        <StatCard icon={Female02Icon} label="Female farmers" value={num(k.femaleFarmers)} hint={pct(k.femaleFarmers, k.totalFarmers)} tone="purple" />
-        <StatCard icon={UserIcon} label="Youth farmers" value={num(k.youthFarmers)} hint={`Aged ${k.youthMaxAge} or under`} tone="gold" />
-        <StatCard icon={MapsIcon} label="Farms" value={num(k.totalFarms)} hint={`${num(k.verifiedFarms)} verified`} />
+        <StatCard icon={UserGroupIcon} variant="solid" label="Registered rice farmers" value={num(k.totalFarmers)} hint={`${num(k.verifiedFarmers)} verified`} />
+        <StatCard icon={Male02Icon} variant="solid" label="Male farmers" value={num(k.maleFarmers)} hint={pct(k.maleFarmers, k.totalFarmers)} tone="blue" />
+        <StatCard icon={Female02Icon} variant="solid" label="Female farmers" value={num(k.femaleFarmers)} hint={pct(k.femaleFarmers, k.totalFarmers)} tone="purple" />
+        <StatCard icon={UserIcon} variant="solid" label="Youth farmers" value={num(k.youthFarmers)} hint={`Aged ${k.youthMaxAge} or under`} tone="gold" />
+        <StatCard icon={MapsIcon} variant="solid" label="Farms" value={num(k.totalFarms)} hint={`${num(k.verifiedFarms)} verified`} />
       </div>
       )}
 
       {part !== 'top' && (
-      <div className="role-grid role-grid-fill">
-        <StatCard icon={Layers01Icon} label="Plots" value={num(k.totalPlots)} hint="Across all farms" tone="blue" />
-        <StatCard icon={Plant01Icon} label="Rice area under cultivation" value={`${num(k.riceAreaUnderCultivationHa)} ha`} hint={`of ${num(k.totalHectares)} ha registered`} />
-        <StatCard icon={Calendar01Icon} label="Active crop seasons" value={num(k.activeCropSeasons)} hint={`${num(k.activeCropCycles)} active crop cycles`} tone="purple" />
-        <StatCard icon={WheatIcon} label="Estimated rice production" value={tons(k.estimatedProductionKg)} hint="Planned + active crop cycles" tone="gold" />
-        <StatCard icon={Leaf01Icon} label="Rice harvested" value={tons(k.riceHarvestedKg)} hint="Recorded actual yield" />
-        <StatCard icon={PackageIcon} label="Total rice aggregated" value={tons(k.riceAggregatedKg)} hint={`${num(k.aggregationRecords)} intake records`} tone="blue" />
-        <StatCard icon={Building03Icon} label="Cooperatives" value={num(k.cooperatives)} hint="Active AMCOS" tone="purple" />
-        <StatCard icon={Money01Icon} label="Farmers accessing finance" value={num(k.farmersAccessingFinance)} hint={pct(k.farmersAccessingFinance, k.totalFarmers)} tone="gold" />
-        <StatCard icon={Shield01Icon} label="Farmers insured" value={num(k.farmersInsured)} hint={pct(k.farmersInsured, k.totalFarmers)} />
+      <article className="fv-card">
+        <div className="fv-card-head">
+          <h2>Farm, Finance &amp; Field Summary</h2>
+        </div>
+        <div className="stat-summary-grid">
+        <StatCard variant="plain" icon={Layers01Icon} label="Plots" value={num(k.totalPlots)} hint="Across all farms" tone="blue" />
+        <StatCard variant="plain" icon={Plant01Icon} label="Rice area under cultivation" value={`${num(k.riceAreaUnderCultivationHa)} ha`} hint={`of ${num(k.totalHectares)} ha registered`} />
+        <StatCard variant="plain" icon={Calendar01Icon} label="Active crop seasons" value={num(k.activeCropSeasons)} hint={`${num(k.activeCropCycles)} active crop cycles`} tone="purple" />
+        <StatCard variant="plain" icon={WheatIcon} label="Estimated rice production" value={tons(k.estimatedProductionKg)} hint="Planned + active crop cycles" tone="gold" />
+        <StatCard variant="plain" icon={Leaf01Icon} label="Rice harvested" value={tons(k.riceHarvestedKg)} hint="Recorded actual yield" />
+        <StatCard variant="plain" icon={PackageIcon} label="Total rice aggregated" value={tons(k.riceAggregatedKg)} hint={`${num(k.aggregationRecords)} intake records`} tone="blue" />
+        <StatCard variant="plain" icon={Building03Icon} label="Cooperatives" value={num(k.cooperatives)} hint="Active AMCOS" tone="purple" />
+        <StatCard variant="plain" icon={Money01Icon} label="Farmers accessing finance" value={num(k.farmersAccessingFinance)} hint={pct(k.farmersAccessingFinance, k.totalFarmers)} tone="gold" />
+        <StatCard variant="plain" icon={Shield01Icon} label="Farmers insured" value={num(k.farmersInsured)} hint={pct(k.farmersInsured, k.totalFarmers)} />
         <StatCard
+          variant="plain"
           icon={UserMultiple02Icon}
           label="Active field officers"
           value={num(k.activeFieldOfficers)}
           hint={`${num(k.fieldOfficersWithRecentVisits)} visited farms in last ${k.fieldOfficerWindowDays} days`}
           tone="blue"
         />
-      </div>
+        </div>
+      </article>
       )}
 
       {part !== 'rest' && (

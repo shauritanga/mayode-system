@@ -38,15 +38,18 @@ export function StatCard({
   hint,
   icon,
   tone = 'green',
+  variant = 'tint',
 }: {
   label: string;
   value: string | number;
   hint?: string;
   icon: IconSvgElement;
   tone?: 'green' | 'blue' | 'gold' | 'red' | 'purple';
+  /** `solid` fills the box with the tone, `tint` is a soft wash, `plain` has no box (for use inside a card). */
+  variant?: 'solid' | 'tint' | 'plain';
 }) {
   return (
-    <article className={`stat-card stat-card-${tone}`}>
+    <article className={`stat-card stat-card-${tone} stat-card-${variant}`}>
       <span className="stat-card-icon" aria-hidden>
         <HugeiconsIcon icon={icon} size={22} strokeWidth={1.8} />
       </span>
