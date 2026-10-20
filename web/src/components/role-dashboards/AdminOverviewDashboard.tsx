@@ -244,10 +244,18 @@ export default function AdminOverviewDashboard() {
     }));
   }, [periodCycles, periodInventory]);
 
-  const totalProductionTons =
-    Math.round((productionLegend.find((r) => r.name === 'Farmers')?.value ?? 0) / 1000) ||
-    Math.round(totalProductionKg / 1000) ||
-    Math.round(periodInventory.reduce((s, r) => s + (r.weightKg || 0), 0) / 1000);
+  const totalProductionKgShown =
+    (productionLegend.find((r) => r.name === 'Farmers')?.value ?? 0) ||
+    totalProductionKg ||
+    periodInventory.reduce((s, r) => s + (r.weightKg || 0), 0);
+  // Whole tons would show 0 for anything under half a ton, so small totals are shown in kg or one decimal.
+  const totalProductionLabel =
+    totalProductionKgShown < 1000
+      ? `${Math.round(totalProductionKgShown).toLocaleString()} kg`
+      : totalProductionKgShown < 10000
+        ? `${(totalProductionKgShown / 1000).toFixed(1)} tons`
+        : `${Math.round(totalProductionKgShown / 1000).toLocaleString()} tons`;
+  const hasProduction = productionLegend.some((r) => r.value > 0);
 
   const productionRays = useMemo(() => {
     const active = productionLegend.filter((r) => r.pct > 0);
@@ -481,7 +489,7 @@ export default function AdminOverviewDashboard() {
               <div className="fv-donut-wrap">
                 {loading ? (
                   <ChartSkeleton height={180} />
-                ) : !productionLegend.some((r) => r.value > 0) ? (
+                ) : !hasProduction ? (
                   <div className="fv-chart-empty">No production in this period</div>
                 ) : (
                   <>
@@ -501,15 +509,16 @@ export default function AdminOverviewDashboard() {
                     </svg>
                     <div className="fv-donut-center">
                       <strong className="fv-prod-total" style={{ fontSize: '0.95rem' }}>
-                        {totalProductionTons.toLocaleString()} tons
+                        {totalProductionLabel}
                       </strong>
                       <small>Total Production</small>
                     </div>
                   </>
                 )}
               </div>
+              {hasProduction && <p className="fv-prod-legend-title">Share by stage</p>}
               <ul className="fv-prod-legend">
-                {productionLegend.map((row) => (
+                {hasProduction && productionLegend.map((row) => (
                   <li key={row.name}>
                     <span className="fv-legend-dot" style={{ background: row.color }} />
                     <span>
