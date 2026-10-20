@@ -16,6 +16,7 @@ const EDITABLE_FIELDS = [
   { key: 'name', label: 'corrFarmName' as const },
   { key: 'plotNumber', label: 'corrPlotNumber' as const },
   { key: 'blockNumber', label: 'corrBlockNumber' as const },
+  { key: 'canal', label: 'corrCanal' as const },
   { key: 'section', label: 'corrSection' as const },
   { key: 'village', label: 'corrVillage' as const },
   { key: 'ward', label: 'corrWard' as const },

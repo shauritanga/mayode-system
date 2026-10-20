@@ -49,6 +49,11 @@ export class CreateFarmDto {
   @IsOptional()
   blockNumber?: string;
 
+  @ApiPropertyOptional({ example: 'Canal 3' })
+  @IsString()
+  @IsOptional()
+  canal?: string;
+
   @ApiPropertyOptional({ example: 'South-West Section' })
   @IsString()
   @IsOptional()
@@ -243,6 +248,11 @@ export class UpdateFarmDto {
   @IsString()
   @IsOptional()
   blockNumber?: string;
+
+  @ApiPropertyOptional({ example: 'Canal 3' })
+  @IsString()
+  @IsOptional()
+  canal?: string;
 
   @ApiPropertyOptional({ example: 'South-West Section' })
   @IsString()

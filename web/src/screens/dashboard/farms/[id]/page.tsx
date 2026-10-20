@@ -188,7 +188,7 @@ export default function FarmDetailPage() {
         <Attr label="Ward" value={farm.ward} />
         <Attr label="Village" value={farm.village} />
         <Attr label="Sub-village" value={farm.subVillage} />
-        <Attr label="Plot / block / section" value={[farm.plotNumber, farm.blockNumber, farm.section].filter(Boolean).join(' / ') || undefined} />
+        <Attr label="Canal / block / plot / section" value={[farm.canal, farm.blockNumber, farm.plotNumber, farm.section].filter(Boolean).join(' / ') || undefined} />
         <Attr label="Full location" value={locationLabel(farm)} />
         <Attr label="GPS coordinates" value={farm.centerLatitude != null ? fmtCoord(farm.centerLatitude, farm.centerLongitude) : undefined} />
         <Attr label="Accessibility" value={farm.accessibility} />

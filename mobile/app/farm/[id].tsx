@@ -31,7 +31,7 @@ interface Plot {
 }
 interface Farm {
   id: string; farmCode: string; name?: string; village?: string;
-  plotNumber?: string; blockNumber?: string; section?: string; ward?: string; district?: string; region?: string;
+  canal?: string; plotNumber?: string; blockNumber?: string; section?: string; ward?: string; district?: string; region?: string;
   socialHectares: number; actualAcres?: number; grade: string;
   isVerified: boolean; hasIrrigation: boolean; ownershipType?: string; ownerName?: string; ownerPhone?: string;
   soilType?: string; waterSource?: string; centerLatitude?: number;
@@ -389,6 +389,7 @@ export default function FarmDetail() {
           <Attr label={t('socialHectares')} value={`${farm.socialHectares} ha`} />
           <Attr label={t('actualAcres')} value={farm.actualAcres ? `${farm.actualAcres} ${t('unitAcres')}` : '—'} />
           <Attr label={t('ownership')} value={farm.ownershipType || '—'} />
+          <Attr label={t('canal')} value={farm.canal || '—'} />
           <Attr label={t('plotNumber')} value={farm.plotNumber || '—'} />
           <Attr label={t('blockNumber')} value={farm.blockNumber || '—'} />
           <Attr label={t('sectionDirection')} value={farm.section || '—'} />

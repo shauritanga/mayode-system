@@ -29,6 +29,7 @@ export default function RegisterFarmScreen() {
   const [farmName, setFarmName] = useState('');
   const [plotNumber, setPlotNumber] = useState('');
   const [blockNumber, setBlockNumber] = useState('');
+  const [canal, setCanal] = useState('');
   const [section, setSection] = useState('');
   const [village, setVillage] = useState('');
   const [ward, setWard] = useState('');
@@ -60,6 +61,7 @@ export default function RegisterFarmScreen() {
 
   const selectedMamcosName = mamcosList.find((m) => m.id === mamcosId)?.name || '';
   const generatedFarmName = [
+    canal ? t('canalNamePart', { value: canal }) : '',
     plotNumber ? t('plotNumberNamePart', { value: plotNumber }) : '',
     blockNumber ? t('blockNumberNamePart', { value: blockNumber }) : '',
     section,
@@ -71,6 +73,10 @@ export default function RegisterFarmScreen() {
   ].filter(Boolean).join(', ');
 
   const submit = async () => {
+    if (!canal.trim() || !blockNumber.trim() || !plotNumber.trim()) {
+      Alert.alert(t('farmDetails'), t('farmLocationNumbersRequired'));
+      return;
+    }
     const structuredName = (farmName.trim() || generatedFarmName).trim();
     if (!structuredName) {
       Alert.alert(t('farmNameRequired'), t('structuredFarmNameRequired'));
@@ -93,8 +99,9 @@ export default function RegisterFarmScreen() {
       const res = await farmsApi.create({
         farmerId,
         name: structuredName,
-        plotNumber: plotNumber || undefined,
-        blockNumber: blockNumber || undefined,
+        canal: canal.trim(),
+        plotNumber: plotNumber.trim(),
+        blockNumber: blockNumber.trim(),
         section: section || undefined,
         village: village || undefined,
         ward: ward || undefined,
@@ -140,9 +147,10 @@ export default function RegisterFarmScreen() {
               <Text style={styles.previewLabel}>{t('structuredNamePreview')}</Text>
               <Text style={styles.previewText}>{farmName.trim() || generatedFarmName || t('structuredNamePreviewEmpty')}</Text>
             </View>
+            <Field label={`${t('canal')} *`} value={canal} onChangeText={setCanal} placeholder="3" />
             <View style={styles.twoCol}>
-              <View style={styles.col}><Field label={t('plotNumber')} value={plotNumber} onChangeText={setPlotNumber} placeholder="02" /></View>
-              <View style={styles.col}><Field label={t('blockNumber')} value={blockNumber} onChangeText={setBlockNumber} placeholder="5" /></View>
+              <View style={styles.col}><Field label={`${t('blockNumber')} *`} value={blockNumber} onChangeText={setBlockNumber} placeholder="5" /></View>
+              <View style={styles.col}><Field label={`${t('plotNumber')} *`} value={plotNumber} onChangeText={setPlotNumber} placeholder="02" /></View>
             </View>
             <SearchableSelect
               label={t('sectionDirection')}

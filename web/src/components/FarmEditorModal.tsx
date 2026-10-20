@@ -16,7 +16,7 @@ const sectionStyle: React.CSSProperties = { gridColumn: '1 / -1', fontSize: 12, 
 type Option = { id?: string; name: string };
 
 interface FarmValues {
-  farmerId: string; name: string; plotNumber: string; blockNumber: string; section: string;
+  farmerId: string; name: string; canal: string; plotNumber: string; blockNumber: string; section: string;
   region: string; district: string; ward: string; village: string; subVillage: string;
   centerLatitude: string; centerLongitude: string; socialHectares: string; actualAcres: string;
   ownershipType: string; landTenure: string; ownerName: string; ownerPhone: string;
@@ -26,7 +26,7 @@ interface FarmValues {
 }
 
 const EMPTY: FarmValues = {
-  farmerId: '', name: '', plotNumber: '', blockNumber: '', section: '',
+  farmerId: '', name: '', canal: '', plotNumber: '', blockNumber: '', section: '',
   region: 'Mbeya', district: 'Mbarali', ward: '', village: '', subVillage: '',
   centerLatitude: '', centerLongitude: '', socialHectares: '', actualAcres: '',
   ownershipType: 'OWNED', landTenure: '', ownerName: '', ownerPhone: '',
@@ -39,7 +39,7 @@ function fromFarm(farm: any): FarmValues {
   const s = (v: unknown) => (v == null ? '' : String(v));
   return {
     ...EMPTY,
-    farmerId: s(farm.farmerId), name: s(farm.name), plotNumber: s(farm.plotNumber), blockNumber: s(farm.blockNumber), section: s(farm.section),
+    farmerId: s(farm.farmerId), name: s(farm.name), canal: s(farm.canal), plotNumber: s(farm.plotNumber), blockNumber: s(farm.blockNumber), section: s(farm.section),
     region: s(farm.region), district: s(farm.district), ward: s(farm.ward), village: s(farm.village), subVillage: s(farm.subVillage),
     centerLatitude: s(farm.centerLatitude), centerLongitude: s(farm.centerLongitude),
     socialHectares: s(farm.socialHectares), actualAcres: s(farm.actualAcres),
@@ -133,7 +133,7 @@ export default function FarmEditorModal({ farm, onClose, onSaved }: { farm?: any
     if (leased && (!v.ownerName.trim() || !v.ownerPhone.trim())) return setError('Owner name and phone are required for rented or leased land.');
 
     const payload: Record<string, unknown> = {
-      name: v.name.trim(), plotNumber: opt(v.plotNumber), blockNumber: opt(v.blockNumber), section: opt(v.section),
+      name: v.name.trim(), canal: opt(v.canal), plotNumber: opt(v.plotNumber), blockNumber: opt(v.blockNumber), section: opt(v.section),
       region: opt(v.region), district: opt(v.district), ward: opt(v.ward), village: opt(v.village), subVillage: opt(v.subVillage),
       centerLatitude: lat, centerLongitude: lng,
       socialHectares: hectares, actualAcres: num(v.actualAcres),
@@ -214,8 +214,9 @@ export default function FarmEditorModal({ farm, onClose, onSaved }: { farm?: any
           </div>
         )}
         <Text label="Farm name *" value={v.name} onChange={(x) => set('name', x)} />
-        <Text label="Plot number" value={v.plotNumber} onChange={(x) => set('plotNumber', x)} />
+        <Text label="Canal" value={v.canal} onChange={(x) => set('canal', x)} />
         <Text label="Block" value={v.blockNumber} onChange={(x) => set('blockNumber', x)} />
+        <Text label="Plot number" value={v.plotNumber} onChange={(x) => set('plotNumber', x)} />
         <Text label="Section" value={v.section} onChange={(x) => set('section', x)} />
         <Select label="Grade" value={v.grade} onChange={(x) => set('grade', x)} options={GRADES} />
 

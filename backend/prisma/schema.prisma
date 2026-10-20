@@ -348,6 +348,7 @@ model Farm {
   name                  String
   plotNumber            String?   @map("plot_number")
   blockNumber           String?   @map("block_number")
+  canal                 String?
   section               String?
   village               String?
   subVillage            String?   @map("sub_village") // kitongoji

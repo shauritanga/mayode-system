@@ -18,6 +18,7 @@ export const EDITABLE_FARM_FIELDS = [
   'name',
   'plotNumber',
   'blockNumber',
+  'canal',
   'section',
   'village',
   'ward',
