@@ -1,7 +1,7 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { MapContainer, Polygon, CircleMarker, Popup, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, Polygon, CircleMarker, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { ClickToZoom, MapBase } from '@/components/MapBase';
 import 'leaflet/dist/leaflet.css';
@@ -61,6 +61,29 @@ function FitToFarms({ points }: { points: [number, number][] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, key]);
   return null;
+}
+
+/**
+ * A farm of a few hectares is a speck when the map shows a whole district. While zoomed out, each farm with a
+ * boundary also gets a pin at its middle so it can be seen and clicked; the pins go away once the shape is big enough to see.
+ */
+function CentrePins({ polygons, popup, colorOf }: { polygons: { farm: MappableFarm; positions: [number, number][] }[]; popup: (farm: MappableFarm) => ReactNode; colorOf: (farm: MappableFarm) => string }) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  if (zoom >= 15) return null;
+  return (
+    <>
+      {polygons.map(({ farm, positions }) => {
+        const centre: [number, number] = [positions.reduce((t, p) => t + p[0], 0) / positions.length, positions.reduce((t, p) => t + p[1], 0) / positions.length];
+        return (
+          <CircleMarker key={`pin-${farm.id}`} center={centre} radius={8} pathOptions={{ color: '#fff', weight: 2, fillColor: colorOf(farm), fillOpacity: 0.95 }}>
+            <Popup>{popup(farm)}</Popup>
+          </CircleMarker>
+        );
+      })}
+    </>
+  );
 }
 
 function FarmPopup({ farm }: { farm: MappableFarm }) {
@@ -129,6 +152,7 @@ export default function FarmsMap({ farms, renderPopup, ownFarms = false }: { far
             </Polygon>
           );
         })}
+        <CentrePins polygons={polygons} popup={popup} colorOf={(farm) => (ownFarms || farm.isVerified ? VERIFIED : PENDING)} />
         {pins.map((farm) => (
           <CircleMarker
             key={farm.id}
