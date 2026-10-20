@@ -110,7 +110,6 @@ export default function FieldOfficersPage() {
       <div className="role-grid" style={{ marginBottom: 16 }}>
         <MetricTile label="Field officers" value={officers.length} hint={`${officers.filter((o) => o.isActive).length} active`} tone="green" />
         <MetricTile label="Farmers assigned" value={sum((o) => o.farmersAssigned).toLocaleString()} hint={`${sum((o) => o.farmersRegistered).toLocaleString()} registered by officers`} tone="blue" />
-        <MetricTile label="Farms assigned" value={sum((o) => o.farmsAssigned).toLocaleString()} hint={`${sum((o) => o.farmsMapped).toLocaleString()} mapped by officers`} tone="gold" />
         <MetricTile label="Visits completed" value={sum((o) => o.visitsCompleted).toLocaleString()} hint="All time" tone="purple" />
         <MetricTile label="Pending tasks" value={sum((o) => o.pendingTasks).toLocaleString()} hint="Verifications and follow-ups" tone="gold" />
         <MetricTile label="Avg data completeness" value={avgCompleteness == null ? '—' : `${avgCompleteness}%`} hint="Records officers registered" tone="green" />
