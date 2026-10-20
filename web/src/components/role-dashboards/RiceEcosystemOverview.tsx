@@ -97,7 +97,7 @@ function loadOverview() {
   return overviewRequest;
 }
 
-/** `top` is the first five tiles and the charts; `rest` is the other ten tiles. */
+/** `top` is the first five tiles; `rest` is the other ten tiles followed by all the charts. */
 export default function RiceEcosystemOverview({ part = 'all' }: { part?: 'all' | 'top' | 'rest' }) {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState('');
@@ -113,7 +113,7 @@ export default function RiceEcosystemOverview({ part = 'all' }: { part?: 'all' |
     return (
       <div className="role-dashboard">
         {[...Array(part === 'rest' ? 10 : 5)].map((_, i) => <StatCardSkeleton key={i} />)}
-        {part !== 'rest' && <ChartSkeleton height={260} />}
+        {part !== 'top' && <ChartSkeleton height={260} />}
       </div>
     );
   }
@@ -168,7 +168,7 @@ export default function RiceEcosystemOverview({ part = 'all' }: { part?: 'all' |
       </article>
       )}
 
-      {part !== 'rest' && (
+      {part !== 'top' && (
       <>
       <div className="role-two-col-even">
         <ChartCard title="Farmer registration by district" subtitle="Registered farmers per district">
