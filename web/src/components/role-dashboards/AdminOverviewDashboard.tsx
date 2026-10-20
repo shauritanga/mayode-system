@@ -141,7 +141,6 @@ export default function AdminOverviewDashboard() {
   const [kpis, setKpis] = useState<any>(null);
   const [weather, setWeather] = useState<any>(null);
   const [unit, setUnit] = useState<'C' | 'F'>('C');
-  const [period, setPeriod] = useState('This Month');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -366,7 +365,6 @@ export default function AdminOverviewDashboard() {
   }, [inventoryRecords, productionByVariety]);
 
   const today = new Date();
-  const greeting = greetingForHour(today.getHours());
   const forecastDay = weather?.days?.[0];
   const tempC = forecastDay?.maxTempC ?? 24;
   const lowC = forecastDay?.minTempC ?? tempC - 4;
@@ -403,34 +401,6 @@ export default function AdminOverviewDashboard() {
   return (
     <div className="fv-dashboard">
       {error && <EmptyState>{error}</EmptyState>}
-
-      <motion.div
-        className="fv-hero"
-        {...(enter || {})}
-        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-      >
-        <div>
-          <h1 className="fv-greeting">{greeting}</h1>
-          <p className="fv-hero-sub">
-            Optimize your cooperative operations with real-time MAYOData insights
-            {user?.firstName ? `, ${user.firstName}` : ''}.
-          </p>
-        </div>
-        <div className="fv-hero-actions">
-          <label className="fv-period">
-            <HugeiconsIcon icon={Calendar01Icon} size={14} strokeWidth={1.8} />
-            <select value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="Period">
-              <option>This Month</option>
-              <option>This Season</option>
-              <option>This Year</option>
-            </select>
-          </label>
-          <Link href="/dashboard/reports" className="fv-export-btn">
-            <HugeiconsIcon icon={Upload04Icon} size={14} strokeWidth={1.8} />
-            Export
-          </Link>
-        </div>
-      </motion.div>
 
       <RiceEcosystemOverview part="top" />
 

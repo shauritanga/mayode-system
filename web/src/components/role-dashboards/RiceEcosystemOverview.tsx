@@ -130,11 +130,9 @@ export default function RiceEcosystemOverview({ part = 'all' }: { part?: 'all' |
 
   return (
     <section className="role-dashboard" aria-label="Rice ecosystem overview">
-      {part !== 'rest' && <div className="role-section-label">Rice ecosystem overview</div>}
-      {part === 'rest' && <div className="role-section-label">More farm and finance figures</div>}
 
       {part !== 'rest' && (
-      <div className="role-grid">
+      <div className="role-grid role-grid-fill">
         <StatCard icon={UserGroupIcon} label="Registered rice farmers" value={num(k.totalFarmers)} hint={`${num(k.verifiedFarmers)} verified`} />
         <StatCard icon={Male02Icon} label="Male farmers" value={num(k.maleFarmers)} hint={pct(k.maleFarmers, k.totalFarmers)} tone="blue" />
         <StatCard icon={Female02Icon} label="Female farmers" value={num(k.femaleFarmers)} hint={pct(k.femaleFarmers, k.totalFarmers)} tone="purple" />
@@ -144,7 +142,7 @@ export default function RiceEcosystemOverview({ part = 'all' }: { part?: 'all' |
       )}
 
       {part !== 'top' && (
-      <div className="role-grid">
+      <div className="role-grid role-grid-fill">
         <StatCard icon={Layers01Icon} label="Plots" value={num(k.totalPlots)} hint="Across all farms" tone="blue" />
         <StatCard icon={Plant01Icon} label="Rice area under cultivation" value={`${num(k.riceAreaUnderCultivationHa)} ha`} hint={`of ${num(k.totalHectares)} ha registered`} />
         <StatCard icon={Calendar01Icon} label="Active crop seasons" value={num(k.activeCropSeasons)} hint={`${num(k.activeCropCycles)} active crop cycles`} tone="purple" />
