@@ -432,7 +432,7 @@ export default function AdminOverviewDashboard() {
         </div>
       </motion.div>
 
-      <RiceEcosystemOverview />
+      <RiceEcosystemOverview part="top" />
 
       <div className="fv-row fv-row-top">
         <motion.article
@@ -758,6 +758,8 @@ export default function AdminOverviewDashboard() {
           </ul>
         </motion.article>
       </div>
+
+      <RiceEcosystemOverview part="rest" />
     </div>
   );
 }

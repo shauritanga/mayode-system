@@ -70,14 +70,24 @@ function GroupedBars({
   );
 }
 
-export default function RiceEcosystemOverview() {
+/** The dashboard shows this in two places (headline tiles, then the rest), so share one request between them. */
+let overviewRequest: Promise<any> | null = null;
+function loadOverview() {
+  if (!overviewRequest) {
+    overviewRequest = reportsApi.riceOverview().then((res) => res.data);
+    overviewRequest.catch(() => { overviewRequest = null; });
+  }
+  return overviewRequest;
+}
+
+/** `top` is the first five tiles and the charts; `rest` is the other ten tiles. */
+export default function RiceEcosystemOverview({ part = 'all' }: { part?: 'all' | 'top' | 'rest' }) {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    reportsApi
-      .riceOverview()
-      .then((res) => setData(res.data))
+    loadOverview()
+      .then(setData)
       .catch(() => setError('Unable to load the rice ecosystem overview.'));
   }, []);
 
@@ -85,8 +95,8 @@ export default function RiceEcosystemOverview() {
   if (!data) {
     return (
       <div className="role-dashboard">
-        <StatGridSkeleton count={12} />
-        <ChartSkeleton height={260} />
+        <StatGridSkeleton count={part === 'rest' ? 10 : 5} />
+        {part !== 'rest' && <ChartSkeleton height={260} />}
       </div>
     );
   }
@@ -103,14 +113,21 @@ export default function RiceEcosystemOverview() {
 
   return (
     <section className="role-dashboard" aria-label="Rice ecosystem overview">
-      <div className="role-section-label">Rice ecosystem overview</div>
+      {part !== 'rest' && <div className="role-section-label">Rice ecosystem overview</div>}
+      {part === 'rest' && <div className="role-section-label">More farm and finance figures</div>}
 
+      {part !== 'rest' && (
       <div className="role-grid">
         <MetricTile label="Registered rice farmers" value={num(k.totalFarmers)} hint={`${num(k.verifiedFarmers)} verified`} />
         <MetricTile label="Male farmers" value={num(k.maleFarmers)} hint={pct(k.maleFarmers, k.totalFarmers)} tone="blue" />
         <MetricTile label="Female farmers" value={num(k.femaleFarmers)} hint={pct(k.femaleFarmers, k.totalFarmers)} tone="purple" />
         <MetricTile label="Youth farmers" value={num(k.youthFarmers)} hint={`Aged ${k.youthMaxAge} or under`} tone="gold" />
         <MetricTile label="Farms" value={num(k.totalFarms)} hint={`${num(k.verifiedFarms)} verified`} />
+      </div>
+      )}
+
+      {part !== 'top' && (
+      <div className="role-grid">
         <MetricTile label="Plots" value={num(k.totalPlots)} hint="Across all farms" tone="blue" />
         <MetricTile label="Rice area under cultivation" value={`${num(k.riceAreaUnderCultivationHa)} ha`} hint={`of ${num(k.totalHectares)} ha registered`} />
         <MetricTile label="Active crop seasons" value={num(k.activeCropSeasons)} hint={`${num(k.activeCropCycles)} active crop cycles`} tone="purple" />
@@ -127,7 +144,10 @@ export default function RiceEcosystemOverview() {
           tone="blue"
         />
       </div>
+      )}
 
+      {part !== 'rest' && (
+      <>
       <div className="role-two-col-even">
         <ChartCard title="Farmer registration by district" subtitle="Registered farmers per district">
           <HorizontalBarChart
@@ -239,6 +259,8 @@ export default function RiceEcosystemOverview() {
           </div>
         </div>
       </ChartCard>
+      </>
+      )}
     </section>
   );
 }
