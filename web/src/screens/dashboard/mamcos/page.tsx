@@ -129,12 +129,16 @@ export default function MamcosPage() {
 
       {
         try {
-          await authApi.createCooperativeAdmin({
+          const adminRes = await authApi.createCooperativeAdmin({
             firstName: form.leaderFirstName, lastName: form.leaderLastName,
             phone: form.leaderPhone, password: form.leaderPassword,
             mamcosId: newId,
           });
-          setMessage('AMCOS created and its administrator added.');
+          setMessage(
+            adminRes.data?.credentialsSms === 'sent'
+              ? 'AMCOS created and its administrator added. Their sign-in details were sent by SMS.'
+              : `AMCOS created and its administrator added, but the SMS could not be sent. Give them this temporary password: ${adminRes.data?.temporaryPassword ?? form.leaderPassword}`,
+          );
         } catch (adminErr) {
           setMessage(`AMCOS created, but the administrator account could not be created: ${apiErrorMessage(adminErr, 'unknown error')}. Use "Add admin" on the AMCOS list to try again.`);
         }

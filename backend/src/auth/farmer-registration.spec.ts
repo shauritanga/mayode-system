@@ -12,7 +12,7 @@ function setup() {
     role: { findMany: jest.fn(), findUnique: jest.fn() },
     user, farmer, $transaction: jest.fn(async (fn) => fn({ user, farmer })),
   };
-  const service = new AuthService(prisma as any, {} as any, { get: jest.fn() } as any);
+  const service = new AuthService(prisma as any, {} as any, { get: jest.fn() } as any, {} as any);
   const tokens = jest.spyOn(service as any, 'generateTokens').mockResolvedValue({ accessToken: 'access', refreshToken: 'refresh' });
   return { service, prisma, tokens };
 }

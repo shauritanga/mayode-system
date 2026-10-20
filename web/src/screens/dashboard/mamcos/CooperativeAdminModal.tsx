@@ -32,7 +32,7 @@ export default function CooperativeAdminModal({
     setSaving(true);
     setError('');
     try {
-      await authApi.createCooperativeAdmin({
+      const res = await authApi.createCooperativeAdmin({
         mamcosId: mamcos.id,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
@@ -40,7 +40,12 @@ export default function CooperativeAdminModal({
         email: form.email.trim() || undefined,
         password: form.password,
       });
-      onCreated(`Administrator ${`${form.firstName} ${form.lastName}`.trim()} added to ${mamcos.name}.`);
+      const who = `${form.firstName} ${form.lastName}`.trim();
+      onCreated(
+        res.data?.credentialsSms === 'sent'
+          ? `Administrator ${who} added to ${mamcos.name}. Their sign-in details were sent by SMS.`
+          : `Administrator ${who} added to ${mamcos.name}, but the SMS could not be sent. Give them this temporary password: ${res.data?.temporaryPassword ?? form.password}`,
+      );
       onClose();
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not create the administrator.'));

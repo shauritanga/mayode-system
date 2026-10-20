@@ -18,7 +18,7 @@ function buildService() {
     role: { findUnique: jest.fn().mockResolvedValue(null) },
     user: { findFirst: jest.fn().mockResolvedValue(null) },
   };
-  return new AuthService(prisma as any, {} as any, {} as any);
+  return new AuthService(prisma as any, {} as any, {} as any, {} as any);
 }
 
 const officerDto = {
@@ -83,7 +83,7 @@ describe('Account creation uses roles selected by Super Admin', () => {
   function setup(customRole: any) {
     const user = { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockImplementation(async ({ data }) => ({ id: 'created-user', ...data })) };
     const prisma = { role: { findUnique: jest.fn().mockResolvedValue(customRole) }, mamcos: { findUnique: jest.fn().mockResolvedValue({ id: 'mamcos-1' }) }, user, $transaction: jest.fn(async (fn) => fn({ user })) };
-    return { service: new AuthService(prisma as any, {} as any, {} as any), user };
+    return { service: new AuthService(prisma as any, {} as any, {} as any, {} as any), user };
   }
   it('creates a general account with the selected role and no inherited Admin privilege', async () => {
     const { service, user } = setup({ id: 'role-1', isActive: true, isSystem: false, systemRole: null, mamcosId: null });
@@ -128,7 +128,7 @@ describe('Cooperative-admin delegation', () => {
       user,
       $transaction: jest.fn(async (fn) => fn({ user })),
     };
-    return { service: new AuthService(prisma as any, {} as any, {} as any), user };
+    return { service: new AuthService(prisma as any, {} as any, {} as any, {} as any), user };
   }
   const dto = { ...platformDto, roleId: 'staff-role', mamcosId: undefined };
   const admin = () => coopAdmin([['users', 'CREATE'], ['farmers', 'VIEW']]);

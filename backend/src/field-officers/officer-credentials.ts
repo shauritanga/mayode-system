@@ -27,16 +27,19 @@ export interface WelcomeSmsInput {
   appUrl?: string;
   /** True when credentials are re-issued rather than a new account. */
   reissued?: boolean;
+  /** Which account the details are for; defaults to a Field Officer. */
+  account?: 'officer' | 'cooperative_admin';
 }
 
 /** The SMS an officer receives with their sign-in details (Swahili unless English is chosen). */
 export function welcomeSms(input: WelcomeSmsInput): string {
   const { firstName, phone, password, portalUrl, appUrl, reissued } = input;
+  const admin = input.account === 'cooperative_admin';
   if (input.language === 'en') {
     return [
       reissued
         ? `MAYODE: ${firstName}, your sign-in details were reset.`
-        : `Welcome to MAYODE, ${firstName}. Your Field Officer account is ready.`,
+        : `Welcome to MAYODE, ${firstName}. Your ${admin ? 'cooperative administrator' : 'Field Officer'} account is ready.`,
       `Dashboard login: ${phone} / ${password}`,
       portalUrl ? `Dashboard: ${portalUrl}` : '',
       `Mobile app: sign in with ${phone}; a code is sent by SMS.${appUrl ? ` Get the app: ${appUrl}` : ''}`,
@@ -48,7 +51,7 @@ export function welcomeSms(input: WelcomeSmsInput): string {
   return [
     reissued
       ? `MAYODE: ${firstName}, taarifa zako za kuingia zimebadilishwa.`
-      : `Karibu MAYODE, ${firstName}. Akaunti yako ya Afisa Ugani imeundwa.`,
+      : `Karibu MAYODE, ${firstName}. Akaunti yako ya ${admin ? 'msimamizi wa ushirika' : 'Afisa Ugani'} imeundwa.`,
     `Kuingia dashibodi: ${phone} / ${password}`,
     portalUrl ? `Dashibodi: ${portalUrl}` : '',
     `Programu ya simu: ingia kwa ${phone}; utatumiwa msimbo kwa SMS.${appUrl ? ` Pakua: ${appUrl}` : ''}`,

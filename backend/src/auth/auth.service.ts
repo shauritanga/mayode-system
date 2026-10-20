@@ -23,7 +23,8 @@ import {
 } from './dto/auth.dto';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UserRole, MamcosStaffRole } from '@prisma/client';
-import { normalizeMsisdn } from '../messaging/sms.service';
+import { normalizeMsisdn, SmsService } from '../messaging/sms.service';
+import { redactPassword, welcomeSms } from '../field-officers/officer-credentials';
 import { createRoleTemplates } from '../roles/role-templates';
 import {
   assertWithinCeiling,
@@ -44,6 +45,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly sms: SmsService,
   ) {}
 
   /**
@@ -516,7 +518,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, await bcrypt.genSalt(10));
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       let role = await tx.role.findFirst({ where: { name: COOPERATIVE_ADMIN_ROLE, mamcosId: mamcos.id } });
       if (!role) {
         role = await tx.role.create({
@@ -549,11 +551,27 @@ export class AuthService {
           roleId: role.id,
           mamcosId: mamcos.id,
           language: dto.language || 'sw',
+          mustChangePassword: true,
         },
-        select: { id: true, phone: true, email: true, firstName: true, lastName: true, role: true, roleId: true, mamcosId: true, createdAt: true },
+        select: { id: true, phone: true, email: true, firstName: true, lastName: true, role: true, roleId: true, mamcosId: true, createdAt: true, language: true },
       });
       return { ...user, roleName: role.name, mamcosName: mamcos.name };
     });
+
+    // Send the sign-in details; the log keeps the text without the password. If the SMS fails the
+    // administrator who created the account gets the temporary password back to pass on.
+    const text = welcomeSms({
+      firstName: dto.firstName,
+      phone,
+      password: dto.password,
+      language: created.language,
+      portalUrl: this.configService.get<string>('PORTAL_URL') || undefined,
+      appUrl: this.configService.get<string>('MOBILE_APP_URL') || undefined,
+      account: 'cooperative_admin',
+    });
+    const sent = await this.sms.sendTransactional(phone, text, 'staff_credentials', redactPassword(text, dto.password));
+    const { language: _language, ...user } = created;
+    return { ...user, credentialsSms: sent ? 'sent' : 'failed', ...(sent ? {} : { temporaryPassword: dto.password }) };
   }
 
   /**
