@@ -86,7 +86,6 @@ export const navGroups: NavGroup[] = [
     label: 'Harvest & Sales',
     items: [
       { href: '/dashboard/inventory', label: 'Harvest & Lots', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'inventory' },
-      { href: '/dashboard/collection-centres', label: 'Collection Centres', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'inventory' },
       { href: '/dashboard/warehouse', label: 'Warehouse counter', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'warehouse_desk', hidden: true },
       { href: '/dashboard/sale-orders', label: 'Cooperative sale orders', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'sale_orders', hidden: true },
       { href: '/dashboard/ops-orders', label: 'Orders & Sales', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'], anyResource: ['ops_orders', 'ops_review', 'ops_payments', 'ops_customers', 'sale_orders', 'sales'] },
@@ -101,13 +100,10 @@ export const navGroups: NavGroup[] = [
   {
     label: 'Money & Reports',
     items: [
-      { href: '/dashboard/finance', label: 'Finance and Accounting', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'finance' },
       { href: '/dashboard/credit', label: 'Credit & Loans', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'loans' },
-      { href: '/dashboard/weather', label: 'Weather', icon: CloudSunRainIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'weather' },
       { href: '/dashboard/reports', label: 'Reports', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'reports' },
       { href: '/dashboard/audit-log', label: 'Audit Log', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'audit_logs' },
       { href: '/dashboard/ai', label: 'AI Insights', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'ai_insights' },
-      { href: '/dashboard/alerts', label: 'Farm Alerts', icon: BellIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'farm_alerts' },
     ],
   },
   {
@@ -116,8 +112,6 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/users', label: 'User Accounts', icon: UserAdd01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'users' },
       { href: '/dashboard/roles', label: 'Roles & Permissions', icon: Shield01Icon, roles: ['SUPER_ADMIN'], resource: 'roles' },
       { href: '/dashboard/settings', label: 'Settings & Integrations', icon: Shield01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'settings' },
-      { href: '/dashboard/locations', label: 'Locations', icon: MapsSearchIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'locations' },
-      { href: '/dashboard/facilities', label: 'Facilities', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'facilities' },
       { href: '/dashboard/rewards', label: 'Rewards', icon: GiftIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'rewards' },
     ],
   },
@@ -184,7 +178,7 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/compliance', label: 'Compliance', icon: File01Icon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'], resource: 'reports' },
       { href: '/dashboard/reports', label: 'Reports', icon: ChartBarLineIcon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'], resource: 'reports' },
       { href: '/dashboard/audit-log', label: 'Audit Log', icon: File01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'audit_logs' },
-      { href: '/dashboard/premium-fund', label: 'Fairtrade Premium Fund', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'reports' },
+      { href: '/dashboard/premium-fund', label: 'Fairtrade Premium Fund', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'reports' },
       { href: '/dashboard/grantor', label: 'Grantor Impact', icon: ChartBarLineIcon, roles: ['AUDITOR', 'BUYER'], resource: 'reports' },
       { href: '/dashboard/ai', label: 'AI Insights', icon: ChartBarLineIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'], resource: 'ai_insights' },
       { href: '/dashboard/governance', label: 'Governance', icon: File01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'governance' },
