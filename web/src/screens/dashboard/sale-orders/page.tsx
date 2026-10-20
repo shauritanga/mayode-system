@@ -20,7 +20,8 @@ interface Warehouse extends Option { isActive: boolean; balance: { availableKg: 
 
 const EMPTY = { agreementId: '', buyerOrderId: '', buyerId: '', warehouseId: '', lotId: '', bags: '', bagSizeKg: '50', quantityKg: '', pricePerKg: '', packaging: '', needsTransport: false, notes: '' };
 
-export default function SaleOrdersPage() {
+/** Cooperative sale orders. `embedded` drops the page heading when shown as a tab of Orders & Sales. */
+export function SaleOrdersView({ embedded = false }: { embedded?: boolean }) {
   const user = useAuthStore((s) => s.user);
   const canCreate = hasPermission(user, 'sale_orders', 'CREATE');
   const [rows, setRows] = useState<Row[]>([]);
@@ -110,11 +111,13 @@ export default function SaleOrdersPage() {
 
   return (
     <div className="ua-page">
-      <div className="ua-head">
-        <div>
-          <h1 className="ua-title">Sale Orders</h1>
-          <p className="ua-sub">Reserve rice for a buyer, give them the reference, and follow it through the warehouse to delivery.</p>
-        </div>
+      <div className="ua-head" style={embedded ? { justifyContent: 'flex-end' } : undefined}>
+        {!embedded && (
+          <div>
+            <h1 className="ua-title">Sale Orders</h1>
+            <p className="ua-sub">Reserve rice for a buyer, give them the reference, and follow it through the warehouse to delivery.</p>
+          </div>
+        )}
         {canCreate && <button className="btn-primary" onClick={openCreate}>+ New sale order</button>}
       </div>
       <ErrorBanner message={error} onDismiss={() => setError('')} />
@@ -250,4 +253,8 @@ export default function SaleOrdersPage() {
       )}
     </div>
   );
+}
+
+export default function SaleOrdersPage() {
+  return <SaleOrdersView />;
 }

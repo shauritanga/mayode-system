@@ -60,7 +60,7 @@ export default function InsightsOverview() {
   ].filter(Boolean) as { text: string; href: string | null }[];
 
   return (
-    <section className="role-dashboard" aria-label="AI insights overview">
+    <section className="role-dashboard" style={{ margin: 0 }} aria-label="AI insights overview">
       <ErrorNote message={error} />
       <div className="role-grid">
         <MetricTile label="Farmers" value={num(kpis.farmers)} hint={`${num(kpis.farms)} farms`} />

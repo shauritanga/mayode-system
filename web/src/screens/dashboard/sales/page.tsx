@@ -16,7 +16,8 @@ const gateLabels: Record<string, string> = {
 const formatMissing = (missing: string[] = []) =>
   missing.map((key) => gateLabels[key] || key.replace(/_/g, ' ')).join(', ');
 
-export default function SalesPage() {
+/** Confirmed sales, buyer payments and farmer payouts. `embedded` drops the page heading when shown as a tab of Orders & Sales. */
+export function SalesView({ embedded = false }: { embedded?: boolean }) {
   const [sales, setSales] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [confirmation, setConfirmation] = useState<{ buyer: string; open: boolean } | null>(null);
@@ -78,18 +79,20 @@ export default function SalesPage() {
 
   return (
     <div className="page-shell">
-      <div className="page-heading">
-        <div>
-          <div className="page-kicker">Commercial</div>
-          <h1 className="page-title">Sales &amp; Payments</h1>
-          <p className="page-subtitle">
-            Confirmed sales: collect the buyer’s payment, then approve farmer payouts. Revenue is shared by intake weight.
-          </p>
+      {!embedded && (
+        <div className="page-heading">
+          <div>
+            <div className="page-kicker">Commercial</div>
+            <h1 className="page-title">Sales &amp; Payments</h1>
+            <p className="page-subtitle">
+              Confirmed sales: collect the buyer’s payment, then approve farmer payouts. Revenue is shared by intake weight.
+            </p>
+          </div>
+          <Link href="/dashboard/traceability" className="btn-secondary" style={{ textDecoration: 'none' }}>
+            Traceability
+          </Link>
         </div>
-        <Link href="/dashboard/traceability" className="btn-secondary" style={{ textDecoration: 'none' }}>
-          Traceability
-        </Link>
-      </div>
+      )}
       {error && <div className="alert-box alert-danger">{error}</div>}
       <div className="alert-box">
         Sales are created from <Link href="/dashboard/sale-orders" style={{ fontWeight: 600, textDecoration: 'underline' }}>Sale Orders</Link>: a salesperson reserves the stock,
@@ -271,4 +274,8 @@ export default function SalesPage() {
       )}
     </div>
   );
+}
+
+export default function SalesPage() {
+  return <SalesView />;
 }

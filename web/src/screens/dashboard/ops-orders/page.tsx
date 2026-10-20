@@ -9,9 +9,12 @@ import CustomerModal, { type Customer } from '@/components/ops/CustomerModal';
 import NewDocModal from '@/components/ops/NewDocModal';
 import OrderModal from '@/components/ops/OrderModal';
 import ReportsRunner from '@/components/ops/ReportsRunner';
+import { MetricTile } from '@/components/role-dashboards/DashboardPrimitives';
+import { SaleOrdersView } from '../sale-orders/page';
+import { SalesView } from '../sales/page';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type Tab = 'orders' | 'quotations' | 'customers' | 'invoices' | 'payments' | 'reports';
+type Tab = 'overview' | 'orders' | 'quotations' | 'customers' | 'invoices' | 'payments' | 'coop' | 'payouts' | 'reports';
 
 const STAGES = [
   ['', 'All stages'], ['PENDING_ACCOUNTS_REVIEW', 'Waiting for accounts'], ['RETURNED_TO_SALES', 'Returned to sales'], ['APPROVED_FOR_INVOICING', 'Ready to invoice'],
@@ -22,20 +25,24 @@ export default function OpsOrdersPage() {
   const user = useAuthStore((s) => s.user);
   const can = (r: string, a: 'VIEW' | 'CREATE' | 'EDIT' = 'VIEW') => hasPermission(user, r, a);
   const tabs = ([
-    ['orders', 'Orders', can('ops_orders') || can('ops_review')], ['quotations', 'Quotations', can('ops_orders')], ['customers', 'Customers', can('ops_customers') || can('ops_orders')],
-    ['invoices', 'Invoices', can('ops_review') || can('ops_payments')], ['payments', 'Payments', can('ops_payments')], ['reports', 'Reports', can('ops_reports')],
+    ['overview', 'Overview', can('ops_reports') || can('ops_review') || can('ops_payments')], ['orders', 'Orders', can('ops_orders') || can('ops_review')], ['quotations', 'Quotations', can('ops_orders')], ['customers', 'Customers', can('ops_customers') || can('ops_orders')],
+    ['invoices', 'Invoices', can('ops_review') || can('ops_payments')], ['payments', 'Payments', can('ops_payments')],
+    ['coop', 'Cooperative sale orders', can('sale_orders')], ['payouts', 'Sales & farmer payouts', can('sales')], ['reports', 'Reports', can('ops_reports')],
   ] as [Tab, string, boolean][]).filter((t) => t[2]).map(([id, label]) => ({ id, label }));
   const [tab, setTab] = useState<Tab>(tabs[0]?.id ?? 'orders');
 
   return (
     <div>
-      <PageHead kicker="Mayode Operations" title="Orders & Billing" subtitle="Quotations, orders, accounts review, invoices and verified payments, up to release for dispatch." />
+      <PageHead kicker="Mayode Operations" title="Orders & Sales" subtitle="Quotations, orders, invoices and payments, up to release for dispatch, plus the cooperative's own sale orders and farmer payouts." />
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
+      {tab === 'overview' && <Overview />}
       {tab === 'orders' && <Orders canCreate={can('ops_orders', 'CREATE')} />}
       {tab === 'quotations' && <Quotations canCreate={can('ops_orders', 'CREATE')} />}
       {tab === 'customers' && <Customers canCreate={can('ops_customers', 'CREATE') || can('ops_orders', 'CREATE')} />}
       {tab === 'invoices' && <Invoices />}
       {tab === 'payments' && <Payments />}
+      {tab === 'coop' && <SaleOrdersView embedded />}
+      {tab === 'payouts' && <SalesView embedded />}
       {tab === 'reports' && <ReportsRunner groups={['Commercial']} />}
       {!tabs.length && <ErrorNote message="Your role does not include orders or billing." />}
     </div>
@@ -167,5 +174,22 @@ function Payments() {
       )}
       {open && <OrderModal id={open} onClose={() => setOpen(null)} onChanged={reload} />}
     </>
+  );
+}
+
+function Overview() {
+  const { data: d, error, loading } = useLoad<any>(() => opsApi.commercialDashboard({}));
+  if (loading && !d) return <Loading />;
+  if (!d) return <ErrorNote message={error} />;
+  return (
+    <section className="role-dashboard" style={{ margin: 0 }} aria-label="Orders and sales overview">
+      <div className="role-grid">
+        <MetricTile label="Waiting for accounts" value={String(d.ordersAwaitingReview)} hint="Orders to review" tone={d.ordersAwaitingReview ? 'gold' : 'green'} />
+        <MetricTile label="Invoices issued" value={tzs(d.invoicesIssued.value)} hint={`${d.invoicesIssued.count} invoices`} tone="blue" />
+        <MetricTile label="Still owed" value={tzs(d.invoicesOutstanding.value)} hint={`${d.invoicesOutstanding.count} unpaid or part-paid`} tone="red" />
+        <MetricTile label="Payments confirmed" value={tzs(d.confirmedPayments.value)} hint={`${d.confirmedPayments.count} payments`} />
+        <MetricTile label="Paid, waiting at the warehouse" value={String(d.ordersAwaitingFulfilment)} hint="Ready to be loaded" tone="purple" />
+      </div>
+    </section>
   );
 }

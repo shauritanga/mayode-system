@@ -47,6 +47,10 @@ export interface NavItem {
    * controller). Undefined = reserved for built-in navigation.
    */
   resource?: string;
+  /** Show (and allow) the item when the role may view ANY of these resources. Used by pages that merge several areas into tabs. */
+  anyResource?: string[];
+  /** Kept so the route stays reachable and guarded, but not listed in the sidebar (its page is a tab of another item). */
+  hidden?: boolean;
   /**
    * Landing page built for one specific persona (see `roles`). Shown in the
    * sidebar only to accounts whose role is listed; Super Admin and generic
@@ -83,13 +87,13 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: '/dashboard/inventory', label: 'Harvest & Lots', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'inventory' },
       { href: '/dashboard/collection-centres', label: 'Collection Centres', icon: Building05Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'inventory' },
-      { href: '/dashboard/warehouse', label: 'Warehouse', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'warehouse_desk' },
-      { href: '/dashboard/sale-orders', label: 'Sale Orders', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'sale_orders' },
-      { href: '/dashboard/ops-orders', label: 'Orders & Billing', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'ops_orders' },
-      { href: '/dashboard/ops-warehouse', label: 'Warehouse & Processing', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'ops_receiving' },
+      { href: '/dashboard/warehouse', label: 'Warehouse counter', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'warehouse_desk', hidden: true },
+      { href: '/dashboard/sale-orders', label: 'Cooperative sale orders', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'sale_orders', hidden: true },
+      { href: '/dashboard/ops-orders', label: 'Orders & Sales', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'], anyResource: ['ops_orders', 'ops_review', 'ops_payments', 'ops_customers', 'sale_orders', 'sales'] },
+      { href: '/dashboard/ops-warehouse', label: 'Warehouse', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], anyResource: ['ops_receiving', 'ops_processing', 'ops_stock', 'ops_dispatch', 'ops_catalog', 'warehouse_desk'] },
       { href: '/dashboard/ops-farm', label: 'Mayode Farms', icon: Plant01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'ops_farm_tasks' },
       { href: '/dashboard/ops-field-work', label: 'My Field Work', icon: ClipboardIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'ops_field_work' },
-      { href: '/dashboard/sales', label: 'Sales & Payments', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'sales' },
+      { href: '/dashboard/sales', label: 'Sales & farmer payouts', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'sales', hidden: true },
       { href: '/dashboard/market', label: 'Market & Buyers', icon: Store01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'buyers' },
       { href: '/dashboard/marketplace', label: 'MLAX', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'marketplace' },
     ],
@@ -161,14 +165,14 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/finance', label: 'Finance and Accounting', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'finance' },
       { href: '/dashboard/credit', label: 'Credit & Loans', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'loans' },
       { href: '/dashboard/marketplace', label: 'M-LAX Marketplace', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], resource: 'marketplace' },
-      { href: '/dashboard/sale-orders', label: 'Sale Orders', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], resource: 'sale_orders' },
-      { href: '/dashboard/ops-orders', label: 'Orders & Billing', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], resource: 'ops_orders' },
-      { href: '/dashboard/ops-warehouse', label: 'Warehouse & Processing', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'ops_receiving' },
+      { href: '/dashboard/sale-orders', label: 'Cooperative sale orders', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], resource: 'sale_orders', hidden: true },
+      { href: '/dashboard/ops-orders', label: 'Orders & Sales', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], anyResource: ['ops_orders', 'ops_review', 'ops_payments', 'ops_customers', 'sale_orders', 'sales'] },
+      { href: '/dashboard/ops-warehouse', label: 'Warehouse', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], anyResource: ['ops_receiving', 'ops_processing', 'ops_stock', 'ops_dispatch', 'ops_catalog', 'warehouse_desk'] },
       { href: '/dashboard/ops-farm', label: 'Mayode Farms', icon: Plant01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'ops_farm_tasks' },
       { href: '/dashboard/ops-field-work', label: 'My Field Work', icon: ClipboardIcon, roles: ['MAMCOS_SECRETARY'], resource: 'ops_field_work' },
-      { href: '/dashboard/warehouse', label: 'Warehouse', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'warehouse_desk' },
+      { href: '/dashboard/warehouse', label: 'Warehouse counter', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'warehouse_desk', hidden: true },
       { href: '/dashboard/market', label: 'Market & Buyers', icon: Store01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'buyers' },
-      { href: '/dashboard/sales', label: 'Sales & Payments', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'sales' },
+      { href: '/dashboard/sales', label: 'Sales & farmer payouts', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'sales', hidden: true },
       { href: '/dashboard/insurance', label: 'Insurance', icon: Shield01Icon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'], resource: 'insurance' },
     ],
   },
@@ -254,13 +258,14 @@ function itemAllowed(item: NavItem, subject: AccessSubject | null | undefined): 
   if (item.href === '/dashboard/roles' && APP_MODE === 'admin') return false;
   if (item.href === '/dashboard') return true;
   if (item.href === '/dashboard/field-officer') return subject.role === 'FIELD_OFFICER';
+  if (item.anyResource) return item.anyResource.some((r) => hasPermission(subject, r, 'VIEW'));
   return !!item.resource && hasPermission(subject, item.resource, 'VIEW');
 }
 
 export function getVisibleGroups(subject: AccessSubject | null | undefined): NavGroup[] {
   const seen = new Set<string>();
   return navGroups.map((group) => ({ ...group, items: group.items.filter((item) => {
-    if (seen.has(item.href) || !itemAllowed(item, subject)) return false;
+    if (item.hidden || seen.has(item.href) || !itemAllowed(item, subject)) return false;
     if (item.persona && !(subject?.role && item.roles.includes(subject.role))) return false;
     if (APP_MODE !== 'farmers' && item.roles.length === 1 && item.roles[0] === 'FARMER') return false;
     seen.add(item.href);

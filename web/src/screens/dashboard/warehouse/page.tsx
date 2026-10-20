@@ -28,7 +28,8 @@ type Dialog =
 
 const kg = (n: number) => `${n.toLocaleString()} kg`;
 
-export default function WarehousePage() {
+/** The warehouse counter and warehouse list. `embedded` drops the page heading when shown as a tab of the Warehouse page. */
+export function WarehouseView({ embedded = false }: { embedded?: boolean }) {
   const user = useAuthStore((s) => s.user);
   const can = (r: string, a: string) => hasPermission(user, r, a);
   const canDesk = can('warehouse_desk', 'VIEW');
@@ -62,11 +63,13 @@ export default function WarehousePage() {
 
   return (
     <div className="ua-page">
-      <div className="ua-head">
-        <div>
-          <h1 className="ua-title">Warehouse</h1>
-          <p className="ua-sub">Receive harvest, check buyers&rsquo; references, load trucks and keep stock accurate. Deliveries are recorded and batched into lots on <Link href="/dashboard/inventory">Harvest &amp; Lots</Link>.</p>
-        </div>
+      <div className="ua-head" style={embedded ? { justifyContent: 'flex-end' } : undefined}>
+        {!embedded && (
+          <div>
+            <h1 className="ua-title">Warehouse</h1>
+            <p className="ua-sub">Receive harvest, check buyers&rsquo; references, load trucks and keep stock accurate. Deliveries are recorded and batched into lots on <Link href="/dashboard/inventory">Harvest &amp; Lots</Link>.</p>
+          </div>
+        )}
         {can('warehouses', 'CREATE') && <button className="btn-primary" onClick={() => setDialog({ kind: 'new' })}>+ New warehouse</button>}
       </div>
       <ErrorBanner message={error} onDismiss={() => setError('')} />
@@ -282,4 +285,8 @@ function Keepers({ warehouse, onClose, onDone }: { warehouse: Warehouse; onClose
       </div>
     </Modal>
   );
+}
+
+export default function WarehousePage() {
+  return <WarehouseView />;
 }
