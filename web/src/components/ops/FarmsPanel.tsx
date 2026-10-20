@@ -28,7 +28,10 @@ export default function FarmsPanel({ canCreate, canEdit }: { canCreate: boolean;
         <Tabs tabs={[{ id: 'list', label: 'List' }, { id: 'map', label: 'Map' }]} value={view} onChange={setView} />
       </Toolbar>
       <ErrorNote message={error} />
-      {view === 'map' && data && (
+      {view === 'map' && data && data.length === 0 && (
+        <div className="table-panel"><div style={{ padding: 36, textAlign: 'center', color: 'var(--neutral-500)', fontSize: 14 }}>No Mayode farms yet. Choose “New Mayode farm” to add one and mark it on the map.</div></div>
+      )}
+      {view === 'map' && data && data.length > 0 && (
         <>
           <Isolated><FarmsMap
             ownFarms
