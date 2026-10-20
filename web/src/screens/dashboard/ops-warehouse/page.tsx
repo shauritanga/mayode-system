@@ -12,7 +12,6 @@ import DispatchPanel from '@/components/ops/DispatchPanel';
 import TracePanel from '@/components/ops/TracePanel';
 import ProductsPanel from '@/components/ops/ProductsPanel';
 import ReportsRunner from '@/components/ops/ReportsRunner';
-import InstallRoles from '@/components/ops/InstallRoles';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Tab = 'overview' | 'receiving' | 'stock' | 'processing' | 'dispatch' | 'trace' | 'products' | 'reports';
@@ -28,7 +27,6 @@ export default function OpsWarehousePage() {
   return (
     <div>
       <PageHead kicker="Mayode Operations" title="Warehouse & Processing" subtitle="Paddy received, milled and packed, stock by batch, and goods released to customers." />
-      {can('roles', 'CREATE') && <InstallRoles />}
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
       {tab === 'overview' && <Overview />}
       {tab === 'receiving' && <ReceivingPanel canCreate={can('ops_receiving', 'CREATE')} canConfirm={can('ops_receiving', 'EDIT')} canCancel={can('ops_receiving', 'DELETE')} />}

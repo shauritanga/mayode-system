@@ -609,7 +609,6 @@ export const opsApi = {
   farmDashboard: (params?: object) => api.get('/ops/reports/dashboard/farm', { params }),
   runReport: (key: string, params?: object) => api.get(`/ops/reports/run/${key}`, { params }),
   downloadReport: (key: string, params?: object) => api.get(`/ops/reports/run/${key}`, { params, responseType: 'blob' }),
-  installRoles: () => api.post('/ops/setup/roles'),
 };
 export const marketApi = {
   overview: (params?: object) => api.get('/market/overview', { params }),
