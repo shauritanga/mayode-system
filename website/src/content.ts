@@ -80,8 +80,7 @@ export const services = [
     n: '06',
     title: 'Carbon Credit Development and MRV Systems',
     text: 'We are pursuing agricultural carbon credit project development through climate-smart rice farming, agricultural data management, and measurement, reporting, and verification (MRV) systems. Our objective is to support credible environmental projects through appropriate methodologies, reliable data, and applicable validation and verification requirements.',
-    images: ['carbon-soil'],
-    photo: 'aerial-fields',
+    images: ['carbon-mrv-art'],
   },
 ] as { n: string; title: string; text: string; images: string[]; photo?: string }[];
 

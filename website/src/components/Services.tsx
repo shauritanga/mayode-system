@@ -1,6 +1,12 @@
 import Image from 'next/image';
 import { services } from '@/content';
 
+/** Illustrations that keep their own proportions instead of the standard 16:9 crop. */
+const ARTWORK: Record<string, { w: number; h: number; cls: string }> = {
+  'dashboard-laptop': { w: 1600, h: 1000, cls: 'card__photo--shot' },
+  'carbon-mrv-art': { w: 1600, h: 747, cls: 'card__photo--wide' },
+};
+
 export default function Services() {
   return (
     <section className="sec sec--grid" id="services">
@@ -18,11 +24,12 @@ export default function Services() {
         <div className="cards">
           {services.map((s) => {
             const pic = s.photo ? `/images/photos/${s.photo}.jpg` : s.images[0] ? `/images/services/${s.images[0]}.jpg` : null;
+            const art = ARTWORK[s.images[0]];
             return (
               <article className="card" key={s.n} data-reveal>
                 {pic && (
-                  <div className={`card__photo${s.images[0] === 'dashboard-laptop' ? ' card__photo--shot' : ''}`}>
-                    <Image src={pic} alt={s.images[0] === 'dashboard-laptop' ? 'The MAYODE dashboard on a laptop, showing farmers, production, yield, tasks and harvest summary' : ''} width={s.images[0] === 'dashboard-laptop' ? 1600 : 560} height={s.images[0] === 'dashboard-laptop' ? 1000 : 315} sizes="(max-width: 640px) 100vw, 40vw" />
+                  <div className={`card__photo${art ? ` ${art.cls}` : ''}`}>
+                    <Image src={pic} alt={s.images[0] === 'dashboard-laptop' ? 'The MAYODE dashboard on a laptop, showing farmers, production, yield, tasks and harvest summary' : s.images[0] === 'carbon-mrv-art' ? 'Drone, soil sensor and satellite measuring forest carbon, with a verified credit and carbon stock chart' : ''} width={art ? art.w : 560} height={art ? art.h : 315} sizes="(max-width: 640px) 100vw, 40vw" />
                   </div>
                 )}
                 <div className="card__head">
