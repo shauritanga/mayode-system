@@ -165,7 +165,7 @@ export default function FieldOfficersPage() {
         ) : error ? (
           <div style={{ padding: 48, textAlign: 'center', color: 'var(--red-400)', fontSize: 14 }}>{error}</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)', fontSize: 14 }}>{hasFilters ? 'No officers match these filters.' : 'No field officers yet. Create them from User Accounts.'}</div>
+          <div style={{ padding: 48, textAlign: 'center', color: 'var(--neutral-500)', fontSize: 14 }}>{hasFilters ? 'No officers match these filters.' : (canAdd ? 'No field officers yet. Choose “+ Add field officer” to create one.' : 'No field officers yet. Their cooperative’s administrator creates them.')}</div>
         ) : (
           <div className="farmers-table-wrap">
             <table className="data-table farmers-table">
