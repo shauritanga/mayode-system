@@ -77,6 +77,7 @@ describe('FieldOfficersService credentials', () => {
   function build(opts: { tenant?: string | null; smsOk?: boolean } = {}) {
     const prisma: any = {
       role: { findFirst: jest.fn().mockResolvedValue({ id: 'role1' }) },
+      mamcos: { findUnique: jest.fn().mockResolvedValue({ id: 'm9' }) },
       mamcosStaff: {
         update: jest.fn().mockResolvedValue({ id: 'off1', employeeCode: 'FO-0009' }),
         findFirst: jest.fn().mockResolvedValue({ id: 'off1', userId: 'usr1', firstName: 'Asha' }),
@@ -117,6 +118,21 @@ describe('FieldOfficersService credentials', () => {
     const res: any = await service.create(dto as any, actor);
     expect(res.credentialsSms).toBe('failed');
     expect(res.temporaryPassword).toBe(auth.createStaffAccount.mock.calls[0][0].password);
+  });
+
+  it('lets Super Admin create an officer inside a chosen cooperative', async () => {
+    const { service, auth, prisma } = build({ tenant: null });
+    await service.create({ ...dto, mamcosId: 'm9' } as any, { id: 'su', role: 'SUPER_ADMIN' } as any);
+    const [created, , options] = auth.createStaffAccount.mock.calls[0];
+    expect(created.staffType).toBe('FIELD_OFFICER');
+    expect(options).toEqual({ mustChangePassword: true, onBehalfOfMamcosId: 'm9' });
+    expect(prisma.role.findFirst.mock.calls[0][0].where.mamcosId).toBe('m9');
+  });
+
+  it('refuses a cooperative administrator who names another cooperative', async () => {
+    const { service, auth } = build();
+    await expect(service.create({ ...dto, mamcosId: 'm9' } as any, actor)).rejects.toThrow('your own cooperative');
+    expect(auth.createStaffAccount).not.toHaveBeenCalled();
   });
 
   it('refuses accounts with no cooperative (Super Admin)', async () => {

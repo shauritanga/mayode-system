@@ -25,7 +25,8 @@ export default function FieldOfficersPage() {
   const [page, setPage] = useState(1);
   const [adding, setAdding] = useState(false);
   const account = useAuthStore((st) => st.user);
-  const canAdd = !!account?.mamcosId && hasPermission(account, 'users', 'CREATE');
+  // A cooperative administrator adds officers to their own cooperative; Super Admin (Mayode corporate) chooses the cooperative in the form.
+  const canAdd = (!!account?.mamcosId || account?.role === 'SUPER_ADMIN') && hasPermission(account, 'users', 'CREATE');
 
   const load = () =>
     fieldOfficersApi.list()

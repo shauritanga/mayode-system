@@ -63,7 +63,8 @@ export function WarehouseView({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <div className="ua-page">
-      <div className="ua-head" style={embedded ? { justifyContent: 'flex-end' } : undefined}>
+      <div className="ua-head" style={embedded ? { alignItems: 'center' } : undefined}>
+        {embedded && <p className="ua-sub" style={{ margin: 0 }}>Create each warehouse, then use <strong>Keepers</strong> on it to choose who receives, confirms and releases stock there.</p>}
         {!embedded && (
           <div>
             <h1 className="ua-title">Warehouse</h1>

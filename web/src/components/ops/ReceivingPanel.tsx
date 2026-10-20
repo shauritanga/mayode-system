@@ -119,7 +119,7 @@ function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean
       <ErrorNote message={error} />
       <FormGrid>
         <Field label="Where did it come from?"><select className="input-field" value={source} onChange={(e) => setSource(e.target.value as typeof source)}><option value="EXTERNAL_FARMER">A farmer</option><option value="MAYODE_FARM">A Mayode farm</option></select></Field>
-        <Field label="Warehouse"><select className="input-field" value={f.warehouseId} onChange={(e) => set('warehouseId', e.target.value)}><option value="">Choose…</option>{lookups?.warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
+        <Field label="Warehouse" hint={lookups && lookups.warehouses.length === 0 ? 'No warehouse exists yet. Create one on the Warehouses tab first.' : undefined}><select className="input-field" value={f.warehouseId} onChange={(e) => set('warehouseId', e.target.value)}><option value="">Choose…</option>{lookups?.warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
         <Field label="Paddy product"><select className="input-field" value={f.productId} onChange={(e) => set('productId', e.target.value)}><option value="">Choose…</option>{products?.filter((p) => p.isActive).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
         <Field label="Date received"><input className="input-field" type="date" value={f.receivedAt} onChange={(e) => set('receivedAt', e.target.value)} /></Field>
       </FormGrid>

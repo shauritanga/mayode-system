@@ -115,6 +115,34 @@ describe('Account creation uses roles selected by Super Admin', () => {
   });
 });
 
+describe('Super Admin creating staff inside a chosen cooperative', () => {
+  function setup(customRole: any) {
+    const user = { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockImplementation(async ({ data }) => ({ id: 'created-user', ...data })) };
+    const mamcosStaff = { create: jest.fn().mockResolvedValue({}), findFirst: jest.fn().mockResolvedValue(null), count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) };
+    const prisma = { role: { findUnique: jest.fn().mockResolvedValue(customRole) }, mamcos: { findUnique: jest.fn().mockResolvedValue({ id: 'mamcos-1' }) }, user, mamcosStaff, $transaction: jest.fn(async (fn) => fn({ user, mamcosStaff })) };
+    const service = new AuthService(prisma as any, {} as any, {} as any, {} as any);
+    jest.spyOn(service as any, 'generateEmployeeCode').mockResolvedValue('FO-0001');
+    return { service, user };
+  }
+  const coopRole = { id: 'fo-role', isActive: true, isSystem: false, systemRole: 'CUSTOM', mamcosId: 'mamcos-1', permissions: [] };
+
+  it('puts the account in that cooperative, using that cooperative\'s role', async () => {
+    const { service, user } = setup(coopRole);
+    await service.createStaffAccount({ ...platformDto, roleId: 'fo-role', staffType: 'FIELD_OFFICER' as any }, actor(UserRole.SUPER_ADMIN), { onBehalfOfMamcosId: 'mamcos-1' });
+    expect(user.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ role: 'FIELD_OFFICER', mamcosId: 'mamcos-1', roleId: 'fo-role' }) }));
+  });
+  it('still refuses a role from a different cooperative', async () => {
+    const { service, user } = setup({ ...coopRole, mamcosId: 'mamcos-2' });
+    await expect(service.createStaffAccount({ ...platformDto, roleId: 'fo-role', staffType: 'FIELD_OFFICER' as any }, actor(UserRole.SUPER_ADMIN), { onBehalfOfMamcosId: 'mamcos-1' })).rejects.toThrow('role from your cooperative');
+    expect(user.create).not.toHaveBeenCalled();
+  });
+  it('is ignored for anyone who is not Super Admin', async () => {
+    const { service, user } = setup(coopRole);
+    await expect(service.createStaffAccount({ ...platformDto, roleId: 'fo-role' }, coopAdmin([['users', 'CREATE']]), { onBehalfOfMamcosId: 'mamcos-9' })).resolves.toBeDefined();
+    expect(user.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ mamcosId: 'mamcos-1' }) }));
+  });
+});
+
 describe('Cooperative-admin delegation', () => {
   const role = (over: Record<string, unknown> = {}) => ({
     id: 'staff-role', isActive: true, isSystem: false, systemRole: 'CUSTOM', mamcosId: 'mamcos-1',

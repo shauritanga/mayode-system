@@ -31,10 +31,10 @@ const num = (n?: number | null) => (n || 0).toLocaleString();
 export default function OpsWarehousePage() {
   const user = useAuthStore((s) => s.user);
   const can = (r: string, a: 'VIEW' | 'CREATE' | 'EDIT' | 'DELETE' = 'VIEW') => hasPermission(user, r, a);
-  // The order follows the rice: in, milled, kept, out. The counter and Products are set-up and everyday extras.
+  // Warehouses come first because nothing can be received until one exists; then the order follows the rice: in, milled, kept, out.
   const tabs = ([
-    ['overview', 'Overview', can('ops_reports') || can('ops_stock')], ['receiving', 'Receiving', can('ops_receiving')], ['processing', 'Milling', can('ops_processing')], ['stock', 'Stock', can('ops_stock')],
-    ['dispatch', 'Dispatch', can('ops_dispatch')], ['trace', 'Traceability', can('ops_stock')], ['counter', 'Counter & warehouses', can('warehouse_desk')], ['products', 'Products', can('ops_catalog')], ['reports', 'Reports', can('ops_reports')],
+    ['overview', 'Overview', can('ops_reports') || can('ops_stock')], ['counter', 'Warehouses', can('warehouse_desk')], ['receiving', 'Receiving', can('ops_receiving')], ['processing', 'Milling', can('ops_processing')],
+    ['stock', 'Stock', can('ops_stock')], ['dispatch', 'Dispatch', can('ops_dispatch')], ['trace', 'Traceability', can('ops_stock')], ['products', 'Products', can('ops_catalog')], ['reports', 'Reports', can('ops_reports')],
   ] as [Tab, string, boolean][]).filter((t) => t[2]).map(([id, label]) => ({ id, label }));
   const [tab, setTab] = useState<Tab>(tabs[0]?.id ?? 'overview');
   const goto = (t: Tab) => { if (tabs.some((x) => x.id === t)) setTab(t); };
@@ -87,6 +87,7 @@ function Overview({ goto }: { goto: (t: Tab) => void }) {
       {empty && (
         <ChartCard title="Start here" subtitle="Nothing has been received yet. Work through these in order." action={<button type="button" className="btn-secondary" onClick={dismiss} aria-label="Dismiss the start-here guide">Dismiss</button>}>
           <ol style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 8, fontSize: 14 }}>
+            <li><LinkBtn onClick={() => goto('counter')}>Warehouses</LinkBtn> — create each warehouse and choose who keeps it.</li>
             <li><LinkBtn onClick={() => goto('products')}>Products</LinkBtn> — add paddy, the rice you sell and the by-products (set this up once).</li>
             <li><LinkBtn onClick={() => goto('receiving')}>Receiving</LinkBtn> — weigh paddy in from a farmer or a Mayode farm and confirm it.</li>
             <li><LinkBtn onClick={() => goto('processing')}>Milling</LinkBtn> — record what the mill produced from the paddy.</li>

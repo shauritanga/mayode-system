@@ -356,10 +356,14 @@ export class AuthService {
   async createStaffAccount(
     dto: CreateStaffUserDto,
     actor: DelegatingActor,
-    options: { mustChangePassword?: boolean } = {},
+    options: { mustChangePassword?: boolean; onBehalfOfMamcosId?: string } = {},
   ) {
     const superActor = isSuperAdmin(actor);
     const tenantId = superActor ? null : requireTenant(actor);
+    // Super Admin (Mayode corporate) may create staff inside a chosen cooperative; the account then belongs to
+    // that cooperative exactly as if its own administrator had created it.
+    const onBehalf = superActor ? options.onBehalfOfMamcosId ?? null : null;
+    const scopeId = tenantId ?? onBehalf;
 
     if (dto.role && dto.role !== UserRole.SUPER_ADMIN) {
       throw new BadRequestException('Select a custom role using roleId');
@@ -373,7 +377,7 @@ export class AuthService {
 
     // Super Admin manages the platform team. Cooperative staff belong to the cooperative admin;
     // the only cooperative account Super Admin creates is the admin itself (createCooperativeAdmin).
-    if (superActor && (dto.staffType || dto.mamcosId)) {
+    if (superActor && !onBehalf && (dto.staffType || dto.mamcosId)) {
       throw new BadRequestException(
         'Super Admin creates platform accounts only. A cooperative’s staff are created by its cooperative administrator.',
       );
@@ -390,14 +394,14 @@ export class AuthService {
       if (!customRole || isLegacyFarmerRole(customRole) || !customRole.isActive || customRole.isSystem || customRole.systemRole === UserRole.SUPER_ADMIN) {
         throw new BadRequestException('Select an active, non-system role');
       }
-      if (superActor) {
+      if (superActor && !onBehalf) {
         if (customRole.mamcosId) {
           throw new BadRequestException('Select a platform role. A cooperative’s roles are for its own administrator to assign.');
         }
       } else {
         // Roles of other cooperatives (or platform roles) don't exist as far as a cooperative admin is concerned.
-        if (customRole.mamcosId !== tenantId) throw new BadRequestException('Select a role from your cooperative');
-        assertWithinCeiling(actor, grantsOfRole(customRole));
+        if (customRole.mamcosId !== scopeId) throw new BadRequestException('Select a role from your cooperative');
+        if (!superActor) assertWithinCeiling(actor, grantsOfRole(customRole));
       }
       roleMamcosId = customRole.mamcosId;
       // The role only carries permissions. Field staff are marked on the account itself.
@@ -405,13 +409,13 @@ export class AuthService {
     }
 
     // The account's cooperative: the creator's own AMCOS, else the role's AMCOS, else an explicit one.
-    if (tenantId && dto.mamcosId && dto.mamcosId !== tenantId) {
+    if (scopeId && dto.mamcosId && dto.mamcosId !== scopeId) {
       throw new ForbiddenException('You can only create accounts inside your own cooperative');
     }
     if (roleMamcosId && dto.mamcosId && dto.mamcosId !== roleMamcosId) {
       throw new BadRequestException('This role belongs to a different cooperative');
     }
-    const mamcosId = tenantId ?? roleMamcosId ?? dto.mamcosId ?? null;
+    const mamcosId = scopeId ?? roleMamcosId ?? dto.mamcosId ?? null;
     if (mamcosId) {
       const mamcos = await this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { id: true } });
       if (!mamcos) throw new NotFoundException('AMCOS not found');

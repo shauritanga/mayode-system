@@ -81,11 +81,16 @@ export class FieldOfficersService {
    * details. If the SMS fails the password is returned once so the admin can pass it on.
    */
   async create(dto: CreateFieldOfficerDto, actor: RequestUser) {
-    const mamcosId = this.tenant(actor);
-    if (!mamcosId) {
-      throw new ForbiddenException(
-        'Field officers are created by their cooperative’s administrator, not by Super Admin',
-      );
+    const tenantId = this.tenant(actor);
+    if (tenantId && dto.mamcosId && dto.mamcosId !== tenantId) {
+      throw new ForbiddenException('You can only create field officers inside your own cooperative');
+    }
+    // A cooperative administrator creates officers for their own cooperative; Super Admin (Mayode corporate) picks one.
+    const mamcosId = tenantId ?? dto.mamcosId;
+    if (!mamcosId) throw new BadRequestException('Choose the cooperative the officer belongs to');
+    if (!tenantId) {
+      const exists = await this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { id: true } });
+      if (!exists) throw new NotFoundException('Cooperative not found');
     }
     const roleId = dto.roleId ?? (await this.fieldOfficerRoleId(mamcosId));
     const password = generateTemporaryPassword();
@@ -103,7 +108,7 @@ export class FieldOfficersService {
         language,
       },
       actor as unknown as DelegatingActor,
-      { mustChangePassword: true },
+      { mustChangePassword: true, ...(tenantId ? {} : { onBehalfOfMamcosId: mamcosId }) },
     );
     const officer = await this.prisma.mamcosStaff.update({
       where: { userId: user.id },

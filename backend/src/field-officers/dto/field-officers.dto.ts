@@ -45,6 +45,11 @@ export class CreateFieldOfficerDto {
   @ApiPropertyOptional({ example: 'Mbarali' }) @IsString() @IsOptional() district?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() assignedArea?: string;
 
+  @ApiPropertyOptional({ description: 'The cooperative the officer belongs to. Required when Super Admin creates the officer; a cooperative administrator’s own cooperative is used otherwise.' })
+  @IsUUID()
+  @IsOptional()
+  mamcosId?: string;
+
   @ApiPropertyOptional({ description: 'Role giving the officer’s dashboard permissions. Defaults to the cooperative’s “Field Officer” role.' })
   @IsUUID()
   @IsOptional()
