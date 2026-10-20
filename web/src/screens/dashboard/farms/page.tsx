@@ -6,6 +6,9 @@ import { motion, useReducedMotion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Search01Icon, Cancel01Icon, MapsIcon, ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import { farmsApi } from '@/lib/api';
+import { hasPermission } from '@/lib/nav';
+import { Tabs } from '@/components/ops/ui';
+import FarmRegistryPage from '../farm-registry/page';
 import { useAuthStore } from '@/store/auth.store';
 import FarmEditorModal from '@/components/FarmEditorModal';
 import { OWNERSHIP_LABELS, fmtHa, locationLabel, productionLabel, riceVarieties, tenureLabel, toCsv, totalPlotHectares } from '@/lib/farm-format';
@@ -79,7 +82,7 @@ const NO_ATTR_FILTERS: AttrFilters = { region: '', district: '', ward: '', villa
 
 const distinct = (values: (string | null | undefined)[]) => [...new Set(values.filter((v): v is string => !!v))].sort((a, b) => a.localeCompare(b));
 
-export default function FarmsPage() {
+function FarmsList() {
   const reduce = useReducedMotion();
   const role = useAuthStore((state) => state.user?.role);
   const canRegister = role === 'SUPER_ADMIN' || role === 'FIELD_OFFICER';
@@ -461,6 +464,20 @@ export default function FarmsPage() {
           onSaved={() => { setRegistering(false); setLoading(true); load(); }}
         />
       )}
+    </div>
+  );
+}
+
+/** Farms, with the pre-registration and spreadsheet import (the farm registry) as a second tab. */
+export default function FarmsPage() {
+  const user = useAuthStore((state) => state.user);
+  const canRegistry = hasPermission(user, 'farm_registry', 'VIEW');
+  const [tab, setTab] = useState<'farms' | 'registry'>('farms');
+  const tabs = [{ id: 'farms' as const, label: 'Farms' }, ...(canRegistry ? [{ id: 'registry' as const, label: 'Farm registry' }] : [])];
+  return (
+    <div>
+      {tabs.length > 1 && <Tabs tabs={tabs} value={tab} onChange={setTab} />}
+      {tab === 'registry' && canRegistry ? <FarmRegistryPage /> : <FarmsList />}
     </div>
   );
 }
