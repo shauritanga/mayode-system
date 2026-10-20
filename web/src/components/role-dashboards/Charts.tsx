@@ -156,6 +156,34 @@ export function DonutBreakdown({
   );
 }
 
+export function GroupedBarChart({
+  data,
+  xKey,
+  series,
+  height = 260,
+}: {
+  data: Record<string, any>[];
+  xKey: string;
+  series: { key: string; name: string; color: string }[];
+  height?: number;
+}) {
+  if (!data.length) return <ChartEmptyState>No data yet.</ChartEmptyState>;
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={data} margin={{ top: 6, right: 8, left: -12, bottom: 0 }}>
+        <CartesianGrid stroke="var(--border)" strokeDasharray="3 5" vertical={false} />
+        <XAxis dataKey={xKey} tick={axisTick} axisLine={{ stroke: 'var(--border)' }} tickLine={false} />
+        <YAxis tick={axisTick} axisLine={false} tickLine={false} width={54} />
+        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--hover-tint-2)' }} />
+        {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
+        {series.map((s) => (
+          <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[6, 6, 0, 0]} maxBarSize={36} />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
 export function HorizontalBarChart({
   data,
   height = 240,
