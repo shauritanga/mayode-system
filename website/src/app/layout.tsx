@@ -1,49 +1,48 @@
-import type { Metadata } from 'next';
-import { Outfit } from 'next/font/google';
+import type { Metadata, Viewport } from 'next';
+import { Fraunces, Hanken_Grotesk } from 'next/font/google';
 import './globals.css';
-import './apple-overrides.css';
 
-const outfit = Outfit({
+const display = Fraunces({
   subsets: ['latin'],
-  variable: '--font-outfit',
+  variable: '--font-display',
+  axes: ['opsz'],
+  style: ['normal', 'italic'],
   display: 'swap',
 });
 
-const TAGLINE = 'The integrated platform for AMCOS and Cooperatives in Tanzania.';
-const DESCRIPTION = `${TAGLINE} Traceability, Farmer records, crop cycles, Insurance, Credit and the M-LAX Marketplace all in one place.`;
+const body = Hanken_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-body',
+  display: 'swap',
+});
+
+const TITLE = 'MAYODE GROUP LIMITED | Commercial rice, Digital Kilimo and climate-smart farming';
+const DESCRIPTION =
+  'MAYODE GROUP LIMITED is an agriculture and technology-driven company in Madibira, Mbarali, Mbeya, specializing in commercial rice farming, rice processing, digital agriculture and sustainable agricultural solutions across Tanzania and East Africa.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3005'),
-  title: 'MAYODE GROUP — Integrated Management Platform',
+  title: TITLE,
   description: DESCRIPTION,
-  keywords: 'MAYODE GROUP, MAYOData, M-LAX Marketplace, Tanzania rice farming, Mbarali, cooperative management, Fairtrade',
-  openGraph: {
-    title: 'MAYODE GROUP — Integrated Management Platform',
-    description: DESCRIPTION,
-    siteName: 'MAYODE GROUP',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'MAYODE GROUP — Integrated Management Platform',
-    description: DESCRIPTION,
-  },
+  keywords:
+    'MAYODE GROUP, commercial rice farming, Tanzania rice, Mbarali, Madibira, Digital Kilimo, MAYOData, MAYODE App, Agribongo, climate-smart agriculture, carbon credits, rice processing',
+  openGraph: { title: TITLE, description: DESCRIPTION, siteName: 'MAYODE GROUP LIMITED', type: 'website' },
+  twitter: { card: 'summary_large_image', title: TITLE, description: DESCRIPTION },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export const viewport: Viewport = { themeColor: '#0e2a1a' };
+
+/**
+ * Content is visible without script. Before first paint, when motion is allowed, entrance states are armed (`has-motion`);
+ * if the animation script never starts, they are lifted again after a few seconds so nothing stays hidden.
+ */
+const ARM_MOTION = `(function(){try{var d=document.documentElement;if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){d.classList.add('has-motion');setTimeout(function(){if(!d.classList.contains('motion-live'))d.classList.remove('has-motion')},4000)}}catch(e){}})();`;
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className={outfit.variable}>
+    <html lang="en" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>
       <head>
-        {/* Set the theme before first paint to avoid a dark→light flash for light-theme users. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem('mayode-theme');if(s){var t=JSON.parse(s).state.theme;if(t==='light')document.documentElement.setAttribute('data-theme','light');}}catch(e){}})();`,
-          }}
-        />
+        <script dangerouslySetInnerHTML={{ __html: ARM_MOTION }} />
       </head>
       <body>{children}</body>
     </html>

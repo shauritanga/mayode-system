@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 
 export const runtime = 'edge';
-export const alt = 'MAYODE GROUP — Integrated Management Platform';
+export const alt = 'MAYODE GROUP LIMITED — Growing Innovation, Sustaining Tomorrow.';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -30,15 +30,15 @@ export default function OpengraphImage() {
               MAYODE GROUP
             </div>
             <div style={{ fontSize: 22, fontWeight: 600, color: '#059669', marginTop: 2 }}>
-              Integrated Management Platform
+              Madibira, Mbarali · Mbeya · Tanzania
             </div>
           </div>
         </div>
         <div style={{ fontSize: 34, fontWeight: 700, color: '#131815', lineHeight: 1.3, maxWidth: 980 }}>
-          The integrated platform for AMCOS and Cooperatives in Tanzania.
+          Growing Innovation, Sustaining Tomorrow.
         </div>
         <div style={{ fontSize: 26, color: '#4E5A53', marginTop: 22, lineHeight: 1.5, maxWidth: 1000 }}>
-          Traceability, Farmer records, crop cycles, Insurance, Credit and the M-LAX Marketplace — all in one place.
+          Commercial rice farming, rice processing, digital agriculture and climate-smart solutions.
         </div>
       </div>
     ),
