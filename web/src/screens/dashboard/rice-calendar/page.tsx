@@ -10,7 +10,7 @@ import { useAuthStore } from '@/store/auth.store';
 import ErrorBanner from '@/components/ErrorBanner';
 import VarietiesPanel, { type Variety } from './VarietiesPanel';
 
-type Protocol = { id: string; name: string; version: number; isActive: boolean; taskDefinitions: unknown[]; updatedAt: string };
+type Protocol = { id: string; name: string; version: number; isActive: boolean; seasonStart?: string | null; taskDefinitions: unknown[]; updatedAt: string };
 type TaskDefinition = {
   key: string; title: string; guidance: string; daysFromPlanting?: number; daysFromHarvest?: number;
   activityType?: string; requiredMeasurements?: Record<string, unknown>; evidenceRequired?: boolean; stageName?: string | null;
@@ -58,8 +58,16 @@ export default function RiceCalendarPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  /** The planting date this calendar is laid out from (YYYY-MM-DD), so the day counts can be read as real dates. */
+  const [seasonStart, setSeasonStart] = useState('');
+  const [open, setOpen] = useState<Set<string>>(new Set());
 
-  const apply = (p: Protocol | null) => { setProtocol(p); setTasks((p?.taskDefinitions ?? []) as TaskDefinition[]); };
+  const apply = (p: Protocol | null) => {
+    setProtocol(p);
+    setTasks((p?.taskDefinitions ?? []) as TaskDefinition[]);
+    setSeasonStart(p?.seasonStart ? p.seasonStart.slice(0, 10) : '');
+    setOpen(new Set());
+  };
 
   const fetchAll = useCallback(() => {
     const run: Promise<void> = isPlatform
@@ -97,10 +105,11 @@ export default function RiceCalendarPage() {
 
   const save = async () => {
     if (!protocol) return;
-    if (tasks.some((t) => !t.title.trim() || !t.guidance.trim())) { setError('Every task needs a title and guidance.'); return; }
+    const incomplete = tasks.find((t) => !t.title.trim() || !t.guidance.trim());
+    if (incomplete) { setOpen((cur) => new Set(cur).add(incomplete.key)); setError('Every task needs a name and a short instruction. The task that is missing one is open below.'); return; }
     setSaving(true); setMessage(''); setError('');
     try {
-      const res = await riceProtocolsApi.update(protocol.id, { name: protocol.name, taskDefinitions: tasks.map((t) => ({ ...t, title: t.title.trim(), guidance: t.guidance.trim() })) });
+      const res = await riceProtocolsApi.update(protocol.id, { name: protocol.name, seasonStart: seasonStart || null, taskDefinitions: tasks.map((t) => ({ ...t, title: t.title.trim(), guidance: t.guidance.trim() })) });
       apply(res.data);
       setMessage(isPlatform
         ? `Saved as version ${res.data.version}. Farmers' crop cycles created from now on follow it; cycles already scheduled keep their tasks.`
@@ -113,6 +122,21 @@ export default function RiceCalendarPage() {
     const range = rule.min != null || rule.max != null ? ` ${rule.min ?? '...'}-${rule.max ?? '...'}` : '';
     return `${rule.label || 'Measurement'}${range}${rule.unit ? ` ${rule.unit}` : ''}`;
   };
+
+  const selectedVariety = varieties.find((v) => v.id === varietyId);
+  /** Days from planting to harvest: the variety's own figure, else wherever this calendar puts the harvest task. */
+  const maturityDays = selectedVariety?.maturityDays ?? tasks.find((t) => t.key === 'harvest')?.daysFromPlanting ?? null;
+  const startDate = seasonStart ? new Date(`${seasonStart}T00:00:00`) : null;
+  const plus = (base: Date, days: number) => new Date(base.getFullYear(), base.getMonth(), base.getDate() + days);
+  const fmt = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const harvestDate = startDate && maturityDays != null ? plus(startDate, maturityDays) : null;
+  const dateFor = (t: TaskDefinition): Date | null => {
+    if (t.daysFromHarvest != null) return harvestDate ? plus(harvestDate, t.daysFromHarvest) : null;
+    return startDate && t.daysFromPlanting != null ? plus(startDate, t.daysFromPlanting) : null;
+  };
+  const toggleOpen = (key: string) => setOpen((cur) => { const n = new Set(cur); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+  const setTiming = (i: number, mode: 'planting' | 'harvest', days: number | undefined) =>
+    updateTask(i, mode === 'harvest' ? { daysFromHarvest: days, daysFromPlanting: undefined } : { daysFromPlanting: days, daysFromHarvest: undefined });
 
   if (loading) return <div style={{ padding: 32 }}><TableSkeleton rows={6} avatar={false} /></div>;
   if (!isPlatform && !mamcosId) return <div className="page-shell"><h1 className="page-title">Rice Calendar</h1><p>Your account is not attached to a cooperative.</p></div>;
@@ -131,14 +155,21 @@ export default function RiceCalendarPage() {
       {protocol && <span className="badge badge-green">Version {protocol.version}</span>}
     </div>
     {isPlatform && <VarietiesPanel varieties={varieties} canEdit={canEdit} onChanged={fetchAll} onError={setError} />}
-    {isPlatform && <div className="action-panel" style={{ marginBottom: 16 }}>
-      <label className="form-label">Rice variety
-        <select className="input-field" value={varietyId} onChange={(e) => { setLoading(true); setMessage(''); setCopyFrom(''); setVarietyId(e.target.value); }}>
-          <option value="">Default calendar (varieties without their own)</option>
-          {varieties.map((v) => <option key={v.id} value={v.id}>{v.name}{v.maturityDays ? ` · ${v.maturityDays} days` : ''}{v.hasCalendar ? '' : ' — uses default'}{v.isActive ? '' : ' (hidden)'}</option>)}
-        </select>
-      </label>
-      <p className="ua-hint" style={{ margin: '8px 0 0' }}>Each variety can have its own activities and due days. Farmers who pick a variety get that calendar from their planting date; a variety with no calendar of its own follows the default.</p>
+    {isPlatform && <div style={{ marginBottom: 16 }}>
+      <div className="ua-hint" style={{ marginBottom: 8, fontWeight: 700 }}>Choose a rice variety</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {[{ id: '', name: 'Default' } as Variety, ...varieties.filter((v) => v.isActive)].map((v) => (
+          <button key={v.id || 'default'} type="button" className={v.id === varietyId ? 'btn-primary' : 'btn-secondary'}
+            onClick={() => { setLoading(true); setMessage(''); setCopyFrom(''); setVarietyId(v.id); }}>
+            {v.name}
+          </button>
+        ))}
+      </div>
+      <p className="ua-hint" style={{ margin: '8px 0 0' }}>
+        {varietyId
+          ? (selectedVariety?.hasCalendar ? `Farmers growing ${selectedVariety.name} follow this calendar.` : `${selectedVariety?.name ?? 'This variety'} has no calendar of its own yet, so farmers follow the Default one.`)
+          : 'The Default calendar is used for any variety that has no calendar of its own.'}
+      </p>
     </div>}
     <ErrorBanner message={error} onDismiss={() => setError('')} />
     {message && <div className="alert-box alert-success">{message}</div>}
@@ -159,40 +190,68 @@ export default function RiceCalendarPage() {
       </div> : <p className="ua-hint">You do not have permission to create it.</p>}
     </div> : <div className="action-panel">
       <div className="panel-header">
-        <div>
+        <div style={{ flex: 1 }}>
           <h2 className="panel-title">{canEdit ? <input className="input-field" aria-label="Calendar name" value={protocol.name} onChange={(e) => setProtocol({ ...protocol, name: e.target.value })} /> : protocol.name}</h2>
-          <p className="panel-copy">{canEdit ? 'Edit, add or remove tasks. \u201cRecords as\u201d is the kind of crop activity logged when a task is completed. Harvest, drying and bagging stay because the harvest quality check depends on them.' : 'Read-only.'}</p>
+          <p className="panel-copy">{canEdit ? 'List what farmers should do and when. Each task is counted in days, and the date next to it is worked out from the planting date below.' : 'Read-only.'}</p>
         </div>
         <span className="badge badge-blue">{tasks.length} tasks</span>
       </div>
-      <div className="task-list">
+
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'end', padding: '14px 16px', margin: '4px 0 16px', background: 'var(--surface-2, rgba(0,0,0,0.03))', borderRadius: 12 }}>
+        <label className="form-label" style={{ margin: 0 }}>Planting date for this season
+          <input className="input-field" type="date" disabled={!canEdit} value={seasonStart} onChange={(e) => setSeasonStart(e.target.value)} />
+        </label>
+        <div className="ua-hint" style={{ paddingBottom: 8 }}>
+          {harvestDate ? <>Harvest is about <b>{fmt(harvestDate)}</b>{selectedVariety?.maturityDays ? ` (${selectedVariety.maturityDays} days after planting)` : ''}.</>
+            : startDate ? 'Add the variety\u2019s days to harvest to see the harvest date.'
+            : 'Pick a planting date to see the real date beside every task.'}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gap: 8 }}>
         {tasks.map((task, index) => {
           const locked = REQUIRED_KEYS.includes(task.key);
-          return <div key={task.key} className="task-editor-row">
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px,1fr) minmax(280px,2fr)', gap: 10 }}>
-              <label className="form-label">Task title<input className="input-field" disabled={!canEdit} value={task.title} onChange={(e) => updateTask(index, { title: e.target.value })} /></label>
-              <label className="form-label">Guidance<input className="input-field" disabled={!canEdit} value={task.guidance} onChange={(e) => updateTask(index, { guidance: e.target.value })} /></label>
+          const mode: 'planting' | 'harvest' = task.daysFromHarvest != null ? 'harvest' : 'planting';
+          const days = mode === 'harvest' ? task.daysFromHarvest : task.daysFromPlanting;
+          const date = dateFor(task);
+          const isOpen = open.has(task.key);
+          return <div key={task.key} style={{ border: '1px solid var(--border, rgba(0,0,0,0.1))', borderRadius: 12, padding: '10px 12px', background: 'var(--surface, #fff)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '28px minmax(160px,1fr) 84px 150px minmax(150px,auto) auto', gap: 10, alignItems: 'center' }}>
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 800, fontSize: 13 }}>{index + 1}</span>
+              <input className="input-field" aria-label="Task name" placeholder="What should the farmer do?" disabled={!canEdit} value={task.title} onChange={(e) => updateTask(index, { title: e.target.value })} />
+              <input className="input-field" aria-label="Number of days" type="number" disabled={!canEdit} value={days ?? ''} onChange={(e) => setTiming(index, mode, e.target.value === '' ? undefined : Number(e.target.value))} />
+              <select className="input-field" aria-label="Counted from" disabled={!canEdit} value={mode} onChange={(e) => setTiming(index, e.target.value as 'planting' | 'harvest', days)}>
+                <option value="planting">days after planting</option>
+                <option value="harvest">days from harvest</option>
+              </select>
+              <span className={date ? 'badge badge-green' : 'ua-hint'} style={{ whiteSpace: 'nowrap', justifySelf: 'start' }}>{date ? fmt(date) : 'No date yet'}</span>
+              <span style={{ display: 'flex', gap: 6, justifySelf: 'end' }}>
+                <button type="button" className="btn-secondary" aria-expanded={isOpen} onClick={() => toggleOpen(task.key)}>{isOpen ? 'Hide details' : 'Details'}</button>
+                {canEdit && <button type="button" className="btn-secondary" disabled={locked} title={locked ? 'Needed for the harvest quality check' : 'Remove this task'} aria-label="Remove task" onClick={() => removeTask(index)}>✕</button>}
+              </span>
             </div>
-            <div className="form-grid" style={{ marginTop: 10, alignItems: 'end' }}>
-              <label className="form-label">Days from planting<input className="input-field" type="number" disabled={!canEdit} value={task.daysFromPlanting ?? ''} onChange={(e) => updateTask(index, { daysFromPlanting: e.target.value === '' ? undefined : Number(e.target.value), ...(e.target.value !== '' ? { daysFromHarvest: undefined } : {}) })} /></label>
-              <label className="form-label">Days from harvest<input className="input-field" type="number" disabled={!canEdit} value={task.daysFromHarvest ?? ''} onChange={(e) => updateTask(index, { daysFromHarvest: e.target.value === '' ? undefined : Number(e.target.value), ...(e.target.value !== '' ? { daysFromPlanting: undefined } : {}) })} /></label>
-              <label className="form-label">Records as
-                <select className="input-field" disabled={!canEdit} value={task.activityType ?? ''} onChange={(e) => updateTask(index, { activityType: e.target.value || undefined })}>
-                  {ACTIVITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+            {isOpen && <div style={{ display: 'grid', gap: 10, marginTop: 12, paddingTop: 12, borderTop: '1px dashed var(--border, rgba(0,0,0,0.12))' }}>
+              <label className="form-label">Instruction for the farmer
+                <input className="input-field" disabled={!canEdit} value={task.guidance} placeholder="A short, clear instruction" onChange={(e) => updateTask(index, { guidance: e.target.value })} />
               </label>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 800 }}><input type="checkbox" disabled={!canEdit} checked={!!task.evidenceRequired} onChange={(e) => updateTask(index, { evidenceRequired: e.target.checked })} /> Photo required</label>
-              {canEdit && <button type="button" className="btn-secondary" disabled={locked} title={locked ? 'Needed for the harvest quality check' : 'Remove this task'} onClick={() => removeTask(index)}>Remove</button>}
-            </div>
-            <div style={{ marginTop: 8 }}>
-              {Object.values(task.requiredMeasurements ?? {}).map((m, mi) => <span className="measurement-chip" key={`${task.key}-${mi}`}>{measurementText(m)}</span>)}
-            </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'end' }}>
+                <label className="form-label" style={{ margin: 0 }}>Counts as
+                  <select className="input-field" disabled={!canEdit} value={task.activityType ?? ''} onChange={(e) => updateTask(index, { activityType: e.target.value || undefined })}>
+                    {ACTIVITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </label>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 700, paddingBottom: 8 }}>
+                  <input type="checkbox" disabled={!canEdit} checked={!!task.evidenceRequired} onChange={(e) => updateTask(index, { evidenceRequired: e.target.checked })} /> Farmer must add a photo
+                </label>
+              </div>
+              <div>{Object.values(task.requiredMeasurements ?? {}).map((m, mi) => <span className="measurement-chip" key={`${task.key}-${mi}`}>{measurementText(m)}</span>)}</div>
+            </div>}
           </div>;
         })}
       </div>
       {canEdit && <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
         <button type="button" className="btn-secondary" onClick={addTask}>+ Add a task</button>
-        <button className="btn-primary" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save new version'}</button>
+        <button className="btn-primary" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save calendar'}</button>
       </div>}
     </div>}
 

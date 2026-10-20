@@ -46,6 +46,14 @@ export class RiceProtocolTaskDefinitionDto {
 
 export class UpdateRiceProtocolDto {
   @ApiProperty() @IsString() @IsNotEmpty() name: string;
+  @ApiPropertyOptional({
+    description:
+      'Planting date this calendar is laid out from (YYYY-MM-DD); empty clears it. Leave out to keep the current one.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsDateString()
+  seasonStart?: string | null;
   @ApiProperty({ type: [RiceProtocolTaskDefinitionDto] })
   @IsArray()
   @ValidateNested({ each: true })

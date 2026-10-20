@@ -575,19 +575,21 @@ model RiceVariety {
 }
 
 model RiceProtocol {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   /// null = the platform rice calendar (the one every farmer's mobile app uses); set = a
   /// cooperative's own calendar, which only that cooperative sees.
-  mamcosId        String?  @map("mamcos_id")
+  mamcosId        String?   @map("mamcos_id")
   /// Platform calendars only: the rice variety this calendar is for. null on a platform calendar =
   /// the default calendar, used for any variety that has none of its own.
-  varietyId       String?  @map("variety_id")
+  varietyId       String?   @map("variety_id")
   name            String
-  version         Int      @default(1)
-  isActive        Boolean  @default(true) @map("is_active")
-  taskDefinitions Json     @map("task_definitions")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  version         Int       @default(1)
+  isActive        Boolean   @default(true) @map("is_active")
+  /// The planting date this season's calendar is laid out from. Only used to show real dates next to the day counts in the admin editor; farmers' own tasks still follow their own planting date.
+  seasonStart     DateTime? @map("season_start") @db.Date
+  taskDefinitions Json      @map("task_definitions")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   mamcos  Mamcos?      @relation(fields: [mamcosId], references: [id], onDelete: Cascade)
   variety RiceVariety? @relation(fields: [varietyId], references: [id])

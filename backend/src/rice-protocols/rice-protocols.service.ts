@@ -513,6 +513,12 @@ export class RiceProtocolsService {
           varietyId: current.varietyId,
           name: dto.name,
           version,
+          seasonStart:
+            dto.seasonStart === undefined
+              ? current.seasonStart
+              : dto.seasonStart
+                ? new Date(dto.seasonStart)
+                : null,
           taskDefinitions:
             dto.taskDefinitions as unknown as Prisma.InputJsonValue,
         },
