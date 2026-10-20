@@ -39,6 +39,7 @@ export function StatCard({
   icon,
   tone = 'green',
   variant = 'tint',
+  color,
 }: {
   label: string;
   value: string | number;
@@ -47,9 +48,14 @@ export function StatCard({
   tone?: 'green' | 'blue' | 'gold' | 'red' | 'purple';
   /** `solid` fills the box with the tone, `tint` is a soft wash, `plain` has no box (for use inside a card). */
   variant?: 'solid' | 'tint' | 'plain';
+  /** Exact fill for the `solid` variant, e.g. 'rgb(217,95,149)'; the icon panel is derived from it. */
+  color?: string;
 }) {
   return (
-    <article className={`stat-card stat-card-${tone} stat-card-${variant}`}>
+    <article
+      className={`stat-card stat-card-${tone} stat-card-${variant}`}
+      style={color ? ({ '--stat-solid': color } as React.CSSProperties) : undefined}
+    >
       <span className="stat-card-icon" aria-hidden>
         <HugeiconsIcon icon={icon} size={variant === 'solid' ? 24 : 22} strokeWidth={1.8} />
       </span>

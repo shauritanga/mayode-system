@@ -133,11 +133,11 @@ export default function RiceEcosystemOverview({ part = 'all' }: { part?: 'all' |
 
       {part !== 'rest' && (
       <div className="role-grid role-grid-fill">
-        <StatCard icon={UserGroupIcon} variant="solid" label="Registered rice farmers" value={num(k.totalFarmers)} hint={`${num(k.verifiedFarmers)} verified`} />
-        <StatCard icon={Male02Icon} variant="solid" label="Male farmers" value={num(k.maleFarmers)} hint={pct(k.maleFarmers, k.totalFarmers)} tone="blue" />
-        <StatCard icon={Female02Icon} variant="solid" label="Female farmers" value={num(k.femaleFarmers)} hint={pct(k.femaleFarmers, k.totalFarmers)} tone="purple" />
-        <StatCard icon={UserIcon} variant="solid" label="Youth farmers" value={num(k.youthFarmers)} hint={`Aged ${k.youthMaxAge} or under`} tone="gold" />
-        <StatCard icon={MapsIcon} variant="solid" label="Farms" value={num(k.totalFarms)} hint={`${num(k.verifiedFarms)} verified`} />
+        <StatCard icon={UserGroupIcon} variant="solid" color="rgb(217,95,149)" label="Registered rice farmers" value={num(k.totalFarmers)} hint={`${num(k.verifiedFarmers)} verified`} />
+        <StatCard icon={Male02Icon} variant="solid" color="rgb(121,195,108)" label="Male farmers" value={num(k.maleFarmers)} hint={pct(k.maleFarmers, k.totalFarmers)} tone="blue" />
+        <StatCard icon={Female02Icon} variant="solid" color="rgb(225,177,99)" label="Female farmers" value={num(k.femaleFarmers)} hint={pct(k.femaleFarmers, k.totalFarmers)} tone="purple" />
+        <StatCard icon={UserIcon} variant="solid" color="rgb(158,213,216)" label="Youth farmers" value={num(k.youthFarmers)} hint={`Aged ${k.youthMaxAge} or under`} tone="gold" />
+        <StatCard icon={MapsIcon} variant="solid" color="rgb(171,150,214)" label="Farms" value={num(k.totalFarms)} hint={`${num(k.verifiedFarms)} verified`} />
       </div>
       )}
 

@@ -1224,8 +1224,8 @@ body {
 .stat-card-purple { --stat-accent: var(--purple-500); }
 .stat-card-icon { flex: none; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; color: var(--stat-accent); background: color-mix(in srgb, var(--stat-accent) 18%, var(--surface-1)); }
 .stat-card-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.stat-card-solid { gap: 0; padding: 0; min-height: 0; align-items: stretch; overflow: hidden; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--stat-accent) 82%, #fff); box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12); }
-.stat-card-solid .stat-card-icon { width: 54px; height: auto; border-radius: 0; color: #fff; background: color-mix(in srgb, var(--stat-accent) 88%, #000); }
+.stat-card-solid { gap: 0; padding: 0; min-height: 0; align-items: stretch; overflow: hidden; border: 0; border-radius: 6px; background: var(--stat-solid, color-mix(in srgb, var(--stat-accent) 82%, #fff)); box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12); }
+.stat-card-solid .stat-card-icon { width: 54px; height: auto; border-radius: 0; color: #fff; background: color-mix(in srgb, var(--stat-solid, var(--stat-accent)) 84%, #000); }
 .stat-card-solid .stat-card-body { flex: 1; flex-direction: row; flex-wrap: wrap; align-items: baseline; align-content: center; column-gap: 8px; padding: 7px 12px; }
 .stat-card-solid .stat-card-body strong { flex: 0 0 100%; font-size: 1.3rem; line-height: 1.1; color: #fff; }
 .stat-card-solid .stat-card-body span { margin-top: 0; font-size: 0.78rem; font-weight: 500; color: rgba(255, 255, 255, 0.95); }
