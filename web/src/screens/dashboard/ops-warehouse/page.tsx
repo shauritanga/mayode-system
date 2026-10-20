@@ -42,7 +42,7 @@ export default function OpsWarehousePage() {
     <div>
       <PageHead kicker="Mayode Operations" title="Warehouse" subtitle="Receive paddy, mill it, keep stock, and release goods to customers." />
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
-      {tab === 'overview' && <Overview goto={goto} can={can} />}
+      {tab === 'overview' && <Overview goto={goto} />}
       {tab === 'receiving' && <ReceivingPanel canCreate={can('ops_receiving', 'CREATE')} canConfirm={can('ops_receiving', 'EDIT')} canCancel={can('ops_receiving', 'DELETE')} />}
       {tab === 'processing' && <ProcessingPanel canCreate={can('ops_processing', 'CREATE')} canReverse={can('ops_processing', 'DELETE')} />}
       {tab === 'stock' && <StockPanel canAdjust={can('ops_stock', 'EDIT')} canTransfer={can('ops_stock', 'EDIT')} />}
@@ -56,7 +56,7 @@ export default function OpsWarehousePage() {
   );
 }
 
-function Overview({ goto, can }: { goto: (t: Tab) => void; can: (r: string, a?: 'VIEW' | 'CREATE' | 'EDIT' | 'DELETE') => boolean }) {
+function Overview({ goto }: { goto: (t: Tab) => void }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [dismissed, setDismissed] = useState(readDismissed);
@@ -76,25 +76,12 @@ function Overview({ goto, can }: { goto: (t: Tab) => void; can: (r: string, a?: 
   ].filter(Boolean) as { text: string; to: Tab }[];
   const empty = onHand === 0 && d.receipts === 0 && !dismissed;
 
-  const actions: { label: string; tab: Tab; show: boolean }[] = [
-    { label: 'Receive paddy', tab: 'receiving', show: can('ops_receiving', 'CREATE') },
-    { label: 'Record milling', tab: 'processing', show: can('ops_processing', 'CREATE') },
-    { label: 'Release goods', tab: 'dispatch', show: can('ops_dispatch', 'CREATE') },
-  ];
-
   return (
     <section className="role-dashboard" style={{ margin: 0 }} aria-label="Warehouse overview">
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {actions.filter((a) => a.show).map((a, i) => (
-            <button key={a.tab} className={i === 0 ? 'btn-primary' : 'btn-secondary'} onClick={() => goto(a.tab)}>{a.label}</button>
-          ))}
-        </div>
-        <Toolbar>
-          <Field label="From"><input className="input-field" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
-          <Field label="To"><input className="input-field" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
-        </Toolbar>
-      </div>
+      <Toolbar>
+        <Field label="From"><input className="input-field" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
+        <Field label="To"><input className="input-field" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+      </Toolbar>
       <ErrorNote message={error} />
 
       {empty && (
