@@ -4,6 +4,8 @@ import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives'
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { cropCyclesApi, farmsApi, integrationsApi, inventoryApi } from '@/lib/api';
+import InsightsOverview from '@/components/ai/InsightsOverview';
+import { PageHead, Tabs } from '@/components/ops/ui';
 
 const INTAKE_TYPES = [
   'SOIL_TESTER',
@@ -19,7 +21,7 @@ function severityBadge(severity?: string) {
   return 'badge-green';
 }
 
-export default function AiInsightsPage() {
+function AdvisoryAndIntake() {
   const [catalog, setCatalog] = useState<any>(null);
   const [records, setRecords] = useState<any[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
@@ -216,18 +218,7 @@ export default function AiInsightsPage() {
   };
 
   return (
-    <div className="page-shell">
-      <div className="page-heading">
-        <div>
-          <div className="page-kicker">AI · Phase 1.5</div>
-          <h1 className="page-title">AI Insights</h1>
-          <p className="page-subtitle">
-            Field Advisory MVP plus soil/drone/sorter intake into MAYOData
-            integration records.
-          </p>
-        </div>
-      </div>
-
+    <div>
       {error && <div className="alert-box alert-danger">{error}</div>}
       {message && <div className="alert-box alert-success">{message}</div>}
       {traceLink && (
@@ -669,6 +660,28 @@ export default function AiInsightsPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+export default function AiInsightsPage() {
+  const [tab, setTab] = useState<'overview' | 'advisory'>('overview');
+  return (
+    <div className="page-shell">
+      <PageHead
+        kicker="AI · Insights"
+        title="AI Insights"
+        subtitle="Harvest, yield, stock, sales and advisories worked out from your live records, plus field advisories and equipment intake."
+      />
+      <Tabs
+        tabs={[
+          { id: 'overview', label: 'Overview' },
+          { id: 'advisory', label: 'Advisory and intake' },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
+      {tab === 'overview' ? <InsightsOverview /> : <AdvisoryAndIntake />}
     </div>
   );
 }

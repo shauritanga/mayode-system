@@ -19,6 +19,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { CreateAiIntegrationRecordDto } from './dto/ai-integration-record.dto';
 import { IntegrationsService } from './integrations.service';
+import { InsightsService } from './insights.service';
 
 const STAFF = [
   UserRole.SUPER_ADMIN,
@@ -34,7 +35,21 @@ const STAFF = [
 @PermissionResource('ai_insights')
 @Controller('integrations')
 export class IntegrationsController {
-  constructor(private readonly integrations: IntegrationsService) {}
+  constructor(
+    private readonly integrations: IntegrationsService,
+    private readonly insights: InsightsService,
+  ) {}
+
+  @Get('insights')
+  @Roles(...STAFF)
+  @RequirePermission('ai_insights', 'VIEW')
+  @ApiOperation({
+    summary:
+      'AI Insights overview: harvest and yield, crop stages, advisories, plus stock and sales for those who may see them',
+  })
+  overview(@CurrentUser() user: RequestUser) {
+    return this.insights.overview(user);
+  }
 
   @Get('ai-catalog')
   @Roles(...STAFF, UserRole.FARMER, UserRole.BUYER)

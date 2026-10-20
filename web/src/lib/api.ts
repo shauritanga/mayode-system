@@ -391,6 +391,7 @@ export const reportsApi = {
 };
 export const integrationsApi = {
   catalog: () => api.get('/integrations/ai-catalog'),
+  insights: () => api.get('/integrations/insights'),
   createAiRecord: (data: object) => api.post('/integrations/ai-records', data),
   generateFieldAdvisory: (cropCycleId: string) =>
     api.post(`/integrations/ai-records/field-advisory/${cropCycleId}`, {}),
