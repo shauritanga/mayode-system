@@ -141,6 +141,7 @@ export default function AdminOverviewDashboard() {
   const [kpis, setKpis] = useState<any>(null);
   const [weather, setWeather] = useState<any>(null);
   const [unit, setUnit] = useState<'C' | 'F'>('C');
+  const [prodPeriod, setProdPeriod] = useState<'QUARTER' | 'SEMI' | 'YEAR'>('YEAR');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -174,8 +175,28 @@ export default function AdminOverviewDashboard() {
   const totalLandHa = Math.round(kpis?.totalHectares || farms.reduce((s, f) => s + (f.socialHectares || 0), 0));
   const revenue = kpis?.totalRevenue ?? 0;
 
+  // Production Overview window: the last 3, 6 or 12 months. Records with no usable date can't be placed, so they stay in every window.
+  const inProdPeriod = useMemo(() => {
+    const months = prodPeriod === 'QUARTER' ? 3 : prodPeriod === 'SEMI' ? 6 : 12;
+    const from = new Date();
+    from.setMonth(from.getMonth() - months);
+    return (raw: unknown) => {
+      if (!raw) return true;
+      const d = new Date(raw as string);
+      return Number.isNaN(d.getTime()) || d >= from;
+    };
+  }, [prodPeriod]);
+  const periodCycles = useMemo(
+    () => cropCycles.filter((c) => inProdPeriod(c.harvestDate || c.endDate || c.createdAt)),
+    [cropCycles, inProdPeriod],
+  );
+  const periodInventory = useMemo(
+    () => inventoryRecords.filter((r) => inProdPeriod(r.createdAt)),
+    [inventoryRecords, inProdPeriod],
+  );
+
   const productionByVariety = useMemo(() => {
-    const totals = cropCycles.reduce<Record<string, number>>((acc, cycle) => {
+    const totals = periodCycles.reduce<Record<string, number>>((acc, cycle) => {
       const label = cycle.riceVariety || 'Unspecified';
       acc[label] = (acc[label] || 0) + (cycle.actualYieldKg || cycle.estimatedYieldKg || 0);
       return acc;
@@ -184,7 +205,7 @@ export default function AdminOverviewDashboard() {
       .map(([name, value]) => ({ name, value: Math.round(value) }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 4);
-  }, [cropCycles]);
+  }, [periodCycles]);
 
   const totalProductionKg = useMemo(
     () => productionByVariety.reduce((s, row) => s + row.value, 0),
@@ -194,12 +215,12 @@ export default function AdminOverviewDashboard() {
   // Value-chain view: same grain, tracked as it moves from farm → cooperative intake → MAYODE-managed batching/export.
   const MAYODE_STAGE_STATUSES = ['BATCHED', 'SHIPPED', 'SOLD'];
   const productionLegend = useMemo(() => {
-    const farmersKg = cropCycles.reduce(
+    const farmersKg = periodCycles.reduce(
       (s, c) => s + (c.actualYieldKg || c.estimatedYieldKg || 0),
       0,
     );
-    const cooperativeKg = inventoryRecords.reduce((s, r) => s + (r.weightKg || 0), 0);
-    const mayodeKg = inventoryRecords
+    const cooperativeKg = periodInventory.reduce((s, r) => s + (r.weightKg || 0), 0);
+    const mayodeKg = periodInventory
       .filter((r) => MAYODE_STAGE_STATUSES.includes(r.status))
       .reduce((s, r) => s + (r.weightKg || 0), 0);
 
@@ -221,12 +242,12 @@ export default function AdminOverviewDashboard() {
       pct: Math.round((row.value / total) * 100),
       color: stageColors[row.name],
     }));
-  }, [cropCycles, inventoryRecords]);
+  }, [periodCycles, periodInventory]);
 
   const totalProductionTons =
     Math.round((productionLegend.find((r) => r.name === 'Farmers')?.value ?? 0) / 1000) ||
     Math.round(totalProductionKg / 1000) ||
-    Math.round(inventoryRecords.reduce((s, r) => s + (r.weightKg || 0), 0) / 1000);
+    Math.round(periodInventory.reduce((s, r) => s + (r.weightKg || 0), 0) / 1000);
 
   const productionRays = useMemo(() => {
     const active = productionLegend.filter((r) => r.pct > 0);
@@ -406,7 +427,7 @@ export default function AdminOverviewDashboard() {
 
       <div className="fv-row fv-row-top">
         <motion.article
-          className="fv-card fv-weather"
+          className={`fv-card fv-weather fv-weather-${condition.toLowerCase()}`}
           {...(enter || {})}
           transition={{ duration: 0.45, delay: 0.04, ease: [0.16, 1, 0.3, 1] }}
         >
@@ -447,17 +468,21 @@ export default function AdminOverviewDashboard() {
           >
             <div className="fv-card-head">
               <h2>Production Overview</h2>
-              <span className="fv-chip">
-                Yearly
+              <label className="fv-chip fv-chip-select">
+                <select value={prodPeriod} onChange={(e) => setProdPeriod(e.target.value as 'QUARTER' | 'SEMI' | 'YEAR')} aria-label="Production period">
+                  <option value="QUARTER">Quarterly</option>
+                  <option value="SEMI">Semi-annual</option>
+                  <option value="YEAR">Annual</option>
+                </select>
                 <HugeiconsIcon icon={ArrowDown01Icon} size={13} strokeWidth={2.4} />
-              </span>
+              </label>
             </div>
             <div className="fv-production-body">
               <div className="fv-donut-wrap">
                 {loading ? (
                   <ChartSkeleton height={180} />
                 ) : !productionLegend.some((r) => r.value > 0) ? (
-                  <div className="fv-chart-empty">No production yet</div>
+                  <div className="fv-chart-empty">No production in this period</div>
                 ) : (
                   <>
                     <svg viewBox="0 0 200 112" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" className="fv-ray-chart">

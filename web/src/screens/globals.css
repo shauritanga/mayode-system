@@ -2488,6 +2488,13 @@ body {
   height: 100%;
 }
 
+.fv-card.fv-weather-sunny { background: linear-gradient(155deg, color-mix(in srgb, var(--gold-400) 26%, var(--surface-1)) 0%, color-mix(in srgb, var(--blue-500) 12%, var(--surface-1)) 100%); }
+.fv-card.fv-weather-cloudy { background: linear-gradient(155deg, color-mix(in srgb, var(--blue-500) 20%, var(--surface-1)) 0%, color-mix(in srgb, var(--neutral-500, #64748b) 14%, var(--surface-1)) 100%); }
+.fv-card.fv-weather-rainy { background: linear-gradient(155deg, color-mix(in srgb, var(--blue-500) 32%, var(--surface-1)) 0%, color-mix(in srgb, var(--purple-500) 14%, var(--surface-1)) 100%); }
+
+.fv-chip-select { position: relative; gap: 4px; cursor: pointer; }
+.fv-chip-select select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: inherit; font: inherit; padding-right: 2px; cursor: pointer; outline: none; }
+
 .fv-card.fv-weather {
   display: flex;
   flex-direction: column;
