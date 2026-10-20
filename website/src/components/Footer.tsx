@@ -34,12 +34,12 @@ export default function Footer() {
             <a href={company.phoneHref}>{company.phone}</a>
             <a href={`mailto:${company.email}`}>{company.email}</a>
             {company.address.map((l) => (<span key={l}>{l}</span>))}
+            <a className="footer__map" href={company.mapsHref} target="_blank" rel="noreferrer">Open in maps →</a>
           </address>
         </div>
       </div>
       <div className="wrap footer__base">
         <span>© {new Date().getFullYear()} {company.name}. All rights reserved.</span>
-        <span>{company.address.slice(1, 4).join(', ')}</span>
       </div>
     </footer>
   );

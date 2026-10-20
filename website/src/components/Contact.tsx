@@ -15,23 +15,6 @@ export default function Contact() {
             <a className="btn btn--ghost" href={company.phoneHref}>Call {company.phone}</a>
           </div>
         </div>
-        <dl className="contact__card" data-reveal>
-          <div>
-            <dt>Telephone</dt>
-            <dd><a href={company.phoneHref}>{company.phone}</a></dd>
-          </div>
-          <div>
-            <dt>Email</dt>
-            <dd><a href={`mailto:${company.email}`}>{company.email}</a></dd>
-          </div>
-          <div>
-            <dt>Head Office</dt>
-            <dd>
-              {company.address.map((l) => (<span key={l}>{l}</span>))}
-              <a className="contact__map" href={company.mapsHref} target="_blank" rel="noreferrer">Open in maps →</a>
-            </dd>
-          </div>
-        </dl>
       </div>
     </section>
   );
