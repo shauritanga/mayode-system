@@ -1,7 +1,8 @@
 'use client';
 import { useEffect } from 'react';
-import { MapContainer, TileLayer, Polygon, CircleMarker, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, Polygon, CircleMarker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { ClickToZoom, MapBase } from '@/components/MapBase';
 import 'leaflet/dist/leaflet.css';
 import { asPolygonGeometry, hasFarmCenterPin, type FarmGeoLike } from '@/lib/farm-geo';
 
@@ -39,24 +40,22 @@ export default function FarmBoundaryMap({ farm, plots }: { farm: FarmGeoLike & {
   if (points.length === 0) return null;
 
   return (
-    <MapContainer center={points[0]} zoom={15} style={{ height: 380, width: '100%', borderRadius: 12 }}>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+    <MapContainer center={points[0]} zoom={15} scrollWheelZoom={false} style={{ height: 380, width: '100%', borderRadius: 12 }}>
+      <MapBase />
+      <ClickToZoom />
       <Fit points={points} />
       {boundary && (
-        <Polygon positions={boundary} pathOptions={{ color: '#059669', fillColor: '#059669', fillOpacity: 0.18, weight: 3 }}>
+        <Polygon positions={boundary} pathOptions={{ color: '#facc15', fillColor: '#facc15', fillOpacity: 0.18, weight: 3 }}>
           <Tooltip sticky>{farm.farmCode} boundary</Tooltip>
         </Polygon>
       )}
       {!boundary && center && (
-        <CircleMarker center={center} radius={8} pathOptions={{ color: '#fff', weight: 2, fillColor: '#2563EB', fillOpacity: 0.9 }}>
+        <CircleMarker center={center} radius={8} pathOptions={{ color: '#fff', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.95 }}>
           <Tooltip>{farm.farmCode} (GPS point)</Tooltip>
         </CircleMarker>
       )}
       {plotShapes.map(({ plot, positions }) => (
-        <Polygon key={plot.id} positions={positions} pathOptions={{ color: '#2563EB', fillColor: '#2563EB', fillOpacity: 0.22, weight: 2 }}>
+        <Polygon key={plot.id} positions={positions} pathOptions={{ color: '#22d3ee', fillColor: '#22d3ee', fillOpacity: 0.25, weight: 2 }}>
           <Tooltip sticky>{plot.plotCode}{plot.sizeAcres ? ` · ${plot.sizeAcres} ac` : ''}</Tooltip>
         </Polygon>
       ))}
@@ -65,7 +64,7 @@ export default function FarmBoundaryMap({ farm, plots }: { farm: FarmGeoLike & {
           key={plot.id}
           center={[plot.centerLatitude as number, plot.centerLongitude as number]}
           radius={6}
-          pathOptions={{ color: '#fff', weight: 2, fillColor: '#7C3AED', fillOpacity: 0.9 }}
+          pathOptions={{ color: '#fff', weight: 2, fillColor: '#c084fc', fillOpacity: 0.95 }}
         >
           <Tooltip>{plot.plotCode}</Tooltip>
         </CircleMarker>

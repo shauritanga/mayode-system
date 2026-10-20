@@ -1,7 +1,8 @@
 'use client';
 import { useEffect } from 'react';
-import { MapContainer, TileLayer, Polygon, Polyline, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, Polygon, Polyline, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import { ClickToZoom, MapBase } from '@/components/MapBase';
 import 'leaflet/dist/leaflet.css';
 
 /** A drawn corner: [latitude, longitude]. */
@@ -64,12 +65,13 @@ export default function BoundaryPicker({ corners, onChange, center, focus = [] }
   const ha = areaHectares(corners);
   return (
     <div>
-      <MapContainer center={center ?? corners[0] ?? focus[0] ?? DEFAULT_CENTER} zoom={center || corners.length ? 16 : focus.length ? 13 : 11} style={{ height: 380, width: '100%', borderRadius: 12, cursor: 'crosshair' }}>
-        <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      <MapContainer center={center ?? corners[0] ?? focus[0] ?? DEFAULT_CENTER} zoom={center || corners.length ? 16 : focus.length ? 13 : 11} scrollWheelZoom={false} style={{ height: 380, width: '100%', borderRadius: 12, cursor: 'crosshair' }}>
+        <MapBase />
+        <ClickToZoom />
         <Fit corners={corners} center={center} focus={focus} />
         <Clicks onAdd={(c) => onChange([...corners, c])} />
-        {corners.length >= 3 ? <Polygon positions={corners} pathOptions={{ color: '#059669', fillColor: '#059669', fillOpacity: 0.2, weight: 3 }} /> : corners.length === 2 ? <Polyline positions={corners} pathOptions={{ color: '#059669', weight: 3 }} /> : null}
-        {corners.map((c, i) => <CircleMarker key={i} center={c} radius={5} pathOptions={{ color: '#fff', weight: 2, fillColor: '#059669', fillOpacity: 1 }} />)}
+        {corners.length >= 3 ? <Polygon positions={corners} pathOptions={{ color: '#facc15', fillColor: '#facc15', fillOpacity: 0.22, weight: 3 }} /> : corners.length === 2 ? <Polyline positions={corners} pathOptions={{ color: '#facc15', weight: 3 }} /> : null}
+        {corners.map((c, i) => <CircleMarker key={i} center={c} radius={5} pathOptions={{ color: '#fff', weight: 2, fillColor: '#facc15', fillOpacity: 1 }} />)}
       </MapContainer>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, flexWrap: 'wrap', fontSize: 13 }}>
         <button type="button" className="btn-secondary" disabled={!corners.length} onClick={() => onChange(corners.slice(0, -1))}>Undo last corner</button>

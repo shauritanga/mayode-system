@@ -1,8 +1,9 @@
 'use client';
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, Polygon, CircleMarker, Popup, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { ClickToZoom, MapBase } from '@/components/MapBase';
 import 'leaflet/dist/leaflet.css';
 import { asPolygonGeometry, hasFarmCenterPin, isFarmBoundaryMapped, type FarmGeoLike } from '@/lib/farm-geo';
 import { locationLabel, productionLabel, riceVarieties, tenureLabel } from '@/lib/farm-format';
@@ -39,9 +40,9 @@ export interface MappableFarm extends FarmGeoLike {
 // Mbarali, Mbeya — the cooperative's home district — as a sensible default center.
 const DEFAULT_CENTER: [number, number] = [-8.9, 34.3];
 
-const VERIFIED = '#059669';
-const PENDING = '#D97706';
-const PIN_ONLY = '#2563EB';
+const VERIFIED = '#34d399';
+const PENDING = '#fbbf24';
+const PIN_ONLY = '#60a5fa';
 
 function boundaryLatLngs(farm: MappableFarm): [number, number][] | null {
   const poly = asPolygonGeometry(farm.boundaryCoordinates);
@@ -116,16 +117,14 @@ export default function FarmsMap({ farms, renderPopup, ownFarms = false }: { far
 
   return (
     <div style={{ position: 'relative' }}>
-      <MapContainer center={points[0] || DEFAULT_CENTER} zoom={12} style={{ height: 520, width: '100%', borderRadius: 12 }}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+      <MapContainer center={points[0] || DEFAULT_CENTER} zoom={12} scrollWheelZoom={false} style={{ height: 520, width: '100%', borderRadius: 12 }}>
+        <MapBase />
+        <ClickToZoom />
         <FitToFarms points={points} />
         {polygons.map(({ farm, positions }) => {
           const color = farm.isVerified ? VERIFIED : PENDING;
           return (
-            <Polygon key={farm.id} positions={positions} pathOptions={{ color, fillColor: color, fillOpacity: 0.25, weight: 2 }}>
+            <Polygon key={farm.id} positions={positions} pathOptions={{ color, fillColor: color, fillOpacity: 0.28, weight: 3 }}>
               <Popup>{popup(farm)}</Popup>
             </Polygon>
           );
@@ -144,9 +143,9 @@ export default function FarmsMap({ farms, renderPopup, ownFarms = false }: { far
           const ring = boundaryLatLngs({ ...farm, boundaryCoordinates: plot.boundaryCoordinates });
           const label = plot.name ?? plot.plotCode ?? 'Plot';
           const key = plot.id ?? `${farm.id}-${plot.plotCode}`;
-          if (ring) return <Polygon key={key} positions={ring} pathOptions={{ color: '#2563EB', fillColor: '#2563EB', fillOpacity: 0.25, weight: 2 }}><Tooltip sticky>{farm.farmCode} · {label}</Tooltip></Polygon>;
+          if (ring) return <Polygon key={key} positions={ring} pathOptions={{ color: '#22d3ee', fillColor: '#22d3ee', fillOpacity: 0.25, weight: 2 }}><Tooltip sticky>{farm.farmCode} · {label}</Tooltip></Polygon>;
           if (!hasFarmCenterPin(plot) || (plot.centerLatitude === farm.centerLatitude && plot.centerLongitude === farm.centerLongitude)) return null;
-          return <CircleMarker key={key} center={[plot.centerLatitude as number, plot.centerLongitude as number]} radius={5} pathOptions={{ color: '#fff', weight: 1.5, fillColor: '#2563EB', fillOpacity: 0.9 }}><Tooltip>{farm.farmCode} · {label}</Tooltip></CircleMarker>;
+          return <CircleMarker key={key} center={[plot.centerLatitude as number, plot.centerLongitude as number]} radius={5} pathOptions={{ color: '#fff', weight: 1.5, fillColor: '#22d3ee', fillOpacity: 0.9 }}><Tooltip>{farm.farmCode} · {label}</Tooltip></CircleMarker>;
         }))}
       </MapContainer>
       <div
@@ -165,7 +164,7 @@ export default function FarmsMap({ farms, renderPopup, ownFarms = false }: { far
           </>
         )}
         <div>{legendDot(PIN_ONLY)}GPS point only ({pins.length})</div>
-        {farms.some((f) => f.plots?.length) && <div>{legendDot('#2563EB')}Plots</div>}
+        {farms.some((f) => f.plots?.length) && <div>{legendDot('#22d3ee')}Plots</div>}
         {missing > 0 && <div style={{ color: 'var(--text-3)' }}>{missing} farm{missing === 1 ? '' : 's'} without GPS</div>}
       </div>
     </div>
