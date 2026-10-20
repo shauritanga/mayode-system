@@ -62,8 +62,7 @@ export const services = [
     n: '03',
     title: 'Digital Agriculture and Farm Management',
     text: 'Through our Digital Kilimo initiative, we promote technology enabled agricultural management using the MAYOData platform and MAYODE App. These solutions are designed to support farm monitoring, agricultural data collection, operational coordination, and informed decision making.',
-    images: [],
-    photo: 'tablet-in-rice',
+    images: ['dashboard-laptop'],
   },
   {
     n: '04',

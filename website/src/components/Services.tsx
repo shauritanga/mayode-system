@@ -21,8 +21,8 @@ export default function Services() {
             return (
               <article className="card" key={s.n} data-reveal>
                 {pic && (
-                  <div className="card__photo">
-                    <Image src={pic} alt="" width={560} height={315} sizes="(max-width: 640px) 100vw, 40vw" />
+                  <div className={`card__photo${s.images[0] === 'dashboard-laptop' ? ' card__photo--shot' : ''}`}>
+                    <Image src={pic} alt={s.images[0] === 'dashboard-laptop' ? 'The MAYODE dashboard on a laptop, showing farmers, production, yield, tasks and harvest summary' : ''} width={s.images[0] === 'dashboard-laptop' ? 1600 : 560} height={s.images[0] === 'dashboard-laptop' ? 1000 : 315} sizes="(max-width: 640px) 100vw, 40vw" />
                   </div>
                 )}
                 <div className="card__head">
