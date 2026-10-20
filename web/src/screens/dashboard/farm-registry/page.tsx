@@ -3,6 +3,7 @@ import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives'
 import { useEffect, useState } from 'react';
 import { registryApi, mamcosApi } from '@/lib/api';
 import Modal from '@/components/Modal';
+import { MetricTile, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 
 interface RegistryRecord {
   id: string;
@@ -146,10 +147,7 @@ export default function FarmRegistryPage() {
           { label: 'Awaiting owner', value: pending, color: 'var(--gold-400)' },
           { label: 'Claimed', value: claimed, color: 'var(--green-400)' },
         ].map(s => (
-          <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>
-            <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.label}</div>
-          </div>
+          <MetricTile key={s.label} label={s.label} value={s.value} tone={toneFromColor(s.color)} />
         ))}
       </div>
 

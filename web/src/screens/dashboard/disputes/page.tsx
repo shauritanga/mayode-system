@@ -1,5 +1,5 @@
 'use client';
-import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
+import { MetricTile, TableSkeleton, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { disputesApi, mamcosApi } from '@/lib/api';
 import Modal from '@/components/Modal';
@@ -65,14 +65,8 @@ export default function DisputesPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-        <div className="stat-card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--red-400)', fontFamily: 'Outfit, sans-serif' }}>{openCount}</div>
-          <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>Open / under review</div>
-        </div>
-        <div className="stat-card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--accent)', fontFamily: 'Outfit, sans-serif' }}>{disputes.filter(d => d.status === 'RESOLVED').length}</div>
-          <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>Resolved</div>
-        </div>
+        <MetricTile label="Open / under review" value={openCount} tone="red" />
+        <MetricTile label="Resolved" value={disputes.filter((d) => d.status === 'RESOLVED').length} tone="green" />
       </div>
 
       <div className="glass-card" style={{ overflow: 'hidden' }}>

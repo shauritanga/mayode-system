@@ -1,5 +1,5 @@
 'use client';
-import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
+import { MetricTile, TableSkeleton, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 import ErrorBanner from '@/components/ErrorBanner';
 import { apiErrorMessage } from '@/lib/api-error';
 import { useEffect, useState } from 'react';
@@ -201,11 +201,7 @@ function OverviewTab() {
               ['Receivables', statements.receivablesTotal, 'Open buyer invoices'],
               ['Payables', statements.payablesTotal, 'Open supplier bills'],
             ].map(([label, value, sub]) => (
-              <div key={String(label)} className="stat-card" style={{ padding: 18 }}>
-                <div className="muted" style={{ fontSize: 12 }}>{label}</div>
-                <strong style={{ display: 'block', fontSize: 20, marginTop: 6 }}>TZS {Math.round(Number(value || 0)).toLocaleString()}</strong>
-                <small className="muted">{sub}</small>
-              </div>
+              <MetricTile key={String(label)} label={String(label)} value={`TZS ${Math.round(Number(value || 0)).toLocaleString()}`} hint={String(sub)} />
             ))}
           </div>
           <div className="table-panel" style={{ marginTop: 16 }}>
@@ -218,11 +214,7 @@ function OverviewTab() {
                 ['Return on assets', statements.ratios?.profitability?.returnOnAssets, 'Net surplus / assets'],
                 ['Debt-to-equity', statements.ratios?.solvency?.debtToEquityRatio, 'Liabilities / owners’ equity'],
               ].map(([label, value, sub]) => (
-                <div key={String(label)} className="stat-card" style={{ padding: 16 }}>
-                  <div className="muted" style={{ fontSize: 12 }}>{label}</div>
-                  <strong style={{ display: 'block', fontSize: 22, marginTop: 6 }}>{value == null ? '—' : Number(value).toFixed(2)}</strong>
-                  <small className="muted">{sub}</small>
-                </div>
+                <MetricTile key={String(label)} label={String(label)} value={value == null ? '—' : Number(value).toFixed(2)} hint={String(sub)} />
               ))}
             </div>
           </div>
@@ -245,11 +237,7 @@ function OverviewTab() {
               { label: 'Cost per kg', value: summary.costPerKg ? `${summary.costPerKg.toFixed(0)} TZS` : '—', color: 'var(--neutral-400)', icon: '⚖️' },
               { label: 'Revenue per kg', value: summary.revenuePerKg ? `${summary.revenuePerKg.toFixed(0)} TZS` : '—', color: 'var(--green-400)', icon: '💰' },
             ].map(stat => (
-              <div key={stat.label} className="stat-card" style={{ padding: '20px' }}>
-                <div style={{ fontSize: '20px', marginBottom: '8px' }}>{stat.icon}</div>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: stat.color, fontFamily: 'Outfit, sans-serif', marginBottom: '4px' }}>{stat.value}</div>
-                <div style={{ fontSize: '12px', color: 'var(--neutral-500)' }}>{stat.label}</div>
-              </div>
+              <MetricTile key={stat.label} label={stat.label} value={stat.value} tone={toneFromColor(stat.color)} />
             ))}
           </div>
 
@@ -356,18 +344,9 @@ function LedgerTab() {
       ) : (
         <>
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-            <div className="stat-card" style={{ padding: 16, flex: 1 }}>
-              <div className="muted" style={{ fontSize: 12 }}>Total debit</div>
-              <strong style={{ fontSize: 20 }}>TZS {Number(trial?.totalDebit || 0).toLocaleString()}</strong>
-            </div>
-            <div className="stat-card" style={{ padding: 16, flex: 1 }}>
-              <div className="muted" style={{ fontSize: 12 }}>Total credit</div>
-              <strong style={{ fontSize: 20 }}>TZS {Number(trial?.totalCredit || 0).toLocaleString()}</strong>
-            </div>
-            <div className="stat-card" style={{ padding: 16, flex: 1 }}>
-              <div className="muted" style={{ fontSize: 12 }}>Balanced</div>
-              <span className={`badge ${trial?.balanced ? 'badge-green' : 'badge-red'}`}>{trial?.balanced ? 'Yes' : 'No'}</span>
-            </div>
+            <div style={{ flex: 1 }}><MetricTile label="Total debit" value={`TZS ${Number(trial?.totalDebit || 0).toLocaleString()}`} /></div>
+            <div style={{ flex: 1 }}><MetricTile label="Total credit" value={`TZS ${Number(trial?.totalCredit || 0).toLocaleString()}`} /></div>
+            <div style={{ flex: 1 }}><MetricTile label="Balanced" value={trial?.balanced ? 'Yes' : 'No'} tone={trial?.balanced ? 'green' : 'red'} /></div>
           </div>
           <div className="glass-card" style={{ overflow: 'hidden' }}>
             <table className="data-table">

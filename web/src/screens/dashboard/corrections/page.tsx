@@ -1,5 +1,5 @@
 'use client';
-import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
+import { MetricTile, TableSkeleton, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { farmCorrectionsApi } from '@/lib/api';
 
@@ -70,14 +70,8 @@ export default function CorrectionsPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-        <div className="stat-card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--gold-400)', fontFamily: 'Outfit, sans-serif' }}>{pending.length}</div>
-          <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>Pending suggestions</div>
-        </div>
-        <div className="stat-card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--red-400)', fontFamily: 'Outfit, sans-serif' }}>{conflicts.length}</div>
-          <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>Conflicting values</div>
-        </div>
+        <MetricTile label="Pending suggestions" value={pending.length} tone="gold" />
+        <MetricTile label="Conflicting values" value={conflicts.length} tone="red" />
       </div>
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>

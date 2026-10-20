@@ -1,5 +1,5 @@
 'use client';
-import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
+import { MetricTile, TableSkeleton, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 
 import { FormEvent, useEffect, useState } from 'react';
 import { buyerPortalApi } from '@/lib/api';
@@ -123,14 +123,7 @@ export default function BuyerPage() {
                 ['Volume bought', kg(metrics.totalPurchasedKg)],
                 ['Spend', money(metrics.totalSpend)],
               ].map(([label, value]) => (
-                <div key={String(label)} className="stat-card" style={{ padding: 18 }}>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {label}
-                  </div>
-                  <strong style={{ display: 'block', fontSize: 22, marginTop: 6 }}>
-                    {value}
-                  </strong>
-                </div>
+                <MetricTile key={String(label)} label={String(label)} value={value as string | number} />
               ))}
             </div>
           )}

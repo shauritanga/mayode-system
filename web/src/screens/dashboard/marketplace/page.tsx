@@ -1,5 +1,5 @@
 'use client';
-import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
+import { MetricTile, TableSkeleton, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { marketplaceApi } from '@/lib/api';
 import Modal from '@/components/Modal';
@@ -552,10 +552,7 @@ export default function MarketplacePage() {
           { label: 'Awaiting verification', value: pendingCount, color: 'var(--gold-400)' },
           { label: 'Registered tractors', value: tractors.length, color: 'var(--blue-500)' },
         ].map(s => (
-          <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>
-            <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.label}</div>
-          </div>
+          <MetricTile key={s.label} label={s.label} value={s.value} tone={toneFromColor(s.color)} />
         ))}
       </div>
 
@@ -1102,22 +1099,10 @@ export default function MarketplacePage() {
                 </button>
                 {toolsResult?.stability && (
                   <div style={{ marginTop: '14px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                    <div className="stat-card" style={{ padding: '12px' }}>
-                      <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--accent)' }}>{toolsResult.stability.stabilityPercent}%</div>
-                      <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Farms on M-LAX</div>
-                    </div>
-                    <div className="stat-card" style={{ padding: '12px' }}>
-                      <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--gold-400)' }}>{toolsResult.stability.secretaryStabilityBonus.toLocaleString()}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Secretary bonus (TZS)</div>
-                    </div>
-                    <div className="stat-card" style={{ padding: '12px' }}>
-                      <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>{toolsResult.stability.farmsOnMlax}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Farms on M-LAX (count)</div>
-                    </div>
-                    <div className="stat-card" style={{ padding: '12px' }}>
-                      <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>{toolsResult.stability.totalFarms}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Total farms</div>
-                    </div>
+                    <MetricTile label="Farms on M-LAX" value={`${toolsResult.stability.stabilityPercent}%`} tone="green" />
+                    <MetricTile label="Secretary bonus (TZS)" value={toolsResult.stability.secretaryStabilityBonus.toLocaleString()} tone="gold" />
+                    <MetricTile label="Farms on M-LAX (count)" value={toolsResult.stability.farmsOnMlax} tone="blue" />
+                    <MetricTile label="Total farms" value={toolsResult.stability.totalFarms} tone="purple" />
                   </div>
                 )}
               </div>

@@ -2,6 +2,7 @@
 import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import { useEffect, useState } from 'react';
 import { locationsApi } from '@/lib/api';
+import { MetricTile, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 
 interface Region { id: string; name: string; _count?: { districts: number } }
 interface District { id: string; name: string; _count?: { wards: number } }
@@ -68,10 +69,7 @@ export default function LocationsPage() {
           { label: 'Districts', value: selectedRegion ? districts.length : '—', color: 'var(--gold-400)' },
           { label: 'Wards', value: selectedDistrict ? wards.length : '—', color: 'var(--blue-500)' },
         ].map(s => (
-          <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>
-            <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.label}</div>
-          </div>
+          <MetricTile key={s.label} label={s.label} value={s.value} tone={toneFromColor(s.color)} />
         ))}
       </div>
 

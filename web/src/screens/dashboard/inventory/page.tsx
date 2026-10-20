@@ -9,6 +9,7 @@ import { hasPermission } from '@/lib/nav';
 import { ChartCard, DonutBreakdown, HorizontalBarChart } from '@/components/role-dashboards/Charts';
 import DeliveryDetailModal from '@/components/DeliveryDetailModal';
 import { PAYMENT_BADGE, PAYMENT_LABELS, deliveryBuyers, deliveryVariety, kgs, tzs, type DeliveryRow } from '@/lib/aggregation';
+import { MetricTile, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 
 interface Slice { name: string; weightKg: number; count: number; value: number }
 interface DashboardSummary {
@@ -766,21 +767,7 @@ export default function InventoryPage() {
             color: 'var(--purple-500)',
           },
         ].map((s) => (
-          <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
-            <div
-              style={{
-                fontSize: '22px',
-                fontWeight: 700,
-                color: s.color,
-                fontFamily: 'Outfit, sans-serif',
-              }}
-            >
-              {s.value}
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>
-              {s.label}
-            </div>
-          </div>
+          <MetricTile key={s.label} label={s.label} value={s.value} tone={toneFromColor(s.color)} />
         ))}
       </div>
 
@@ -796,11 +783,7 @@ export default function InventoryPage() {
               { label: 'Purchase value', value: tzs(summary.purchaseValue), hint: summary.unpricedKg ? `${kgs(summary.unpricedKg)} not priced yet` : 'All deliveries priced', color: 'var(--green-500)' },
               { label: 'Paid to farmers', value: tzs(summary.paidToFarmers), hint: `${tzs(summary.owedToFarmers)} still owed`, color: 'var(--green-500)' },
             ].map((s) => (
-              <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
-                <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>
-                <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.label}</div>
-                <div style={{ fontSize: '11px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.hint}</div>
-              </div>
+              <MetricTile key={s.label} label={s.label} value={s.value} hint={s.hint} tone={toneFromColor(s.color)} />
             ))}
           </div>
 

@@ -1,5 +1,5 @@
 'use client';
-import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
+import { MetricTile, TableSkeleton, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 
 import { useEffect, useState } from 'react';
 import { reportsApi } from '@/lib/api';
@@ -170,14 +170,7 @@ export default function GrantorImpactPage() {
               ['Members', data.membershipCount],
               ['Fairtrade premium', money(data.fairtradePremiumEarned)],
             ].map(([label, value]) => (
-              <div key={String(label)} className="stat-card" style={{ padding: 18 }}>
-                <div className="muted" style={{ fontSize: 12 }}>
-                  {label}
-                </div>
-                <strong style={{ display: 'block', fontSize: 20, marginTop: 6 }}>
-                  {value}
-                </strong>
-              </div>
+              <MetricTile key={String(label)} label={String(label)} value={value as string | number} />
             ))}
           </div>
 

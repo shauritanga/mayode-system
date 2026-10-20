@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { salesApi } from '@/lib/api';
+import { MetricTile, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 
 const gateLabels: Record<string, string> = {
   crop_cycle: 'Source crop cycle',
@@ -108,21 +109,7 @@ export function SalesView({ embedded = false }: { embedded?: boolean }) {
           },
           { label: 'Pending payment', value: pendingSales, color: 'var(--gold-400)' },
         ].map((metric) => (
-          <div key={metric.label} className="stat-card" style={{ padding: 16 }}>
-            <div
-              style={{
-                color: metric.color,
-                fontFamily: 'Outfit, sans-serif',
-                fontSize: 22,
-                fontWeight: 800,
-              }}
-            >
-              {metric.value}
-            </div>
-            <div className="muted" style={{ fontSize: 12 }}>
-              {metric.label}
-            </div>
-          </div>
+          <MetricTile key={metric.label} label={metric.label} value={metric.value} tone={toneFromColor(metric.color)} />
         ))}
       </div>
       <div className="table-panel">

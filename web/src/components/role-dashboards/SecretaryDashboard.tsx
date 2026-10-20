@@ -19,6 +19,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { mamcosApi, marketplaceApi, reportsApi, workspaceApi } from '@/lib/api';
 import { CountUpValue } from '@/components/CountUpValue';
+import { MetricTile, toneFromColor } from './DashboardPrimitives';
 
 // Secretary day-to-day ops: members, farms, seasons, memberships, queues.
 const SECRETARY_ACTIONS: { label: string; href: string; icon: IconSvgElement; color: string }[] = [
@@ -42,35 +43,8 @@ interface StatDef {
   color: string;
 }
 
-function StatCard({ stat, index }: { stat: StatDef; index: number }) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.div
-      className="stat-card"
-      initial={reduce ? false : { opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay: index * 0.05, ease: [0.16, 1, 0.3, 1] }}
-      whileHover={reduce ? undefined : { y: -3 }}
-      style={{ display: 'flex', alignItems: 'center', gap: '16px' }}
-    >
-      <div style={{
-        width: '46px', height: '46px', borderRadius: '12px',
-        background: `color-mix(in srgb, ${stat.color} 12%, transparent)`,
-        color: stat.color,
-        display: 'flex', alignItems: 'center',
-        justifyContent: 'center', flexShrink: 0,
-      }}>
-        <HugeiconsIcon icon={stat.icon} size={22} strokeWidth={1.8} />
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-outfit), sans-serif', lineHeight: 1.2, letterSpacing: '-0.02em', fontFeatureSettings: "'tnum'" }}>
-          <CountUpValue value={stat.value} />
-        </div>
-        <div style={{ fontSize: '12.5px', color: 'var(--text-2)', fontWeight: 500 }}>{stat.label}</div>
-        {stat.sub && <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '1px', fontWeight: 500 }}>{stat.sub}</div>}
-      </div>
-    </motion.div>
-  );
+function StatCard({ stat }: { stat: StatDef; index: number }) {
+  return <MetricTile label={stat.label} value={stat.value} hint={stat.sub} icon={stat.icon} tone={toneFromColor(stat.color)} />;
 }
 
 function StatCardSkeleton() {

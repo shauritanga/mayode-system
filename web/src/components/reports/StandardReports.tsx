@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { reportsApi } from '@/lib/api';
 import { ChartCard, HorizontalBarChart } from '@/components/role-dashboards/Charts';
+import { MetricTile, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 
 type ColumnType = 'text' | 'number' | 'currency' | 'percent' | 'date';
 type FilterKey =
@@ -272,12 +273,7 @@ export default function StandardReports() {
           <div style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 120ms' }}>
             <div className="metric-grid" style={{ marginBottom: 16 }}>
               {report.summary.map((s) => (
-                <div key={s.label} className="stat-card" style={{ padding: 16 }}>
-                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Outfit, sans-serif', color: 'var(--text-1)' }}>
-                    {formatValue(s.value, s.type)}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--neutral-500)', marginTop: 2 }}>{s.label}</div>
-                </div>
+                <MetricTile key={s.label} label={s.label} value={formatValue(s.value, s.type)} />
               ))}
             </div>
 

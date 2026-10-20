@@ -1,5 +1,5 @@
 'use client';
-import { TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
+import { MetricTile, TableSkeleton, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 
 import { useEffect, useState } from 'react';
 import { reportsApi } from '@/lib/api';
@@ -76,11 +76,7 @@ export default function CompliancePage() {
     {error && <p style={{ color: 'var(--red-400)' }}>{error}</p>}
     {!summary && !error && <TableSkeleton rows={4} avatar={false} />}
     <div className="metric-grid">
-      {cards.map(([label, value, sub]) => <div key={label} className="stat-card" style={{ padding: 22 }}>
-        <div style={{ color: 'var(--neutral-500)', fontSize: 13 }}>{label}</div>
-        <div style={{ color: 'var(--text-primary)', fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 24, margin: '8px 0' }}>{value}</div>
-        <div style={{ color: 'var(--accent)', fontSize: 12 }}>{sub}</div>
-      </div>)}
+      {cards.map(([label, value, sub]) => <MetricTile key={label} label={String(label)} value={value as string | number} hint={String(sub)} />)}
     </div>
     {auditPack && <div style={{ display: 'grid', gap: 18, marginTop: 24 }}>
       <section className="action-panel">
@@ -97,11 +93,7 @@ export default function CompliancePage() {
             ['Incomplete quality checks', gaps?.incompleteHarvestQualityChecks ?? 0, 'Missing harvest/drying/bagging/warehouse measurements'],
             ['Uncertified buyer sales', gaps?.uncertifiedBuyerSales ?? 0, 'Sales where buyer certification is false'],
             ['Unverified source farms', gaps?.unverifiedSourceFarms ?? 0, 'Inventory records tied to unverified farms'],
-          ].map(([label, value, sub]) => <div key={label} className="stat-card" style={{ padding: 18 }}>
-            <div className="muted" style={{ fontSize: 13 }}>{label}</div>
-            <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 26, fontWeight: 800, marginTop: 6 }}>{Number(value).toLocaleString()}</div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{sub}</div>
-          </div>)}
+          ].map(([label, value, sub]) => <MetricTile key={label} label={String(label)} value={Number(value).toLocaleString()} hint={String(sub)} />)}
         </div>
       </section>
 
@@ -122,10 +114,7 @@ export default function CompliancePage() {
             ['Votes', auditPack.governance.voteCount],
             ['Vote responses', auditPack.governance.voteResponseCount],
             ['Projects', auditPack.governance.communityProjectCount],
-          ].map(([label, value]) => <div key={label} className="stat-card" style={{ padding: 16 }}>
-            <div className="muted" style={{ fontSize: 12 }}>{label}</div>
-            <strong style={{ fontSize: 20 }}>{Number(value).toLocaleString()}</strong>
-          </div>)}
+          ].map(([label, value]) => <MetricTile key={label} label={String(label)} value={Number(value).toLocaleString()} />)}
         </div>
       </section>
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { farmLeasesApi, seasonalAssignmentsApi, farmOwnershipsApi, farmsApi, farmingSeasonsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import Modal from '@/components/Modal';
+import { MetricTile, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 
 const OFFICER_METHODS = [
   'PHONE_CALL', 'IN_PERSON', 'VIDEO_CALL', 'DOCUMENT_REVIEW',
@@ -115,10 +116,7 @@ export default function LeasesPage() {
           { label: 'Seasonal assignments', value: assignments.length, color: 'var(--blue-500)' },
           { label: 'Ownerships unconfirmed', value: pendingOwnerships, color: 'var(--red-400)' },
         ].map(s => (
-          <div key={s.label} className="stat-card" style={{ padding: '16px' }}>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, fontFamily: 'Outfit, sans-serif' }}>{s.value}</div>
-            <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>{s.label}</div>
-          </div>
+          <MetricTile key={s.label} label={s.label} value={s.value} tone={toneFromColor(s.color)} />
         ))}
       </div>
 
