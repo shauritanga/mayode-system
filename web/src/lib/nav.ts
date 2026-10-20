@@ -256,9 +256,23 @@ function itemAllowed(item: NavItem, subject: AccessSubject | null | undefined): 
   return !!item.resource && hasPermission(subject, item.resource, 'VIEW');
 }
 
+/** Hidden from the Mayode admin sidebar (the cooperatives portal keeps them). Direct URLs are still guarded by permissions. */
+const ADMIN_PORTAL_HIDDEN_HREFS = new Set([
+  '/dashboard/collection-centres',
+  '/dashboard/finance',
+  '/dashboard/weather',
+  '/dashboard/alerts',
+  '/dashboard/locations',
+  '/dashboard/facilities',
+  '/dashboard/premium-fund',
+]);
+const ADMIN_PORTAL_HIDDEN_GROUPS = new Set(['Governance & Insights']);
+
 export function getVisibleGroups(subject: AccessSubject | null | undefined): NavGroup[] {
   const seen = new Set<string>();
+  const trimAdminPortal = APP_MODE === 'admin' && (subject?.role === 'SUPER_ADMIN' || subject?.role === 'ADMIN');
   return navGroups.map((group) => ({ ...group, items: group.items.filter((item) => {
+    if (trimAdminPortal && (ADMIN_PORTAL_HIDDEN_GROUPS.has(group.label) || ADMIN_PORTAL_HIDDEN_HREFS.has(item.href))) return false;
     if (item.hidden || seen.has(item.href) || !itemAllowed(item, subject)) return false;
     if (item.persona && !(subject?.role && item.roles.includes(subject.role))) return false;
     if (APP_MODE !== 'farmers' && item.roles.length === 1 && item.roles[0] === 'FARMER') return false;
