@@ -1,4 +1,7 @@
 'use client';
+
+import { HugeiconsIcon } from '@hugeicons/react';
+import type { IconSvgElement } from '@hugeicons/react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { CountUpValue } from '@/components/CountUpValue';
@@ -23,6 +26,43 @@ export function MetricTile({
       {hint && <small>{hint}</small>}
     </article>
   );
+}
+
+/**
+ * Summary box: icon on the left, value and label stacked on the right, on a softly tinted background.
+ * Reusable for any headline figure; `tone` picks the colour, `icon` is any Hugeicons icon.
+ */
+export function StatCard({
+  label,
+  value,
+  hint,
+  icon,
+  tone = 'green',
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  icon: IconSvgElement;
+  tone?: 'green' | 'blue' | 'gold' | 'red' | 'purple';
+}) {
+  return (
+    <article className={`stat-card stat-card-${tone}`}>
+      <span className="stat-card-icon" aria-hidden>
+        <HugeiconsIcon icon={icon} size={22} strokeWidth={1.8} />
+      </span>
+      <div className="stat-card-body">
+        <strong>
+          <CountUpValue value={value} />
+        </strong>
+        <span>{label}</span>
+        {hint && <small>{hint}</small>}
+      </div>
+    </article>
+  );
+}
+
+export function StatCardSkeleton() {
+  return <div className="stat-card skeleton" aria-hidden="true" style={{ minHeight: 84 }} />;
 }
 
 export function MetricTileSkeleton() {

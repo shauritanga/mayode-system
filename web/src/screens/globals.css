@@ -1210,6 +1210,19 @@ body {
 .metric-tile-green { --metric-accent: var(--green-500); }
 .metric-tile-blue { --metric-accent: var(--blue-500); }
 .metric-tile-gold { --metric-accent: var(--gold-400); }
+
+/* StatCard: icon left, value + label stacked right, tinted by tone */
+.stat-card { --stat-accent: var(--green-500); display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--stat-accent) 22%, transparent); background: color-mix(in srgb, var(--stat-accent) 11%, var(--surface-1)); min-width: 0; }
+.stat-card-blue { --stat-accent: var(--blue-500); }
+.stat-card-gold { --stat-accent: var(--gold-400); }
+.stat-card-red { --stat-accent: var(--red-400); }
+.stat-card-purple { --stat-accent: var(--purple-500); }
+.stat-card-icon { flex: none; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; color: var(--stat-accent); background: color-mix(in srgb, var(--stat-accent) 18%, var(--surface-1)); }
+.stat-card-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.stat-card-body strong { font-size: 1.5rem; font-weight: 700; color: var(--text-1); }
+.stat-card-body span { margin-top: 3px; font-size: 0.85rem; font-weight: 600; color: var(--text-2); }
+.stat-card-body small { margin-top: 2px; font-size: 0.75rem; color: var(--text-3); }
+
 .metric-tile-red { --metric-accent: var(--red-400); }
 .metric-tile-purple { --metric-accent: var(--purple-500); }
 

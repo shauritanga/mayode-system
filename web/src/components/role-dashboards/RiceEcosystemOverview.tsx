@@ -11,6 +11,23 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import {
+  Building03Icon,
+  Calendar01Icon,
+  Female02Icon,
+  Layers01Icon,
+  Leaf01Icon,
+  MapsIcon,
+  Male02Icon,
+  Money01Icon,
+  PackageIcon,
+  Plant01Icon,
+  Shield01Icon,
+  UserGroupIcon,
+  UserIcon,
+  UserMultiple02Icon,
+  WheatIcon,
+} from '@hugeicons/core-free-icons';
 import { reportsApi } from '@/lib/api';
 import {
   CHART_PALETTE,
@@ -21,8 +38,8 @@ import {
 } from '@/components/role-dashboards/Charts';
 import {
   EmptyState,
-  MetricTile,
-  StatGridSkeleton,
+  StatCard,
+  StatCardSkeleton,
   ChartSkeleton,
   money,
 } from '@/components/role-dashboards/DashboardPrimitives';
@@ -95,7 +112,7 @@ export default function RiceEcosystemOverview({ part = 'all' }: { part?: 'all' |
   if (!data) {
     return (
       <div className="role-dashboard">
-        <StatGridSkeleton count={part === 'rest' ? 10 : 5} />
+        {[...Array(part === 'rest' ? 10 : 5)].map((_, i) => <StatCardSkeleton key={i} />)}
         {part !== 'rest' && <ChartSkeleton height={260} />}
       </div>
     );
@@ -118,26 +135,27 @@ export default function RiceEcosystemOverview({ part = 'all' }: { part?: 'all' |
 
       {part !== 'rest' && (
       <div className="role-grid">
-        <MetricTile label="Registered rice farmers" value={num(k.totalFarmers)} hint={`${num(k.verifiedFarmers)} verified`} />
-        <MetricTile label="Male farmers" value={num(k.maleFarmers)} hint={pct(k.maleFarmers, k.totalFarmers)} tone="blue" />
-        <MetricTile label="Female farmers" value={num(k.femaleFarmers)} hint={pct(k.femaleFarmers, k.totalFarmers)} tone="purple" />
-        <MetricTile label="Youth farmers" value={num(k.youthFarmers)} hint={`Aged ${k.youthMaxAge} or under`} tone="gold" />
-        <MetricTile label="Farms" value={num(k.totalFarms)} hint={`${num(k.verifiedFarms)} verified`} />
+        <StatCard icon={UserGroupIcon} label="Registered rice farmers" value={num(k.totalFarmers)} hint={`${num(k.verifiedFarmers)} verified`} />
+        <StatCard icon={Male02Icon} label="Male farmers" value={num(k.maleFarmers)} hint={pct(k.maleFarmers, k.totalFarmers)} tone="blue" />
+        <StatCard icon={Female02Icon} label="Female farmers" value={num(k.femaleFarmers)} hint={pct(k.femaleFarmers, k.totalFarmers)} tone="purple" />
+        <StatCard icon={UserIcon} label="Youth farmers" value={num(k.youthFarmers)} hint={`Aged ${k.youthMaxAge} or under`} tone="gold" />
+        <StatCard icon={MapsIcon} label="Farms" value={num(k.totalFarms)} hint={`${num(k.verifiedFarms)} verified`} />
       </div>
       )}
 
       {part !== 'top' && (
       <div className="role-grid">
-        <MetricTile label="Plots" value={num(k.totalPlots)} hint="Across all farms" tone="blue" />
-        <MetricTile label="Rice area under cultivation" value={`${num(k.riceAreaUnderCultivationHa)} ha`} hint={`of ${num(k.totalHectares)} ha registered`} />
-        <MetricTile label="Active crop seasons" value={num(k.activeCropSeasons)} hint={`${num(k.activeCropCycles)} active crop cycles`} tone="purple" />
-        <MetricTile label="Estimated rice production" value={tons(k.estimatedProductionKg)} hint="Planned + active crop cycles" tone="gold" />
-        <MetricTile label="Rice harvested" value={tons(k.riceHarvestedKg)} hint="Recorded actual yield" />
-        <MetricTile label="Total rice aggregated" value={tons(k.riceAggregatedKg)} hint={`${num(k.aggregationRecords)} intake records`} tone="blue" />
-        <MetricTile label="Cooperatives" value={num(k.cooperatives)} hint="Active AMCOS" tone="purple" />
-        <MetricTile label="Farmers accessing finance" value={num(k.farmersAccessingFinance)} hint={pct(k.farmersAccessingFinance, k.totalFarmers)} tone="gold" />
-        <MetricTile label="Farmers insured" value={num(k.farmersInsured)} hint={pct(k.farmersInsured, k.totalFarmers)} />
-        <MetricTile
+        <StatCard icon={Layers01Icon} label="Plots" value={num(k.totalPlots)} hint="Across all farms" tone="blue" />
+        <StatCard icon={Plant01Icon} label="Rice area under cultivation" value={`${num(k.riceAreaUnderCultivationHa)} ha`} hint={`of ${num(k.totalHectares)} ha registered`} />
+        <StatCard icon={Calendar01Icon} label="Active crop seasons" value={num(k.activeCropSeasons)} hint={`${num(k.activeCropCycles)} active crop cycles`} tone="purple" />
+        <StatCard icon={WheatIcon} label="Estimated rice production" value={tons(k.estimatedProductionKg)} hint="Planned + active crop cycles" tone="gold" />
+        <StatCard icon={Leaf01Icon} label="Rice harvested" value={tons(k.riceHarvestedKg)} hint="Recorded actual yield" />
+        <StatCard icon={PackageIcon} label="Total rice aggregated" value={tons(k.riceAggregatedKg)} hint={`${num(k.aggregationRecords)} intake records`} tone="blue" />
+        <StatCard icon={Building03Icon} label="Cooperatives" value={num(k.cooperatives)} hint="Active AMCOS" tone="purple" />
+        <StatCard icon={Money01Icon} label="Farmers accessing finance" value={num(k.farmersAccessingFinance)} hint={pct(k.farmersAccessingFinance, k.totalFarmers)} tone="gold" />
+        <StatCard icon={Shield01Icon} label="Farmers insured" value={num(k.farmersInsured)} hint={pct(k.farmersInsured, k.totalFarmers)} />
+        <StatCard
+          icon={UserMultiple02Icon}
           label="Active field officers"
           value={num(k.activeFieldOfficers)}
           hint={`${num(k.fieldOfficersWithRecentVisits)} visited farms in last ${k.fieldOfficerWindowDays} days`}
