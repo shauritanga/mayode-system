@@ -22,11 +22,11 @@ export default function PlotNew() {
   const [capturing, setCapturing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const capture = async (camera: boolean) => {
+  const capture = async () => {
     setCapturing(true);
     try {
-      if (camera && !(await ImagePicker.requestCameraPermissionsAsync()).granted) { Alert.alert(t('cameraPermissionNeeded')); return; }
-      const result = camera ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.75 }) : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.75 });
+      if (!(await ImagePicker.requestCameraPermissionsAsync()).granted) { Alert.alert(t('cameraPermissionNeeded')); return; }
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.75 });
       if (!result.canceled) {
         const asset = result.assets[0];
         const res = await uploadsApi.uploadFile({ uri: asset.uri, name: asset.fileName || 'plot.jpg', type: asset.mimeType || 'image/jpeg' });
@@ -81,8 +81,7 @@ export default function PlotNew() {
 
         <Text style={styles.label}>{t('plotPhoto')}</Text>
         {photoUrl && <Image source={{ uri: resolveMediaUrl(photoUrl) || photoUrl }} style={{ width: '100%', height: 180, borderRadius: 12 }} />}
-        <TouchableOpacity disabled={capturing} onPress={() => { void capture(true); }} style={styles.btn}><Text style={styles.btnText}>{t('takePhoto')}</Text></TouchableOpacity>
-        <TouchableOpacity disabled={capturing} onPress={() => { void capture(false); }} style={styles.btn}><Text style={styles.btnText}>{t('chooseFromGallery')}</Text></TouchableOpacity>
+        <TouchableOpacity disabled={capturing} onPress={() => { void capture(); }} style={styles.btn}><Text style={styles.btnText}>{t('takePhoto')}</Text></TouchableOpacity>
         <TouchableOpacity onPress={locate} style={styles.btn}><Text style={styles.btnText}>{t('captureLocation')}</Text></TouchableOpacity>
         {gps && <Text>{gps.latitude.toFixed(6)}, {gps.longitude.toFixed(6)}</Text>}
         <Field label={t('plotNameOptional')} value={name} onChangeText={setName} placeholder={t('plotNamePlaceholder')} />

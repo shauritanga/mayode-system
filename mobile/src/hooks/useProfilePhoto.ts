@@ -14,13 +14,14 @@ export function useProfilePhotoUpload() {
   const pickAndUpload = async () => {
     if (!user?.id) return;
 
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    // Photos are taken with the camera only, never picked from the gallery.
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert(t('permissionNeeded'), t('allowPhotoAccess'));
+      Alert.alert(t('permissionNeeded'), t('cameraPermissionNeeded'));
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],

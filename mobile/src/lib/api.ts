@@ -76,7 +76,8 @@ function isFieldMutation(url: string, method: string) {
 async function sendFile(file: LocalUpload) {
   const form = new FormData();
   form.append('file', file as unknown as Blob);
-  return api.post('/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  // The server only accepts camera-style image files from the mobile app.
+  return api.post('/uploads', form, { headers: { 'Content-Type': 'multipart/form-data', 'X-MAYODE-Client': 'mobile-camera' } });
 }
 syncQueue.onDiscard(discardOfflineMutation);
 syncQueue.configure(async mutation => {

@@ -165,26 +165,6 @@ export default function FarmDetail() {
           })();
         },
       },
-      {
-        text: t('chooseFromGallery'),
-        onPress: () => {
-          void (async () => {
-            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!perm.granted) {
-              Alert.alert(t('farmPhotos'), t('allowPhotoAccess'));
-              return;
-            }
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ['images'],
-              quality: 0.6,
-              allowsMultipleSelection: true,
-              selectionLimit: 8,
-            });
-            if (result.canceled || !result.assets?.length) return;
-            await uploadFarmPhotos(result.assets);
-          })();
-        },
-      },
       { text: t('cancel'), style: 'cancel' },
     ]);
   }, [id, uploadingPhoto, t, uploadFarmPhotos]);

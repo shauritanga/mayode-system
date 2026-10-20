@@ -134,29 +134,9 @@ export default function ActivityNew() {
     await uploadAsset(result.assets[0]);
   };
 
-  const pickFromLibrary = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert(t('logActivity'), t('allowPhotoAccess'));
-      return;
-    }
-    const remaining = Math.max(MIN_PHOTOS - photos.length, 1);
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.75,
-      allowsMultipleSelection: true,
-      selectionLimit: Math.min(remaining + 2, 6),
-    });
-    if (result.canceled || !result.assets?.length) return;
-    for (const asset of result.assets) {
-      await uploadAsset(asset);
-    }
-  };
-
   const addPhoto = () => {
     Alert.alert(t('addActivityPhoto'), t('activityPhotosHint'), [
       { text: t('takePhoto'), onPress: () => { void pickFromCamera(); } },
-      { text: t('chooseFromGallery'), onPress: () => { void pickFromLibrary(); } },
       { text: t('cancel'), style: 'cancel' },
     ]);
   };
