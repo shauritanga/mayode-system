@@ -51,7 +51,7 @@ export function StatCard({
   return (
     <article className={`stat-card stat-card-${tone} stat-card-${variant}`}>
       <span className="stat-card-icon" aria-hidden>
-        <HugeiconsIcon icon={icon} size={variant === 'solid' ? 34 : 22} strokeWidth={1.8} />
+        <HugeiconsIcon icon={icon} size={variant === 'solid' ? 24 : 22} strokeWidth={1.8} />
       </span>
       <div className="stat-card-body">
         <strong>
