@@ -8,7 +8,7 @@ import { Search01Icon, Cancel01Icon, MapsIcon, ArrowLeft01Icon, ArrowRight01Icon
 import { farmsApi } from '@/lib/api';
 import { hasPermission } from '@/lib/nav';
 import { Tabs } from '@/components/ops/ui';
-import FarmRegistryPage from '../farm-registry/page';
+import OpsFarmPage from '../ops-farm/page';
 import { useAuthStore } from '@/store/auth.store';
 import FarmEditorModal from '@/components/FarmEditorModal';
 import { OWNERSHIP_LABELS, fmtHa, locationLabel, productionLabel, riceVarieties, tenureLabel, toCsv, totalPlotHectares } from '@/lib/farm-format';
@@ -468,16 +468,21 @@ function FarmsList() {
   );
 }
 
-/** Farms, with the pre-registration and spreadsheet import (the farm registry) as a second tab. */
+/** One Farms page: member farms, and Mayode's own farms as a second tab. */
 export default function FarmsPage() {
   const user = useAuthStore((state) => state.user);
-  const canRegistry = hasPermission(user, 'farm_registry', 'VIEW');
-  const [tab, setTab] = useState<'farms' | 'registry'>('farms');
-  const tabs = [{ id: 'farms' as const, label: 'Farms' }, ...(canRegistry ? [{ id: 'registry' as const, label: 'Farm registry' }] : [])];
+  const canFarms = hasPermission(user, 'farms', 'VIEW');
+  const canMayode = ['ops_farm_tasks', 'ops_reports', 'ops_farm_inputs', 'ops_harvest'].some((r) => hasPermission(user, r, 'VIEW'));
+  const tabs = [
+    ...(canFarms ? [{ id: 'farms' as const, label: 'Farms' }] : []),
+    ...(canMayode ? [{ id: 'mayode' as const, label: 'Mayode Farms' }] : []),
+  ];
+  const [picked, setPicked] = useState<'farms' | 'mayode'>('farms');
+  const tab = tabs.some((t) => t.id === picked) ? picked : tabs[0]?.id;
   return (
     <div>
-      {tabs.length > 1 && <Tabs tabs={tabs} value={tab} onChange={setTab} />}
-      {tab === 'registry' && canRegistry ? <FarmRegistryPage /> : <FarmsList />}
+      {tabs.length > 1 && <Tabs tabs={tabs} value={tab ?? 'farms'} onChange={setPicked} />}
+      {tab === 'mayode' ? <OpsFarmPage /> : <FarmsList />}
     </div>
   );
 }
