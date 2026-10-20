@@ -23,6 +23,9 @@ const LinkBtn = ({ onClick, children }: { onClick: () => void; children: React.R
   <button type="button" onClick={onClick} style={{ background: 'none', border: 0, padding: 0, font: 'inherit', color: 'var(--green-600, var(--accent))', fontWeight: 600, cursor: 'pointer' }}>{children}</button>
 );
 
+const START_KEY = 'mayode.warehouse.startHereDismissed';
+const readDismissed = () => { try { return localStorage.getItem(START_KEY) === '1'; } catch { return false; } };
+
 const num = (n?: number | null) => (n || 0).toLocaleString();
 
 export default function OpsWarehousePage() {
@@ -56,6 +59,8 @@ export default function OpsWarehousePage() {
 function Overview({ goto, can }: { goto: (t: Tab) => void; can: (r: string, a?: 'VIEW' | 'CREATE' | 'EDIT' | 'DELETE') => boolean }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [dismissed, setDismissed] = useState(readDismissed);
+  const dismiss = () => { setDismissed(true); try { localStorage.setItem(START_KEY, '1'); } catch { /* the guide just comes back next visit */ } };
   const { data: d, error, loading } = useLoad<any>(() => opsApi.commercialDashboard({ from: from || undefined, to: to || undefined }), [from, to]);
   if (loading && !d) return <Loading />;
   if (!d) return <ErrorNote message={error} />;
@@ -69,7 +74,7 @@ function Overview({ goto, can }: { goto: (t: Tab) => void; can: (r: string, a?: 
     st.inTransitKg > 0 && { text: `${kg(st.inTransitKg)} is on the way between warehouses and has not been received`, to: 'stock' as Tab },
     ...(st.lowStock as any[]).map((b) => ({ text: `${b.product} at ${b.warehouse} is running low: ${kg(b.availableKg)} left, reorder at ${kg(b.reorderLevelKg)}`, to: 'stock' as Tab })),
   ].filter(Boolean) as { text: string; to: Tab }[];
-  const empty = onHand === 0 && d.receipts === 0;
+  const empty = onHand === 0 && d.receipts === 0 && !dismissed;
 
   const actions: { label: string; tab: Tab; show: boolean }[] = [
     { label: 'Receive paddy', tab: 'receiving', show: can('ops_receiving', 'CREATE') },
@@ -93,7 +98,7 @@ function Overview({ goto, can }: { goto: (t: Tab) => void; can: (r: string, a?: 
       <ErrorNote message={error} />
 
       {empty && (
-        <ChartCard title="Start here" subtitle="Nothing has been received yet. Work through these in order.">
+        <ChartCard title="Start here" subtitle="Nothing has been received yet. Work through these in order." action={<button type="button" className="btn-secondary" onClick={dismiss} aria-label="Dismiss the start-here guide">Dismiss</button>}>
           <ol style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 8, fontSize: 14 }}>
             <li><LinkBtn onClick={() => goto('products')}>Products</LinkBtn> — add paddy, the rice you sell and the by-products (set this up once).</li>
             <li><LinkBtn onClick={() => goto('receiving')}>Receiving</LinkBtn> — weigh paddy in from a farmer or a Mayode farm and confirm it.</li>
