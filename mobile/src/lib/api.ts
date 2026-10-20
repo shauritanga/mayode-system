@@ -353,6 +353,19 @@ export const activitiesApi = {
 };
 
 // ── Crop Cycles (starting a season, farming activities) ──
+export interface RiceVariety {
+  id: string;
+  name: string;
+  code?: string | null;
+  /** Days from planting to harvest. */
+  maturityDays?: number | null;
+}
+
+/** The rice varieties Super Admin has set up; farmers and officers choose from these. */
+export const riceVarietiesApi = {
+  list: () => api.get<RiceVariety[]>('/rice-varieties'),
+};
+
 export const cropCyclesApi = {
   getAll: (params?: object) => api.get('/crop-cycles', { params }),
   getOne: (id: string) => api.get(`/crop-cycles/${id}`),
@@ -361,7 +374,7 @@ export const cropCyclesApi = {
   create: (data: {
     farmId: string;
     season: string;
-    riceVariety?: string;
+    riceVarietyId?: string;
     plantingDate?: string;
     expectedHarvest?: string;
     estimatedYieldKg?: number;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Platform,
 } from 'react-native';
@@ -9,6 +9,8 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Calendar01Icon } from '@hugeicons/core-free-icons';
 import { cropCyclesApi } from '../src/lib/data';
 import { useI18n } from '../src/i18n';
+import { SearchableSelect } from '../src/components/SearchableSelect';
+import { harvestFromPlanting, useRiceVarieties } from '../src/hooks/useRiceVarieties';
 
 function toDateInput(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -25,19 +27,28 @@ export default function CropCycleNew() {
   const { t } = useI18n();
 
   const [season, setSeason] = useState('');
+  const { varieties } = useRiceVarieties();
   const [riceVariety, setRiceVariety] = useState('');
+  const variety = useMemo(() => varieties.find((v) => v.name === riceVariety), [varieties, riceVariety]);
+  // Set once the farmer picks a harvest date themselves, so the variety's date never overwrites it.
+  const [harvestChosen, setHarvestChosen] = useState(false);
   const [plantingDate, setPlantingDate] = useState('');
   const [expectedHarvest, setExpectedHarvest] = useState('');
   const [estimatedYieldKg, setEstimatedYieldKg] = useState('');
   const [pickerFor, setPickerFor] = useState<'plant' | 'harvest' | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (harvestChosen) return;
+    setExpectedHarvest(harvestFromPlanting(plantingDate, variety?.maturityDays));
+  }, [plantingDate, variety, harvestChosen]);
+
   const onPickDate = (event: any, selected?: Date) => {
     const field = pickerFor;
     setPickerFor(Platform.OS === 'ios' ? pickerFor : null);
     if (event.type === 'dismissed' || !selected || !field) return;
     if (field === 'plant') setPlantingDate(toDateInput(selected));
-    else setExpectedHarvest(toDateInput(selected));
+    else { setExpectedHarvest(toDateInput(selected)); setHarvestChosen(true); }
     if (Platform.OS === 'ios') setPickerFor(null);
   };
 
@@ -54,7 +65,7 @@ export default function CropCycleNew() {
       const result = await cropCyclesApi.create({
         farmId: farmId!,
         season: season.trim(),
-        riceVariety: riceVariety.trim() || undefined,
+        riceVarietyId: variety?.id,
         plantingDate: plantingDate || undefined,
         expectedHarvest: expectedHarvest || undefined,
         estimatedYieldKg: estimatedYieldKg ? Number(estimatedYieldKg) : undefined,
@@ -76,7 +87,20 @@ export default function CropCycleNew() {
 
         <View style={styles.card}>
           <Field label={t('seasonLabel')} value={season} onChangeText={setSeason} placeholder="2026/2027 Masika" />
-          <Field label={t('riceVariety')} value={riceVariety} onChangeText={setRiceVariety} placeholder="SARO 5 (TXD 306)" />
+          {varieties.length > 0 ? (
+            <SearchableSelect
+              label={t('riceVariety')}
+              value={riceVariety}
+              options={varieties.map((v) => v.name)}
+              placeholder={t('select')}
+              onSelect={setRiceVariety}
+            />
+          ) : (
+            <View style={{ marginBottom: 12 }}>
+              <Text style={styles.fieldLabel}>{t('riceVariety')}</Text>
+              <Text style={styles.hint}>{t('noRiceVarieties')}</Text>
+            </View>
+          )}
 
           <Text style={styles.fieldLabel}>{t('plantingDate')}</Text>
           <TouchableOpacity style={styles.dateBtn} onPress={() => setPickerFor('plant')}>
@@ -89,6 +113,9 @@ export default function CropCycleNew() {
             <HugeiconsIcon icon={Calendar01Icon} size={16} color="#10B981" strokeWidth={2} />
             <Text style={styles.dateBtnText}>{expectedHarvest || t('dateFormatHint')}</Text>
           </TouchableOpacity>
+          {!harvestChosen && !!expectedHarvest && !!variety?.maturityDays && (
+            <Text style={[styles.hint, { marginTop: -6, marginBottom: 12 }]}>{t('harvestFromVariety', { days: variety.maturityDays })}</Text>
+          )}
 
           {pickerFor && (
             <DateTimePicker
@@ -127,6 +154,7 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111827' },
   dateBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
   dateBtnText: { fontSize: 14, color: '#111827' },
+  hint: { fontSize: 12, color: '#6B7280' },
   submitBtn: { backgroundColor: '#065F46', paddingVertical: 15, borderRadius: 14, alignItems: 'center' },
   submitText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });

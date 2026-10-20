@@ -15,6 +15,8 @@ export const mamcosApi = impl.mamcosApi;
 export const farmsApi = impl.farmsApi;
 export const plotsApi = impl.plotsApi;
 export const cropCyclesApi = impl.cropCyclesApi;
+export const riceVarietiesApi = impl.riceVarietiesApi;
+export type { RiceVariety } from './api';
 export const riceProtocolsApi = impl.riceProtocolsApi;
 export const activitiesApi = impl.activitiesApi;
 export const locationsApi = impl.locationsApi;

@@ -13,6 +13,7 @@ import { cropCyclesApi, farmsApi, officerVisitsApi, uploadsApi, resolveMediaUrl 
 import { getCurrentPoint } from '../../src/services/location.service';
 import { useI18n } from '../../src/i18n';
 import { SearchableSelect } from '../../src/components/SearchableSelect';
+import { useRiceVarieties } from '../../src/hooks/useRiceVarieties';
 import {
   CONDITION_LABEL_KEYS,
   FIELD_CONDITION_STATUSES,
@@ -111,6 +112,12 @@ export default function OfficerVisitNewScreen() {
   const draftKey = `mayode-field-visit-draft-${farmerIdParam ?? 'new'}`;
 
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT());
+  const { varieties } = useRiceVarieties();
+  // Varieties come from the admin's list; a value already on the record is kept in the list so it still shows.
+  const varietyOptions = useMemo(() => {
+    const names = varieties.map((v) => v.name);
+    return draft.riceVariety && !names.includes(draft.riceVariety) ? [draft.riceVariety, ...names] : names;
+  }, [varieties, draft.riceVariety]);
   const [farms, setFarms] = useState<FarmOption[]>([]);
   const [selectedFarmId, setSelectedFarmId] = useState<string | null>(farmIdParam ?? null);
   const [cropCycleId, setCropCycleId] = useState<string | undefined>(cropCycleIdParam);
@@ -349,12 +356,12 @@ export default function OfficerVisitNewScreen() {
             onSelect={(v) => set('growthStage', v as RiceGrowthStage)}
           />
           <View style={{ marginTop: 12 }}>
-            <Text style={styles.fieldLabel}>{t('riceVariety')}</Text>
-            <TextInput
-              style={styles.input}
+            <SearchableSelect
+              label={t('riceVariety')}
               value={draft.riceVariety}
-              onChangeText={(v) => set('riceVariety', v)}
-              placeholderTextColor="#9CA3AF"
+              options={varietyOptions}
+              placeholder={t('select')}
+              onSelect={(v) => set('riceVariety', v)}
             />
           </View>
         </View>

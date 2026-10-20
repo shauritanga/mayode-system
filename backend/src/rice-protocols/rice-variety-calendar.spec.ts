@@ -290,6 +290,43 @@ describe("Generating a farmer's calendar from variety and planting date", () => 
   });
 });
 
+describe("A cycle with no planting date follows the calendar's planting date", () => {
+  const SEASON = new Date('2026-08-21T00:00:00Z');
+
+  it("uses the variety calendar's planting date, and leaves the farmer's cycle dates alone", async () => {
+    const w = world({ cycle: { plantingDate: null } });
+    w.protocols.find((p) => p.id === 'p-saro').seasonStart = SEASON;
+    await w.service.scheduleForCycle('c1');
+    const weed = w.tasks.find((t) => t.taskKey === 'weed');
+    expect(weed.dueDate.getTime()).toBe(SEASON.getTime() + 25 * DAY);
+    expect(
+      w.tasks.find((t) => t.taskKey === 'harvest').dueDate.getTime(),
+    ).toBe(SEASON.getTime() + 120 * DAY);
+    expect(w.cycle.plantingDate).toBeNull();
+    expect(w.cycle.expectedHarvest).toBeNull();
+  });
+
+  it("falls back to the default calendar's planting date when the variety has none", async () => {
+    const w = world({
+      cycle: { plantingDate: null, riceVarietyId: 'v-super', variety: SUPER },
+    });
+    w.protocols.find((p) => p.id === 'p-default').seasonStart = SEASON;
+    await w.service.scheduleForCycle('c1');
+    expect(w.tasks.find((t) => t.taskKey === 'weed').dueDate.getTime()).toBe(
+      SEASON.getTime() + 30 * DAY,
+    );
+  });
+
+  it("never overrides a planting date the farmer's own cycle has", async () => {
+    const w = world();
+    w.protocols.find((p) => p.id === 'p-saro').seasonStart = SEASON;
+    await w.service.scheduleForCycle('c1');
+    expect(w.tasks.find((t) => t.taskKey === 'weed').dueDate.getTime()).toBe(
+      new Date('2026-01-10T07:00:00Z').getTime() + 25 * DAY,
+    );
+  });
+});
+
 describe('Re-planning when dates or variety change', () => {
   const future = (days: number) => new Date(Date.now() + days * DAY);
   const task = (over: Record<string, unknown>) => ({

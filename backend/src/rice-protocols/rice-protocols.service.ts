@@ -528,7 +528,24 @@ export class RiceProtocolsService {
         data: { isActive: false },
       }),
     ]);
+    if (!next.mamcosId) await this.rescheduleSeasonCycles(next.varietyId);
     return next;
+  }
+
+  /**
+   * Farmers whose crop cycle has no planting date of its own follow the calendar's planting date, so
+   * saving the calendar brings their tasks up to date. Cycles with their own date are not touched.
+   */
+  private async rescheduleSeasonCycles(varietyId: string | null) {
+    const cycles = await this.prisma.cropCycle.findMany({
+      where: {
+        plantingDate: null,
+        status: { in: ['PLANNED', 'ACTIVE'] },
+        ...(varietyId ? { riceVarietyId: varietyId } : {}),
+      },
+      select: { id: true },
+    });
+    for (const cycle of cycles) await this.scheduleForCycle(cycle.id);
   }
 
   /**
@@ -628,20 +645,27 @@ export class RiceProtocolsService {
         variety: { select: { maturityDays: true } },
       },
     });
-    if (!cycle?.plantingDate) return result;
+    if (!cycle) return result;
     const protocol = await this.activePlatform(cycle.riceVarietyId);
     if (!protocol) return result;
+    // A crop cycle with no planting date of its own follows the planting date Super Admin set on the
+    // variety's calendar, so the farmer still sees that calendar. A date of their own always wins.
+    const usesSeasonStart = !cycle.plantingDate;
+    const plantingDate = cycle.plantingDate ?? protocol.seasonStart;
+    if (!plantingDate) return result;
 
     // Varieties take different times to grow: when only a planting date is known, the harvest date follows from it.
     let expectedHarvest = cycle.expectedHarvest;
     if (!expectedHarvest && cycle.variety?.maturityDays) {
       expectedHarvest = new Date(
-        cycle.plantingDate.getTime() + cycle.variety.maturityDays * DAY_MS,
+        plantingDate.getTime() + cycle.variety.maturityDays * DAY_MS,
       );
-      await this.prisma.cropCycle.update({
-        where: { id: cropCycleId },
-        data: { expectedHarvest },
-      });
+      // The calendar's date is only a stand-in, so it is never written onto the farmer's own cycle.
+      if (!usesSeasonStart)
+        await this.prisma.cropCycle.update({
+          where: { id: cropCycleId },
+          data: { expectedHarvest },
+        });
     }
 
     const defs = (protocol.taskDefinitions as unknown as ProtocolTask[]).filter(
@@ -651,7 +675,7 @@ export class RiceProtocolsService {
       new Date(
         (task.daysFromHarvest != null
           ? expectedHarvest!
-          : cycle.plantingDate!
+          : plantingDate
         ).getTime() +
           (task.daysFromHarvest ?? task.daysFromPlanting ?? 0) * DAY_MS,
       );
