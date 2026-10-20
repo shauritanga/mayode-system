@@ -112,7 +112,7 @@ export default function FieldOfficersPage() {
         <MetricTile label="Farmers assigned" value={sum((o) => o.farmersAssigned).toLocaleString()} hint={`${sum((o) => o.farmersRegistered).toLocaleString()} registered by officers`} tone="blue" />
         <MetricTile label="Visits completed" value={sum((o) => o.visitsCompleted).toLocaleString()} hint="All time" tone="purple" />
         <MetricTile label="Pending tasks" value={sum((o) => o.pendingTasks).toLocaleString()} hint="Verifications and follow-ups" tone="gold" />
-        <MetricTile label="Avg data completeness" value={avgCompleteness == null ? '—' : `${avgCompleteness}%`} hint="Records officers registered" tone="green" />
+        <MetricTile label="Avg data completeness" value={avgCompleteness == null ? '—' : `${avgCompleteness}%`} hint="Records officers registered" tone="red" />
       </div>
 
       <section className="glass-card" style={{ padding: 16, marginBottom: 16 }}>
