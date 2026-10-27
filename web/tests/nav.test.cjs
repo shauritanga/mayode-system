@@ -185,3 +185,24 @@ test('sale workflow pages ship in both portals and follow their own grants', () 
   // Buyers are now a cooperative page too.
   assert.equal(nav.isPathAllowed('/dashboard/buyers', grants('buyers')), true);
 });
+
+test('Accounting & Finance navigation exposes all workspaces behind the accounting grant', () => {
+  const nav = loadNavigation('cooperatives');
+  const group = nav.navGroups.find((entry) => entry.items.some((item) => item.href === '/dashboard/accounting'));
+  assert.ok(group);
+  const parent = group.items[0];
+  assert.equal(parent.label, 'Accounting & Finance');
+  assert.equal(parent.resource, 'accounting');
+  assert.equal(parent.children.length, 12);
+  assert.equal(parent.children.reduce((count, category) => count + category.children.length, 0), 48);
+  const granted = { role: 'CUSTOM', roleId: 'r', permissions: [{ resource: 'accounting', action: 'VIEW' }] };
+  assert.equal(nav.isPathAllowed('/dashboard/accounting', granted), true);
+  assert.equal(nav.isPathAllowed('/dashboard/accounting/general-ledger/trial-balance', granted), true);
+  assert.equal(nav.isPathAllowed('/dashboard/accounting/not-a-real-page', granted), false);
+  assert.equal(nav.isPathAllowed('/dashboard/accounting/general-ledger/trial-balance', { ...granted, permissions: [] }), false);
+  for (const mode of ['admin', 'cooperatives']) {
+    const root = require('node:path').resolve(__dirname, '../apps', mode, 'src/app/dashboard/accounting');
+    assert.ok(require('node:fs').existsSync(require('node:path').join(root, 'page.tsx')));
+    assert.ok(require('node:fs').existsSync(require('node:path').join(root, '[...slug]', 'page.tsx')));
+  }
+});

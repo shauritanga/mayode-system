@@ -1,0 +1,33 @@
+{
+  "snapshot_date": "2026-10-26",
+  "repository_revision": "a84fe8ffa1d4d9a5cf6fc972d2ff1c806f1f6161",
+  "features": [
+    {
+      "id": "01-mobile-offline-sync",
+      "title": "Offline field-change queue and retry-safe synchronization",
+      "path": "mobile/src/services/sync-queue.ts",
+      "lines": "83-156",
+      "source_sha256": "a598272c84ee5f96361aaf75180dc67e516789a2ed5dfa33475c23a401d3121e",
+      "excerpt_sha256": "d77c568be0803da992ea86814a630eca431097cf96206d3b1d64e343a0d84b9d",
+      "excerpt_file": "excerpts/01-mobile-offline-sync.txt"
+    },
+    {
+      "id": "02-farm-verification",
+      "title": "Farm verification evidence and atomic status update",
+      "path": "backend/src/farm-verifications/farm-verifications.service.ts",
+      "lines": "14-71",
+      "source_sha256": "34978ac42c6cb26e9873e736ba27d11ba1513f9e79af63e01c9dde653b5db49e",
+      "excerpt_sha256": "86945f067bf8d9a4b76a84739d3cf9d5abacc237875f076323a30cc9e1aebed6",
+      "excerpt_file": "excerpts/02-farm-verification.txt"
+    },
+    {
+      "id": "03-field-survey-schema",
+      "title": "Field survey model for soil, water access and GPS",
+      "path": "backend/prisma/schema.prisma",
+      "lines": "2642-2675",
+      "source_sha256": "898d2fcf1b1cbe747e67cac27c41a894868da80678c05d1c21ccfabb3c689d7b",
+      "excerpt_sha256": "047a8493709c88b8e7221b4550551f2ff52b9ae3fbc30ae6b170462fcb760b0c",
+      "excerpt_file": "excerpts/03-field-survey-schema.txt"
+    }
+  ]
+}

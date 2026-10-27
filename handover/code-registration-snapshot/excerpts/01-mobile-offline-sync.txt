@@ -1,0 +1,74 @@
+  async enqueue(
+    input: Omit<PendingMutation, "id" | "createdAt" | "attempts"> & {
+      id?: string;
+    },
+  ) {
+    if (!owner) throw new Error("Sign in before saving field records.");
+    const mutation: PendingMutation = {
+      ...input,
+      id: input.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    };
+    // Preserve every ordered write: replacing PATCHes loses independent fields.
+    await change(owner, (queue) =>
+      queue.some((m) => m.id === mutation.id) ? queue : [...queue, mutation],
+    );
+    return mutation;
+  },
+  pending: () => read(),
+  async flush() {
+    if (running || !replay || !owner) return;
+    running = true;
+    const id = owner;
+    try {
+      const network = await NetInfo.fetch();
+      connected =
+        !!network.isConnected && network.isInternetReachable !== false;
+      if (!connected) return;
+      await notify();
+      for (const mutation of await read(id)) {
+        if (owner !== id) break;
+        try {
+          await replay(mutation);
+          await change(id, (queue) =>
+            queue.filter((m) => m.id !== mutation.id),
+          );
+          await AsyncStorage.setItem(
+            `${key(id)}.last`,
+            new Date().toISOString(),
+          );
+        } catch (error: any) {
+          await change(id, (queue) =>
+            queue.map((m) =>
+              m.id === mutation.id
+                ? {
+                    ...m,
+                    attempts: m.attempts + 1,
+                    lastError: String(
+                      error?.response?.data?.message || error.message,
+                    ),
+                  }
+                : m,
+            ),
+          );
+          // Keep dependent records behind the failed parent until corrected/retried.
+          break;
+        }
+      }
+      if (
+        onSynced &&
+        owner === id &&
+        Date.now() - lastReported > REPORT_EVERY_MS &&
+        (await read(id)).length === 0
+      ) {
+        lastReported = Date.now();
+        await onSynced().catch(() => {
+          lastReported = 0;
+        });
+      }
+    } finally {
+      running = false;
+      await notify();
+    }
+  },

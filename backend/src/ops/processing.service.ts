@@ -57,6 +57,9 @@ export class ProcessingService {
       }
       const varieties = [...new Set(batches.map((b) => b.riceVariety).filter(Boolean))];
       const variety = varieties.length === 1 ? varieties[0] : varieties.length > 1 ? 'Mixed' : null;
+      const ownership = new Set(batches.map((b) => `${b.ownerType}:${b.ownerFarmerId ?? ''}`));
+      if (ownership.size > 1) throw new BadRequestException('Do not combine stock with different owners in one processing batch. Process each ownership group separately to preserve ownership through milling.');
+      const [ownerType, ownerFarmerId] = [...ownership][0].split(':');
       const balance = runBalance(inputKg, dto.outputs);
       const run = await tx.processingRun.create({
         data: {
@@ -77,6 +80,7 @@ export class ProcessingService {
             data: {
               mamcosId: run.mamcosId, reference: await nextRef(tx, 'BT'), productId: o.productId, warehouseId: dto.warehouseId, storageLocation: o.destinationLocation?.trim() || null,
               riceVariety: variety ?? p.riceVariety, grade: p.grade, processingRunId: run.id, outputKind: o.kind,
+              ownerType: ownerType as never, ownerFarmerId: ownerFarmerId || null,
             },
           });
           batchId = b.id;

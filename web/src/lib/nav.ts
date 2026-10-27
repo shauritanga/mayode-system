@@ -57,6 +57,7 @@ export interface NavItem {
    * custom roles don't see it, though the route stays reachable by URL.
    */
   persona?: boolean;
+  children?: NavItem[];
 }
 
 export interface NavGroup {
@@ -89,7 +90,7 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/warehouse', label: 'Warehouse counter', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'warehouse_desk', hidden: true },
       { href: '/dashboard/sale-orders', label: 'Cooperative sale orders', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'sale_orders', hidden: true },
       { href: '/dashboard/ops-orders', label: 'Orders & Sales', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN'], anyResource: ['ops_orders', 'ops_review', 'ops_payments', 'ops_customers', 'sale_orders', 'sales'] },
-      { href: '/dashboard/ops-warehouse', label: 'Warehouse', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], anyResource: ['ops_receiving', 'ops_processing', 'ops_stock', 'ops_dispatch', 'ops_catalog', 'warehouse_desk'] },
+      { href: '/dashboard/ops-warehouse', label: 'Warehouse & Inventory', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], anyResource: ['ops_receiving', 'ops_processing', 'ops_stock', 'ops_dispatch', 'ops_catalog', 'warehouse_desk', 'warehouses'] },
       { href: '/dashboard/ops-farm', label: 'Mayode Farms', icon: Plant01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'ops_farm_tasks', hidden: true },
       { href: '/dashboard/ops-field-work', label: 'My Field Work', icon: ClipboardIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'ops_field_work' },
       { href: '/dashboard/sales', label: 'Sales & farmer payouts', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'sales', hidden: true },
@@ -100,6 +101,84 @@ export const navGroups: NavGroup[] = [
   {
     label: 'Money & Reports',
     items: [
+      {
+            href: '/dashboard/accounting', label: 'Accounting & Finance', icon: Wallet01Icon,
+            roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'AUDITOR'], resource: 'accounting',
+            children: [
+              { href: '/dashboard/accounting/farmer-financial-accounts', label: 'Farmer Financial Accounts', icon: UserGroupIcon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/farmer-financial-accounts/farmer-ledger', label: 'Farmer Ledger', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/farmer-financial-accounts/farmer-balances', label: 'Farmer Balances', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/farmer-financial-accounts/advances', label: 'Advances', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/farmer-financial-accounts/deductions', label: 'Deductions', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/farmer-financial-accounts/farmer-statements', label: 'Farmer Statements', icon: File01Icon, roles: [] },
+              ] },
+              { href: '/dashboard/accounting/paddy-procurement', label: 'Paddy Procurement', icon: WheatIcon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/paddy-procurement/paddy-purchases', label: 'Paddy Purchases', icon: ShoppingCart02Icon, roles: [] },
+                { href: '/dashboard/accounting/paddy-procurement/paddy-deliveries', label: 'Paddy Deliveries', icon: Package01Icon, roles: [] },
+                { href: '/dashboard/accounting/paddy-procurement/procurement-payables', label: 'Procurement Payables', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/paddy-procurement/quality-adjustments', label: 'Quality Adjustments', icon: FileEditIcon, roles: [] },
+              ] },
+              { href: '/dashboard/accounting/farmer-settlements', label: 'Farmer Settlements', icon: Wallet01Icon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/farmer-settlements/settlement-batches', label: 'Settlement Batches', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/farmer-settlements/payment-approvals', label: 'Payment Approvals', icon: Shield01Icon, roles: [] },
+                { href: '/dashboard/accounting/farmer-settlements/partial-payments', label: 'Partial Payments', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/farmer-settlements/settlement-reconciliation', label: 'Settlement Reconciliation', icon: FileEditIcon, roles: [] },
+              ] },
+              { href: '/dashboard/accounting/rice-sales-receivables', label: 'Rice Sales & Receivables', icon: Store01Icon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/rice-sales-receivables/sales-invoices', label: 'Sales Invoices', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/rice-sales-receivables/customer-receipts', label: 'Customer Receipts', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/rice-sales-receivables/credit-sales', label: 'Credit Sales', icon: ShoppingCart02Icon, roles: [] },
+                { href: '/dashboard/accounting/rice-sales-receivables/customer-debtors', label: 'Customer Debtors', icon: UserGroupIcon, roles: [] },
+              ] },
+              { href: '/dashboard/accounting/milling-cost-accounting', label: 'Milling Cost Accounting', icon: Plant01Icon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/milling-cost-accounting/production-costs', label: 'Production Costs', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/milling-cost-accounting/milling-yield', label: 'Milling Yield', icon: WheatIcon, roles: [] },
+                { href: '/dashboard/accounting/milling-cost-accounting/by-products', label: 'By-products', icon: Package01Icon, roles: [] },
+                { href: '/dashboard/accounting/milling-cost-accounting/cost-per-kilogram', label: 'Cost per Kilogram', icon: Wallet01Icon, roles: [] },
+              ] },
+              { href: '/dashboard/accounting/cash-banking', label: 'Cash & Banking', icon: Wallet01Icon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/cash-banking/cashbooks', label: 'Cashbooks', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/cash-banking/bank-accounts', label: 'Bank Accounts', icon: Building05Icon, roles: [] },
+                { href: '/dashboard/accounting/cash-banking/mobile-money', label: 'Mobile Money', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/cash-banking/bank-reconciliation', label: 'Bank Reconciliation', icon: FileEditIcon, roles: [] },
+              ] },
+              { href: '/dashboard/accounting/purchases-suppliers', label: 'Purchases & Suppliers', icon: ShoppingCart02Icon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/purchases-suppliers/supplier-bills', label: 'Supplier Bills', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/purchases-suppliers/supplier-payments', label: 'Supplier Payments', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/purchases-suppliers/outstanding-balances', label: 'Outstanding Balances', icon: Wallet01Icon, roles: [] },
+              ] },
+              { href: '/dashboard/accounting/expenses-petty-cash', label: 'Expenses & Petty Cash', icon: Wallet01Icon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/expenses-petty-cash/expense-claims', label: 'Expense Claims', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/expenses-petty-cash/payment-vouchers', label: 'Payment Vouchers', icon: FileEditIcon, roles: [] },
+                { href: '/dashboard/accounting/expenses-petty-cash/cash-advances', label: 'Cash Advances', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/expenses-petty-cash/expense-approvals', label: 'Expense Approvals', icon: Shield01Icon, roles: [] },
+              ] },
+              { href: '/dashboard/accounting/assets-loans', label: 'Assets & Loans', icon: Building05Icon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/assets-loans/equipment-register', label: 'Equipment Register', icon: Package01Icon, roles: [] },
+                { href: '/dashboard/accounting/assets-loans/depreciation', label: 'Depreciation', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/assets-loans/borrowings', label: 'Borrowings', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/assets-loans/interest', label: 'Interest', icon: File01Icon, roles: [] },
+              ] },
+              { href: '/dashboard/accounting/general-ledger', label: 'General Ledger', icon: BookOpen01Icon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/general-ledger/chart-of-accounts', label: 'Chart of Accounts', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/general-ledger/journal-entries', label: 'Journal Entries', icon: FileEditIcon, roles: [] },
+                { href: '/dashboard/accounting/general-ledger/trial-balance', label: 'Trial Balance', icon: BookOpen01Icon, roles: [] },
+                { href: '/dashboard/accounting/general-ledger/account-balances', label: 'Account Balances', icon: Wallet01Icon, roles: [] },
+              ] },
+              { href: '/dashboard/accounting/budgets-cooperative-funds', label: 'Budgets & Cooperative Funds', icon: GiftIcon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/budgets-cooperative-funds/annual-budgets', label: 'Annual Budgets', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/budgets-cooperative-funds/member-contributions', label: 'Member Contributions', icon: UserGroupIcon, roles: [] },
+                { href: '/dashboard/accounting/budgets-cooperative-funds/reserves', label: 'Reserves', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/budgets-cooperative-funds/approved-allocations', label: 'Approved Allocations', icon: Shield01Icon, roles: [] },
+              ] },
+              { href: '/dashboard/accounting/financial-reports', label: 'Financial Reports', icon: ChartBarLineIcon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/financial-reports/income-statement', label: 'Income Statement', icon: ChartBarLineIcon, roles: [] },
+                { href: '/dashboard/accounting/financial-reports/balance-sheet', label: 'Balance Sheet', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/financial-reports/cash-flow-statement', label: 'Cash Flow Statement', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/financial-reports/farmer-liabilities', label: 'Farmer Liabilities', icon: UserGroupIcon, roles: [] },
+              ] },
+            ],
+          },
       { href: '/dashboard/credit', label: 'Credit & Loans', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'loans' },
       { href: '/dashboard/reports', label: 'Reports', icon: ChartBarLineIcon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'reports' },
       { href: '/dashboard/audit-log', label: 'Audit Log', icon: File01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'audit_logs' },
@@ -161,7 +240,7 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/marketplace', label: 'M-LAX Marketplace', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], resource: 'marketplace' },
       { href: '/dashboard/sale-orders', label: 'Cooperative sale orders', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], resource: 'sale_orders', hidden: true },
       { href: '/dashboard/ops-orders', label: 'Orders & Sales', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], anyResource: ['ops_orders', 'ops_review', 'ops_payments', 'ops_customers', 'sale_orders', 'sales'] },
-      { href: '/dashboard/ops-warehouse', label: 'Warehouse', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], anyResource: ['ops_receiving', 'ops_processing', 'ops_stock', 'ops_dispatch', 'ops_catalog', 'warehouse_desk'] },
+      { href: '/dashboard/ops-warehouse', label: 'Warehouse & Inventory', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], anyResource: ['ops_receiving', 'ops_processing', 'ops_stock', 'ops_dispatch', 'ops_catalog', 'warehouse_desk', 'warehouses'] },
       { href: '/dashboard/ops-farm', label: 'Mayode Farms', icon: Plant01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'ops_farm_tasks', hidden: true },
       { href: '/dashboard/ops-field-work', label: 'My Field Work', icon: ClipboardIcon, roles: ['MAMCOS_SECRETARY'], resource: 'ops_field_work' },
       { href: '/dashboard/warehouse', label: 'Warehouse counter', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'warehouse_desk', hidden: true },
@@ -295,6 +374,14 @@ export function isPathAllowed(pathname: string, subject: AccessSubject | null | 
     return subject?.role === 'FARMER' && ['', '/farms', '/crop-cycles', '/rice-tasks', '/finance', '/loans', '/weather', '/insurance', '/membership', '/votes', '/alerts', '/marketplace', '/consent', '/warehouse', '/community'].includes(suffix);
   }
   if (pathname === '/dashboard' || pathname === '/dashboard/forbidden') return !!subject?.role;
+  if (pathname === '/dashboard/accounting' || pathname.startsWith('/dashboard/accounting/')) {
+    const parent = navGroups.flatMap((group) => group.items).find((item) => item.href === '/dashboard/accounting');
+    if (!parent || !itemAllowed(parent, subject)) return false;
+    const descendants = (parent.children ?? []).flatMap(function visit(item): NavItem[] {
+      return [item, ...(item.children ?? []).flatMap(visit)];
+    });
+    return pathname === parent.href || descendants.some((item) => item.href === pathname);
+  }
   // Use the most specific match so /dashboard cannot authorize every child URL.
   const matches = navGroups.flatMap((g) => g.items).filter((item) =>
     pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(`${item.href}/`)));

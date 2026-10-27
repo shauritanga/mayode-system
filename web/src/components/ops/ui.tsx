@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { apiErrorMessage } from '@/lib/api-error';
 import { tone, label } from '@/lib/ops';
 
@@ -34,15 +34,25 @@ export interface Column<T> {
   nowrap?: boolean;
 }
 
-export function DataTable<T>({ rows, columns, rowKey, empty = 'Nothing to show.', onRow }: { rows: T[]; columns: Column<T>[]; rowKey: (row: T) => string; empty?: string; onRow?: (row: T) => void }) {
+export const TablePageSizeContext = createContext<number | undefined>(undefined);
+
+export function DataTable<T>({ rows, columns, rowKey, empty = 'Nothing to show.', onRow, pageSize: pageSizeProp }: { rows: T[]; columns: Column<T>[]; rowKey: (row: T) => string; empty?: string; onRow?: (row: T) => void; pageSize?: number }) {
+  const [page, setPage] = useState(0);
+  const contextualPageSize = useContext(TablePageSizeContext);
   if (!rows.length) return <div className="table-panel"><Empty>{empty}</Empty></div>;
+  const pageSize = pageSizeProp ?? contextualPageSize ?? 0;
+  const pageCount = pageSize ? Math.ceil(rows.length / pageSize) : 1;
+  const activePage = Math.min(page, pageCount - 1);
+  const visibleRows = pageSize ? rows.slice(activePage * pageSize, (activePage + 1) * pageSize) : rows;
+  const firstItem = pageSize ? activePage * pageSize + 1 : 1;
+  const lastItem = pageSize ? Math.min((activePage + 1) * pageSize, rows.length) : rows.length;
   return (
     <div className="table-panel">
       <div style={{ overflowX: 'auto' }}>
         <table className="data-table">
           <thead><tr>{columns.map((c) => <th key={c.header} style={{ textAlign: c.align ?? 'left' }}>{c.header}</th>)}</tr></thead>
           <tbody>
-            {rows.map((r) => (
+            {visibleRows.map((r) => (
               <tr key={rowKey(r)} onClick={onRow ? () => onRow(r) : undefined} style={onRow ? { cursor: 'pointer' } : undefined}>
                 {columns.map((c) => <td key={c.header} style={{ textAlign: c.align ?? 'left', whiteSpace: c.nowrap === false ? 'normal' : 'nowrap', fontVariantNumeric: c.align === 'right' ? 'tabular-nums' : undefined }}>{c.render(r)}</td>)}
               </tr>
@@ -50,13 +60,17 @@ export function DataTable<T>({ rows, columns, rowKey, empty = 'Nothing to show.'
           </tbody>
         </table>
       </div>
+      {pageSize > 0 && rows.length > pageSize && <div className="ops-table-pagination" aria-label="Table pagination">
+        <span>Showing <strong>{firstItem}–{lastItem}</strong> of <strong>{rows.length.toLocaleString()}</strong> records</span>
+        <div className="ops-table-pagination-controls"><button type="button" className="btn-secondary" disabled={activePage === 0} onClick={() => setPage(activePage - 1)}>Previous</button><span>Page {activePage + 1} of {pageCount}</span><button type="button" className="btn-secondary" disabled={activePage >= pageCount - 1} onClick={() => setPage(activePage + 1)}>Next</button></div>
+      </div>}
     </div>
   );
 }
 
 export function Toolbar({ children, right }: { children?: ReactNode; right?: ReactNode }) {
   return (
-    <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+    <div className="ops-toolbar" style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between' }}>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>{children}</div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{right}</div>
     </div>

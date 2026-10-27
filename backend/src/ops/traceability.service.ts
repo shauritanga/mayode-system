@@ -21,7 +21,8 @@ export class TraceabilityService {
     assertVisible(actor, b, 'Batch');
     const node: Record<string, unknown> = {
       batchId: b.id, reference: b.reference, product: b.product.name, brand: b.product.brand, category: b.product.category,
-      variety: b.riceVariety, grade: b.grade, createdAt: b.createdAt,
+      variety: b.riceVariety, grade: b.grade, ownerType: b.ownerType, ownerFarmerId: b.ownerFarmerId,
+      stockStatus: b.stockStatus, statusReason: b.statusReason, createdAt: b.createdAt,
     };
     if (b.receiptId) {
       const r = await this.prisma.goodsReceipt.findUnique({
@@ -71,7 +72,7 @@ export class TraceabilityService {
   async forward(batchId: string, actor: Actor, depth = 0): Promise<unknown> {
     const b = await this.batchHead(batchId);
     assertVisible(actor, b, 'Batch');
-    const node: Record<string, unknown> = { batchId: b.id, reference: b.reference, product: b.product.name, brand: b.product.brand, category: b.product.category, createdAt: b.createdAt };
+    const node: Record<string, unknown> = { batchId: b.id, reference: b.reference, product: b.product.name, brand: b.product.brand, category: b.product.category, ownerType: b.ownerType, ownerFarmerId: b.ownerFarmerId, stockStatus: b.stockStatus, statusReason: b.statusReason, createdAt: b.createdAt };
     const [inputs, lines, allocs] = await Promise.all([
       this.prisma.processingInput.findMany({ where: { batchId }, include: { run: { include: { outputs: true, batches: { select: { id: true } } } } } }),
       this.prisma.opsDispatchLine.findMany({

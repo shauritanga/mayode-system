@@ -197,6 +197,7 @@ model Farmer {
   documents                 Document[]
   verifications             FarmerVerification[]
   memberships               Membership[]
+  memberContributions       MemberContribution[]
   farmOwnerships            FarmOwnership[]                @relation("LegalOwner")
   leasesAsOwner             FarmLease[]                    @relation("LeaseOwner")
   leasesAsRenter            FarmLease[]                    @relation("LeaseRenter")
@@ -282,19 +283,22 @@ model Mamcos {
   votes              Vote[]
 
   // Relations
-  staff              MamcosStaff[]
-  accounts           User[]               @relation("UserMamcos")
-  roles              Role[]
-  farmers            Farmer[]
-  farms              Farm[]
-  farmingSeasons     FarmingSeason[]
-  registryRecords    FarmRegistryRecord[]
-  riceProtocols      RiceProtocol[]
-  irrigationSchemes  IrrigationScheme[]
-  aggregationCentres AggregationCentre[]
-  buyers             Buyer[]
-  warehouses         Warehouse[]
-  collectionCentres  CollectionCentre[]
+  staff               MamcosStaff[]
+  accounts            User[]               @relation("UserMamcos")
+  roles               Role[]
+  farmers             Farmer[]
+  farms               Farm[]
+  farmingSeasons      FarmingSeason[]
+  registryRecords     FarmRegistryRecord[]
+  riceProtocols       RiceProtocol[]
+  irrigationSchemes   IrrigationScheme[]
+  aggregationCentres  AggregationCentre[]
+  buyers              Buyer[]
+  warehouses          Warehouse[]
+  collectionCentres   CollectionCentre[]
+  memberContributions MemberContribution[]
+  reserveAllocations  ReserveAllocation[]
+  budgets             Budget[]
 
   @@map("mamcos")
 }
@@ -1238,14 +1242,19 @@ model Bill {
 }
 
 model Budget {
-  id          String       @id @default(uuid())
-  name        String
-  fiscalYear  Int?         @map("fiscal_year")
-  seasonLabel String?      @map("season_label")
-  startDate   DateTime     @map("start_date")
-  endDate     DateTime     @map("end_date")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  lines       BudgetLine[]
+  id               String       @id @default(uuid())
+  mamcosId         String?      @map("mamcos_id")
+  name             String
+  fiscalYear       Int?         @map("fiscal_year")
+  seasonLabel      String?      @map("season_label")
+  startDate        DateTime     @map("start_date")
+  endDate          DateTime     @map("end_date")
+  status           BudgetStatus @default(DRAFT)
+  approvedAt       DateTime?    @map("approved_at")
+  approvedByUserId String?      @map("approved_by_user_id")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  mamcos           Mamcos?      @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  lines            BudgetLine[]
 
   @@map("budgets")
 }
@@ -2381,6 +2390,39 @@ model Membership {
   @@map("memberships")
 }
 
+model MemberContribution {
+  id               String   @id @default(uuid())
+  mamcosId         String   @map("mamcos_id")
+  farmerId         String   @map("farmer_id")
+  amount           Float
+  contributionDate DateTime @map("contribution_date")
+  paymentMethod    String?  @map("payment_method")
+  reference        String?
+  description      String?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  mamcos Mamcos @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  farmer Farmer @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+
+  @@index([mamcosId, contributionDate])
+  @@index([farmerId, contributionDate])
+  @@map("member_contributions")
+}
+
+model ReserveAllocation {
+  id             String   @id @default(uuid())
+  mamcosId       String   @map("mamcos_id")
+  amount         Float
+  allocationDate DateTime @map("allocation_date")
+  description    String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  mamcos Mamcos @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+
+  @@index([mamcosId, allocationDate])
+  @@map("reserve_allocations")
+}
+
 // ============================================================
 // FARM-ACTION ALERTS (free preview, premium recommendation)
 // ============================================================
@@ -2849,6 +2891,12 @@ enum AccountType {
   EXPENSE
 }
 
+enum BudgetStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
 enum InvoiceStatus {
   OPEN
   PAID
@@ -3315,6 +3363,7 @@ model Warehouse {
   goodsReceipts     GoodsReceipt[]
   processingRuns    ProcessingRun[]
   opsDispatches     OpsDispatch[]
+  stockCounts       StockCount[]
 
   @@index([mamcosId])
   @@map("warehouses")
@@ -3697,34 +3746,117 @@ model Customer {
 
 /// One identifiable quantity of rice: a delivery received, or something produced by processing.
 model StockBatch {
-  id              String      @id @default(uuid())
-  mamcosId        String?     @map("mamcos_id")
-  reference       String      @unique
-  productId       String      @map("product_id")
-  warehouseId     String      @map("warehouse_id")
+  id                    String         @id @default(uuid())
+  mamcosId              String?        @map("mamcos_id")
+  reference             String         @unique
+  productId             String         @map("product_id")
+  warehouseId           String         @map("warehouse_id")
   /// Bay or stack inside the warehouse.
-  storageLocation String?     @map("storage_location")
-  riceVariety     String?     @map("rice_variety")
-  grade           String?
+  storageLocation       String?        @map("storage_location")
+  riceVariety           String?        @map("rice_variety")
+  grade                 String?
   /// Set for paddy received from a farmer or Mayode farm.
-  receiptId       String?     @unique @map("receipt_id")
+  receiptId             String?        @unique @map("receipt_id")
   /// Set for rice produced by a processing run.
-  processingRunId String?     @map("processing_run_id")
-  outputKind      OutputKind? @map("output_kind")
-  createdAt       DateTime    @default(now()) @map("created_at")
+  processingRunId       String?        @map("processing_run_id")
+  outputKind            OutputKind?    @map("output_kind")
+  ownerType             StockOwnerType @default(COOPERATIVE) @map("owner_type")
+  ownerFarmerId         String?        @map("owner_farmer_id")
+  stockStatus           StockStatus    @default(AVAILABLE) @map("stock_status")
+  statusReason          String?        @map("status_reason")
+  statusChangedByUserId String?        @map("status_changed_by_user_id")
+  statusChangedAt       DateTime?      @map("status_changed_at")
+  createdAt             DateTime       @default(now()) @map("created_at")
 
-  product     Product            @relation(fields: [productId], references: [id])
-  warehouse   Warehouse          @relation(fields: [warehouseId], references: [id])
-  receipt     GoodsReceipt?      @relation(fields: [receiptId], references: [id])
-  run         ProcessingRun?     @relation("RunOutputs", fields: [processingRunId], references: [id])
-  ledger      StockLedgerEntry[]
-  inputs      ProcessingInput[]
-  allocations OrderAllocation[]
-  dispatches  OpsDispatchLine[]
+  product         Product            @relation(fields: [productId], references: [id])
+  warehouse       Warehouse          @relation(fields: [warehouseId], references: [id])
+  receipt         GoodsReceipt?      @relation(fields: [receiptId], references: [id])
+  run             ProcessingRun?     @relation("RunOutputs", fields: [processingRunId], references: [id])
+  ledger          StockLedgerEntry[]
+  statusEvents    StockStatusEvent[]
+  stockCountLines StockCountLine[]
+  inputs          ProcessingInput[]
+  allocations     OrderAllocation[]
+  dispatches      OpsDispatchLine[]
 
   @@index([productId, warehouseId])
   @@index([mamcosId])
+  @@index([mamcosId, stockStatus])
+  @@index([ownerType, ownerFarmerId])
   @@map("stock_batches")
+}
+
+enum StockCountStatus {
+  COUNTING
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+model StockCount {
+  id               String           @id @default(uuid())
+  mamcosId         String?          @map("mamcos_id")
+  reference        String           @unique
+  warehouseId      String           @map("warehouse_id")
+  status           StockCountStatus @default(COUNTING)
+  blind            Boolean          @default(true)
+  note             String?
+  createdByUserId  String           @map("created_by_user_id")
+  approvedByUserId String?          @map("approved_by_user_id")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  submittedAt      DateTime?        @map("submitted_at")
+  approvedAt       DateTime?        @map("approved_at")
+  warehouse        Warehouse        @relation(fields: [warehouseId], references: [id])
+  lines            StockCountLine[]
+
+  @@index([mamcosId, status])
+  @@index([warehouseId, createdAt])
+  @@map("stock_counts")
+}
+
+model StockCountLine {
+  id              String     @id @default(uuid())
+  countId         String     @map("count_id")
+  batchId         String     @map("batch_id")
+  systemKg        Float      @map("system_kg")
+  countedKg       Float?     @map("counted_kg")
+  note            String?
+  countedByUserId String?    @map("counted_by_user_id")
+  countedAt       DateTime?  @map("counted_at")
+  count           StockCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  batch           StockBatch @relation(fields: [batchId], references: [id])
+
+  @@unique([countId, batchId])
+  @@index([batchId])
+  @@map("stock_count_lines")
+}
+
+enum StockOwnerType {
+  COOPERATIVE
+  FARMER
+  CUSTOMER
+  OTHER
+}
+
+enum StockStatus {
+  AVAILABLE
+  QUARANTINED
+  DAMAGED
+  REJECTED
+}
+
+model StockStatusEvent {
+  id              String       @id @default(uuid())
+  batchId         String       @map("batch_id")
+  fromStatus      StockStatus? @map("from_status")
+  toStatus        StockStatus  @map("to_status")
+  reason          String
+  createdByUserId String       @map("created_by_user_id")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  batch           StockBatch   @relation(fields: [batchId], references: [id])
+
+  @@index([batchId, createdAt])
+  @@map("stock_status_events")
 }
 
 /// The source of truth for physical stock. Rows are only ever added; a mistake is corrected by a new row.

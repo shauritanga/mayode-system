@@ -162,6 +162,7 @@ async function seedRolesAndPermissions() {
     { key: 'buyer_portal', label: 'Buyer Portal' },
     { key: 'rice_protocols', label: 'Rice Calendar & Protocols' },
     { key: 'farm_reports', label: 'Farm Reports & Surveys' },
+    { key: 'ops_quality', label: 'Inventory Quality and Disposition' },
   ];
   for (const resource of resources) {
     await prisma.resource.upsert({

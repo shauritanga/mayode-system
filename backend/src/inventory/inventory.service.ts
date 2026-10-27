@@ -6,7 +6,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
+import { PaymentStatus, PaymentType, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateInventoryRecordDto,
@@ -22,6 +22,7 @@ import { summariseWarehouse } from './warehouse-summary';
 import { RiceProtocolsService } from '../rice-protocols/rice-protocols.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { ActivitiesService } from '../activities/activities.service';
+import { AccountingService } from '../accounting/accounting.service';
 
 @Injectable()
 export class InventoryService {
@@ -30,6 +31,7 @@ export class InventoryService {
     private readonly riceProtocols: RiceProtocolsService,
     private readonly ownership: OwnershipService,
     private readonly activities: ActivitiesService,
+    private readonly accounting: AccountingService,
   ) {}
 
   /**
@@ -186,6 +188,19 @@ export class InventoryService {
         },
       },
     });
+
+    if (record.totalValue != null) {
+      await this.accounting.postToLedger(
+        'PaddyDelivery',
+        record.id,
+        record.receivedDate,
+        `Paddy received from farmer · ${record.trackingCode}`,
+        [
+          { code: '1200', debit: record.totalValue },
+          { code: '2200', credit: record.totalValue },
+        ],
+      );
+    }
 
     await this.activities.log(
       farmerId,
@@ -411,7 +426,7 @@ export class InventoryService {
     const weightKg = dto.weightKg ?? record.weightKg;
     const pricePerKg = dto.pricePerKg ?? record.pricePerKg;
     const totalValue = deliveryValue(weightKg, pricePerKg);
-    return this.prisma.inventoryRecord.update({
+    const updated = await this.prisma.inventoryRecord.update({
       where: { id },
       data: {
         ...dto,
@@ -422,6 +437,19 @@ export class InventoryService {
       },
       include: this.recordInclude,
     });
+    if (updated.totalValue != null) {
+      await this.accounting.postToLedger(
+        'PaddyDelivery',
+        updated.id,
+        updated.receivedDate,
+        `Paddy received from farmer · ${updated.trackingCode}`,
+        [
+          { code: '1200', debit: updated.totalValue },
+          { code: '2200', credit: updated.totalValue },
+        ],
+      );
+    }
+    return updated;
   }
 
   /** Record money paid to the farmer; the status moves from unpaid to partial to paid. */
@@ -441,15 +469,41 @@ export class InventoryService {
         'That payment is more than the amount still owed to the farmer',
       );
     const status = paymentStatusFor(record.totalValue, amountPaid);
-    return this.prisma.inventoryRecord.update({
-      where: { id },
-      data: {
-        amountPaid,
-        farmerPaymentStatus: status,
-        paidAt: status === 'PAID' ? new Date() : null,
-      },
-      include: this.recordInclude,
+    const paidAt = new Date();
+    const { updated, payment } = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.inventoryRecord.update({
+        where: { id },
+        data: {
+          amountPaid,
+          farmerPaymentStatus: status,
+          paidAt: status === 'PAID' ? paidAt : null,
+        },
+        include: this.recordInclude,
+      });
+      const payment = await tx.payment.create({
+        data: {
+          farmerId: record.farmerId,
+          amount: dto.amount,
+          netAmount: dto.amount,
+          paymentType: PaymentType.RICE_PURCHASE,
+          status: PaymentStatus.CLEARED,
+          paidAt,
+          description: `Paddy procurement payment · ${record.trackingCode}`,
+        },
+      });
+      return { updated, payment };
     });
+    await this.accounting.postToLedger(
+      'FarmerProcurementPayment',
+      payment.id,
+      paidAt,
+      `Paddy payment to farmer · ${record.trackingCode}`,
+      [
+        { code: '2200', debit: dto.amount },
+        { code: '1000', credit: dto.amount },
+      ],
+    );
+    return updated;
   }
 
   // ------------------------------------------------------ collection centres

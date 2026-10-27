@@ -25,6 +25,7 @@ function buildService(cycle: any = CYCLE) {
     {} as any,
     ownership,
     {} as any,
+    { postToLedger: jest.fn() } as any,
   );
   const receive = jest
     .spyOn(service, 'receiveInventory')

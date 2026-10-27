@@ -8,13 +8,13 @@ import { DataTable, ErrorNote, Field, FormGrid, Loading, Status, Tabs, Toolbar, 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Sub = 'position' | 'batches' | 'ledger' | 'transfers';
 
-export default function StockPanel({ canAdjust, canTransfer }: { canAdjust: boolean; canTransfer: boolean }) {
-  const [sub, setSub] = useState<Sub>('position');
+export default function StockPanel({ canAdjust, canTransfer, canManageQuality = false, initialTab = 'position', hideTabs = false, onChanged }: { canAdjust: boolean; canTransfer: boolean; canManageQuality?: boolean; initialTab?: Sub; hideTabs?: boolean; onChanged?: () => void }) {
+  const [sub, setSub] = useState<Sub>(initialTab);
   return (
     <>
-      <Tabs tabs={[{ id: 'position', label: 'Stock position' }, { id: 'batches', label: 'Batches' }, { id: 'ledger', label: 'Stock history' }, { id: 'transfers', label: 'Transfers' }]} value={sub} onChange={setSub} />
+      {!hideTabs && <Tabs tabs={[{ id: 'position', label: 'Stock position' }, { id: 'batches', label: 'Batches' }, { id: 'ledger', label: 'Stock history' }, { id: 'transfers', label: 'Transfers' }]} value={sub} onChange={setSub} />}
       {sub === 'position' && <Position />}
-      {sub === 'batches' && <Batches canAdjust={canAdjust} canTransfer={canTransfer} />}
+      {sub === 'batches' && <Batches canAdjust={canAdjust} canTransfer={canTransfer} canManageQuality={canManageQuality} onChanged={onChanged} />}
       {sub === 'ledger' && <Ledger canAdjust={canAdjust} />}
       {sub === 'transfers' && <Transfers canTransfer={canTransfer} />}
     </>
@@ -46,11 +46,12 @@ function Position() {
   );
 }
 
-function Batches({ canAdjust, canTransfer }: { canAdjust: boolean; canTransfer: boolean }) {
+function Batches({ canAdjust, canTransfer, canManageQuality, onChanged }: { canAdjust: boolean; canTransfer: boolean; canManageQuality: boolean; onChanged?: () => void }) {
   const [q, setQ] = useState('');
   const [inStock, setInStock] = useState(true);
   const [adjust, setAdjust] = useState<any>(null);
   const [transfer, setTransfer] = useState<any>(null);
+  const [statusBatch, setStatusBatch] = useState<any>(null);
   const { data, error, loading, reload } = useLoad<any[]>(() => opsApi.batches({ q: q || undefined, inStock: inStock ? 'true' : undefined }), [q, inStock]);
   return (
     <>
@@ -62,16 +63,32 @@ function Batches({ canAdjust, canTransfer }: { canAdjust: boolean; canTransfer: 
       {loading && !data ? <Loading /> : (
         <DataTable rows={data ?? []} rowKey={(b) => b.id + b.warehouseId} empty="No batches."
           columns={[{ header: 'Batch', render: (b) => <strong>{b.reference}</strong> }, { header: 'Product', render: (b) => `${b.product.name}${b.product.brand ? ` · ${b.product.brand}` : ''}` }, { header: 'Variety', render: (b) => b.riceVariety ?? '—' },
-            { header: 'Source', render: (b) => (b.receipt?.farmer ? `${b.receipt.farmer.firstName} ${b.receipt.farmer.lastName}` : b.receipt?.sellerName ?? label(b.origin)) }, { header: 'Created', render: (b) => day(b.createdAt) }, { header: 'Warehouse', render: (b) => b.warehouseName ?? '—' },
+            { header: 'Source', render: (b) => (b.receipt?.farmer ? `${b.receipt.farmer.firstName} ${b.receipt.farmer.lastName}` : b.receipt?.sellerName ?? label(b.origin)) }, { header: 'Owner', render: (b) => b.ownerType === 'FARMER' ? `Farmer · ${b.receipt?.farmer ? `${b.receipt.farmer.firstName} ${b.receipt.farmer.lastName}` : 'recorded'}` : label(b.ownerType || 'COOPERATIVE') }, { header: 'Status', render: (b) => <Status value={b.stockStatus || 'AVAILABLE'} /> }, { header: 'Created', render: (b) => day(b.createdAt) }, { header: 'Warehouse', render: (b) => b.warehouseName ?? '—' },
             { header: 'Physical', align: 'right', render: (b) => kg(b.physicalKg) }, { header: 'Reserved', align: 'right', render: (b) => kg(b.reservedKg) }, { header: 'Available', align: 'right', render: (b) => <strong>{kg(b.availableKg)}</strong> },
             { header: '', render: (b) => <span style={{ display: 'flex', gap: 6 }}>
               {canAdjust && <button className="btn-secondary" onClick={(e) => { e.stopPropagation(); setAdjust(b); }}>Adjust</button>}
+              {canManageQuality && <button className="btn-secondary" onClick={(e) => { e.stopPropagation(); setStatusBatch(b); }}>Stock status</button>}
               {canTransfer && b.availableKg > 0 && <button className="btn-secondary" onClick={(e) => { e.stopPropagation(); setTransfer(b); }}>Transfer</button>}</span> }]} />
       )}
-      {adjust && <AdjustModal batch={adjust} onClose={() => setAdjust(null)} onSaved={() => { setAdjust(null); reload(); }} />}
-      {transfer && <TransferModal batch={transfer} onClose={() => setTransfer(null)} onSaved={() => { setTransfer(null); reload(); }} />}
+      {adjust && <AdjustModal batch={adjust} onClose={() => setAdjust(null)} onSaved={() => { setAdjust(null); reload(); onChanged?.(); }} />}
+      {transfer && <TransferModal batch={transfer} onClose={() => setTransfer(null)} onSaved={() => { setTransfer(null); reload(); onChanged?.(); }} />}
+      {statusBatch && <BatchStatusModal batch={statusBatch} onClose={() => setStatusBatch(null)} onSaved={() => { setStatusBatch(null); reload(); onChanged?.(); }} />}
     </>
   );
+}
+
+function BatchStatusModal({ batch, onClose, onSaved }: { batch: any; onClose: () => void; onSaved: () => void }) {
+  const [status, setStatus] = useState(batch.stockStatus || 'AVAILABLE');
+  const [reason, setReason] = useState('');
+  const { busy, error, run } = useAction();
+  const submit = async () => { if ((await run(() => opsApi.setBatchStatus(batch.id, { status, reason }))) !== undefined) onSaved(); };
+  return <Modal title={`Stock status · ${batch.reference}`} subtitle="Quarantined, damaged and rejected stock cannot be allocated, milled or dispatched." onClose={onClose}
+    footer={<><button className="btn-secondary" onClick={onClose}>Close</button><button className="btn-primary" disabled={busy || !reason.trim()} onClick={submit}>{busy ? 'Saving…' : 'Save status'}</button></>}>
+    <ErrorNote message={error} />
+    {batch.statusReason && <p style={{ fontSize: 13, color: 'var(--neutral-600)' }}>Current status: <strong>{label(batch.stockStatus)}</strong> · {batch.statusReason}</p>}
+    {batch.statusEvents?.length > 0 && <div style={{ margin: '12px 0', fontSize: 12 }}><strong>Recent status history</strong>{batch.statusEvents.slice(0, 5).map((event: any) => <div key={event.id} style={{ padding: '5px 0', borderBottom: '1px solid var(--neutral-100)' }}>{label(event.fromStatus || 'New batch')} → {label(event.toStatus)} · {day(event.createdAt)} · {event.reason}</div>)}</div>}
+    <FormGrid><Field label="Status"><select className="input-field" value={status} onChange={(e) => setStatus(e.target.value)}><option value="AVAILABLE">Available</option><option value="QUARANTINED">Quarantined</option><option value="DAMAGED">Damaged</option><option value="REJECTED">Rejected</option></select></Field><Field label="Reason" wide><input className="input-field" value={reason} onChange={(e) => setReason(e.target.value)} /></Field></FormGrid>
+  </Modal>;
 }
 
 function AdjustModal({ batch, onClose, onSaved }: { batch: any; onClose: () => void; onSaved: () => void }) {

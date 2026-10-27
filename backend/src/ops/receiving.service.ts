@@ -126,8 +126,11 @@ export class ReceivingService {
         data: {
           mamcosId: r.mamcosId, reference: await nextRef(tx, 'BT'), productId: r.productId, warehouseId: r.warehouseId, riceVariety: r.riceVariety,
           grade: r.qualityGrade, receiptId: r.id,
+          ownerType: r.farmerId ? 'FARMER' : r.sellerName ? 'OTHER' : 'COOPERATIVE', ownerFarmerId: r.farmerId,
+          ...(r.inspection === 'FAILED' ? { stockStatus: 'QUARANTINED', statusReason: 'Receipt inspection failed', statusChangedAt: new Date(), statusChangedByUserId: actor.id } : {}),
         },
       });
+      if (r.inspection === 'FAILED') await tx.stockStatusEvent.create({ data: { batchId: batch.id, fromStatus: null, toStatus: 'QUARANTINED', reason: 'Receipt inspection failed', createdByUserId: actor.id } });
       await tx.stockLedgerEntry.create({ data: { batchId: batch.id, warehouseId: r.warehouseId, type: 'RECEIPT', quantityKg: acceptedKg, refType: 'receipt', refId: r.id, createdByUserId: actor.id } });
       // Keep the crop record in step with what actually reached the warehouse.
       if (r.cropCycleId) {

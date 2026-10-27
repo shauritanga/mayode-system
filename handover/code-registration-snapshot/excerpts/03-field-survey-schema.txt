@@ -1,0 +1,34 @@
+model FarmFieldSurvey {
+  id           String         @id @default(uuid())
+  farmId       String         @map("farm_id")
+  surveyedById String?        @map("surveyed_by_id")
+  surveyDate   DateTime       @default(now()) @map("survey_date")
+  source       FarmDataSource @default(FIELD_OFFICER)
+
+  // Soil
+  soilPh            Float?  @map("soil_ph")
+  soilTexture       String? @map("soil_texture")
+  soilOrganicMatter Float?  @map("soil_organic_matter") // %
+  soilNotes         String? @map("soil_notes")
+
+  // Road & water access
+  roadDistanceMeters  Int?    @map("road_distance_meters")
+  roadAccessQuality   String? @map("road_access_quality") // GOOD | FAIR | POOR
+  waterSource         String? @map("water_source")
+  waterDistanceMeters Int?    @map("water_distance_meters")
+  waterReliability    String? @map("water_reliability")
+
+  // Physical
+  slope        String?
+  floodRisk    String? @map("flood_risk")
+  observations String?
+  latitude     Float?
+  longitude    Float?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId])
+  @@map("farm_field_surveys")
+}

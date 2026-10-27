@@ -35,6 +35,14 @@ export class ReasonDto {
   @IsString() reason: string;
 }
 
+export class BatchStatusDto {
+  @IsEnum({ AVAILABLE: 'AVAILABLE', QUARANTINED: 'QUARANTINED', DAMAGED: 'DAMAGED', REJECTED: 'REJECTED' }) status: 'AVAILABLE' | 'QUARANTINED' | 'DAMAGED' | 'REJECTED';
+  @IsString() reason: string;
+}
+
+export class CreateStockCountDto { @IsString() warehouseId: string; @IsOptional() @IsBoolean() blind?: boolean; @IsOptional() @IsString() note?: string; }
+export class StockCountLineDto { @IsNumber() @Min(0) countedKg: number; @IsOptional() @IsString() note?: string; }
+
 export class AdjustStockDto {
   @IsString() batchId: string;
   @IsString() warehouseId: string;

@@ -6,8 +6,8 @@ import { dateTime, day, kg, label } from '@/lib/ops';
 import { DataTable, ErrorNote, Facts, Field, FormGrid, Loading, Status, Toolbar, useAction, useLoad } from './ui';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export default function ReceivingPanel({ canCreate, canConfirm, canCancel }: { canCreate: boolean; canConfirm: boolean; canCancel: boolean }) {
-  const [status, setStatus] = useState('');
+export default function ReceivingPanel({ canCreate, canConfirm, canCancel, initialStatus = '' }: { canCreate: boolean; canConfirm: boolean; canCancel: boolean; initialStatus?: string }) {
+  const [status, setStatus] = useState(initialStatus);
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);

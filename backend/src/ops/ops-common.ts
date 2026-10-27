@@ -60,13 +60,15 @@ export async function batchBalances(db: Tx | PrismaService, batchIds: string[], 
       select: { batchId: true, quantityKg: true, dispatchedKg: true, releasedKg: true },
     }),
   ]);
+  const statuses = await db.stockBatch.findMany({ where: { id: { in: batchIds } }, select: { id: true, stockStatus: true } });
   const reserved = new Map<string, number>();
   for (const a of allocs) reserved.set(a.batchId, (reserved.get(a.batchId) ?? 0) + (a.quantityKg - a.dispatchedKg - a.releasedKg));
   for (const id of batchIds) {
     const physical = ledger.find((l) => l.batchId === id)?._sum.quantityKg ?? 0;
     const res = reserved.get(id) ?? 0;
     const r3 = (n: number) => Math.round(n * 1000) / 1000;
-    out.set(id, { physicalKg: r3(physical), reservedKg: r3(res), availableKg: r3(physical - res) });
+    const eligible = statuses.find((b) => b.id === id)?.stockStatus === 'AVAILABLE';
+    out.set(id, { physicalKg: r3(physical), reservedKg: r3(res), availableKg: eligible ? r3(physical - res) : 0 });
   }
   return out;
 }

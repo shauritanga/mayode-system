@@ -21,7 +21,7 @@ function NavList({ onNavigate, collapsed = false }: { onNavigate?: () => void; c
   return (
     <nav className="sidebar-nav">
       {visibleGroups.map((group) => (
-        <div key={group.label || 'admin-flat'} className="sidebar-group">
+        <div key={group.label || group.items[0]?.href || 'admin-flat'} className="sidebar-group">
           {group.label && <div className="sidebar-group-label">{group.label}</div>}
           {group.items.map((item) => {
             // Landing pages that sit at the same path prefix as their own sibling

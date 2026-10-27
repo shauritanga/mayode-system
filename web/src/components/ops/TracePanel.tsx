@@ -1,5 +1,6 @@
 'use client';
 import { useState, type ReactNode } from 'react';
+import { PackageSearch } from 'lucide-react';
 import { opsApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-error';
 import { day, kg, label } from '@/lib/ops';
@@ -13,6 +14,7 @@ function Back({ n }: { n: any }): ReactNode {
   return (
     <div style={box}>
       <strong>{n.reference}</strong> · {n.product}{n.brand ? ` · ${n.brand}` : ''}{n.variety ? ` · ${n.variety}` : ''} · {day(n.createdAt)}
+      <div style={{ color: 'var(--neutral-600)' }}>Owner: {label(n.ownerType || 'COOPERATIVE')} · Stock status: {label(n.stockStatus || 'AVAILABLE')}{n.statusReason ? ` · ${n.statusReason}` : ''}</div>
       {s && (
         <div style={{ marginTop: 4 }}>
           Received {day(s.receivedAt)} as {s.reference}: {kg(s.grossKg)} delivered, {kg(s.rejectedKg)} rejected{s.moisturePct != null ? `, ${s.moisturePct}% moisture` : ''}.
@@ -36,6 +38,7 @@ function Fwd({ n }: { n: any }): ReactNode {
   return (
     <div style={box}>
       <strong>{n.reference}</strong> · {n.product}{n.brand ? ` · ${n.brand}` : ''}
+      <div style={{ color: 'var(--neutral-600)' }}>Owner: {label(n.ownerType || 'COOPERATIVE')} · Stock status: {label(n.stockStatus || 'AVAILABLE')}</div>
       {n.processedInto?.map((p: any) => <div key={p.run.runId} style={{ marginTop: 4 }}>{kg(p.usedKg)} used in {label(p.run.kind)} run <strong>{p.run.reference}</strong> ({day(p.run.processedAt)}), which produced:{p.products.map((x: any) => <Fwd key={x.batchId} n={x} />)}</div>)}
       {n.dispatched?.map((d: any, i: number) => <div key={i} style={{ marginTop: 4 }}>{kg(d.quantityKg)} sold to <strong>{d.customer.name}</strong> · order {d.order} · dispatch {d.dispatch} · release note {d.releaseNote} · {day(d.releasedAt)} · vehicle {d.vehicle}</div>)}
       {n.reservedForOrders?.map((r: any, i: number) => <div key={i} style={{ marginTop: 4, color: 'var(--neutral-500)' }}>{kg(r.reservedKg)} set aside for {r.customer} (order {r.order})</div>)}
@@ -59,6 +62,8 @@ export default function TracePanel() {
         <button className="btn-primary" disabled={busy || !ref.trim()} onClick={search}>{busy ? 'Searching…' : 'Trace'}</button>
       </Toolbar>
       <ErrorNote message={error} />
+      {!results && !error && <div className="warehouse-trace-empty"><span><PackageSearch size={20} /></span><div><strong>Trace a warehouse record</strong><p>Enter a batch or transaction reference to see where the rice came from and where it moved.</p></div></div>}
+      {results && results.length === 0 && <div className="warehouse-trace-empty"><span><PackageSearch size={20} /></span><div><strong>No matching trace found</strong><p>Check the reference and search again.</p></div></div>}
       {results?.map((r) => (
         <div key={r.batchId} className="glass-card" style={{ padding: 14, marginBottom: 14 }}>
           <h4 style={{ margin: '0 0 4px', fontSize: 14 }}>Where it came from</h4><Back n={r.backward} />

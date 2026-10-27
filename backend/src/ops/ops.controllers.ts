@@ -24,7 +24,7 @@ import { FarmInputsService } from './farm-inputs.service';
 import { HarvestService } from './harvest.service';
 import { OpsReportsService } from './ops-reports.service';
 import { UpsertCustomerDto, UpsertProductDto } from './dto/catalog.dto';
-import { AdjustStockDto, CreateReceiptDto, CreateRunDto, ReasonDto, ReceiveTransferDto, TransferDto } from './dto/warehouse.dto';
+import { AdjustStockDto, BatchStatusDto, CreateReceiptDto, CreateRunDto, CreateStockCountDto, ReasonDto, ReceiveTransferDto, StockCountLineDto, TransferDto } from './dto/warehouse.dto';
 import { AllocateDto, AuthorizeDto, ControlNumberDto, CreateOrderDto, CreateQuotationDto, DeliveryDto, IssueInvoiceDto, MobilePaymentDto, PrepareDispatchDto, RecordPaymentDto, ReviewOrderDto, ShortageDto, UpdateOrderDto } from './dto/commercial.dto';
 import { AdjustInputDto, CheckInDto, CreateHarvestDto, CreateInspectionDto, CreateMayodeFarmDto, CreateTaskDto, NewCropCycleDto, NewPlotDto, ReviewTaskDto, StartWithoutGpsDto, StockInDto, SubmitInspectionDto, SubmitReportDto, TransportDto, UpsertFarmDto, UpsertInputItemDto } from './dto/farm.dto';
 
@@ -108,6 +108,20 @@ export class OpsWarehouseController {
   ledger(@CurrentUser() u: U, @Query() q: Record<string, string>) { return this.stock.ledger(u, q); }
   @Post('stock/adjust') @RequirePermission('ops_stock', 'EDIT')
   adjust(@Body() dto: AdjustStockDto, @CurrentUser() u: U) { return this.stock.adjust(dto, u); }
+  @Post('stock/batches/:id/status') @RequirePermission('ops_quality', 'EDIT')
+  batchStatus(@Param('id') id: string, @Body() dto: BatchStatusDto, @CurrentUser() u: U) { return this.stock.setBatchStatus(id, dto, u); }
+  @Get('stock/counts') @RequirePermission('ops_stock', 'VIEW')
+  stockCounts(@CurrentUser() u: U) { return this.stock.stockCounts(u); }
+  @Get('stock/counts/:id') @RequirePermission('ops_stock', 'VIEW')
+  stockCount(@Param('id') id: string, @CurrentUser() u: U) { return this.stock.stockCount(id, u); }
+  @Post('stock/counts') @RequirePermission('ops_stock', 'CREATE')
+  createStockCount(@Body() dto: CreateStockCountDto, @CurrentUser() u: U) { return this.stock.createStockCount(dto, u); }
+  @Patch('stock/counts/:id/lines/:lineId') @RequirePermission('ops_stock', 'CREATE')
+  countLine(@Param('id') id: string, @Param('lineId') lineId: string, @Body() dto: StockCountLineDto, @CurrentUser() u: U) { return this.stock.countLine(id, lineId, dto, u); }
+  @Post('stock/counts/:id/submit') @RequirePermission('ops_stock', 'CREATE')
+  submitStockCount(@Param('id') id: string, @CurrentUser() u: U) { return this.stock.submitStockCount(id, u); }
+  @Post('stock/counts/:id/approve') @RequirePermission('ops_stock', 'EDIT')
+  approveStockCount(@Param('id') id: string, @CurrentUser() u: U) { return this.stock.approveStockCount(id, u); }
   @Post('stock/ledger/:id/reverse') @RequirePermission('ops_stock', 'EDIT')
   reverse(@Param('id') id: string, @Body() dto: ReasonDto, @CurrentUser() u: U) { return this.stock.reverse(id, dto.reason, u); }
   @Get('stock/transfers') @RequirePermission('ops_stock', 'VIEW')

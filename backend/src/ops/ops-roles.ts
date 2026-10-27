@@ -39,7 +39,12 @@ export const OPS_ROLE_TEMPLATES: OpsRoleTemplate[] = [
   {
     name: 'Warehouse Supervisor',
     description: 'Everything a warehouse officer does, plus stock adjustments, transfers, reversals and cancelling receipts or dispatches.',
-    grants: { ops_catalog: V, ops_receiving: ALL, ops_processing: ALL, ops_stock: VCE, ops_dispatch: ALL, ops_harvest: V, ops_reports: V, ...LOOKUPS },
+    grants: { ops_catalog: V, ops_receiving: ALL, ops_processing: ALL, ops_stock: VCE, ops_quality: VCE, ops_dispatch: ALL, ops_harvest: V, ops_reports: V, ...LOOKUPS },
+  },
+  {
+    name: 'Quality Inspector',
+    description: 'Reviews receipt and stock quality, records quarantine or release decisions, and cannot post stock write-offs or dispatch goods.',
+    grants: { ops_receiving: V, ops_processing: V, ops_stock: V, ops_quality: VCE, ops_reports: V, ...LOOKUPS },
   },
   {
     name: 'Farm Manager',

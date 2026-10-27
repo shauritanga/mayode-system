@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { Actor, assertVisible, batchBalances, lockBatches, nextRef, owner, OpsNotifyService, scope } from './ops-common';
 import { r3 } from './ops-rules';
-import { AdjustStockDto, ReceiveTransferDto, TransferDto } from './dto/warehouse.dto';
+import { AdjustStockDto, BatchStatusDto, CreateStockCountDto, ReceiveTransferDto, StockCountLineDto, TransferDto } from './dto/warehouse.dto';
 
 const day = (d?: string) => (d ? new Date(d) : undefined);
 const endOfDay = (d?: string) => {
@@ -38,6 +38,7 @@ export class StockService {
       include: {
         product: { select: { name: true, brand: true, category: true, packSizeKg: true, riceVariety: true } },
         receipt: { select: { reference: true, farmer: { select: { firstName: true, lastName: true, controlNumber: true } }, sellerName: true } },
+        statusEvents: { orderBy: { createdAt: 'desc' }, take: 10 },
       },
       orderBy: { createdAt: 'desc' },
       take: 500,
@@ -59,6 +60,75 @@ export class StockService {
     return out;
   }
 
+  async setBatchStatus(batchId: string, dto: BatchStatusDto, actor: Actor & { id: string }) {
+    const reason = dto.reason.trim();
+    if (!reason) throw new BadRequestException('Give the reason for changing stock status');
+    return this.prisma.$transaction(async (tx) => {
+      const batch = await tx.stockBatch.findUnique({ where: { id: batchId } });
+      assertVisible(actor, batch, 'Batch');
+      const updated = await tx.stockBatch.update({ where: { id: batchId }, data: { stockStatus: dto.status, statusReason: reason, statusChangedAt: new Date(), statusChangedByUserId: actor.id } });
+      await tx.stockStatusEvent.create({ data: { batchId, fromStatus: batch.stockStatus, toStatus: dto.status, reason, createdByUserId: actor.id } });
+      return updated;
+    });
+  }
+
+  stockCounts(actor: Actor) { return this.prisma.stockCount.findMany({ where: scope(actor), include: { warehouse: { select: { name: true } }, _count: { select: { lines: true } } }, orderBy: { createdAt: 'desc' }, take: 200 }); }
+
+  async stockCount(id: string, actor: Actor) {
+    const count = await this.prisma.stockCount.findUnique({ where: { id }, include: { lines: { include: { batch: { include: { product: { select: { name: true } } } } } }, warehouse: { select: { name: true } } } });
+    assertVisible(actor, count, 'Stock count');
+    if (count.blind && count.status === 'COUNTING') return { ...count, lines: count.lines.map(({ systemKg: _systemKg, ...line }) => line) };
+    return count;
+  }
+
+  async createStockCount(dto: CreateStockCountDto, actor: Actor & { id: string }) {
+    const warehouse = await this.prisma.warehouse.findUnique({ where: { id: dto.warehouseId } });
+    assertVisible(actor, warehouse, 'Warehouse');
+    const ledgers = await this.prisma.stockLedgerEntry.groupBy({ by: ['batchId'], where: { warehouseId: dto.warehouseId, batch: scope(actor) } });
+    const batches = ledgers.map((row) => ({ id: row.batchId }));
+    const balances = (await Promise.all(batches.map(async (b) => ({ batchId: b.id, systemKg: (await batchBalances(this.prisma, [b.id], dto.warehouseId)).get(b.id)!.physicalKg })))).filter((b) => b.systemKg > 0.0005);
+    return this.prisma.$transaction(async (tx) => {
+      const count = await tx.stockCount.create({ data: { mamcosId: owner(actor), warehouseId: dto.warehouseId, reference: await nextRef(tx, 'CNT'), blind: dto.blind ?? true, note: dto.note?.trim() || null, createdByUserId: actor.id, lines: { create: balances } } });
+      const lines = await tx.stockCountLine.findMany({ where: { countId: count.id }, include: { batch: { include: { product: { select: { name: true } } } } }, orderBy: { batch: { reference: 'asc' } } });
+      return { ...count, lines: lines.map(({ systemKg: _systemKg, ...line }) => line) };
+    });
+  }
+
+  async countLine(id: string, lineId: string, dto: StockCountLineDto, actor: Actor & { id: string }) {
+    const count = await this.prisma.stockCount.findUnique({ where: { id }, include: { lines: { where: { id: lineId } } } });
+    assertVisible(actor, count, 'Stock count');
+    if (count.status !== 'COUNTING') throw new ConflictException('Only an open count can be updated');
+    const line = count.lines[0];
+    if (!line) throw new NotFoundException('Count line not found');
+    return this.prisma.stockCountLine.update({ where: { id: lineId }, data: { countedKg: dto.countedKg, note: dto.note?.trim() || null, countedByUserId: actor.id, countedAt: new Date() } });
+  }
+
+  async submitStockCount(id: string, actor: Actor & { id: string }) {
+    const count = await this.prisma.stockCount.findUnique({ where: { id }, include: { lines: true } });
+    assertVisible(actor, count, 'Stock count');
+    if (count.status !== 'COUNTING' || count.lines.some((l) => l.countedKg == null)) throw new ConflictException('Record a physical count for every line before submitting');
+    return this.prisma.stockCount.update({ where: { id }, data: { status: 'PENDING_APPROVAL', submittedAt: new Date() } });
+  }
+
+  async approveStockCount(id: string, actor: Actor & { id: string }) {
+    return this.prisma.$transaction(async (tx) => {
+      const count = await tx.stockCount.findUnique({ where: { id }, include: { lines: { include: { batch: true } } } });
+      assertVisible(actor, count, 'Stock count');
+      if (count.status !== 'PENDING_APPROVAL') throw new ConflictException('This stock count is not awaiting approval');
+      if (count.createdByUserId === actor.id || count.lines.some((l) => l.countedByUserId === actor.id)) throw new ConflictException('The counter and count creator cannot approve this count');
+      await lockBatches(tx, count.lines.map((l) => l.batchId));
+      for (const line of count.lines) {
+        const current = (await batchBalances(tx, [line.batchId], count.warehouseId)).get(line.batchId)!.physicalKg;
+        if (Math.abs(current - line.systemKg) > 0.0005) throw new ConflictException(`Stock moved for ${line.batch.reference} after the count began. Reconcile the movement and recount.`);
+      }
+      for (const line of count.lines) {
+        const variance = r3(line.countedKg! - line.systemKg);
+        if (variance) await tx.stockLedgerEntry.create({ data: { batchId: line.batchId, warehouseId: count.warehouseId, type: 'ADJUSTMENT', quantityKg: variance, reason: `Approved stock count ${count.reference}${line.note ? `: ${line.note}` : ''}`, refType: 'stock-count', refId: count.id, createdByUserId: actor.id, approvedByUserId: actor.id } });
+      }
+      return tx.stockCount.update({ where: { id }, data: { status: 'APPROVED', approvedByUserId: actor.id, approvedAt: new Date() } });
+    });
+  }
+
   /** Opening, movements and closing stock for a period, grouped by product and warehouse, with reserved and available now. */
   async position(actor: Actor, f: { from?: string; to?: string; productId?: string; brand?: string; category?: string; warehouseId?: string; batchId?: string } = {}) {
     const from = day(f.from);
@@ -74,16 +144,17 @@ export class StockService {
         ...(f.warehouseId ? { warehouseId: f.warehouseId } : {}),
         ...(to ? { createdAt: { lte: to } } : {}),
       },
-      select: { type: true, quantityKg: true, createdAt: true, warehouseId: true, batch: { select: { id: true, productId: true } } },
+      select: { type: true, quantityKg: true, createdAt: true, warehouseId: true, batch: { select: { id: true, productId: true, stockStatus: true } } },
     });
     const products = new Map((await this.prisma.product.findMany({ where: { id: { in: [...new Set(entries.map((e) => e.batch.productId))] } } })).map((p) => [p.id, p]));
     const wh = new Map((await this.prisma.warehouse.findMany({ select: { id: true, name: true } })).map((w) => [w.id, w.name]));
-    type Row = { productId: string; warehouseId: string; opening: number; received: number; processedOut: number; produced: number; dispatched: number; adjustments: number; transfers: number; closing: number };
+    type Row = { productId: string; warehouseId: string; opening: number; received: number; processedOut: number; produced: number; dispatched: number; adjustments: number; transfers: number; closing: number; unavailable: number };
     const rows = new Map<string, Row>();
     for (const e of entries) {
       const key = `${e.batch.productId}|${e.warehouseId}`;
-      const r = rows.get(key) ?? { productId: e.batch.productId, warehouseId: e.warehouseId, opening: 0, received: 0, processedOut: 0, produced: 0, dispatched: 0, adjustments: 0, transfers: 0, closing: 0 };
+      const r = rows.get(key) ?? { productId: e.batch.productId, warehouseId: e.warehouseId, opening: 0, received: 0, processedOut: 0, produced: 0, dispatched: 0, adjustments: 0, transfers: 0, closing: 0, unavailable: 0 };
       r.closing += e.quantityKg;
+      if (e.batch.stockStatus !== 'AVAILABLE') r.unavailable += e.quantityKg;
       if (from && e.createdAt < from) r.opening += e.quantityKg;
       else {
         if (e.type === 'RECEIPT') r.received += e.quantityKg;
@@ -110,9 +181,9 @@ export class StockService {
         productId: r.productId, product: p.name, brand: p.brand, category: p.category, variety: p.riceVariety, grade: p.grade, packSizeKg: p.packSizeKg,
         warehouseId: r.warehouseId, warehouse: wh.get(r.warehouseId) ?? null,
         openingKg: r3(r.opening), receivedKg: r3(r.received), processedOutKg: r3(r.processedOut), producedKg: r3(r.produced), dispatchedKg: r3(r.dispatched),
-        adjustmentsKg: r3(r.adjustments), transfersKg: r3(r.transfers), closingKg: r3(r.closing), reservedKg: r3(reservedKg), availableKg: r3(r.closing - reservedKg), inTransitKg: r3(inTransitKg),
+        adjustmentsKg: r3(r.adjustments), transfersKg: r3(r.transfers), closingKg: r3(r.closing), unavailableKg: r3(r.unavailable), reservedKg: r3(reservedKg), availableKg: r3(Math.max(0, r.closing - r.unavailable - reservedKg)), inTransitKg: r3(inTransitKg),
         indicativeValue: p.unitPrice ? Math.round(r.closing * p.unitPrice) : null,
-        lowStock: p.reorderLevelKg != null && r.closing - reservedKg < p.reorderLevelKg,
+        lowStock: p.reorderLevelKg != null && r.closing - r.unavailable - reservedKg < p.reorderLevelKg,
         reorderLevelKg: p.reorderLevelKg,
       };
     });
