@@ -99,9 +99,9 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Farmer Dues',
+    label: 'AMCOS Charges',
     items: [
-      { href: '/dashboard/dues', label: 'Farmer Dues', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'dues' },
+      { href: '/dashboard/dues', label: 'AMCOS Charges', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'dues' },
     ],
   },
   {
@@ -417,8 +417,8 @@ const COOPERATIVE_PORTAL_HIDDEN_HREFS = new Set([
  * oversight, then setup). Anything not listed keeps its original relative order after these.
  */
 const COOPERATIVE_MENU_ORDER = [
-  '/dashboard', '/dashboard/farmers', '/dashboard/irrigation', '/dashboard/dues', '/dashboard/ops-orders', '/dashboard/ops-warehouse', '/dashboard/task-management',
-  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/staff', '/dashboard/suppliers', '/dashboard/sales',
+  '/dashboard', '/dashboard/farmers', '/dashboard/irrigation', '/dashboard/dues', '/dashboard/ops-orders', '/dashboard/task-management',
+  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/ops-warehouse', '/dashboard/staff', '/dashboard/suppliers', '/dashboard/sales',
   '/dashboard/reports', '/dashboard/credit', '/dashboard/traceability', '/dashboard/disputes', '/dashboard/governance', '/dashboard/ai',
   '/dashboard/audit-log', '/dashboard/roles', '/dashboard/settings',
 ];

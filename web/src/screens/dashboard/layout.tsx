@@ -11,6 +11,7 @@ import { authApi } from '@/lib/api';
 import { isPathAllowed } from '@/lib/nav';
 import { isAccountAllowedInThisMode } from '@/lib/app-mode';
 import ChangePasswordGate from '@/components/ChangePasswordGate';
+import LoginAlerts from '@/components/LoginAlerts';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, _hasHydrated, updateUser, clearAuth } = useAuthStore();
@@ -76,6 +77,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
       {user?.mustChangePassword && <ChangePasswordGate />}
+      <LoginAlerts />
     </div>
   );
 }

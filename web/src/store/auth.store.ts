@@ -25,6 +25,9 @@ interface User {
   mustChangePassword?: boolean;
 }
 
+/** Set at sign-in so the AMCOS portal shows its alerts popup once for that session. */
+export const LOGIN_ALERTS_FLAG = 'mayode.loginAlerts';
+
 interface AuthState {
   user: User | null;
   accessToken: string | null;
@@ -52,6 +55,7 @@ export const useAuthStore = create<AuthState>()(
         if (typeof window !== 'undefined') {
           localStorage.setItem('accessToken', accessToken);
           if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+          sessionStorage.setItem(LOGIN_ALERTS_FLAG, 'pending');
         }
         set({ user, accessToken, isAuthenticated: true });
       },

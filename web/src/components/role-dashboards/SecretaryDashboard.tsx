@@ -1,44 +1,15 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { irrigationApi } from '@/lib/api';
-import { getVisibleGroups } from '@/lib/nav';
 import { useAuthStore } from '@/store/auth.store';
 import { BASE, CardsSkeleton, LoadError, StatusBadge, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 import {
-  AlertsPanel, BlockStatus, CanalPerformance, IrrigationActivity, LeadershipWatch, MembersApprovals, MoneySnapshot,
+  BlockStatus, CanalPerformance, IrrigationActivity, LeadershipWatch, MembersApprovals, MoneySnapshot,
   OrdersAndStock, SchemeStatistics,
 } from './amcos/sections';
-
-/** Shortcuts, shown only for pages the signed-in user can actually open in the AMCOS portal. */
-const ACTIONS: { label: string; href: string; resource?: string; action?: string }[] = [
-  { label: 'Allocate a hectare', href: `${BASE}/allocation/allocate`, resource: 'irrigation_allocations', action: 'CREATE' },
-  { label: 'Register a transfer', href: `${BASE}/allocation/transfers?add=1`, resource: 'irrigation_allocations', action: 'CREATE' },
-  { label: 'Appoint a leader', href: `${BASE}/leadership/assignments`, resource: 'irrigation_leadership', action: 'CREATE' },
-  { label: 'Add a canal', href: `${BASE}/structure/canals?add=1`, resource: 'irrigation', action: 'CREATE' },
-  { label: 'Add a block', href: `${BASE}/structure/blocks?add=1`, resource: 'irrigation', action: 'CREATE' },
-  { label: 'Farmers', href: '/dashboard/farmers' },
-  { label: 'Orders & Sales', href: '/dashboard/ops-orders' },
-  { label: 'Warehouse & Inventory', href: '/dashboard/ops-warehouse' },
-  { label: 'Accounting & Finance', href: '/dashboard/accounting' },
-  { label: 'Reports', href: '/dashboard/reports' },
-];
-
-function QuickActions() {
-  const user = useAuthStore((s) => s.user);
-  const can = useCan();
-  const reachable = useMemo(() => new Set(getVisibleGroups(user).flatMap((g) => g.items.map((i) => i.href))), [user]);
-  const links = ACTIONS.filter((a) => (a.resource ? can(a.resource, a.action ?? 'VIEW') : reachable.has(a.href.split('?')[0])));
-  if (!links.length) return null;
-  return (
-    <section className="insight-panel">
-      <div className="insight-panel-head"><div><h2>Quick actions</h2><p>Common cooperative tasks.</p></div></div>
-      <div className="role-list">{links.map((a) => <Link key={a.href} href={a.href} className="quick-action"><span className="quick-action-label">{a.label}</span></Link>)}</div>
-    </section>
-  );
-}
 
 /**
  * AMCOS landing page: the irrigation scheme first (statistics, alerts, canals, blocks, members, leadership, activity),
@@ -100,23 +71,20 @@ export function SecretaryDashboard() {
       {o?.totals && (
         <>
           <SchemeStatistics totals={o.totals} plannedCanals={o.scheme.plannedCanalCount} />
-          <div className="dash-two-col" style={{ alignItems: 'start' }}><AlertsPanel alerts={o.alerts} /><QuickActions /></div>
           <CanalPerformance canals={o.canals} />
-          <div className="dash-two-col" style={{ alignItems: 'start' }}>
+          <div className="dash-two-col">
             <BlockStatus distribution={o.blockDistribution} blocks={allocation.data?.byBlock ?? null} />
             <MembersApprovals totals={o.totals} />
           </div>
-          <div className="dash-two-col" style={{ alignItems: 'start' }}>
+          <div className="dash-two-col">
             {leadership.data?.totals ? <LeadershipWatch data={leadership.data} /> : null}
             <IrrigationActivity events={o.recent} />
           </div>
         </>
       )}
 
-      {!showScheme && <QuickActions />}
-
       {(showOrders || showContributions) && (
-        <div className="dash-two-col" style={{ alignItems: 'start' }}>
+        <div className="dash-two-col">
           {showOrders && <OrdersAndStock />}
           <MoneySnapshot showSales={showOrders} showContributions={showContributions} />
         </div>

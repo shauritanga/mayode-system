@@ -1503,6 +1503,14 @@ body {
 @media (max-width: 900px) {
   .dash-two-col { grid-template-columns: 1fr; }
 }
+/* Cards that share a row are the same height, and an empty one fills its space instead of leaving a gap. */
+.dash-two-col { align-items: stretch; }
+.dash-two-col > .insight-panel { display: flex; flex-direction: column; min-width: 0; }
+.dash-two-col > .insight-panel > .chart-empty-state,
+.dash-two-col > .insight-panel > .role-empty-state { flex: 1; }
+.dash-two-col > .insight-panel > .role-list { align-content: start; }
+.quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 520px) { .quick-grid { grid-template-columns: 1fr; } }
 
 .quick-action {
   display: flex;
@@ -3395,3 +3403,34 @@ body {
 .scheme-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 @media (max-width: 1100px) { .scheme-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .scheme-stat-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Alerts popup shown once after sign-in (bottom right). */
+.login-alerts {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  animation: loginAlertsIn 0.35s var(--ease-out) both;
+}
+.login-alerts-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.login-alerts-head strong { flex: 1; font-size: 0.92rem; color: var(--text-1); }
+.login-alerts-close {
+  width: 26px; height: 26px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2);
+  font-size: 18px; line-height: 1; cursor: pointer;
+}
+.login-alerts-close:hover { background: var(--hover-tint-2); color: var(--text-1); }
+.login-alerts-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.login-alerts-list a {
+  display: block; padding: 9px 11px; border-radius: var(--r-md); background: var(--surface-tint);
+  color: var(--text-1); font-size: 0.83rem; font-weight: 600; text-decoration: none;
+}
+.login-alerts-list a:hover { background: var(--hover-tint-2); }
+.login-alerts-more { margin-top: 8px; color: var(--text-2); font-size: 12px; }
+@keyframes loginAlertsIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .login-alerts { animation: none; } }

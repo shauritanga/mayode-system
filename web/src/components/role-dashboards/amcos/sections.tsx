@@ -44,24 +44,6 @@ export function SchemeStatistics({ totals, plannedCanals }: { totals: any; plann
   );
 }
 
-export function AlertsPanel({ alerts }: { alerts: any[] }) {
-  const sorted = [...alerts].sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'warning' ? -1 : 1));
-  return (
-    <Panel title="Alerts" subtitle="Setup gaps and items waiting for a decision." badge={sorted.length ? <span className="badge badge-gold">{sorted.length}</span> : <span className="badge badge-green">All clear</span>}>
-      {!sorted.length ? <Empty>Nothing needs attention.</Empty> : (
-        <div className="role-list">
-          {sorted.map((a, i) => (
-            <Link key={i} href={a.href} className="quick-action">
-              <span className={`badge ${a.severity === 'warning' ? 'badge-gold' : 'badge-blue'}`}>{a.severity === 'warning' ? 'Attention' : 'Info'}</span>
-              <span className="quick-action-label">{a.message}</span>
-            </Link>
-          ))}
-        </div>
-      )}
-    </Panel>
-  );
-}
-
 export function CanalPerformance({ canals }: { canals: any[] }) {
   const ranked = [...canals].filter((c) => c.hectareUnits > 0).sort((a, b) => b.completionPct - a.completionPct);
   // Only call out highest/lowest when the canals actually differ.

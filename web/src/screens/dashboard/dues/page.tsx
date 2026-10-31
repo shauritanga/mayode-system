@@ -509,17 +509,17 @@ function Arrears({ can }: { can: (r: string, a: string) => boolean }) {
   );
 }
 
-/** Farmer Dues: levies, membership and canal cleaning fees, and fertiliser repayments, with what each farmer has paid. */
+/** AMCOS Charges: levies, membership and canal cleaning fees, and fertiliser repayments, with what each farmer has paid. */
 export default function DuesPage() {
   const user = useAuthStore((s) => s.user);
   const can = useCan();
   const [tab, setTab] = useState<'dues' | 'charges' | 'arrears'>('dues');
   if (!user?.mamcosId) {
-    return <><PageHeader title="Farmer Dues" /><Empty title="Farmer dues belong to an AMCOS" hint="Sign in with an AMCOS account to see what its farmers owe." /></>;
+    return <><PageHeader title="AMCOS Charges" /><Empty title="AMCOS charges belong to an AMCOS" hint="Sign in with an AMCOS account to see what its farmers owe." /></>;
   }
   return (
     <div>
-      <PageHeader title="Farmer Dues" subtitle="Levies, membership and canal cleaning fees, and fertiliser repayments: what each farmer owes, what they have paid, and who is behind." />
+      <PageHeader title="AMCOS Charges" subtitle="Levies, membership and canal cleaning fees, and fertiliser repayments: what each farmer owes, what they have paid, and who is behind." />
       <Tabs tabs={[{ id: 'dues', label: 'Dues & payments' }, { id: 'charges', label: 'Charges' }, { id: 'arrears', label: 'Arrears' }]} active={tab} onChange={setTab} />
       {tab === 'dues' && <Dues can={can} />}
       {tab === 'charges' && <Charges can={can} />}
