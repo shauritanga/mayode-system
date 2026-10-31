@@ -2,6 +2,7 @@
 import ErrorBanner from '@/components/ErrorBanner';
 import { apiErrorMessage } from '@/lib/api-error';
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { motion, useReducedMotion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
@@ -396,7 +397,7 @@ export default function FarmersPage() {
                           {`${farmer.firstName[0] ?? ''}${farmer.lastName[0] ?? ''}`.toUpperCase() || '?'}
                         </span>
                         <div className="farmers-person-text">
-                          <div className="farmers-name">{farmer.firstName} {farmer.lastName}</div>
+                          <Link href={`/dashboard/farmers/${farmer.id}`} className="farmers-name">{farmer.firstName} {farmer.lastName}</Link>
                           <div className="farmers-phone">{farmer.user?.phone ?? '—'}</div>
                         </div>
                       </div>
