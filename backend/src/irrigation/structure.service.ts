@@ -6,16 +6,12 @@ import { IrrigationScope, IrrigationScopeService } from './irrigation-scope.serv
 import { diffRecords, writeAudit } from './irrigation-audit';
 import { fullName, num, paged, paging, rethrowIntegrity, today, userNames, type Db } from './irrigation-common';
 import { SchemesService } from './schemes.service';
+import { blockCodeFor, hectareCodeFor, pad2, type BlockSide } from './irrigation-codes';
 import {
   CreateBlockDto, CreateCanalDto, CreateHectareDto, UpdateBlockDto, UpdateCanalDto,
 } from './dto/irrigation.dto';
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const SIDE_LETTER = { LEFT: 'L', RIGHT: 'R' } as const;
-/** <canal>.<block><L|R>, e.g. 5.15R. */
-const blockCodeFor = (canalNumber: number, blockNumber: number, side: 'LEFT' | 'RIGHT') => `${canalNumber}.${blockNumber}${SIDE_LETTER[side]}`;
-/** <block code><hectare>, e.g. 5.15R12. Blocks from before sides were recorded keep the old -H01 style. */
-const hectareCodeFor = (blockCode: string, n: number, side?: string | null) => (side ? `${blockCode}${n}` : `${blockCode}-H${pad(n)}`);
+const pad = pad2;
 
 export interface BlockStats {
   hectareUnits: number;
@@ -344,7 +340,7 @@ export class StructureService {
     }
   }
 
-  private async generateHectares(tx: Db, blockId: string, blockCode: string, upTo: number, from: number, skip = new Set<number>(), side?: string | null) {
+  private async generateHectares(tx: Db, blockId: string, blockCode: string, upTo: number, from: number, skip = new Set<number>(), side?: BlockSide | null) {
     const data: Prisma.IrrigationHectareCreateManyInput[] = [];
     for (let n = from; n <= upTo; n++) {
       if (skip.has(n)) continue;

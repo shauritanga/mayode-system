@@ -8,6 +8,7 @@ import {
   IsDateString,
   IsNotEmpty,
   IsBoolean,
+  IsUUID,
   MinLength,
   Min,
 } from 'class-validator';
@@ -19,6 +20,11 @@ import { Gender, EducationLevel } from '@prisma/client';
  * Provisions the login User + Farmer profile in one transaction.
  */
 export class CreateFarmerDto {
+  @ApiPropertyOptional({ description: 'AMCOS farmers: the free hectare they already hold. Its code (e.g. 5.15R12) becomes their farmer ID and the hectare is allocated to them.' })
+  @IsOptional()
+  @IsUUID()
+  hectareId?: string;
+
   @ApiProperty({
     example: '+255700000001',
     description: 'Login phone number (unique)',

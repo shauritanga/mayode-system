@@ -20,6 +20,7 @@ import { MembershipsService } from '../memberships/memberships.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { DocumentsService } from '../uploads/documents.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
+import { writeAudit } from '../irrigation/irrigation-audit';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
 import { QueryFarmersDto } from './dto/query-farmers.dto';
@@ -77,8 +78,10 @@ export class FarmersService {
       );
     }
 
+    // An AMCOS farmer is registered on the hectare they already hold, and that hectare's code is their ID.
+    const hectare = dto.hectareId ? await this.hectareForRegistration(dto.hectareId, tenantId) : null;
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const controlNumber = await this.generateControlNumber();
+    const controlNumber = hectare ? hectare.code : await this.generateControlNumber();
     // A farmer registered by a field officer is credited to, and assigned to, that officer.
     const registeringOfficer =
       actor?.role === UserRole.FIELD_OFFICER
@@ -101,7 +104,7 @@ export class FarmersService {
         },
       });
 
-      return tx.farmer.create({
+      const created = await tx.farmer.create({
         data: {
           userId: user.id,
           controlNumber,
@@ -129,7 +132,33 @@ export class FarmersService {
         },
         include: { user: { select: { phone: true, email: true } } },
       });
+      if (hectare && actor) {
+        const allocation = await tx.irrigationHectareAllocation.create({
+          data: { hectareId: hectare.id, farmerId: created.id, status: 'ACTIVE', allocatedOn: new Date(), requestedById: actor.id, approvedById: actor.id, approvedAt: new Date(), notes: 'Registered on this hectare' },
+        });
+        await writeAudit(tx, actor, 'irrigation_hectare', hectare.id, 'allocate', null, { ...allocation, registeredWithFarmer: true } as any);
+      }
+      return created;
+    }).catch((error) => {
+      if (hectare && error?.code === 'P2002') throw new ConflictException('This hectare was just taken or its ID is already in use');
+      throw error;
     });
+  }
+
+  /** The free hectare of the caller's AMCOS that a new farmer is being registered on. */
+  private async hectareForRegistration(hectareId: string, tenantId: string | null) {
+    if (!tenantId) throw new BadRequestException('A hectare can only be chosen when registering a farmer for an AMCOS');
+    const hectare = await this.prisma.irrigationHectare.findFirst({
+      where: { id: hectareId, block: { canal: { scheme: { mamcosId: tenantId } } } },
+      select: { id: true, code: true, isActive: true, allocations: { where: { status: { in: ['ACTIVE', 'PENDING_APPROVAL'] } }, select: { id: true }, take: 1 } },
+    });
+    if (!hectare) throw new NotFoundException('That hectare was not found in your AMCOS');
+    if (!hectare.isActive) throw new BadRequestException('That hectare is not in use');
+    if (hectare.allocations.length) throw new ConflictException('That hectare already belongs to a farmer');
+    if (await this.prisma.farmer.findUnique({ where: { controlNumber: hectare.code }, select: { id: true } })) {
+      throw new ConflictException(`A farmer with the ID ${hectare.code} already exists`);
+    }
+    return hectare;
   }
 
   // --------------------------------------------------------------------------

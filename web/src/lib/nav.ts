@@ -89,7 +89,27 @@ export const navGroups: NavGroup[] = [
   {
     label: 'Scheme Management',
     items: [
-      { href: '/dashboard/irrigation', label: 'Scheme Management', icon: DropletIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], anyResource: ['irrigation', 'irrigation_allocations', 'irrigation_leadership'] },
+      // No sidebar entry any more: its pages moved to Scheme Structure, Farmers & Plot Allocation and Leadership & Committees.
+      // The route stays so single canal, block, hectare and scheme pages (and old links) keep working.
+      { href: '/dashboard/irrigation', label: 'Scheme Management', icon: DropletIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], anyResource: ['irrigation', 'irrigation_allocations', 'irrigation_leadership'], hidden: true },
+    ],
+  },
+  {
+    label: 'Scheme Structure',
+    items: [
+      { href: '/dashboard/scheme-structure', label: 'Scheme Structure', icon: DropletIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'irrigation' },
+    ],
+  },
+  {
+    label: 'Farmers & Plot Allocation',
+    items: [
+      { href: '/dashboard/plot-allocation', label: 'Farmers & Plot Allocation', icon: UserGroupIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'irrigation_allocations' },
+    ],
+  },
+  {
+    label: 'Leadership & Committees',
+    items: [
+      { href: '/dashboard/leadership', label: 'Leadership & Committees', icon: Shield01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'irrigation_leadership' },
     ],
   },
   {
@@ -417,8 +437,8 @@ const COOPERATIVE_PORTAL_HIDDEN_HREFS = new Set([
  * oversight, then setup). Anything not listed keeps its original relative order after these.
  */
 const COOPERATIVE_MENU_ORDER = [
-  '/dashboard', '/dashboard/farmers', '/dashboard/irrigation', '/dashboard/dues', '/dashboard/ops-orders', '/dashboard/task-management',
-  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/ops-warehouse', '/dashboard/staff', '/dashboard/suppliers', '/dashboard/sales',
+  '/dashboard', '/dashboard/farmers', '/dashboard/irrigation', '/dashboard/scheme-structure', '/dashboard/plot-allocation', '/dashboard/dues', '/dashboard/ops-orders', '/dashboard/task-management',
+  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/ops-warehouse', '/dashboard/staff', '/dashboard/leadership', '/dashboard/suppliers', '/dashboard/sales',
   '/dashboard/reports', '/dashboard/credit', '/dashboard/traceability', '/dashboard/disputes', '/dashboard/governance', '/dashboard/ai',
   '/dashboard/audit-log', '/dashboard/roles', '/dashboard/settings',
 ];
@@ -433,9 +453,13 @@ function flattenForCooperatives(groups: NavGroup[]): NavGroup[] {
 export function getVisibleGroups(subject: AccessSubject | null | undefined): NavGroup[] {
   const seen = new Set<string>();
   const trimAdminPortal = APP_MODE === 'admin' && (subject?.role === 'SUPER_ADMIN' || subject?.role === 'ADMIN');
+  // In the AMCOS portal the farmer list is the first tab of Farmers & Plot Allocation, so people who see that menu do not get a second Farmers item.
+  const plotMenu = navGroups.flatMap((g) => g.items).find((i) => i.href === '/dashboard/plot-allocation');
+  const farmersInPlotMenu = APP_MODE === 'cooperatives' && !!plotMenu && itemAllowed(plotMenu, subject) && !!subject && hasPermission(subject, 'farmers', 'VIEW');
   const visible = navGroups.map((group) => ({ ...group, items: group.items.filter((item) => {
     if (trimAdminPortal && (ADMIN_PORTAL_HIDDEN_GROUPS.has(group.label) || ADMIN_PORTAL_HIDDEN_HREFS.has(item.href))) return false;
     if (item.hidden || seen.has(item.href) || !itemAllowed(item, subject)) return false;
+    if (farmersInPlotMenu && item.href === '/dashboard/farmers') return false;
     if (item.persona && !(subject?.role && item.roles.includes(subject.role))) return false;
     if (APP_MODE !== 'farmers' && item.roles.length === 1 && item.roles[0] === 'FARMER') return false;
     seen.add(item.href);

@@ -13,7 +13,7 @@ import {
 } from './ui';
 
 /** Page 9 — canal → block → hectare → member → confirm. */
-export default function AllocateWorkspace() {
+export default function AllocateWorkspace({ bare = false }: { bare?: boolean } = {}) {
   const { schemeId, schemes, can } = useIrrigation();
   const search = useSearchParams();
   const scheme = schemes.find((s) => s.id === schemeId);
@@ -50,7 +50,7 @@ export default function AllocateWorkspace() {
   const canAllocate = can('irrigation_allocations', 'CREATE');
   return (
     <>
-      <PageHeader title="Hectare Allocation" subtitle="Choose a canal and block, pick a free hectare, then pick the member who will farm it." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Hectare Allocation' }]} />
+      {!bare && <PageHeader title="Hectare Allocation" subtitle="Choose a canal and block, pick a free hectare, then pick the member who will farm it." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Hectare Allocation' }]} />}
       {message && <Notice tone={message.tone} onDismiss={() => setMessage(null)}>{message.text}</Notice>}
       {scheme?.status === 'INACTIVE' && <Notice tone="error">This scheme is inactive; allocations are disabled.</Notice>}
       <Panel title="1 · Choose the block">

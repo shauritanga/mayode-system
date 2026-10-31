@@ -63,7 +63,8 @@ export function BlockFormModal({ block, canalId, canals, onClose, onSaved }: {
 }
 
 /** Page 5 — every block across the canals. */
-export function BlockList() {
+/** `adding` / `onAddDone` let a parent page own the Add block button; without them the list shows its own. */
+export function BlockList({ adding, onAddDone }: { adding?: boolean; onAddDone?: () => void } = {}) {
   const { schemeId, can } = useIrrigation();
   const search = useSearchParams();
   const [filters, setFilters] = useState({ canalId: '', blockNumber: '', allocation: '', status: '', leadership: '', q: '' });
@@ -76,8 +77,7 @@ export function BlockList() {
   const setFilter = (k: string, v: string) => { setFilters((f) => ({ ...f, [k]: v })); setPage(1); };
   return (
     <>
-      <PageHeader title="Block List" subtitle="Every block across the canals, with its hectare units and leadership." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Block List' }]}
-        actions={can('irrigation', 'CREATE') && schemeId ? <button type="button" className="btn-primary" onClick={() => setForm({})}>Add block</button> : undefined} />
+      {adding === undefined && can('irrigation', 'CREATE') && schemeId && <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}><button type="button" className="btn-primary" onClick={() => setForm({})}>Add block</button></div>}
       {message && <Notice tone="success" onDismiss={() => setMessage('')}>{message}</Notice>}
       <LoadError message={error} onRetry={reload} />
       <section className="table-panel">
@@ -115,7 +115,7 @@ export function BlockList() {
         )}
         <Pager meta={data?.meta} onPage={setPage} />
       </section>
-      {form && <BlockFormModal block={form.block} canals={opts.canals} onClose={() => setForm(null)} onSaved={(m) => { setForm(null); setMessage(m); reload(); }} />}
+      {(form || adding) && <BlockFormModal block={form?.block} canals={opts.canals} onClose={() => { setForm(null); onAddDone?.(); }} onSaved={(m) => { setForm(null); onAddDone?.(); setMessage(m); reload(); }} />}
     </>
   );
 }

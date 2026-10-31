@@ -84,6 +84,12 @@ function pageTitle(pathname: string): string {
   const segments = pathname.split('/').filter(Boolean);
   const last = segments[segments.length - 1];
   if (!last || last === 'dashboard') return 'Dashboard';
+  if (segments[1] === 'farmers' && segments.length > 2) return 'Farmer';
+  // A single record (canal, block, hectare, scheme) is titled by its kind, not its id.
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(last) && segments.length > 2) {
+    const kind = segments[segments.length - 2].replace(/s$/, '');
+    return kind.charAt(0).toUpperCase() + kind.slice(1);
+  }
   return TITLE_MAP[last] ?? last.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

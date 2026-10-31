@@ -152,6 +152,29 @@ describeDb('AMCOS codes and join requests (PostgreSQL)', () => {
     expect((await farmers.getOverview()).total).toBe(everyone); // platform view is unchanged
   });
 
+  it("registers a farmer on a free hectare, and that hectare's code becomes their ID", async () => {
+    const farmers = new FarmersService(prisma as any, { get: () => 'JR' } as any, {} as any, {} as any, {} as any, new OwnershipService(prisma as any), {} as any);
+    const tag = randomUUID().slice(0, 6);
+    const scheme = await prisma.irrigationScheme.create({ data: { mamcosId: madibira.id, code: `HR-${tag}`, name: `Scheme ${tag}`, region: 'Mbeya', district: 'Mbarali', waterSource: 'River' } as any });
+    const canal = await prisma.irrigationCanal.create({ data: { schemeId: scheme.id, canalNumber: 5, code: 'C05', name: 'Canal 05' } as any });
+    const block = await prisma.irrigationBlock.create({ data: { canalId: canal.id, blockNumber: 15, side: 'RIGHT', code: '5.15R', areaHectares: 30, hectareCount: 30 } });
+    const hectare = await prisma.irrigationHectare.create({ data: { blockId: block.id, hectareNumber: 12, code: '5.15R12', areaHectares: 1 } });
+
+    // The allocation is audited against a real user, so the registering admin needs a row.
+    const staff = await prisma.user.create({ data: { phone: phone(), passwordHash: 'x', firstName: 'Reg', lastName: 'Admin', role: UserRole.CUSTOM } });
+    const registrar = { ...adminA, id: staff.id };
+    const created: any = await farmers.create({ phone: phone(), password: 'Secret123', firstName: 'Neema', lastName: 'Joseph', hectareId: hectare.id } as any, registrar);
+    expect(created.controlNumber).toBe('5.15R12');
+    expect(created.mamcosId).toBe(madibira.id);
+    const allocation = await prisma.irrigationHectareAllocation.findFirstOrThrow({ where: { hectareId: hectare.id } });
+    expect(allocation).toMatchObject({ farmerId: created.id, status: 'ACTIVE' });
+
+    // The hectare now belongs to someone, so nobody else can be registered on it.
+    await expect(farmers.create({ phone: phone(), password: 'Secret123', firstName: 'Juma', lastName: 'Ali', hectareId: hectare.id } as any, registrar)).rejects.toBeInstanceOf(ConflictException);
+    // Another AMCOS cannot use it either.
+    await expect(farmers.create({ phone: phone(), password: 'Secret123', firstName: 'Juma', lastName: 'Ali', hectareId: hectare.id } as any, adminB)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('texts a new farmer their sign-in details without the password reaching the log', async () => {
     const sent: any[] = [];
     const sms: any = { sendTransactional: async (...args: any[]) => { sent.push(args); return true; } };

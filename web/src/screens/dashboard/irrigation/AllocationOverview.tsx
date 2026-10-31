@@ -10,7 +10,7 @@ import {
 } from './ui';
 
 /** Page 8 — allocation statistics and progress by canal and block. */
-export default function AllocationOverview() {
+export default function AllocationOverview({ bare = false }: { bare?: boolean } = {}) {
   const { schemeId, can, schemes, loading: schemesLoading } = useIrrigation();
   const [canalId, setCanalId] = useState('');
   const [blockId, setBlockId] = useState('');
@@ -19,8 +19,10 @@ export default function AllocationOverview() {
   const t = data?.totals;
   return (
     <>
-      <PageHeader title="Farmer Allocation Overview" subtitle="How much of the scheme is allocated to members, by canal and block." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Allocation Overview' }]}
+      {!bare && (
+        <PageHeader title="Farmer Allocation Overview" subtitle="How much of the scheme is allocated to members, by canal and block." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Allocation Overview' }]}
         actions={can('irrigation_allocations', 'CREATE') ? <Link className="btn-primary" href={`${BASE}/allocation/allocate`}>Allocate hectares</Link> : undefined} />
+      )}
       <LoadError message={error} onRetry={reload} />
       <section className="table-panel" style={{ marginBottom: 16 }}>
         <Filters>

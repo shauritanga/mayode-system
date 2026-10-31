@@ -211,12 +211,11 @@ test('irrigation section follows its three permission resources', () => {
   const nav = loadNavigation('cooperatives');
   const grants = (...resources) => ({ role: 'CUSTOM', roleId: 'r', permissions: resources.map((resource) => ({ resource, action: 'VIEW' })) });
   const links = (user) => nav.getVisibleGroups(user).flatMap((g) => g.items.map((i) => i.href));
-  assert.ok(links({ role: 'SUPER_ADMIN' }).includes('/dashboard/irrigation'));
+  assert.ok(!links({ role: 'SUPER_ADMIN' }).includes('/dashboard/irrigation'), 'no sidebar entry; its pages live in three newer menus');
+  assert.equal(nav.isPathAllowed('/dashboard/irrigation', { role: 'SUPER_ADMIN' }), true);
   for (const resource of ['irrigation', 'irrigation_allocations', 'irrigation_leadership']) {
-    assert.ok(links(grants(resource)).includes('/dashboard/irrigation'), resource);
     assert.equal(nav.isPathAllowed('/dashboard/irrigation/structure/canals', grants(resource)), true);
   }
-  assert.ok(!links(grants('reports')).includes('/dashboard/irrigation'));
   assert.equal(nav.isPathAllowed('/dashboard/irrigation', grants('reports')), false);
   assert.equal(nav.isPathAllowed('/dashboard/irrigation/leadership/history', { role: 'ADMIN' }), false);
 });
@@ -252,9 +251,21 @@ test('the AMCOS sidebar is one ungrouped list, most-used pages first', () => {
   assert.equal(groups.length, 1);
   assert.equal(groups[0].label, '');
   const links = groups[0].items.map((i) => i.href);
-  assert.equal(links.slice(0, 3).join(), '/dashboard,/dashboard/farmers,/dashboard/irrigation');
+  assert.equal(links.slice(0, 3).join(), '/dashboard,/dashboard/scheme-structure,/dashboard/plot-allocation');
+  assert.ok(!links.includes('/dashboard/irrigation'), 'Scheme Management has no sidebar entry any more');
   assert.ok(links.indexOf('/dashboard/ops-orders') < links.indexOf('/dashboard/accounting'));
   assert.ok(loadNavigation('admin').getVisibleGroups({ role: 'SUPER_ADMIN' }).length > 1, 'admin portal keeps its groups');
+});
+
+test('the farmer list lives inside Farmers & Plot Allocation, and stays a menu item for those without it', () => {
+  const coop = loadNavigation('cooperatives');
+  const hrefs = (u) => coop.getVisibleGroups(u).flatMap((g) => g.items.map((i) => i.href));
+  assert.ok(!hrefs({ role: 'SUPER_ADMIN' }).includes('/dashboard/farmers'));
+  const farmersOnly = { role: 'CUSTOM', roleId: 'r', mamcosId: 'm1', permissions: [{ resource: 'farmers', action: 'VIEW' }] };
+  assert.ok(hrefs(farmersOnly).includes('/dashboard/farmers'));
+  assert.equal(coop.isPathAllowed('/dashboard/farmers', { role: 'SUPER_ADMIN' }), true);
+  const both = { ...farmersOnly, permissions: [...farmersOnly.permissions, { resource: 'irrigation_allocations', action: 'VIEW' }] };
+  assert.ok(hrefs(both).includes('/dashboard/plot-allocation') && !hrefs(both).includes('/dashboard/farmers'));
 });
 
 test('Task Management follows the machinery grant and exists only in the AMCOS portal', () => {

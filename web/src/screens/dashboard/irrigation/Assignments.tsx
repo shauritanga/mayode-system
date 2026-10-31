@@ -101,12 +101,12 @@ function AppointmentSection({ position }: { position: 'CANAL_LEADER' | 'BLOCK_LE
 }
 
 /** Page 13 — appoint and replace canal and block leaders. */
-export default function Assignments() {
+export default function Assignments({ bare = false }: { bare?: boolean } = {}) {
   const search = useSearchParams();
   const [tab, setTab] = useState<'canal' | 'block'>(search.get('blockId') ? 'block' : 'canal');
   return (
     <>
-      <PageHeader title="Canal & Block Leader Assignments" subtitle="One active leader per canal and per block. Replacing a leader keeps the previous appointment in the history." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Leader Assignments' }]} />
+      {!bare && <PageHeader title="Canal & Block Leader Assignments" subtitle="One active leader per canal and per block. Replacing a leader keeps the previous appointment in the history." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Leader Assignments' }]} />}
       <Tabs tabs={[{ id: 'canal', label: 'Canal leaders' }, { id: 'block', label: 'Block leaders' }]} active={tab} onChange={setTab} />
       {tab === 'canal' ? <AppointmentSection key="canal" position="CANAL_LEADER" /> : <AppointmentSection key="block" position="BLOCK_LEADER" />}
     </>

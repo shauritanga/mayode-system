@@ -2,15 +2,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useState } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Copy01Icon, Tick02Icon } from '@hugeicons/core-free-icons';
 import Modal from '@/components/Modal';
+import HectarePicker from './HectarePicker';
 import { farmersApi, joinRequestsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import {
-  ConfirmDialog, Empty, Field, FormGrid, LoadError, Notice, TableSkeleton, errMsg, fmtDate, useApi, useCan,
+  ConfirmDialog, Empty, Field, LoadError, Notice, TableSkeleton, errMsg, fmtDate, useApi, useCan,
 } from '@/screens/dashboard/irrigation/ui';
 
 function AddFarmerModal({ onClose, onCreated }: { onClose: () => void; onCreated: (message: string, password?: string) => void }) {
   const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', village: '' });
+  const [hectare, setHectare] = useState<{ id: string; code: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -22,32 +26,33 @@ function AddFarmerModal({ onClose, onCreated }: { onClose: () => void; onCreated
     if (!form.lastName.trim()) found.lastName = 'Last name is required';
     if (!/^\+?[0-9\s-]{9,15}$/.test(form.phone.trim())) found.phone = 'Enter a valid phone number, e.g. +255712345678';
     if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) found.email = 'Enter a valid email address';
+    if (!hectare) found.hectare = 'Choose the hectare this farmer holds';
     setErrors(found);
     if (Object.keys(found).length) return;
     setSaving(true); setError('');
     try {
       const res = await farmersApi.create({
         firstName: form.firstName.trim(), lastName: form.lastName.trim(), phone: form.phone.trim(),
-        email: form.email.trim() || undefined, village: form.village.trim() || undefined,
+        email: form.email.trim() || undefined, village: form.village.trim() || undefined, hectareId: hectare!.id,
       });
       const name = form.firstName.trim();
-      onCreated(res.data.credentialsSms === 'sent' ? `${name} was registered. Sign-in details were sent by SMS.` : `${name} was registered, but the SMS could not be sent.`, res.data.temporaryPassword);
+      onCreated(res.data.credentialsSms === 'sent' ? `${name} was registered on hectare ${hectare!.code}. Sign-in details were sent by SMS.` : `${name} was registered on hectare ${hectare!.code}, but the SMS could not be sent.`, res.data.temporaryPassword);
     } catch (e) { setError(errMsg(e, 'Could not register this farmer.')); setSaving(false); }
   };
 
   return (
-    <Modal title="Register farmer" subtitle="Only the basics are needed. The farmer gets a temporary password by SMS and completes their own profile in the app." onClose={() => !saving && onClose()} width="560px"
+    <Modal title="Register farmer" subtitle="They get a temporary password by SMS." onClose={() => !saving && onClose()} width="560px"
       footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><button type="submit" form="add-farmer-form" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Register farmer'}</button></>}>
       <form id="add-farmer-form" onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
-        <FormGrid>
-          <Field label="First name *" error={errors.firstName}><input className="input-field" value={form.firstName} onChange={(e) => set('firstName', e.target.value)} /></Field>
-          <Field label="Last name *" error={errors.lastName}><input className="input-field" value={form.lastName} onChange={(e) => set('lastName', e.target.value)} /></Field>
-          <Field label="Phone *" error={errors.phone} hint="This is their sign-in and where the SMS goes"><input className="input-field" inputMode="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+255712345678" /></Field>
-          <Field label="Email" error={errors.email} hint="Optional. Sign-in details are sent by SMS."><input className="input-field" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} /></Field>
-          <Field label="Village" wide><input className="input-field" value={form.village} onChange={(e) => set('village', e.target.value)} /></Field>
-        </FormGrid>
-        <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>The farmer becomes a member of your AMCOS straight away, because you are registering them.</p>
-        {error && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 13, marginTop: 10 }}>{error}</div>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px 16px', alignItems: 'start' }}>
+          <Field label="First name *" error={errors.firstName}><input className="input-field" value={form.firstName} onChange={(e) => set('firstName', e.target.value)} autoComplete="off" /></Field>
+          <Field label="Last name *" error={errors.lastName}><input className="input-field" value={form.lastName} onChange={(e) => set('lastName', e.target.value)} autoComplete="off" /></Field>
+          <Field label="Phone *" error={errors.phone}><input className="input-field" inputMode="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+255712345678" autoComplete="off" /></Field>
+          <Field label="Email" error={errors.email}><input className="input-field" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="Optional" autoComplete="off" /></Field>
+          <Field label="Village"><input className="input-field" value={form.village} onChange={(e) => set('village', e.target.value)} placeholder="Optional" autoComplete="off" /></Field>
+          <HectarePicker up value={hectare} onChange={(h) => { setHectare(h); setErrors((e) => ({ ...e, hectare: '' })); }} error={errors.hectare} />
+        </div>
+        {error && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 13, marginTop: 12 }}>{error}</div>}
       </form>
     </Modal>
   );
@@ -78,10 +83,15 @@ export default function FarmerOnboarding({ onChanged }: { onChanged: () => void 
     <div style={{ marginBottom: 16 }}>
       <div className="glass-card" style={{ padding: '12px 16px', display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div className="muted" style={{ fontSize: 12 }}>Your AMCOS code — farmers enter it when they sign up to ask to join</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 2 }}>
-            <strong style={{ fontFamily: 'monospace', fontSize: 18, letterSpacing: 1 }}>{requests.loading ? '…' : code ?? 'Not set'}</strong>
-            {code && <button type="button" className="btn-secondary" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>}
+          <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Your AMCOS ID. Farmers enter it when they sign up to ask to join.</div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 4px 4px 12px', border: '1px solid var(--border-strong)', borderRadius: 8, background: 'var(--surface-tint)' }}>
+            <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 14, fontWeight: 600, letterSpacing: 0.5 }}>{requests.loading ? '…' : code ?? 'Not set'}</code>
+            {code && (
+              <button type="button" onClick={copy} title={copied ? 'Copied' : 'Copy ID'} aria-label={copied ? 'Copied' : 'Copy AMCOS ID'}
+                style={{ display: 'grid', placeItems: 'center', width: 28, height: 28, border: 0, borderRadius: 6, background: 'transparent', color: copied ? 'var(--green-400, #34D399)' : 'var(--text-2)', cursor: 'pointer' }}>
+                <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={16} strokeWidth={2} />
+              </button>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

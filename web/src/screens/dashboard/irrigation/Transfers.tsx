@@ -67,12 +67,15 @@ function NewTransferModal({ schemeId, presetHectareId, onClose, onSaved }: { sch
 }
 
 /** Page 11 — every hectare-to-farmer transfer, with the paperwork behind it. */
-export default function Transfers() {
+/** `bare` drops the page heading; `adding` / `onAddDone` let a parent page own the New transfer button. */
+export default function Transfers({ bare = false, adding: addingProp, onAddDone }: { bare?: boolean; adding?: boolean; onAddDone?: () => void } = {}) {
   const { schemeId, can } = useIrrigation();
   const search = useSearchParams();
   const [filters, setFilters] = useState({ status: '', q: '', from: '', to: '' });
   const [page, setPage] = useState(1);
-  const [adding, setAdding] = useState(!!search.get('add'));
+  const [addingOwn, setAdding] = useState(!!search.get('add'));
+  const adding = addingOwn || !!addingProp;
+  const closeAdd = () => { setAdding(false); onAddDone?.(); };
   const [docs, setDocs] = useState<any>(null);
   const [action, setAction] = useState<{ kind: 'approve' | 'reject' | 'cancel'; transfer: any } | null>(null);
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
@@ -81,9 +84,11 @@ export default function Transfers() {
   const canEdit = can('irrigation_allocations', 'EDIT');
   return (
     <>
-      <PageHeader title="Allocation Transfer History" subtitle="Hectare transfers between members. A transfer closes the previous allocation and opens a new one; nothing is overwritten."
+      {!bare && (
+        <PageHeader title="Allocation Transfer History" subtitle="Hectare transfers between members. A transfer closes the previous allocation and opens a new one; nothing is overwritten."
         crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Transfer History' }]}
         actions={can('irrigation_allocations', 'CREATE') ? <button type="button" className="btn-primary" onClick={() => setAdding(true)}>New transfer</button> : undefined} />
+      )}
       {message && <Notice tone={message.tone} onDismiss={() => setMessage(null)}>{message.text}</Notice>}
       <LoadError message={error} onRetry={reload} />
       <section className="table-panel">
@@ -114,7 +119,7 @@ export default function Transfers() {
         )}
         <Pager meta={data?.meta} onPage={setPage} />
       </section>
-      {adding && <NewTransferModal schemeId={schemeId} presetHectareId={search.get('hectareId') ?? undefined} onClose={() => setAdding(false)} onSaved={(m) => { setAdding(false); setMessage({ tone: 'success', text: m }); reload(); }} />}
+      {adding && <NewTransferModal schemeId={schemeId} presetHectareId={search.get('hectareId') ?? undefined} onClose={closeAdd} onSaved={(m) => { closeAdd(); setMessage({ tone: 'success', text: m }); reload(); }} />}
       {docs && (
         <Modal title={`Documents · ${docs.hectare.code}`} onClose={() => { setDocs(null); reload(); }} width="720px" footer={<button type="button" className="btn-secondary" onClick={() => { setDocs(null); reload(); }}>Close</button>}>
           <DocumentsPanel schemeId={schemeId} transferId={docs.id} canAdd={can('irrigation', 'CREATE')} />

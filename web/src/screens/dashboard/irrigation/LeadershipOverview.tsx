@@ -8,14 +8,17 @@ import {
 } from './ui';
 
 /** Page 12 — who leads what, and what is about to lapse. */
-export default function LeadershipOverview() {
+/** `bare` drops the page heading, for pages that have their own (Leadership & Committees). */
+export default function LeadershipOverview({ bare = false }: { bare?: boolean } = {}) {
   const { schemeId, can, schemes, loading: schemesLoading } = useIrrigation();
   const { data, loading, error, reload } = useApi<any>(schemeId ? () => irrigationApi.leadershipOverview({ schemeId }) : null, [schemeId]);
   const t = data?.totals;
   return (
     <>
-      <PageHeader title="Leadership Overview" subtitle="Canal and block leader coverage and upcoming appointment expirations." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Leadership Overview' }]}
+      {!bare && (
+        <PageHeader title="Leadership Overview" subtitle="Canal and block leader coverage and upcoming appointment expirations." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Leadership Overview' }]}
         actions={can('irrigation_leadership', 'CREATE') ? <Link className="btn-primary" href={`${BASE}/leadership/assignments`}>Appoint a leader</Link> : undefined} />
+      )}
       <LoadError message={error} onRetry={reload} />
       {(!schemesLoading && !schemes.length) || (!loading && data && !data.scheme) ? (
         <Panel pad={false}><Empty title="No irrigation scheme has been registered yet" hint="Register the scheme and its canals and blocks first." action={can('irrigation', 'CREATE') ? <Link className="btn-primary" href={`${BASE}/structure/scheme`}>Register scheme</Link> : undefined} /></Panel>
@@ -24,9 +27,7 @@ export default function LeadershipOverview() {
           <div className="metric-grid" style={{ marginBottom: 16 }}>
             <StatCard label="Canals" value={fmtNum(t.canals)} /><StatCard label="Blocks" value={fmtNum(t.blocks)} />
             <StatCard label="Canal leaders assigned" value={fmtNum(t.assignedCanalLeaders)} />
-            <StatCard label="Canals without a leader" value={fmtNum(t.unassignedCanals)} tone={t.unassignedCanals ? 'warn' : 'good'} />
             <StatCard label="Block leaders assigned" value={fmtNum(t.assignedBlockLeaders)} />
-            <StatCard label="Blocks without a leader" value={fmtNum(t.blocksWithoutLeaders)} tone={t.blocksWithoutLeaders ? 'warn' : 'good'} />
             <StatCard label="Current appointments" value={fmtNum(t.currentAppointments)} />
             <StatCard label={`Expiring within ${data.windowDays} days`} value={fmtNum(data.expiring.length)} tone={data.expiring.length ? 'warn' : 'good'} />
           </div>

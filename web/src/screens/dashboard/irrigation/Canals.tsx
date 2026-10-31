@@ -58,7 +58,8 @@ function CanalFormModal({ canal, schemeId, nextNumber, onClose, onSaved }: { can
 }
 
 /** Page 3 — canal register. */
-export function CanalList() {
+/** `adding` / `onAddDone` let a parent page own the Add canal button; without them the list shows its own. */
+export function CanalList({ adding, onAddDone }: { adding?: boolean; onAddDone?: () => void } = {}) {
   const { schemeId, can } = useIrrigation();
   const search = useSearchParams();
   const [filters, setFilters] = useState({ q: '', status: '', hasLeader: '', archived: '' });
@@ -70,8 +71,7 @@ export function CanalList() {
   const nextNumber = (data?.data ?? []).reduce((m: number, c: any) => Math.max(m, c.canalNumber), 0) + 1;
   return (
     <>
-      <PageHeader title="Canal List" subtitle="The scheme's canals with their block counts, area and leaders." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Canal List' }]}
-        actions={can('irrigation', 'CREATE') && schemeId ? <button type="button" className="btn-primary" onClick={() => setForm({})}>Add canal</button> : undefined} />
+      {adding === undefined && can('irrigation', 'CREATE') && schemeId && <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}><button type="button" className="btn-primary" onClick={() => setForm({})}>Add canal</button></div>}
       {message && <Notice tone="success" onDismiss={() => setMessage('')}>{message}</Notice>}
       <LoadError message={error} onRetry={reload} />
       <section className="table-panel">
@@ -100,7 +100,7 @@ export function CanalList() {
         )}
         <Pager meta={data?.meta} onPage={setPage} />
       </section>
-      {form && <CanalFormModal canal={form.canal} schemeId={schemeId} nextNumber={nextNumber} onClose={() => setForm(null)} onSaved={(m) => { setForm(null); setMessage(m); reload(); }} />}
+      {(form || adding) && <CanalFormModal canal={form?.canal} schemeId={schemeId} nextNumber={nextNumber} onClose={() => { setForm(null); onAddDone?.(); }} onSaved={(m) => { setForm(null); onAddDone?.(); setMessage(m); reload(); }} />}
     </>
   );
 }

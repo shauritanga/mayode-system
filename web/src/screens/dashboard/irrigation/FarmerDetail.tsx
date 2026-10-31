@@ -10,15 +10,16 @@ import {
 } from './ui';
 
 /** Entry point for page 10 from the menu: pick a member, then open their profile. */
-export function FarmerSearch() {
+/** `bare` drops the page heading and opens the farmer's profile page instead of the irrigation one. */
+export function FarmerSearch({ bare = false }: { bare?: boolean } = {}) {
   const { schemeId } = useIrrigation();
   const router = useRouter();
   const [member, setMember] = useState<MemberLite | null>(null);
   return (
     <>
-      <PageHeader title="Farmer / Hectare Details" subtitle="Look up a member to see their hectares, allocation history and related farm records." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Farmer / Hectare Details' }]} />
+      {!bare && <PageHeader title="Farmer / Hectare Details" subtitle="Look up a member to see their hectares, allocation history and related farm records." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Farmer / Hectare Details' }]} />}
       <Panel title="Find a member">
-        <div style={{ maxWidth: 520 }}><MemberPicker schemeId={schemeId} value={member} onChange={(m) => { setMember(m); if (m) router.push(`${BASE}/allocation/farmers/${m.id}`); }} /></div>
+        <div style={{ maxWidth: 520 }}><MemberPicker schemeId={schemeId} value={member} onChange={(m) => { setMember(m); if (m) router.push(bare ? `/dashboard/farmers/${m.id}` : `${BASE}/allocation/farmers/${m.id}`); }} /></div>
         <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>You can also open a farmer from any hectare, block or allocation list.</p>
       </Panel>
     </>

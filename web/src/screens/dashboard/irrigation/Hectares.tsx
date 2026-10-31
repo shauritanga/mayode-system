@@ -17,7 +17,7 @@ export function HectareRegister() {
   const [filters, setFilters] = useState({ canalId: '', blockId: search.get('blockId') ?? '', status: '', q: '' });
   const [page, setPage] = useState(1);
   const opts = useCanalBlockOptions(schemeId, filters.canalId);
-  const { data, loading, error, reload } = useApi<any>(schemeId ? () => irrigationApi.hectares({ schemeId, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page, pageSize: 30 }) : null, [schemeId, JSON.stringify(filters), page]);
+  const { data, loading, error, reload } = useApi<any>(schemeId ? () => irrigationApi.hectares({ schemeId, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page, pageSize: 10 }) : null, [schemeId, JSON.stringify(filters), page]);
   const setFilter = (k: string, v: string) => {
     setFilters((f) => ({ ...f, [k]: v, ...(k === 'canalId' ? { blockId: '' } : {}) }));
     setPage(1);
@@ -25,8 +25,6 @@ export function HectareRegister() {
   const block = opts.blocks.find((b: any) => b.id === filters.blockId);
   return (
     <>
-      <PageHeader title="Hectare Register" subtitle="Each block has its own numbered 30 hectare units. They are created automatically with the block; none can be added beyond the block's size."
-        crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Hectare Register' }]} />
       <LoadError message={error} onRetry={reload} />
       {block && <div className="metric-grid" style={{ marginBottom: 16 }}>
         <StatCard label={`${block.code} units`} value={`${block.stats.hectareUnits} / ${block.hectareCount}`} />
@@ -39,13 +37,12 @@ export function HectareRegister() {
           <Field label="Block"><select className="input-field" value={filters.blockId} onChange={(e) => setFilter('blockId', e.target.value)}><option value="">All blocks</option>{opts.blocks.map((b: any) => <option key={b.id} value={b.id}>{b.code}</option>)}</select></Field>
           <Field label="Allocation"><select className="input-field" value={filters.status} onChange={(e) => setFilter('status', e.target.value)}><option value="">All</option><option value="AVAILABLE">Unallocated</option><option value="ALLOCATED">Allocated</option><option value="PENDING">Awaiting approval</option></select></Field>
         </Filters>
-        {loading ? <TableSkeleton cols={7} rows={10} /> : !data?.data.length ? <Empty title="No hectare units match" hint="Hectare units appear when a block is created." /> : (
-          <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Hectare</th><th>Block</th><th>Canal</th><th className="num">Area</th><th>Status</th><th>Current farmer</th><th>Guardian</th><th>Allocated</th><th /></tr></thead><tbody>
+        {loading ? <TableSkeleton cols={6} rows={10} /> : !data?.data.length ? <Empty title="No hectare units match" hint="Hectare units appear when a block is created." /> : (
+          <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Hectare</th><th>Status</th><th>Current farmer</th><th>Guardian</th><th>Allocated</th><th /></tr></thead><tbody>
             {data.data.map((h: any) => (
               <tr key={h.id}>
                 <td><Link href={`${BASE}/structure/hectares/${h.id}`} style={{ fontWeight: 600 }}>{h.code}</Link></td>
-                <td><Link href={`${BASE}/structure/blocks/${h.block.id}`}>{h.block.code}</Link></td><td>{h.block.canal.code}</td>
-                <td className="num">{fmtHa(h.areaHectares)}</td><td><StatusBadge value={h.allocationStatus} /></td>
+                <td><StatusBadge value={h.allocationStatus} /></td>
                 <td>{h.farmer ? <Link href={`${BASE}/allocation/farmers/${h.farmer.id}`}>{h.farmer.name} <span className="muted">· {h.farmer.memberNumber}</span></Link> : '—'}</td>
                 <td>{h.guardian ? <Link href={`${BASE}/allocation/farmers/${h.guardian.id}`}>{h.guardian.name}</Link> : '—'}</td>
                 <td>{fmtDate(h.allocatedOn)}</td>

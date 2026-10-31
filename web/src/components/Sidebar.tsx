@@ -28,7 +28,9 @@ function NavList({ onNavigate, collapsed = false }: { onNavigate?: () => void; c
             // routes must match exactly, not by prefix — otherwise the landing
             // page's nav item stays highlighted on every sub-page too.
             const isLandingPage = item.href === '/dashboard' || item.href === '/dashboard/farmer';
-            const isActive = pathname === item.href || (!isLandingPage && pathname.startsWith(item.href));
+            // A farmer's profile opens from the Farmers tab of Farmers & Plot Allocation, so that item stays lit there.
+            const isActive = pathname === item.href || (!isLandingPage && pathname.startsWith(item.href))
+              || (item.href === '/dashboard/plot-allocation' && pathname.startsWith('/dashboard/farmers/'));
             return (
               <Link
                 key={item.href}

@@ -3,6 +3,8 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { isPathAllowed } from '@/lib/nav';
+import { useAuthStore } from '@/store/auth.store';
 import { API_BASE_URL, farmersApi, irrigationApi } from '@/lib/api';
 import { BASE, CardsSkeleton, Empty, LoadError, Panel, StatCard, StatusBadge, fmtDate, fmtHa, titleCase, useApi } from '../../irrigation/ui';
 
@@ -11,6 +13,9 @@ const photoSrc = (url?: string | null) => (!url ? null : /^https?:/.test(url) ? 
 /** A farmer's profile: photo and details on top, their hectares below, then the farms they guide. */
 export default function FarmerProfilePage() {
   const { id } = useParams<{ id: string }>();
+  const user = useAuthStore((st) => st.user);
+  // In the AMCOS portal the farmer list is a tab of Farmers & Plot Allocation.
+  const listHref = user && isPathAllowed('/dashboard/plot-allocation', user) ? '/dashboard/plot-allocation' : '/dashboard/farmers';
   const person = useApi<any>(() => farmersApi.getOne(id), [id]);
   // Hectare records come from the irrigation scheme; a farmer outside it, or a user without that grant, simply has none to show.
   const land = useApi<any>(() => irrigationApi.farmer(id), [id]);
@@ -27,7 +32,7 @@ export default function FarmerProfilePage() {
   return (
     <>
       <nav aria-label="Breadcrumb" className="muted" style={{ fontSize: 12, marginBottom: 14, display: 'flex', gap: 6 }}>
-        <Link href="/dashboard/farmers" style={{ color: 'inherit', textDecoration: 'underline' }}>Farmers</Link><span>/</span><span>{name}</span>
+        <Link href={listHref} style={{ color: 'inherit', textDecoration: 'underline' }}>Farmers</Link><span>/</span><span>{name}</span>
       </nav>
       <LoadError message={person.error} onRetry={person.reload} />
       {person.loading ? <CardsSkeleton count={3} /> : !f ? null : (

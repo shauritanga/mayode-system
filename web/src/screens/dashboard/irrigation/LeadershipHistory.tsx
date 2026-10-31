@@ -7,7 +7,7 @@ import { irrigationApi } from '@/lib/api';
 import { BASE, Empty, Field, Filters, LoadError, PageHeader, Pager, StatusBadge, TableSkeleton, fmtDate, titleCase, useApi, useCanalBlockOptions, useIrrigation } from './ui';
 
 /** Page 14 — every appointment, current and past. */
-export default function LeadershipHistory() {
+export default function LeadershipHistory({ bare = false }: { bare?: boolean } = {}) {
   const { schemeId } = useIrrigation();
   const [filters, setFilters] = useState({ canalId: '', blockId: '', position: '', status: '', q: '', from: '', to: '' });
   const [page, setPage] = useState(1);
@@ -19,7 +19,7 @@ export default function LeadershipHistory() {
   };
   return (
     <>
-      <PageHeader title="Leadership History" subtitle="Current and past appointments, who replaced whom, and who recorded each change." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Leadership History' }]} />
+      {!bare && <PageHeader title="Leadership History" subtitle="Current and past appointments, who replaced whom, and who recorded each change." crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Leadership History' }]} />}
       <LoadError message={error} onRetry={reload} />
       <section className="table-panel">
         <Filters>

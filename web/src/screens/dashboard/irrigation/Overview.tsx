@@ -16,15 +16,16 @@ const ACTIONS: { label: string; href: string; resource: string; action: string }
   { label: 'Register a transfer', href: `${BASE}/allocation/transfers?add=1`, resource: 'irrigation_allocations', action: 'CREATE' },
 ];
 
-export default function Overview() {
+/** `bare` leaves out the page heading, for pages that already have their own (Scheme Structure). */
+export default function Overview({ bare = false }: { bare?: boolean } = {}) {
   const { schemeId, schemes, loading: schemesLoading, can } = useIrrigation();
   const { data, loading, error, reload } = useApi<any>(schemeId ? () => irrigationApi.overview({ schemeId }) : null, [schemeId]);
 
-  if (schemesLoading) return <><PageHeader title="Scheme Overview" /><CardsSkeleton count={8} /></>;
+  if (schemesLoading) return <>{!bare && <PageHeader title="Scheme Overview" />}<CardsSkeleton count={8} /></>;
   if (!schemes.length) {
     return (
       <>
-        <PageHeader title="Scheme Overview" subtitle="Irrigation scheme, canals, blocks and hectare allocation for your AMCOS." />
+        {!bare && <PageHeader title="Scheme Overview" subtitle="Irrigation scheme, canals, blocks and hectare allocation for your AMCOS." />}
         <Panel pad={false}>
           <Empty title="No irrigation scheme has been registered yet"
             hint="Register the scheme first, then add its canals and blocks. Each block gets its 30 hectare units automatically."
@@ -37,12 +38,14 @@ export default function Overview() {
   const scheme = data?.scheme;
   return (
     <>
-      <PageHeader
+      {!bare && (
+        <PageHeader
         title={scheme?.name ?? 'Scheme Overview'}
         subtitle={scheme ? [scheme.code, scheme.mamcos?.name, [scheme.village, scheme.ward, scheme.district, scheme.region].filter(Boolean).join(', ')].filter(Boolean).join(' · ') : undefined}
         crumbs={[{ label: 'Irrigation' }, { label: 'Scheme Overview' }]}
         actions={<>{scheme && <StatusBadge value={scheme.status} />}{scheme && can('irrigation', 'EDIT') && <Link className="btn-secondary" href={`${BASE}/structure/scheme/${scheme.id}`}>Edit scheme</Link>}</>}
-      />
+        />
+      )}
       <LoadError message={error} onRetry={reload} />
       {loading || !t ? <CardsSkeleton count={8} /> : (
         <>
@@ -59,7 +62,7 @@ export default function Overview() {
             <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>{fmtHa(t.allocatedHectares)} of {fmtHa(t.registeredHectares)} allocated</div>
           </Panel>
 
-          {data.alerts.length > 0 && (
+          {!bare && data.alerts.length > 0 && (
             <Panel title={`Setup alerts (${data.alerts.length})`} pad={false}>
               <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                 {data.alerts.map((a: any, i: number) => (
@@ -96,12 +99,12 @@ export default function Overview() {
                 <div><strong style={{ fontSize: 22 }}>{data.blockDistribution.none}</strong><div className="muted" style={{ fontSize: 12 }}>Not allocated</div></div>
               </div>
             </Panel>
-            <Panel title="Quick actions">
+            {!bare && <Panel title="Quick actions">
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {ACTIONS.filter((a) => can(a.resource, a.action)).map((a) => <Link key={a.href} className="btn-secondary" href={a.href}>{a.label}</Link>)}
                 {!ACTIONS.some((a) => can(a.resource, a.action)) && <span className="muted" style={{ fontSize: 13 }}>Your role can view this scheme but not change it.</span>}
               </div>
-            </Panel>
+            </Panel>}
           </div>
 
           <Panel title="Recent scheme activity" pad={false}>

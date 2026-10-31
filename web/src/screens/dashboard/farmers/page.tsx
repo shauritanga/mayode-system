@@ -17,7 +17,9 @@ import {
   Clock01Icon,
   AlertCircleIcon,
 } from '@hugeicons/core-free-icons';
-import { farmersApi, mamcosApi } from '@/lib/api';
+import { farmersApi, locationsApi, mamcosApi } from '@/lib/api';
+import { useApi } from '../irrigation/ui';
+import { useAuthStore } from '@/store/auth.store';
 import { MetricTile, MetricTileSkeleton, TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 import FarmerOnboarding from './FarmerOnboarding';
 
@@ -109,8 +111,20 @@ function pageNumbers(page: number, totalPages: number): (number | '…')[] {
   return out;
 }
 
-export default function FarmersPage() {
+type Place = { id: string; name: string };
+
+/** Names for a select, keeping a chosen value selectable even if the registry does not list it. */
+const nameOptions = (list: { name: string }[] | null | undefined, current: string) => {
+  const names = (list ?? []).map((x) => x.name);
+  return current && !names.includes(current) ? [current, ...names] : names;
+};
+
+/** `embedded` leaves out the summary tiles, for when the list sits inside another page (Farmers & Plot Allocation). */
+export default function FarmersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const router = useRouter();
+  const authUser = useAuthStore((st) => st.user);
+  // Someone who works for one AMCOS only ever sees that AMCOS's farmers, so there is nothing to filter by and no other AMCOS to list.
+  const multiAmcos = authUser?.role === 'SUPER_ADMIN' || !authUser?.mamcosId;
   const reduce = useReducedMotion();
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -131,6 +145,12 @@ export default function FarmersPage() {
   const [ward, setWard] = useState('');
   const [village, setVillage] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
+  // Region → district → ward come from the location registry; the filter sends the chosen names.
+  const regions = useApi<Place[]>(() => locationsApi.getRegions(), []);
+  const regionId = regions.data?.find((r) => r.name === region)?.id;
+  const districts = useApi<Place[]>(regionId ? () => locationsApi.getDistricts(regionId) : null, [regionId]);
+  const districtId = districts.data?.find((d) => d.name === district)?.id;
+  const wards = useApi<Place[]>(districtId ? () => locationsApi.getWards(districtId) : null, [districtId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -226,11 +246,12 @@ export default function FarmersPage() {
   }, [page, debouncedSearch, status, mamcosId, region, district, ward, village, reloadTick]);
 
   useEffect(() => {
+    if (!multiAmcos) return;
     mamcosApi.getAll().then((res) => {
       const raw = res.data;
       setMamcosList(Array.isArray(raw) ? raw : (raw?.data ?? []));
     }).catch((e) => setLoadError(apiErrorMessage(e, 'Failed to load AMCOS filter list')));
-  }, []);
+  }, [multiAmcos]);
 
   const pages = useMemo(
     () => pageNumbers(pagination?.page ?? 1, pagination?.totalPages ?? 1),
@@ -249,7 +270,7 @@ export default function FarmersPage() {
     <div className="page-shell farmers-page">
       <FarmerOnboarding onChanged={() => setReloadTick((n) => n + 1)} />
       {/* Summary */}
-      <div className="role-grid farmers-summary">
+      {!embedded && <div className="role-grid farmers-summary">
         {overviewLoading ? (
           <>
             <MetricTileSkeleton />
@@ -265,7 +286,7 @@ export default function FarmersPage() {
             <MetricTile label="Flagged" value={flagged} hint="Rejected, suspended or disputed" tone="red" />
           </>
         )}
-      </div>
+      </div>}
 
       {/* Unified list workspace */}
       <section className="glass-card farmers-workspace farmers-workspace-tint">
@@ -293,7 +314,7 @@ export default function FarmersPage() {
               ))}
             </select>
 
-            <select
+            {multiAmcos && <select
               className="farmers-select"
               value={mamcosId}
               onChange={(e) => applyFilter(setMamcosId)(e.target.value)}
@@ -303,7 +324,7 @@ export default function FarmersPage() {
               {mamcosList.map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
-            </select>
+            </select>}
 
             <button
               type="button"
@@ -320,13 +341,22 @@ export default function FarmersPage() {
           {moreOpen && (
             <div className="farmers-location-grid">
               <label className="form-label">Region
-                <input className="input-field" value={region} onChange={(e) => applyFilter(setRegion)(e.target.value)} placeholder="e.g. Mbeya" />
+                <select className="input-field" value={region} onChange={(e) => { applyFilter(setRegion)(e.target.value); setDistrict(''); setWard(''); }}>
+                  <option value="">All regions</option>
+                  {nameOptions(regions.data, region).map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
               </label>
               <label className="form-label">District
-                <input className="input-field" value={district} onChange={(e) => applyFilter(setDistrict)(e.target.value)} placeholder="e.g. Mbarali" />
+                <select className="input-field" value={district} disabled={!region} onChange={(e) => { applyFilter(setDistrict)(e.target.value); setWard(''); }}>
+                  <option value="">{region ? 'All districts' : 'Choose a region first'}</option>
+                  {nameOptions(districts.data, district).map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
               </label>
               <label className="form-label">Ward
-                <input className="input-field" value={ward} onChange={(e) => applyFilter(setWard)(e.target.value)} placeholder="e.g. Rujewa" />
+                <select className="input-field" value={ward} disabled={!district} onChange={(e) => applyFilter(setWard)(e.target.value)}>
+                  <option value="">{district ? 'All wards' : 'Choose a district first'}</option>
+                  {nameOptions(wards.data, ward).map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
               </label>
               <label className="form-label">Village
                 <input className="input-field" value={village} onChange={(e) => applyFilter(setVillage)(e.target.value)} placeholder="e.g. Madibira" />
@@ -380,7 +410,7 @@ export default function FarmersPage() {
                   <th>District</th>
                   <th>Ward</th>
                   <th>Village</th>
-                  <th>Group Name / AMCOS</th>
+                  {multiAmcos && <th>Group Name / AMCOS</th>}
                   <th className="num">Farm Size</th>
                   <th>Status</th>
                 </tr>
@@ -410,11 +440,11 @@ export default function FarmersPage() {
                     <td className="farmers-cell">{farmer.district || '—'}</td>
                     <td className="farmers-cell">{farmer.ward || '—'}</td>
                     <td className="farmers-cell">{farmer.village || '—'}</td>
-                    <td>
+                    {multiAmcos && <td>
                       <span className="farmers-amcos" title={farmer.mamcos?.name ?? undefined}>
                         {farmer.mamcos?.name ?? '—'}
                       </span>
-                    </td>
+                    </td>}
                     <td className="num">
                       <span className="farmers-size">{formatFarmSize(farmer.farmSizeHa)}</span>
                     </td>

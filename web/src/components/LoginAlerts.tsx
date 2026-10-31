@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import AlertToast from '@/components/AlertToast';
 import { irrigationApi } from '@/lib/api';
 import { APP_MODE } from '@/lib/app-mode';
 import { hasPermission } from '@/lib/nav';
@@ -72,20 +72,5 @@ export default function LoginAlerts() {
     return () => { live = false; };
   }, [eligible]);
 
-  if (!open || !alerts.length) return null;
-  return (
-    <aside className="login-alerts" role="status" aria-live="polite" aria-label="Alerts">
-      <div className="login-alerts-head">
-        <strong>Needs your attention</strong>
-        <span className="badge badge-gold">{alerts.length}</span>
-        <button type="button" className="login-alerts-close" onClick={() => setOpen(false)} aria-label="Close alerts">×</button>
-      </div>
-      <ul className="login-alerts-list">
-        {alerts.slice(0, 5).map((a, i) => (
-          <li key={i}><Link href={a.href} onClick={() => setOpen(false)}>{a.message}</Link></li>
-        ))}
-      </ul>
-      {alerts.length > 5 && <div className="login-alerts-more">and {alerts.length - 5} more</div>}
-    </aside>
-  );
+  return open ? <AlertToast alerts={alerts} onClose={() => setOpen(false)} /> : null;
 }
