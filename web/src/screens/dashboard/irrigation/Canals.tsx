@@ -31,7 +31,7 @@ function CanalFormModal({ canal, schemeId, nextNumber, onClose, onSaved }: { can
     setErrors(found);
     if (Object.keys(found).length) return;
     setSaving(true); setError('');
-    const body: any = { name: form.name.trim() || undefined, status: form.status, description: form.description.trim() || undefined, headworks: form.headworks.trim() || undefined, infrastructureNotes: form.infrastructureNotes.trim() || undefined, ...(form.lengthKm !== '' ? { lengthKm: Number(form.lengthKm) } : {}) };
+    const body: any = { status: form.status, description: form.description.trim() || undefined, headworks: form.headworks.trim() || undefined, infrastructureNotes: form.infrastructureNotes.trim() || undefined, ...(form.lengthKm !== '' ? { lengthKm: Number(form.lengthKm) } : {}) };
     if (form.code.trim()) body.code = form.code.trim();
     try {
       if (editing) { await irrigationApi.updateCanal(canal.id, body); onSaved('Canal saved.'); }
@@ -45,7 +45,6 @@ function CanalFormModal({ canal, schemeId, nextNumber, onClose, onSaved }: { can
         <FormGrid>
           <Field label="Canal number *" error={errors.canalNumber}><input type="number" min={1} max={99} className="input-field" value={form.canalNumber} onChange={(e) => set('canalNumber', e.target.value)} disabled={editing} /></Field>
           <Field label="Canal code" hint="Defaults to C01, C02 …"><input className="input-field" value={form.code} onChange={(e) => set('code', e.target.value)} placeholder={editing ? undefined : `C${String(form.canalNumber || '').padStart(2, '0')}`} /></Field>
-          <Field label="Canal name" hint="Defaults to Canal 01 …"><input className="input-field" value={form.name} onChange={(e) => set('name', e.target.value)} /></Field>
           <Field label="Status"><select className="input-field" value={form.status} onChange={(e) => set('status', e.target.value)}>{STATUSES.map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}</select></Field>
           <Field label="Length (km)" error={errors.lengthKm}><input type="number" step="0.01" min={0} className="input-field" value={form.lengthKm} onChange={(e) => set('lengthKm', e.target.value)} /></Field>
           <Field label="Intake"><input className="input-field" value={form.headworks} onChange={(e) => set('headworks', e.target.value)} /></Field>

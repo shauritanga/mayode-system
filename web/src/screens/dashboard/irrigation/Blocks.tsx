@@ -18,7 +18,7 @@ export function BlockFormModal({ block, canalId, canals, onClose, onSaved }: {
   block?: any; canalId?: string; canals: any[]; onClose: () => void; onSaved: (msg: string) => void;
 }) {
   const editing = !!block;
-  const [form, setForm] = useState({ canalId: block?.canalId ?? canalId ?? '', blockNumber: block ? String(block.blockNumber) : '', name: block?.name ?? '', status: block?.status ?? 'ACTIVE', description: block?.description ?? '' });
+  const [form, setForm] = useState({ canalId: block?.canalId ?? canalId ?? '', blockNumber: block ? String(block.blockNumber) : '', side: block?.side ?? '', status: block?.status ?? 'ACTIVE', description: block?.description ?? '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -27,15 +27,16 @@ export function BlockFormModal({ block, canalId, canals, onClose, onSaved }: {
     const found: Record<string, string> = {};
     if (!editing && !form.canalId) found.canalId = 'Choose the canal';
     if (!editing && !(Number(form.blockNumber) >= 1)) found.blockNumber = 'Enter a block number of 1 or more';
+    if (!form.side) found.side = 'Say whether the block is on the left or right of the canal';
     setErrors(found);
     if (Object.keys(found).length) return;
     setSaving(true); setError('');
     try {
       if (editing) {
-        await irrigationApi.updateBlock(block.id, { name: form.name.trim(), status: form.status, description: form.description.trim() });
+        await irrigationApi.updateBlock(block.id, { side: form.side || undefined, status: form.status, description: form.description.trim() });
         onSaved('Block saved.');
       } else {
-        await irrigationApi.createBlock({ canalId: form.canalId, blockNumber: Number(form.blockNumber), name: form.name.trim() || undefined, status: form.status, description: form.description.trim() || undefined });
+        await irrigationApi.createBlock({ canalId: form.canalId, blockNumber: Number(form.blockNumber), side: form.side, status: form.status, description: form.description.trim() || undefined });
         onSaved('Block created with its hectare units.');
       }
     } catch (e) { setError(errMsg(e, 'Could not save the block.')); setSaving(false); }
@@ -51,7 +52,7 @@ export function BlockFormModal({ block, canalId, canals, onClose, onSaved }: {
             </select>
           </Field>
           <Field label="Block number *" error={errors.blockNumber}><input type="number" min={1} className="input-field" value={form.blockNumber} onChange={(e) => set('blockNumber', e.target.value)} disabled={editing} /></Field>
-          <Field label="Name" hint="Defaults to Block 01, Block 02 …"><input className="input-field" value={form.name} onChange={(e) => set('name', e.target.value)} /></Field>
+          <Field label="Side of the canal *" error={errors.side}><select className="input-field" value={form.side} onChange={(e) => set('side', e.target.value)}><option value="">Select left or right</option><option value="LEFT">Left</option><option value="RIGHT">Right</option></select></Field>
           <Field label="Operational status"><select className="input-field" value={form.status} onChange={(e) => set('status', e.target.value)}>{STATUSES.map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}</select></Field>
           <Field label="Description" wide><textarea className="input-field" rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} /></Field>
         </FormGrid>
@@ -93,12 +94,13 @@ export function BlockList() {
             action={can('irrigation', 'CREATE') && schemeId && !Object.values(filters).some(Boolean) ? <button type="button" className="btn-primary" onClick={() => setForm({})}>Add block</button> : undefined} />
         ) : (
           <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr>
-            <th>Block</th><th>Code</th><th>Canal</th><th className="num">Area</th><th className="num">Units</th><th className="num">Allocated</th><th className="num">Unallocated</th><th className="num">Farmers</th><th>Block leader</th><th>Status</th><th /></tr></thead><tbody>
+            <th>Block</th><th>Code</th><th>Canal</th><th>Side</th><th className="num">Area</th><th className="num">Units</th><th className="num">Allocated</th><th className="num">Unallocated</th><th className="num">Farmers</th><th>Block leader</th><th>Status</th><th /></tr></thead><tbody>
             {data.data.map((b: any) => (
               <tr key={b.id}>
                 <td style={{ fontWeight: 600 }}>{b.blockNumber}</td>
                 <td><Link href={`${BASE}/structure/blocks/${b.id}`}>{b.code}</Link></td>
                 <td><Link href={`${BASE}/structure/canals/${b.canal.id}`}>{b.canal.code}</Link></td>
+                <td>{b.side ? titleCase(b.side) : <span className="muted">Not set</span>}</td>
                 <td className="num">{fmtHa(b.areaHectares)}</td><td className="num">{b.stats.hectareUnits}</td>
                 <td className="num">{b.stats.allocatedUnits}</td><td className="num">{b.stats.unallocatedUnits}</td><td className="num">{b.stats.farmerCount}</td>
                 <td>{b.leader ? <>{b.leader.name}{b.leader.state === 'TERM_EXPIRED' && <> <StatusBadge value="TERM_EXPIRED" label="Term expired" /></>}</> : <StatusBadge value="UNASSIGNED" label="No leader" />}</td>
@@ -203,7 +205,7 @@ export function BlockDetail({ id }: { id: string }) {
   return (
     <>
       <PageHeader title={b ? `${b.code} · ${b.name ?? `Block ${b.blockNumber}`}` : 'Block'}
-        subtitle={b ? `${b.canal.name} · ${b.scheme.name}` : undefined}
+        subtitle={b ? `${b.canal.name}${b.side ? ` (${titleCase(b.side)} side)` : ''} · ${b.scheme.name}` : undefined}
         crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Block List', href: `${BASE}/structure/blocks` }, { label: b?.code ?? '…' }]}
         actions={b && <>
           <StatusBadge value={b.archivedAt ? 'INACTIVE' : b.status} label={b.archivedAt ? 'Archived' : undefined} />

@@ -4,7 +4,7 @@ import {
   IsUUID, Matches, Max, MaxLength, Min,
 } from 'class-validator';
 import {
-  IrrigationDocumentType, IrrigationLeadershipPosition, IrrigationStatus,
+  IrrigationBlockSide, IrrigationDocumentType, IrrigationLeadershipPosition, IrrigationStatus,
 } from '@prisma/client';
 
 const CODE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -83,12 +83,14 @@ export class CreateBlockDto {
   @IsUUID() canalId: string;
   @Type(() => Number) @IsInt() @Min(1) @Max(999) blockNumber: number;
   @IsOptional() @IsString() @MaxLength(32) @Matches(CODE) code?: string;
+  @IsEnum(IrrigationBlockSide) side: IrrigationBlockSide;
   @IsOptional() @IsString() @MaxLength(160) name?: string;
   @IsOptional() @IsEnum(IrrigationStatus) status?: IrrigationStatus;
   @IsOptional() @IsString() @MaxLength(2000) description?: string;
 }
 
 export class UpdateBlockDto {
+  @IsOptional() @IsEnum(IrrigationBlockSide) side?: IrrigationBlockSide;
   @IsOptional() @IsString() @MaxLength(160) name?: string;
   @IsOptional() @IsEnum(IrrigationStatus) status?: IrrigationStatus;
   @IsOptional() @IsString() @MaxLength(2000) description?: string;

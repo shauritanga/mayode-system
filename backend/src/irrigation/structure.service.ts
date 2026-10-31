@@ -319,7 +319,7 @@ export class StructureService {
           throw new ConflictException(`${canal.name} already has ${existing} blocks, the maximum set for this scheme (${scheme.maxBlocksPerCanal})`);
         const block = await tx.irrigationBlock.create({
           data: {
-            canalId: canal.id, blockNumber: dto.blockNumber, code,
+            canalId: canal.id, blockNumber: dto.blockNumber, code, side: dto.side,
             name: dto.name?.trim() || `Block ${pad(dto.blockNumber)}`,
             areaHectares: hectareCount, hectareCount,
             status: dto.status ?? 'ACTIVE', description: dto.description?.trim() || null,
@@ -388,6 +388,7 @@ export class StructureService {
       const updated = await tx.irrigationBlock.update({
         where: { id },
         data: {
+          ...(dto.side !== undefined ? { side: dto.side } : {}),
           ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
           ...(dto.status !== undefined ? { status: dto.status } : {}),
           ...(dto.description !== undefined ? { description: dto.description.trim() || null } : {}),

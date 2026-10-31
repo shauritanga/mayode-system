@@ -372,6 +372,12 @@ enum IrrigationStatus {
   INACTIVE
 }
 
+/// Which side of its canal a block lies on, looking downstream.
+enum IrrigationBlockSide {
+  LEFT
+  RIGHT
+}
+
 model IrrigationCanal {
   id                  String           @id @default(uuid())
   schemeId            String           @map("scheme_id")
@@ -405,6 +411,8 @@ model IrrigationBlock {
   blockNumber         Int              @map("block_number")
   code                String
   name                String?
+  /// Left or right of the canal. Null only for blocks created before this was recorded.
+  side                IrrigationBlockSide?
   areaHectares        Decimal          @map("area_hectares") @db.Decimal(10, 2)
   /// Number of 1-hectare allocation units generated for this block.
   hectareCount        Int              @map("hectare_count")

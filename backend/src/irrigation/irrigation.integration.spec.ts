@@ -160,7 +160,7 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
       for (let c = 0; c < 6; c++) {
         blockIds[c] = [];
         for (let b = 1; b <= BLOCKS_PER_CANAL[c]; b++) {
-          blockIds[c].push((await structure.createBlock(admin, { canalId: canalIds[c], blockNumber: b }) as any).id);
+          blockIds[c].push((await structure.createBlock(admin, { canalId: canalIds[c], blockNumber: b, side: 'LEFT'}) as any).id);
         }
       }
       const counts = await prisma.$queryRawUnsafe<{ block_id: string; n: bigint; lo: number; hi: number; area: string }[]>(
@@ -170,8 +170,8 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
     });
 
     it('refuses a block beyond the canal maximum and a repeated block number', async () => {
-      await expect(structure.createBlock(admin, { canalId: canalIds[0], blockNumber: 17 })).rejects.toBeInstanceOf(ConflictException);
-      await expect(structure.createBlock(admin, { canalId: canalIds[1], blockNumber: 5 })).rejects.toBeInstanceOf(ConflictException);
+      await expect(structure.createBlock(admin, { canalId: canalIds[0], blockNumber: 17, side: 'LEFT'})).rejects.toBeInstanceOf(ConflictException);
+      await expect(structure.createBlock(admin, { canalId: canalIds[1], blockNumber: 5, side: 'LEFT'})).rejects.toBeInstanceOf(ConflictException);
     });
 
     it('the database refuses a duplicate hectare number and a 31st hectare', async () => {
@@ -473,7 +473,7 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
     it('cannot change scheme structure or configuration', async () => {
       const u = canalLeader.user;
       await expect(structure.createCanal(u, { schemeId, canalNumber: 7 })).rejects.toBeInstanceOf(ForbiddenException);
-      await expect(structure.createBlock(u, { canalId: canalIds[0], blockNumber: 17 })).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(structure.createBlock(u, { canalId: canalIds[0], blockNumber: 17, side: 'LEFT'})).rejects.toBeInstanceOf(ForbiddenException);
       await expect(schemes.update(u, schemeId, { name: 'Hijacked' })).rejects.toBeInstanceOf(ForbiddenException);
     });
 
