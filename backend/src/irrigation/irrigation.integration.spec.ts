@@ -169,6 +169,19 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
       expect(counts.every((r) => Number(r.n) === 30 && r.lo === 1 && r.hi === 30 && Number(r.area) === 30)).toBe(true);
     });
 
+    it('names blocks and hectares <canal>.<block><L|R><hectare> and renames them when the side changes', async () => {
+      const canal = await prisma.irrigationCanal.findUniqueOrThrow({ where: { id: canalIds[0] } });
+      const block: any = await prisma.irrigationBlock.findUniqueOrThrow({ where: { id: blockIds[0][0] } });
+      expect(block.code).toBe(`${canal.canalNumber}.${block.blockNumber}L`);
+      const first = await prisma.irrigationHectare.findFirstOrThrow({ where: { blockId: block.id, hectareNumber: 12 } });
+      expect(first.code).toBe(`${canal.canalNumber}.${block.blockNumber}L12`);
+      await structure.updateBlock(admin, block.id, { side: 'RIGHT' });
+      const moved = await prisma.irrigationHectare.findFirstOrThrow({ where: { blockId: block.id, hectareNumber: 12 } });
+      expect(moved.code).toBe(`${canal.canalNumber}.${block.blockNumber}R12`);
+      expect((await prisma.irrigationBlock.findUniqueOrThrow({ where: { id: block.id } })).code).toBe(`${canal.canalNumber}.${block.blockNumber}R`);
+      await structure.updateBlock(admin, block.id, { side: 'LEFT' });
+    });
+
     it('refuses a block beyond the canal maximum and a repeated block number', async () => {
       await expect(structure.createBlock(admin, { canalId: canalIds[0], blockNumber: 17, side: 'LEFT'})).rejects.toBeInstanceOf(ConflictException);
       await expect(structure.createBlock(admin, { canalId: canalIds[1], blockNumber: 5, side: 'LEFT'})).rejects.toBeInstanceOf(ConflictException);

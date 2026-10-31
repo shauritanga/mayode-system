@@ -11,6 +11,11 @@ import {
 } from './dto/irrigation.dto';
 
 const pad = (n: number) => String(n).padStart(2, '0');
+const SIDE_LETTER = { LEFT: 'L', RIGHT: 'R' } as const;
+/** <canal>.<block><L|R>, e.g. 5.15R. */
+const blockCodeFor = (canalNumber: number, blockNumber: number, side: 'LEFT' | 'RIGHT') => `${canalNumber}.${blockNumber}${SIDE_LETTER[side]}`;
+/** <block code><hectare>, e.g. 5.15R12. Blocks from before sides were recorded keep the old -H01 style. */
+const hectareCodeFor = (blockCode: string, n: number, side?: string | null) => (side ? `${blockCode}${n}` : `${blockCode}-H${pad(n)}`);
 
 export interface BlockStats {
   hectareUnits: number;
@@ -308,7 +313,7 @@ export class StructureService {
     const canal = await this.scopeService.assertCanal(scope, dto.canalId);
     if (canal.archivedAt) throw new BadRequestException('This canal is archived');
     const scheme = canal.scheme;
-    const code = dto.code?.trim() || `${canal.code}-B${pad(dto.blockNumber)}`;
+    const code = dto.code?.trim() || blockCodeFor(canal.canalNumber, dto.blockNumber, dto.side);
     const hectareCount = Math.round(num(scheme.hectaresPerBlock));
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -326,7 +331,7 @@ export class StructureService {
             createdById: actor.id, updatedById: actor.id,
           },
         });
-        await this.generateHectares(tx, block.id, code, hectareCount, 1);
+        await this.generateHectares(tx, block.id, code, hectareCount, 1, new Set(), dto.side);
         await writeAudit(tx, actor, 'irrigation_block', block.id, 'create', null, { ...block, hectareUnitsGenerated: hectareCount } as any);
         return block;
       });
@@ -339,11 +344,11 @@ export class StructureService {
     }
   }
 
-  private async generateHectares(tx: Db, blockId: string, blockCode: string, upTo: number, from: number, skip = new Set<number>()) {
+  private async generateHectares(tx: Db, blockId: string, blockCode: string, upTo: number, from: number, skip = new Set<number>(), side?: string | null) {
     const data: Prisma.IrrigationHectareCreateManyInput[] = [];
     for (let n = from; n <= upTo; n++) {
       if (skip.has(n)) continue;
-      data.push({ blockId, hectareNumber: n, code: `${blockCode}-H${pad(n)}`, areaHectares: 1 });
+      data.push({ blockId, hectareNumber: n, code: hectareCodeFor(blockCode, n, side), areaHectares: 1 });
     }
     if (data.length) await tx.irrigationHectare.createMany({ data });
     return data.length;
@@ -356,7 +361,7 @@ export class StructureService {
     const block = await this.scopeService.assertBlock(scope, blockId);
     return this.prisma.$transaction(async (tx) => {
       const have = new Set((await tx.irrigationHectare.findMany({ where: { blockId }, select: { hectareNumber: true } })).map((h) => h.hectareNumber));
-      const created = await this.generateHectares(tx, blockId, block.code, block.hectareCount, 1, have);
+      const created = await this.generateHectares(tx, blockId, block.code, block.hectareCount, 1, have, block.side);
       if (created) await writeAudit(tx, actor, 'irrigation_block', blockId, 'initialize-hectares', null, { created });
       return { created, total: have.size + created };
     });
@@ -368,7 +373,7 @@ export class StructureService {
     const block = await this.scopeService.assertBlock(scope, dto.blockId);
     try {
       return await this.prisma.irrigationHectare.create({
-        data: { blockId: block.id, hectareNumber: dto.hectareNumber, code: `${block.code}-H${pad(dto.hectareNumber)}`, areaHectares: 1 },
+        data: { blockId: block.id, hectareNumber: dto.hectareNumber, code: hectareCodeFor(block.code, dto.hectareNumber, block.side), areaHectares: 1 },
       });
     } catch (error) {
       rethrowIntegrity(error, {
@@ -383,12 +388,16 @@ export class StructureService {
   async updateBlock(actor: RequestUser, id: string, dto: UpdateBlockDto) {
     const scope = await this.scopeService.resolve(actor);
     this.scopeService.assertUnrestricted(scope, 'Editing a block');
-    const { canal: _c, ...before } = await this.scopeService.assertBlock(scope, id);
+    const { canal, ...before } = await this.scopeService.assertBlock(scope, id);
+    const canalNumber = canal.canalNumber;
     return this.prisma.$transaction(async (tx) => {
+      // Moving a block to the other side (or giving an old block its side) renames it and its hectares to match.
+      const recode = dto.side !== undefined && dto.side !== before.side;
+      const newCode = recode ? blockCodeFor(canalNumber, before.blockNumber, dto.side!) : undefined;
       const updated = await tx.irrigationBlock.update({
         where: { id },
         data: {
-          ...(dto.side !== undefined ? { side: dto.side } : {}),
+          ...(recode ? { side: dto.side, code: newCode } : {}),
           ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
           ...(dto.status !== undefined ? { status: dto.status } : {}),
           ...(dto.description !== undefined ? { description: dto.description.trim() || null } : {}),
@@ -399,6 +408,10 @@ export class StructureService {
           updatedById: actor.id,
         },
       });
+      if (recode) {
+        const hectares = await tx.irrigationHectare.findMany({ where: { blockId: id }, select: { id: true, hectareNumber: true } });
+        for (const h of hectares) await tx.irrigationHectare.update({ where: { id: h.id }, data: { code: hectareCodeFor(newCode!, h.hectareNumber, dto.side) } });
+      }
       const changes = diffRecords(before as any, updated as any);
       if (Object.keys(changes).length) await writeAudit(tx, actor, 'irrigation_block', id, 'update', before as any, { changes } as any);
       return updated;
