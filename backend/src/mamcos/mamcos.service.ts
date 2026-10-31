@@ -4,6 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { MamcosStaffRole } from '@prisma/client';
+import { generateAmcosCode } from '../join-requests/amcos-code';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import {
@@ -31,8 +32,11 @@ export class MamcosService {
       );
     }
 
+    // Farmers type this code at sign-up to ask to join; generated, never typed by an admin.
+    let code = generateAmcosCode(createMamcosDto.name);
+    while (await this.prisma.mamcos.findUnique({ where: { code }, select: { id: true } })) code = generateAmcosCode(createMamcosDto.name);
     return this.prisma.mamcos.create({
-      data: createMamcosDto,
+      data: { ...createMamcosDto, code },
     });
   }
 

@@ -1,4 +1,5 @@
 'use client';
+import { roleLabel } from '@/lib/role-label';
 import { useRouter } from 'next/navigation';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Logout01Icon, UserIcon, CallIcon, IdIcon } from '@hugeicons/core-free-icons';
@@ -55,7 +56,7 @@ export default function ProfilePage() {
           </span>
           <div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'Outfit, sans-serif' }}>{displayName}</div>
-            <span className="badge badge-green" style={{ marginTop: '6px' }}>{user?.role}</span>
+            <span className="badge badge-green" style={{ marginTop: '6px' }}>{roleLabel(user)}</span>
           </div>
         </div>
 
@@ -63,7 +64,7 @@ export default function ProfilePage() {
           <ProfileRow icon={CallIcon} label="Phone number" value={user?.phone ?? '—'} />
           <ProfileRow icon={UserIcon} label="First name" value={user?.firstName ?? '—'} />
           <ProfileRow icon={UserIcon} label="Last name" value={user?.lastName ?? '—'} />
-          <ProfileRow icon={IdIcon} label="Role" value={user?.role ?? '—'} />
+          <ProfileRow icon={IdIcon} label="Role" value={roleLabel(user) || '—'} />
           <div style={{ padding: '12px', background: 'var(--surface-2)', borderRadius: '10px' }}>
             <div style={{ fontSize: '11px', color: 'var(--neutral-500)', marginBottom: 8 }}>Language / Lugha</div>
             <div style={{ display: 'flex', gap: 8 }}>

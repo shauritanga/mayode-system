@@ -14,6 +14,8 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { FarmerCredentialsService } from './farmer-credentials.service';
+import { normalizeMsisdn } from '../messaging/sms.service';
 import { FarmersService } from './farmers.service';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
@@ -51,6 +53,7 @@ export class FarmersController {
   constructor(
     private readonly farmersService: FarmersService,
     private readonly exporter: ExportService,
+    private readonly credentials: FarmerCredentialsService,
   ) {}
 
   @Post()
@@ -59,8 +62,15 @@ export class FarmersController {
   @ApiOperation({
     summary: 'Register a new farmer (provisions login + profile)',
   })
-  create(@Body() dto: CreateFarmerDto, @CurrentUser() user: RequestUser) {
-    return this.farmersService.create(dto, user);
+  async create(@Body() dto: CreateFarmerDto, @CurrentUser() user: RequestUser) {
+    const phone = normalizeMsisdn(dto.phone);
+    // With no password given the farmer is registered with just their name and phone: a temporary password is generated,
+    // texted to them, and they must replace it at first sign-in. They complete the rest of their profile themselves.
+    if (dto.password) return this.farmersService.create({ ...dto, phone, password: dto.password }, user);
+    const password = this.credentials.temporaryPassword();
+    const farmer = await this.farmersService.create({ ...dto, phone, password }, user, { mustChangePassword: true });
+    const sent = await this.credentials.send(phone, dto.firstName, 'sw', password);
+    return { ...farmer, credentialsSms: sent ? 'sent' : 'failed', ...(sent ? {} : { temporaryPassword: password }) };
   }
 
   @Get()
@@ -132,8 +142,8 @@ export class FarmersController {
   @ApiOperation({
     summary: 'Farmer dashboard aggregates (counts by status and region)',
   })
-  overview() {
-    return this.farmersService.getOverview();
+  overview(@CurrentUser() user: RequestUser) {
+    return this.farmersService.getOverview(user);
   }
 
   @Get('all')
@@ -148,8 +158,8 @@ export class FarmersController {
     summary:
       'Unpaginated farmer list for admin dashboard reporting/aggregation (minimal fields — not for UI tables, use GET /farmers for that)',
   })
-  findAllUnpaginated() {
-    return this.farmersService.findAllUnpaginated();
+  findAllUnpaginated(@CurrentUser() user: RequestUser) {
+    return this.farmersService.findAllUnpaginated(user);
   }
 
   @Get('control-number/:controlNumber')

@@ -24,6 +24,7 @@ import {
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UserRole, MamcosStaffRole } from '@prisma/client';
 import { normalizeMsisdn, SmsService } from '../messaging/sms.service';
+import { findAmcosByCode, openJoinRequest } from '../join-requests/join-request-helpers';
 import { redactPassword, welcomeSms } from '../field-officers/officer-credentials';
 import { createRoleTemplates } from '../roles/role-templates';
 import {
@@ -293,12 +294,19 @@ export class AuthService {
       );
     }
 
+    // A wrong code is the farmer's mistake to fix now, not after the account exists.
+    const amcosCode = registerDto.amcosCode?.trim();
+    if (amcosCode && !(await findAmcosByCode(this.prisma, amcosCode))) {
+      throw new BadRequestException('No AMCOS has that code. Check it with your AMCOS office.');
+    }
+
     const salt = await bcrypt.genSalt(10);
     // Code-verified sign-ups have no password; the random hash can never be matched.
     const passwordHash = await bcrypt.hash(password ?? randomBytes(32).toString('hex'), salt);
 
     let createdUser;
     let controlNumber: string | undefined = undefined;
+    let joinRequest: { status: string; amcosName: string } | undefined;
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
@@ -316,7 +324,7 @@ export class AuthService {
         });
 
         controlNumber = await this.generateControlNumber(prisma as any);
-        await prisma.farmer.create({
+        const farmerRow = await prisma.farmer.create({
           data: {
             userId: user.id,
             controlNumber,
@@ -330,6 +338,7 @@ export class AuthService {
             consentedAt: dataShareConsent ? new Date() : null,
           },
         });
+        if (amcosCode) joinRequest = await openJoinRequest(prisma, farmerRow.id, amcosCode);
 
         return user;
         });
@@ -344,7 +353,8 @@ export class AuthService {
       }
     }
 
-    return this.generateTokens({ ...createdUser, customRole: null }, controlNumber);
+    const tokens = await this.generateTokens({ ...createdUser, customRole: null }, controlNumber);
+    return joinRequest ? { ...tokens, joinRequest: { status: joinRequest.status, amcosName: joinRequest.amcosName } } : tokens;
   }
 
   /**

@@ -381,8 +381,7 @@ export class SalesService {
         ...(sale.fairtradePremium
           ? [{ code: '4100', credit: sale.fairtradePremium }]
           : []),
-      ],
-    );
+      ], this.accounting.mamcosOfSale(sale.id));
     await Promise.all(
       sale.payments.map((payment) =>
         this.accounting.postToLedger(
@@ -393,8 +392,7 @@ export class SalesService {
           [
             { code: '5200', debit: payment.amount },
             { code: '2200', credit: payment.amount },
-          ],
-        ),
+          ], this.accounting.mamcosOfSale(sale.id)),
       ),
     );
     return sale;
@@ -522,8 +520,7 @@ export class SalesService {
             code: '1100',
             credit: revenueDrop + (premiumDrop > 0 ? premiumDrop : 0),
           },
-        ],
-      );
+        ], this.accounting.mamcosOfSale(saleId));
     }
     if (obligationDrop > 0) {
       await this.accounting.postToLedger(
@@ -534,8 +531,7 @@ export class SalesService {
         [
           { code: '2200', debit: obligationDrop },
           { code: '5200', credit: obligationDrop },
-        ],
-      );
+        ], this.accounting.mamcosOfSale(saleId));
     }
     return result;
   }
@@ -580,8 +576,7 @@ export class SalesService {
           code: '1100',
           credit: settled.totalRevenue + (settled.fairtradePremium ?? 0),
         },
-      ],
-    );
+      ], this.accounting.mamcosOfSale(id));
     await this.prisma.invoice.updateMany({
       where: { saleId: id, status: 'OPEN' },
       data: { status: 'PAID', paidAt: settled.paymentDate },

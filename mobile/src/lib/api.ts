@@ -252,7 +252,7 @@ export const authApi = {
     api.post<{ sent: true; resendInSeconds: number; expiresInSeconds: number; devCode?: string }>('/auth/otp/request', { phone, intent }),
   verifyOtp: (phone: string, code: string) =>
     api.post('/auth/otp/verify', { phone, code }),
-  registerWithOtp: (data: { phone: string; registrationToken: string; firstName: string; lastName: string; dataShareConsent: boolean; region?: string; district?: string; ward?: string; village?: string }) =>
+  registerWithOtp: (data: { phone: string; registrationToken: string; firstName: string; lastName: string; dataShareConsent: boolean; amcosCode?: string; region?: string; district?: string; ward?: string; village?: string }) =>
     api.post('/auth/otp/register', data),
   logout: () => api.post('/auth/logout'),
   // AMCOS Secretary self-service: mamcosId is resolved server-side from the

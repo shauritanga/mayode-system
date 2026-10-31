@@ -103,8 +103,7 @@ export class FinanceService {
       [
         { code: '5000', debit: cost.totalCost },
         { code: '1000', credit: cost.totalCost },
-      ],
-    );
+      ], this.accounting.mamcosOfCropCycle(cost.cropCycleId));
     return cost;
   }
 
@@ -159,8 +158,7 @@ export class FinanceService {
       [
         { code: '1000', debit: revenue.totalRevenue },
         { code: '4000', credit: revenue.totalRevenue },
-      ],
-    );
+      ], this.accounting.mamcosOfCropCycle(revenue.cropCycleId));
     return revenue;
   }
 

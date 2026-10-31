@@ -458,8 +458,7 @@ export class MembershipsService {
           [
             { code: '1000', debit: payment.amount },
             { code: '4200', credit: payment.amount },
-          ],
-        ),
+          ], this.accounting.mamcosOfPayment(payment.id)),
       ),
     );
 

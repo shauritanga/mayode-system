@@ -17,6 +17,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { farmersApi, mamcosApi } from '@/lib/api';
 import { MetricTile, MetricTileSkeleton, TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
+import FarmerOnboarding from './FarmerOnboarding';
 
 const PAGE_SIZE = 10;
 
@@ -117,6 +118,7 @@ export default function FarmersPage() {
   const [overviewLoading, setOverviewLoading] = useState(true);
 
   const [page, setPage] = useState(1);
+  const [reloadTick, setReloadTick] = useState(0);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -184,7 +186,7 @@ export default function FarmersPage() {
         .finally(() => { if (!cancelled) setOverviewLoading(false); });
     }, 0);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, []);
+  }, [reloadTick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,7 +220,7 @@ export default function FarmersPage() {
         .finally(() => { if (!cancelled) setLoading(false); });
     }, 0);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [page, debouncedSearch, status, mamcosId, region, district, ward, village]);
+  }, [page, debouncedSearch, status, mamcosId, region, district, ward, village, reloadTick]);
 
   useEffect(() => {
     mamcosApi.getAll().then((res) => {
@@ -242,6 +244,7 @@ export default function FarmersPage() {
 
   return (
     <div className="page-shell farmers-page">
+      <FarmerOnboarding onChanged={() => setReloadTick((n) => n + 1)} />
       {/* Summary */}
       <div className="role-grid farmers-summary">
         {overviewLoading ? (

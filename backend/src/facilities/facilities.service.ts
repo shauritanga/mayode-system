@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   UpdateAggregationCentreDto,
@@ -38,6 +38,9 @@ export class FacilitiesService {
     });
     if (!existing)
       throw new NotFoundException(`Irrigation scheme with ID ${id} not found`);
+    const canals = await this.prisma.irrigationScheme.findUnique({ where: { id }, select: { _count: { select: { canals: true, documents: true } } } });
+    if (canals && (canals._count.canals || canals._count.documents))
+      throw new ConflictException('This scheme has canals or documents. Set it to inactive instead of deleting it.');
     await this.prisma.irrigationScheme.delete({ where: { id } });
     return { deleted: true };
   }

@@ -128,15 +128,15 @@ test('persona dashboards are hidden from Super Admin and generic roles but stay 
   assert.ok(links({ role: 'FIELD_OFFICER', roleId: 'r', permissions: [] }).includes('/dashboard/field-officer'));
 });
 
-test('cooperative admins reach Users and Roles only with the matching grants', () => {
+test('cooperative admins reach Roles only with the matching grant; User Accounts is not offered in the AMCOS portal', () => {
   const nav = loadNavigation('cooperatives');
   const admin = (...resources) => ({ role: 'CUSTOM', roleId: 'r', mamcosId: 'm1', permissions: resources.map((resource) => ({ resource, action: 'VIEW' })) });
-  assert.equal(nav.isPathAllowed('/dashboard/users', admin('users')), true);
+  assert.equal(nav.isPathAllowed('/dashboard/users', admin('users')), false);
   assert.equal(nav.isPathAllowed('/dashboard/roles', admin('roles')), true);
   assert.equal(nav.isPathAllowed('/dashboard/roles', admin('users')), false);
   assert.equal(nav.isPathAllowed('/dashboard/users', admin('roles')), false);
   const links = nav.getVisibleGroups(admin('users', 'roles')).flatMap((g) => g.items.map((i) => i.href));
-  assert.ok(links.includes('/dashboard/users') && links.includes('/dashboard/roles'));
+  assert.ok(!links.includes('/dashboard/users') && links.includes('/dashboard/roles'));
 });
 
 test('platform role management stays Super Admin only in the admin portal', () => {
@@ -205,4 +205,94 @@ test('Accounting & Finance navigation exposes all workspaces behind the accounti
     assert.ok(require('node:fs').existsSync(require('node:path').join(root, 'page.tsx')));
     assert.ok(require('node:fs').existsSync(require('node:path').join(root, '[...slug]', 'page.tsx')));
   }
+});
+
+test('irrigation section follows its three permission resources', () => {
+  const nav = loadNavigation('cooperatives');
+  const grants = (...resources) => ({ role: 'CUSTOM', roleId: 'r', permissions: resources.map((resource) => ({ resource, action: 'VIEW' })) });
+  const links = (user) => nav.getVisibleGroups(user).flatMap((g) => g.items.map((i) => i.href));
+  assert.ok(links({ role: 'SUPER_ADMIN' }).includes('/dashboard/irrigation'));
+  for (const resource of ['irrigation', 'irrigation_allocations', 'irrigation_leadership']) {
+    assert.ok(links(grants(resource)).includes('/dashboard/irrigation'), resource);
+    assert.equal(nav.isPathAllowed('/dashboard/irrigation/structure/canals', grants(resource)), true);
+  }
+  assert.ok(!links(grants('reports')).includes('/dashboard/irrigation'));
+  assert.equal(nav.isPathAllowed('/dashboard/irrigation', grants('reports')), false);
+  assert.equal(nav.isPathAllowed('/dashboard/irrigation/leadership/history', { role: 'ADMIN' }), false);
+});
+
+test('scheme management is on the AMCOS portal only, not the admin or farmer portals', () => {
+  const user = { role: 'MAMCOS_SECRETARY', roleId: 'r', permissions: [{ resource: 'irrigation', action: 'VIEW' }] };
+  assert.equal(loadNavigation('cooperatives').isPathAllowed('/dashboard/irrigation', user), true);
+  assert.equal(loadNavigation('admin').isPathAllowed('/dashboard/irrigation', { ...user, role: 'ADMIN' }), false);
+  assert.equal(loadNavigation('admin').isPathAllowed('/dashboard/irrigation', { role: 'SUPER_ADMIN' }), false);
+  assert.equal(loadNavigation('farmers').isPathAllowed('/dashboard/irrigation', { role: 'FARMER' }), false);
+});
+
+test('the AMCOS portal does not offer the removed sections, but the admin portal still does', () => {
+  const removed = ['marketplace', 'leases', 'premium-fund', 'grantor', 'projects', 'compliance', 'corrections', 'insurance', 'finance',
+    'collection-centres', 'ops-field-work', 'market', 'inventory', 'field-officers', 'farms', 'memberships',
+    'rice-calendar', 'users', 'field-surveys', 'crop-cycles', 'activities', 'seasons', 'weather', 'credit'].map((s) => `/dashboard/${s}`);
+  const user = { role: 'SUPER_ADMIN' };
+  const coop = loadNavigation('cooperatives');
+  const links = coop.getVisibleGroups(user).flatMap((g) => g.items.map((i) => i.href));
+  for (const href of removed) {
+    assert.ok(!links.includes(href), `sidebar still lists ${href}`);
+    assert.equal(coop.isPathAllowed(href, user), false, `${href} still reachable`);
+  }
+  assert.equal(coop.isPathAllowed('/dashboard/farms/abc', user), false);
+  for (const href of ['/dashboard/farmers', '/dashboard/irrigation', '/dashboard/accounting', '/dashboard/roles']) {
+    assert.equal(coop.isPathAllowed(href, user), true, href);
+  }
+  assert.ok(loadNavigation('admin').getVisibleGroups(user).flatMap((g) => g.items.map((i) => i.href)).includes('/dashboard/farms'));
+});
+
+test('the AMCOS sidebar is one ungrouped list, most-used pages first', () => {
+  const groups = loadNavigation('cooperatives').getVisibleGroups({ role: 'SUPER_ADMIN' });
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].label, '');
+  const links = groups[0].items.map((i) => i.href);
+  assert.equal(links.slice(0, 3).join(), '/dashboard,/dashboard/farmers,/dashboard/irrigation');
+  assert.ok(links.indexOf('/dashboard/ops-orders') < links.indexOf('/dashboard/accounting'));
+  assert.ok(loadNavigation('admin').getVisibleGroups({ role: 'SUPER_ADMIN' }).length > 1, 'admin portal keeps its groups');
+});
+
+test('Task Management follows the machinery grant and exists only in the AMCOS portal', () => {
+  const user = { role: 'CUSTOM', roleId: 'r', mamcosId: 'm1', permissions: [{ resource: 'machinery', action: 'VIEW' }] };
+  const coop = loadNavigation('cooperatives');
+  assert.ok(coop.getVisibleGroups(user).flatMap((g) => g.items.map((i) => i.href)).includes('/dashboard/task-management'));
+  assert.equal(coop.isPathAllowed('/dashboard/task-management', user), true);
+  assert.equal(coop.isPathAllowed('/dashboard/task-management', { ...user, permissions: [] }), false);
+  assert.equal(loadNavigation('admin').isPathAllowed('/dashboard/task-management', { role: 'SUPER_ADMIN' }), false);
+  assert.equal(loadNavigation('farmers').isPathAllowed('/dashboard/task-management', { role: 'FARMER' }), false);
+});
+
+test('Assets follow their own grant and exist only in the AMCOS portal', () => {
+  const user = { role: 'CUSTOM', roleId: 'r', mamcosId: 'm1', permissions: [{ resource: 'assets', action: 'VIEW' }] };
+  const coop = loadNavigation('cooperatives');
+  assert.ok(coop.getVisibleGroups(user).flatMap((g) => g.items.map((i) => i.href)).includes('/dashboard/assets'));
+  assert.equal(coop.isPathAllowed('/dashboard/assets', user), true);
+  assert.equal(coop.isPathAllowed('/dashboard/assets', { ...user, permissions: [{ resource: 'machinery', action: 'VIEW' }] }), false);
+  assert.equal(loadNavigation('admin').isPathAllowed('/dashboard/assets', { role: 'SUPER_ADMIN' }), false);
+  assert.equal(loadNavigation('farmers').isPathAllowed('/dashboard/assets', { role: 'FARMER' }), false);
+});
+
+test('Farmer Dues follow their own grant and exist only in the AMCOS portal', () => {
+  const user = { role: 'CUSTOM', roleId: 'r', mamcosId: 'm1', permissions: [{ resource: 'dues', action: 'VIEW' }] };
+  const coop = loadNavigation('cooperatives');
+  assert.ok(coop.getVisibleGroups(user).flatMap((g) => g.items.map((i) => i.href)).includes('/dashboard/dues'));
+  assert.equal(coop.isPathAllowed('/dashboard/dues', user), true);
+  assert.equal(coop.isPathAllowed('/dashboard/dues', { ...user, permissions: [{ resource: 'assets', action: 'VIEW' }] }), false);
+  assert.equal(loadNavigation('admin').isPathAllowed('/dashboard/dues', { role: 'SUPER_ADMIN' }), false);
+  assert.equal(loadNavigation('farmers').isPathAllowed('/dashboard/dues', { role: 'FARMER' }), false);
+});
+
+test('Communication follows its own grant and exists only in the AMCOS portal', () => {
+  const user = { role: 'CUSTOM', roleId: 'r', mamcosId: 'm1', permissions: [{ resource: 'communication', action: 'VIEW' }] };
+  const coop = loadNavigation('cooperatives');
+  assert.ok(coop.getVisibleGroups(user).flatMap((g) => g.items.map((i) => i.href)).includes('/dashboard/communication'));
+  assert.equal(coop.isPathAllowed('/dashboard/communication', user), true);
+  assert.equal(coop.isPathAllowed('/dashboard/communication', { ...user, permissions: [{ resource: 'machinery', action: 'VIEW' }] }), false);
+  assert.equal(loadNavigation('admin').isPathAllowed('/dashboard/communication', { role: 'SUPER_ADMIN' }), false);
+  assert.equal(loadNavigation('farmers').isPathAllowed('/dashboard/communication', { role: 'FARMER' }), false);
 });

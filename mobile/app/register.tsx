@@ -19,6 +19,9 @@ export default function RegisterRoute() {
   // The number and token come from the verification screen: the phone is already proved.
   const { phone = '', registrationToken = '' } = useLocalSearchParams<{ phone?: string; registrationToken?: string }>();
   const [dataShareConsent, setDataShareConsent] = useState(false);
+  // Membership is claimed, not assumed: with the switch on, the farmer's AMCOS code starts a request the AMCOS approves.
+  const [inAmcos, setInAmcos] = useState(false);
+  const [amcosCode, setAmcosCode] = useState('');
   const [loading, setLoading] = useState(false);
   const { setAuth, setFarmerId } = useAuthStore();
   const { t } = useI18n();
@@ -45,6 +48,11 @@ export default function RegisterRoute() {
       return;
     }
 
+    if (inAmcos && !amcosCode.trim()) {
+      Alert.alert(t('validationError'), t('amcosCodeRequired'));
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await authApi.registerWithOtp({
@@ -53,11 +61,13 @@ export default function RegisterRoute() {
         firstName,
         lastName,
         dataShareConsent,
+        ...(inAmcos ? { amcosCode: amcosCode.trim() } : {}),
         ...location,
       });
       const ok = await startSession(res.data, { setAuth, setFarmerId });
       if (!ok) return;
-      Alert.alert(t('success'), t('farmerCreated'));
+      const joined = (res.data as { joinRequest?: { amcosName: string } }).joinRequest;
+      Alert.alert(t('success'), joined ? `${t('farmerCreated')}\n\n${t('joinRequestSent', { name: joined.amcosName })}` : t('farmerCreated'));
       router.replace('/(drawer)/(tabs)');
     } catch (err: unknown) {
       Alert.alert(t('registrationFailed'), getApiErrorMessage(err, t('registrationFailedMessage')));
@@ -120,6 +130,27 @@ export default function RegisterRoute() {
             <SearchableSelect label={t('district')} value={location.district} options={getDistricts(location.region)} onSelect={district => setLocation(l => ({ ...l, district, ward: '' }))} searchable />
             <SearchableSelect label={t('ward')} value={location.ward} options={getWards(location.region, location.district)} onSelect={ward => setLocation(l => ({ ...l, ward }))} searchable />
             <Text style={styles.label}>{t('village')}</Text><TextInput style={styles.input} value={location.village} onChangeText={village => setLocation(l => ({ ...l, village }))} />
+            <View style={styles.consentRow}>
+              <Switch value={inAmcos} onValueChange={setInAmcos} trackColor={{ true: '#10B981' }} />
+              <TouchableOpacity style={styles.consentCopy} onPress={() => setInAmcos((value) => !value)} activeOpacity={0.8}>
+                <Text style={styles.consentTitle}>{t('inAmcosQuestion')}</Text>
+                <Text style={styles.consentText}>{t('inAmcosHint')}</Text>
+              </TouchableOpacity>
+            </View>
+            {inAmcos && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('amcosCode')}</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="MAD-4F2A91"
+                  placeholderTextColor="#6B7280"
+                  value={amcosCode}
+                  onChangeText={setAmcosCode}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+              </View>
+            )}
             <View style={styles.consentRow}>
               <Switch value={dataShareConsent} onValueChange={setDataShareConsent} trackColor={{ true: '#10B981' }} />
               <TouchableOpacity style={styles.consentCopy} onPress={() => setDataShareConsent((value) => !value)} activeOpacity={0.8}>

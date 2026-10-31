@@ -8,6 +8,7 @@ import {
   IsUUID,
   MinLength,
   Matches,
+  MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 
@@ -52,6 +53,12 @@ export class RegisterDto {
     message: 'Phone number must be valid (10-15 digits)',
   })
   phone: string;
+
+  @ApiPropertyOptional({ example: 'MAD-4F2A91', description: 'Code of the AMCOS the farmer belongs to; creates a join request the AMCOS admin approves. Leave out for an independent farmer.' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(40)
+  amcosCode?: string;
 
   @ApiPropertyOptional({ example: 'farmer@example.com' })
   @IsEmail()
@@ -149,6 +156,8 @@ export class AuthResponseDto {
     profilePhotoUrl?: string;
     mustChangePassword?: boolean;
   };
+  /** Set when the sign-up asked to join an AMCOS: waiting for that AMCOS to approve. */
+  joinRequest?: { status: string; amcosName: string };
 }
 
 export class ChangePasswordDto {

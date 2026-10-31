@@ -172,6 +172,9 @@ model Farmer {
   // Relations
   user                      User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
   mamcosId                  String?                        @map("mamcos_id")
+  farmerDues                FarmerDue[]
+  guardianships             IrrigationHectareGuardian[]    @relation("FarmerGuardianships")
+  duePayments               DuePayment[]
   mamcos                    Mamcos?                        @relation(fields: [mamcosId], references: [id])
   farms                     Farm[]
   cropCycles                CropCycle[]
@@ -211,6 +214,12 @@ model Farmer {
   questionnaires            FarmerQuestionnaire[]
   insurancePolicies         InsurancePolicy[]
   goodsReceipts             GoodsReceipt[]
+  irrigationAllocations     IrrigationHectareAllocation[]
+  irrigationTransfersFrom   IrrigationAllocationTransfer[] @relation("TransferFromFarmer")
+  irrigationTransfersTo     IrrigationAllocationTransfer[] @relation("TransferToFarmer")
+  irrigationLeaderships     IrrigationLeadership[]
+  joinRequests              AmcosJoinRequest[]
+  communicationReceipts     CommunicationRecipient[]
 
   @@map("farmers")
 }
@@ -268,6 +277,8 @@ model MamcosStaff {
 model Mamcos {
   id            String   @id @default(uuid())
   name          String   @unique
+  /// Short code a farmer types on sign-up to ask to join this AMCOS (e.g. MDB-4F2A91).
+  code          String?  @unique
   location      String?
   district      String?  @default("Mbarali")
   totalHectares Float?   @map("total_hectares")
@@ -283,22 +294,34 @@ model Mamcos {
   votes              Vote[]
 
   // Relations
-  staff               MamcosStaff[]
-  accounts            User[]               @relation("UserMamcos")
-  roles               Role[]
-  farmers             Farmer[]
-  farms               Farm[]
-  farmingSeasons      FarmingSeason[]
-  registryRecords     FarmRegistryRecord[]
-  riceProtocols       RiceProtocol[]
-  irrigationSchemes   IrrigationScheme[]
-  aggregationCentres  AggregationCentre[]
-  buyers              Buyer[]
-  warehouses          Warehouse[]
-  collectionCentres   CollectionCentre[]
-  memberContributions MemberContribution[]
-  reserveAllocations  ReserveAllocation[]
-  budgets             Budget[]
+  staff                 MamcosStaff[]
+  accounts              User[]                 @relation("UserMamcos")
+  roles                 Role[]
+  farmers               Farmer[]
+  farms                 Farm[]
+  farmingSeasons        FarmingSeason[]
+  registryRecords       FarmRegistryRecord[]
+  riceProtocols         RiceProtocol[]
+  irrigationSchemes     IrrigationScheme[]
+  joinRequests          AmcosJoinRequest[]
+  equipment             AmcosEquipment[]
+  communications        Communication[]
+  ledgerEntries         LedgerEntry[]
+  invoices              Invoice[]
+  bills                 Bill[]
+  machineryActivities   MachineryActivity[]
+  aggregationCentres    AggregationCentre[]
+  buyers                Buyer[]
+  warehouses            Warehouse[]
+  collectionCentres     CollectionCentre[]
+  memberContributions   MemberContribution[]
+  reserveAllocations    ReserveAllocation[]
+  budgets               Budget[]
+  assets                Asset[]
+  assetDepreciationRuns AssetDepreciationRun[]
+  farmerDueTypes        FarmerDueType[]
+  farmerDues            FarmerDue[]
+  duePayments           DuePayment[]
 
   @@map("mamcos")
 }
@@ -313,9 +336,277 @@ model IrrigationScheme {
   isActive         Boolean  @default(true) @map("is_active")
   createdAt        DateTime @default(now()) @map("created_at")
 
-  mamcos Mamcos? @relation(fields: [mamcosId], references: [id])
+  // Irrigation Scheme Management (canals → blocks → hectare units)
+  code                      String?          @unique
+  region                    String?
+  district                  String?
+  ward                      String?
+  village                   String?
+  description               String?
+  establishedOn             DateTime?        @map("established_on") @db.Date
+  status                    IrrigationStatus @default(ACTIVE)
+  /// Planning targets used for setup alerts; they never block data entry except maxBlocksPerCanal / hectaresPerBlock.
+  plannedCanalCount         Int              @default(6) @map("planned_canal_count")
+  minBlocksPerCanal         Int              @default(15) @map("min_blocks_per_canal")
+  maxBlocksPerCanal         Int              @default(16) @map("max_blocks_per_canal")
+  hectaresPerBlock          Decimal          @default(30) @map("hectares_per_block") @db.Decimal(8, 2)
+  /// Allocation policy: null = a member may hold any number of hectares.
+  maxHectaresPerFarmer      Int?             @map("max_hectares_per_farmer")
+  requireAllocationApproval Boolean          @default(false) @map("require_allocation_approval")
+  createdById               String?          @map("created_by_id")
+  updatedById               String?          @map("updated_by_id")
+  updatedAt                 DateTime         @default(now()) @updatedAt @map("updated_at")
 
+  mamcos    Mamcos?              @relation(fields: [mamcosId], references: [id])
+  canals    IrrigationCanal[]
+  documents IrrigationDocument[]
+
+  @@index([mamcosId])
   @@map("irrigation_schemes")
+}
+
+enum IrrigationStatus {
+  PLANNED
+  ACTIVE
+  UNDER_MAINTENANCE
+  INACTIVE
+}
+
+model IrrigationCanal {
+  id                  String           @id @default(uuid())
+  schemeId            String           @map("scheme_id")
+  canalNumber         Int              @map("canal_number")
+  code                String
+  name                String
+  status              IrrigationStatus @default(ACTIVE)
+  description         String?
+  lengthKm            Decimal?         @map("length_km") @db.Decimal(8, 2)
+  headworks           String?
+  infrastructureNotes String?          @map("infrastructure_notes")
+  createdById         String?          @map("created_by_id")
+  updatedById         String?          @map("updated_by_id")
+  archivedAt          DateTime?        @map("archived_at")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  scheme      IrrigationScheme       @relation(fields: [schemeId], references: [id], onDelete: Restrict)
+  blocks      IrrigationBlock[]
+  leaderships IrrigationLeadership[]
+  documents   IrrigationDocument[]
+
+  @@unique([schemeId, canalNumber])
+  @@unique([schemeId, code])
+  @@map("irrigation_canals")
+}
+
+model IrrigationBlock {
+  id                  String           @id @default(uuid())
+  canalId             String           @map("canal_id")
+  blockNumber         Int              @map("block_number")
+  code                String
+  name                String?
+  areaHectares        Decimal          @map("area_hectares") @db.Decimal(10, 2)
+  /// Number of 1-hectare allocation units generated for this block.
+  hectareCount        Int              @map("hectare_count")
+  status              IrrigationStatus @default(ACTIVE)
+  description         String?
+  boundaryCoordinates Json?            @map("boundary_coordinates")
+  centerLatitude      Float?           @map("center_latitude")
+  centerLongitude     Float?           @map("center_longitude")
+  boundaryNotes       String?          @map("boundary_notes")
+  createdById         String?          @map("created_by_id")
+  updatedById         String?          @map("updated_by_id")
+  archivedAt          DateTime?        @map("archived_at")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  canal               IrrigationCanal        @relation(fields: [canalId], references: [id], onDelete: Restrict)
+  hectares            IrrigationHectare[]
+  leaderships         IrrigationLeadership[]
+  documents           IrrigationDocument[]
+  machineryActivities MachineryActivity[]
+
+  @@unique([canalId, blockNumber])
+  @@unique([canalId, code])
+  @@map("irrigation_blocks")
+}
+
+model IrrigationHectare {
+  id            String   @id @default(uuid())
+  blockId       String   @map("block_id")
+  hectareNumber Int      @map("hectare_number")
+  code          String
+  areaHectares  Decimal  @default(1) @map("area_hectares") @db.Decimal(8, 2)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  block       IrrigationBlock                @relation(fields: [blockId], references: [id], onDelete: Restrict)
+  allocations IrrigationHectareAllocation[]
+  transfers   IrrigationAllocationTransfer[]
+
+  @@unique([blockId, hectareNumber])
+  @@map("irrigation_hectares")
+}
+
+enum HectareAllocationStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  ENDED
+  REJECTED
+}
+
+/// One row per period a member holds a hectare. The partial unique index
+/// irrigation_hectare_allocations_one_open_per_hectare (raw SQL in the migration) allows a
+/// single PENDING_APPROVAL/ACTIVE row per hectare. Rows are never deleted or overwritten.
+model IrrigationHectareAllocation {
+  id             String                  @id @default(uuid())
+  hectareId      String                  @map("hectare_id")
+  farmerId       String                  @map("farmer_id")
+  status         HectareAllocationStatus
+  allocatedOn    DateTime                @map("allocated_on") @db.Date
+  endedOn        DateTime?               @map("ended_on") @db.Date
+  endReason      String?                 @map("end_reason")
+  notes          String?
+  requestedById  String?                 @map("requested_by_id")
+  approvedById   String?                 @map("approved_by_id")
+  approvedAt     DateTime?               @map("approved_at")
+  rejectedReason String?                 @map("rejected_reason")
+  endedById      String?                 @map("ended_by_id")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+
+  hectare       IrrigationHectare              @relation(fields: [hectareId], references: [id], onDelete: Restrict)
+  farmer        Farmer                         @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+  transfersFrom IrrigationAllocationTransfer[] @relation("TransferFromAllocation")
+  transfersTo   IrrigationAllocationTransfer[] @relation("TransferToAllocation")
+  guardians     IrrigationHectareGuardian[]
+
+  @@index([hectareId, status])
+  @@index([farmerId, status])
+  @@map("irrigation_hectare_allocations")
+}
+
+enum IrrigationTransferStatus {
+  PENDING_APPROVAL
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+model IrrigationAllocationTransfer {
+  id               String                   @id @default(uuid())
+  hectareId        String                   @map("hectare_id")
+  fromAllocationId String                   @map("from_allocation_id")
+  toAllocationId   String?                  @map("to_allocation_id")
+  fromFarmerId     String                   @map("from_farmer_id")
+  toFarmerId       String                   @map("to_farmer_id")
+  transferDate     DateTime                 @map("transfer_date") @db.Date
+  effectiveDate    DateTime                 @map("effective_date") @db.Date
+  reason           String
+  status           IrrigationTransferStatus
+  requestedById    String?                  @map("requested_by_id")
+  approvedById     String?                  @map("approved_by_id")
+  approvedAt       DateTime?                @map("approved_at")
+  processedById    String?                  @map("processed_by_id")
+  processedAt      DateTime?                @map("processed_at")
+  rejectedReason   String?                  @map("rejected_reason")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
+
+  hectare        IrrigationHectare            @relation(fields: [hectareId], references: [id], onDelete: Restrict)
+  fromAllocation IrrigationHectareAllocation  @relation("TransferFromAllocation", fields: [fromAllocationId], references: [id], onDelete: Restrict)
+  toAllocation   IrrigationHectareAllocation? @relation("TransferToAllocation", fields: [toAllocationId], references: [id], onDelete: Restrict)
+  fromFarmer     Farmer                       @relation("TransferFromFarmer", fields: [fromFarmerId], references: [id], onDelete: Restrict)
+  toFarmer       Farmer                       @relation("TransferToFarmer", fields: [toFarmerId], references: [id], onDelete: Restrict)
+  documents      IrrigationDocument[]
+
+  @@index([hectareId, status])
+  @@map("irrigation_allocation_transfers")
+}
+
+enum IrrigationLeadershipPosition {
+  CANAL_LEADER
+  BLOCK_LEADER
+}
+
+enum IrrigationLeadershipStatus {
+  ACTIVE
+  ENDED
+}
+
+/// Appointment history. Partial unique indexes (raw SQL in the migration) allow one ACTIVE canal
+/// leader per canal and one ACTIVE block leader per block. Ended rows are kept for the audit trail.
+model IrrigationLeadership {
+  id           String                       @id @default(uuid())
+  position     IrrigationLeadershipPosition
+  canalId      String                       @map("canal_id")
+  blockId      String?                      @map("block_id")
+  farmerId     String                       @map("farmer_id")
+  appointedOn  DateTime                     @map("appointed_on") @db.Date
+  termStart    DateTime                     @map("term_start") @db.Date
+  termEnd      DateTime?                    @map("term_end") @db.Date
+  status       IrrigationLeadershipStatus   @default(ACTIVE)
+  notes        String?
+  endedOn      DateTime?                    @map("ended_on") @db.Date
+  endReason    String?                      @map("end_reason")
+  replacedById String?                      @map("replaced_by_id")
+  recordedById String?                      @map("recorded_by_id")
+  endedById    String?                      @map("ended_by_id")
+  createdAt    DateTime                     @default(now()) @map("created_at")
+  updatedAt    DateTime                     @updatedAt @map("updated_at")
+
+  canal      IrrigationCanal        @relation(fields: [canalId], references: [id], onDelete: Restrict)
+  block      IrrigationBlock?       @relation(fields: [blockId], references: [id], onDelete: Restrict)
+  farmer     Farmer                 @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+  replacedBy IrrigationLeadership?  @relation("LeadershipReplacement", fields: [replacedById], references: [id], onDelete: Restrict)
+  replaces   IrrigationLeadership[] @relation("LeadershipReplacement")
+  documents  IrrigationDocument[]
+
+  @@index([canalId, status])
+  @@index([blockId, status])
+  @@index([farmerId])
+  @@map("irrigation_leaderships")
+}
+
+enum IrrigationDocumentType {
+  REGISTRATION
+  SURVEY_MAP
+  ALLOCATION_LETTER
+  TRANSFER_SUPPORT
+  APPOINTMENT_LETTER
+  INFRASTRUCTURE
+  OTHER
+}
+
+model IrrigationDocument {
+  id           String                 @id @default(uuid())
+  schemeId     String                 @map("scheme_id")
+  canalId      String?                @map("canal_id")
+  blockId      String?                @map("block_id")
+  transferId   String?                @map("transfer_id")
+  leadershipId String?                @map("leadership_id")
+  type         IrrigationDocumentType @default(OTHER)
+  title        String
+  fileUrl      String                 @map("file_url")
+  fileName     String                 @map("file_name")
+  mimeType     String?                @map("mime_type")
+  sizeBytes    Int?                   @map("size_bytes")
+  uploadedById String?                @map("uploaded_by_id")
+  archivedAt   DateTime?              @map("archived_at")
+  createdAt    DateTime               @default(now()) @map("created_at")
+
+  scheme     IrrigationScheme              @relation(fields: [schemeId], references: [id], onDelete: Restrict)
+  canal      IrrigationCanal?              @relation(fields: [canalId], references: [id], onDelete: Restrict)
+  block      IrrigationBlock?              @relation(fields: [blockId], references: [id], onDelete: Restrict)
+  transfer   IrrigationAllocationTransfer? @relation(fields: [transferId], references: [id], onDelete: Restrict)
+  leadership IrrigationLeadership?         @relation(fields: [leadershipId], references: [id], onDelete: Restrict)
+
+  @@index([schemeId])
+  @@index([canalId])
+  @@index([blockId])
+  @@index([transferId])
+  @@map("irrigation_documents")
 }
 
 model AggregationCentre {
@@ -1195,12 +1486,16 @@ model LedgerEntry {
   sourceType  String   @map("source_type")
   sourceId    String   @map("source_id")
   description String?
+  /// Cooperative whose books this belongs to. Null = platform-level (Mayode corporate, or could not be attributed); visible to Super Admin only.
+  mamcosId    String?  @map("mamcos_id")
   createdAt   DateTime @default(now()) @map("created_at")
 
   account Account @relation(fields: [accountId], references: [id])
+  mamcos  Mamcos? @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
 
   @@unique([sourceType, sourceId, accountId])
   @@index([entryDate])
+  @@index([mamcosId, entryDate])
   @@map("ledger_entries")
 }
 
@@ -1211,6 +1506,8 @@ model Invoice {
   buyerId        String?       @map("buyer_id")
   amount         Float
   dueDate        DateTime      @map("due_date")
+  /// Cooperative these books belong to (null = platform-level).
+  mamcosId       String?       @map("mamcos_id")
   status         InvoiceStatus @default(OPEN)
   paidAt         DateTime?     @map("paid_at")
   lastReminderAt DateTime?     @map("last_reminder_at")
@@ -1218,8 +1515,10 @@ model Invoice {
   createdAt      DateTime      @default(now()) @map("created_at")
   sale           Sale?         @relation(fields: [saleId], references: [id])
   buyer          Buyer?        @relation(fields: [buyerId], references: [id])
+  mamcos         Mamcos?       @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
 
   @@index([dueDate, status])
+  @@index([mamcosId])
   @@map("invoices")
 }
 
@@ -1230,14 +1529,18 @@ model Bill {
   supplierId  String?       @map("supplier_id")
   amount      Float
   dueDate     DateTime      @map("due_date")
+  /// Cooperative these books belong to (null = platform-level).
+  mamcosId    String?       @map("mamcos_id")
   status      InvoiceStatus @default(OPEN)
   paidAt      DateTime?     @map("paid_at")
   description String?
   createdAt   DateTime      @default(now()) @map("created_at")
 
   supplierRef Supplier? @relation(fields: [supplierId], references: [id])
+  mamcos      Mamcos?   @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
 
   @@index([dueDate, status])
+  @@index([mamcosId])
   @@map("bills")
 }
 
@@ -4506,4 +4809,522 @@ model HarvestRecord {
   @@index([mamcosId, harvestDate])
   @@index([cropCycleId])
   @@map("harvest_records")
+}
+
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// A farmer asking to be counted as a member of an AMCOS. Approval (by that AMCOS's admin) sets farmers.mamcos_id.
+/// One pending request per farmer is enforced by a partial unique index in the migration.
+model AmcosJoinRequest {
+  id             String            @id @default(uuid())
+  farmerId       String            @map("farmer_id")
+  mamcosId       String            @map("mamcos_id")
+  status         JoinRequestStatus @default(PENDING)
+  decidedById    String?           @map("decided_by_id")
+  decidedAt      DateTime?         @map("decided_at")
+  rejectedReason String?           @map("rejected_reason")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  farmer Farmer @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+  mamcos Mamcos @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+
+  @@index([mamcosId, status])
+  @@index([farmerId])
+  @@map("amcos_join_requests")
+}
+
+enum EquipmentType {
+  TRACTOR
+  POWER_TILLER
+  COMBINE_HARVESTER
+  THRESHER
+  TRANSPLANTER
+  SPRAYER
+  TRUCK
+  OTHER
+}
+
+enum EquipmentOwnership {
+  AMCOS
+  EXTERNAL
+}
+
+enum MachineryActivityType {
+  PLOUGHING
+  HARROWING
+  LEVELLING
+  TRANSPLANTING
+  SPRAYING
+  HARVESTING
+  THRESHING
+  TRANSPORT
+  OTHER
+}
+
+enum MachineryActivityStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ActivityFeeStatus {
+  NOT_APPLICABLE
+  PENDING
+  PAID
+}
+
+/// A machine the AMCOS works with: its own, or one owned by someone else and registered with the AMCOS, whose use
+/// earns the AMCOS a contribution (fee_per_hectare is the default; each activity records the amount actually due).
+model AmcosEquipment {
+  id             String             @id @default(uuid())
+  mamcosId       String             @map("mamcos_id")
+  name           String
+  type           EquipmentType
+  registrationNo String?            @map("registration_no")
+  ownership      EquipmentOwnership @default(AMCOS)
+  ownerName      String?            @map("owner_name")
+  ownerPhone     String?            @map("owner_phone")
+  feePerHectare  Decimal?           @map("fee_per_hectare") @db.Decimal(12, 2)
+  isActive       Boolean            @default(true) @map("is_active")
+  notes          String?
+  createdById    String?            @map("created_by_id")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  mamcos     Mamcos              @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  activities MachineryActivity[]
+  asset      Asset?
+
+  @@unique([mamcosId, name])
+  @@index([mamcosId, isActive])
+  @@map("amcos_equipment")
+}
+
+/// One job done by a machine: ploughing, harvesting … Fees count toward AMCOS income only while the job is COMPLETED.
+model MachineryActivity {
+  id           String                  @id @default(uuid())
+  mamcosId     String                  @map("mamcos_id")
+  activityDate DateTime                @map("activity_date") @db.Date
+  type         MachineryActivityType
+  equipmentId  String                  @map("equipment_id")
+  operatorName String?                 @map("operator_name")
+  /// Optional link to the irrigation block worked; blockId is null for work done outside the scheme.
+  blockId      String?                 @map("block_id")
+  location     String?
+  hectares     Decimal                 @db.Decimal(8, 2)
+  feeAmount    Decimal                 @default(0) @map("fee_amount") @db.Decimal(12, 2)
+  feeStatus    ActivityFeeStatus       @default(NOT_APPLICABLE) @map("fee_status")
+  feePaidOn    DateTime?               @map("fee_paid_on") @db.Date
+  status       MachineryActivityStatus @default(COMPLETED)
+  notes        String?
+  createdById  String?                 @map("created_by_id")
+  updatedById  String?                 @map("updated_by_id")
+  createdAt    DateTime                @default(now()) @map("created_at")
+  updatedAt    DateTime                @updatedAt @map("updated_at")
+
+  mamcos    Mamcos           @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  equipment AmcosEquipment   @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
+  block     IrrigationBlock? @relation(fields: [blockId], references: [id], onDelete: Restrict)
+
+  @@index([mamcosId, activityDate])
+  @@index([equipmentId])
+  @@index([blockId])
+  @@map("machinery_activities")
+}
+
+enum CommunicationChannel {
+  SMS
+  EMAIL
+  BOTH
+}
+
+enum CommunicationAudience {
+  ALL
+  SELECTED
+}
+
+enum CommunicationStatus {
+  SENDING
+  COMPLETED
+  INTERRUPTED
+}
+
+enum MessageChannel {
+  SMS
+  EMAIL
+}
+
+enum MessageDeliveryStatus {
+  PENDING
+  SENT
+  SIMULATED
+  FAILED
+  SKIPPED
+}
+
+/// A message an AMCOS admin sent to its farmers. One row per send; each farmer/channel outcome is a CommunicationRecipient.
+model Communication {
+  id              String                @id @default(uuid())
+  mamcosId        String                @map("mamcos_id")
+  channel         CommunicationChannel
+  audience        CommunicationAudience
+  subject         String?
+  body            String
+  status          CommunicationStatus   @default(SENDING)
+  totalRecipients Int                   @default(0) @map("total_recipients")
+  sentCount       Int                   @default(0) @map("sent_count")
+  /// Recorded but not actually delivered, because the SMS or email provider is not configured.
+  simulatedCount  Int                   @default(0) @map("simulated_count")
+  failedCount     Int                   @default(0) @map("failed_count")
+  skippedCount    Int                   @default(0) @map("skipped_count")
+  sentById        String?               @map("sent_by_id")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  completedAt     DateTime?             @map("completed_at")
+
+  mamcos     Mamcos                   @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  recipients CommunicationRecipient[]
+
+  @@index([mamcosId, createdAt])
+  @@map("communications")
+}
+
+model CommunicationRecipient {
+  id              String                @id @default(uuid())
+  communicationId String                @map("communication_id")
+  farmerId        String                @map("farmer_id")
+  channel         MessageChannel
+  address         String?
+  status          MessageDeliveryStatus @default(PENDING)
+  error           String?
+  sentAt          DateTime?             @map("sent_at")
+
+  communication Communication @relation(fields: [communicationId], references: [id], onDelete: Cascade)
+  farmer        Farmer        @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+
+  @@unique([communicationId, farmerId, channel], map: "communication_recipients_unique_per_channel")
+  @@index([communicationId, status])
+  @@index([farmerId])
+  @@map("communication_recipients")
+}
+
+enum AssetCategory {
+  MACHINERY_VEHICLE
+  BUILDING_WAREHOUSE
+  MILL_PROCESSING
+  IRRIGATION_STRUCTURE
+  SOLAR_POWER
+  MEASURING_EQUIPMENT
+  TOOLS
+  OFFICE_IT
+  FURNITURE
+  OTHER
+}
+
+enum AssetFundingSource {
+  AMCOS_FUNDS
+  MEMBER_CONTRIBUTIONS
+  GRANT
+  LOAN
+  DONATION
+}
+
+enum AssetCondition {
+  NEW
+  GOOD
+  FAIR
+  POOR
+  UNDER_REPAIR
+}
+
+enum AssetStatus {
+  IN_USE
+  IDLE
+  DISPOSED
+}
+
+enum AssetMaintenanceKind {
+  SERVICE
+  REPAIR
+  INSPECTION
+  CALIBRATION
+  PEST_CONTROL
+  FUEL
+}
+
+enum AssetDisposalMethod {
+  SOLD
+  SCRAPPED
+  LOST_STOLEN
+  DONATED
+}
+
+/// Something the AMCOS owns and keeps on its books: machines, buildings, mills, tools. Depreciated straight-line and posted to the ledger.
+model Asset {
+  id                  String             @id @default(uuid())
+  mamcosId            String             @map("mamcos_id")
+  tag                 String
+  name                String
+  category            AssetCategory
+  make                String?
+  model               String?
+  serialNo            String?            @map("serial_no")
+  purchaseDate        DateTime           @map("purchase_date") @db.Date
+  cost                Decimal            @db.Decimal(14, 2)
+  fundingSource       AssetFundingSource @default(AMCOS_FUNDS) @map("funding_source")
+  supplier            String?
+  location            String?
+  condition           AssetCondition     @default(GOOD)
+  status              AssetStatus        @default(IN_USE)
+  usefulLifeYears     Int                @map("useful_life_years")
+  salvageValue        Decimal            @default(0) @map("salvage_value") @db.Decimal(14, 2)
+  depreciationStart   DateTime           @map("depreciation_start") @db.Date
+  custodianName       String?            @map("custodian_name")
+  custodianUserId     String?            @map("custodian_user_id")
+  warrantyExpiresOn   DateTime?          @map("warranty_expires_on") @db.Date
+  insuranceExpiresOn  DateTime?          @map("insurance_expires_on") @db.Date
+  serviceIntervalDays Int?               @map("service_interval_days")
+  nextServiceDue      DateTime?          @map("next_service_due") @db.Date
+  equipmentId         String?            @unique @map("equipment_id")
+  notes               String?
+  postedPurchase      Boolean            @default(false) @map("posted_purchase")
+  createdById         String?            @map("created_by_id")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  archivedAt          DateTime?          @map("archived_at")
+
+  mamcos       Mamcos                  @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  equipment    AmcosEquipment?         @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  maintenance  AssetMaintenance[]
+  custodyLog   AssetCustodyLog[]
+  disposal     AssetDisposal?
+  depreciation AssetDepreciationLine[]
+
+  @@unique([mamcosId, tag])
+  @@index([mamcosId, status])
+  @@index([mamcosId, category])
+  @@map("assets")
+}
+
+model AssetMaintenance {
+  id          String               @id @default(uuid())
+  assetId     String               @map("asset_id")
+  kind        AssetMaintenanceKind
+  doneOn      DateTime             @map("done_on") @db.Date
+  cost        Decimal              @default(0) @db.Decimal(14, 2)
+  performedBy String?              @map("performed_by")
+  notes       String?
+  nextDueOn   DateTime?            @map("next_due_on") @db.Date
+  posted      Boolean              @default(false)
+  createdById String?              @map("created_by_id")
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([assetId, doneOn])
+  @@map("asset_maintenance")
+}
+
+/// Who held the asset and when. Append-only.
+model AssetCustodyLog {
+  id         String   @id @default(uuid())
+  assetId    String   @map("asset_id")
+  fromName   String?  @map("from_name")
+  toName     String   @map("to_name")
+  toUserId   String?  @map("to_user_id")
+  assignedOn DateTime @map("assigned_on") @db.Date
+  assignedBy String?  @map("assigned_by")
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([assetId, assignedOn])
+  @@map("asset_custody_log")
+}
+
+model AssetDisposal {
+  id           String              @id @default(uuid())
+  assetId      String              @unique @map("asset_id")
+  disposedOn   DateTime            @map("disposed_on") @db.Date
+  method       AssetDisposalMethod
+  proceeds     Decimal             @default(0) @db.Decimal(14, 2)
+  reason       String?
+  bookValue    Decimal             @map("book_value") @db.Decimal(14, 2)
+  gainLoss     Decimal             @map("gain_loss") @db.Decimal(14, 2)
+  posted       Boolean             @default(false)
+  approvedById String?             @map("approved_by_id")
+  createdAt    DateTime            @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@map("asset_disposals")
+}
+
+model AssetDepreciationRun {
+  id       String   @id @default(uuid())
+  mamcosId String   @map("mamcos_id")
+  period   String
+  total    Decimal  @db.Decimal(14, 2)
+  postedAt DateTime @default(now()) @map("posted_at")
+  postedBy String?  @map("posted_by")
+
+  mamcos Mamcos                  @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  lines  AssetDepreciationLine[]
+
+  @@unique([mamcosId, period])
+  @@map("asset_depreciation_runs")
+}
+
+model AssetDepreciationLine {
+  id      String  @id @default(uuid())
+  runId   String  @map("run_id")
+  assetId String  @map("asset_id")
+  amount  Decimal @db.Decimal(14, 2)
+
+  run   AssetDepreciationRun @relation(fields: [runId], references: [id], onDelete: Restrict)
+  asset Asset                @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@unique([runId, assetId])
+  @@index([assetId])
+  @@map("asset_depreciation_lines")
+}
+
+enum DueCategory {
+  LEVY
+  MEMBERSHIP_FEE
+  CANAL_CLEANING
+  FERTILISER
+  OTHER
+}
+
+enum DueBasis {
+  PER_HECTARE
+  FLAT
+}
+
+enum DuePaymentMethod {
+  CASH
+  MOBILE_MONEY
+  BANK
+  HARVEST_DEDUCTION
+}
+
+enum DueStatus {
+  ACTIVE
+  CANCELLED
+}
+
+/// A charge the AMCOS sets once (a levy, the membership fee, canal cleaning) and then applies to its farmers.
+model FarmerDueType {
+  id          String      @id @default(uuid())
+  mamcosId    String      @map("mamcos_id")
+  name        String
+  category    DueCategory
+  basis       DueBasis
+  rate        Decimal     @db.Decimal(14, 2)
+  season      String?
+  dueDate     DateTime?   @map("due_date") @db.Date
+  isActive    Boolean     @default(true) @map("is_active")
+  notes       String?
+  createdById String?     @map("created_by_id")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  mamcos Mamcos      @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  dues   FarmerDue[]
+
+  @@unique([mamcosId, name])
+  @@map("farmer_due_types")
+}
+
+/// One amount a farmer owes the AMCOS. Balance = amount − waived − payments that are not voided.
+model FarmerDue {
+  id           String      @id @default(uuid())
+  mamcosId     String      @map("mamcos_id")
+  typeId       String?     @map("type_id")
+  farmerId     String      @map("farmer_id")
+  category     DueCategory
+  description  String
+  hectares     Decimal?    @db.Decimal(8, 2)
+  itemName     String?     @map("item_name")
+  quantity     Decimal?    @db.Decimal(12, 2)
+  unit         String?
+  unitPrice    Decimal?    @map("unit_price") @db.Decimal(14, 2)
+  amount       Decimal     @db.Decimal(14, 2)
+  waivedAmount Decimal     @default(0) @map("waived_amount") @db.Decimal(14, 2)
+  waivedReason String?     @map("waived_reason")
+  status       DueStatus   @default(ACTIVE)
+  cancelReason String?     @map("cancel_reason")
+  issuedOn     DateTime    @map("issued_on") @db.Date
+  dueDate      DateTime?   @map("due_date") @db.Date
+  postedIssue  Boolean     @default(false) @map("posted_issue")
+  createdById  String?     @map("created_by_id")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  mamcos   Mamcos         @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  type     FarmerDueType? @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  farmer   Farmer         @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+  payments DuePayment[]
+
+  @@unique([typeId, farmerId])
+  @@index([mamcosId, status])
+  @@index([farmerId])
+  @@index([mamcosId, dueDate])
+  @@map("farmer_dues")
+}
+
+model DuePayment {
+  id           String           @id @default(uuid())
+  mamcosId     String           @map("mamcos_id")
+  dueId        String           @map("due_id")
+  farmerId     String           @map("farmer_id")
+  receiptNo    String           @map("receipt_no")
+  amount       Decimal          @db.Decimal(14, 2)
+  paidOn       DateTime         @map("paid_on") @db.Date
+  method       DuePaymentMethod
+  reference    String?
+  note         String?
+  recordedById String?          @map("recorded_by_id")
+  voidedAt     DateTime?        @map("voided_at")
+  voidReason   String?          @map("void_reason")
+  voidedById   String?          @map("voided_by_id")
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  mamcos Mamcos    @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  due    FarmerDue @relation(fields: [dueId], references: [id], onDelete: Restrict)
+  farmer Farmer    @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+
+  @@unique([mamcosId, receiptNo])
+  @@index([dueId])
+  @@index([mamcosId, paidOn])
+  @@map("due_payments")
+}
+
+/// The member who really owns a hectare that is registered in a relative's name. History: a row is closed, never deleted.
+model IrrigationHectareGuardian {
+  id           String    @id @default(uuid())
+  allocationId String    @map("allocation_id")
+  guardianId   String    @map("guardian_id")
+  startedOn    DateTime  @map("started_on") @db.Date
+  endedOn      DateTime? @map("ended_on") @db.Date
+  endReason    String?   @map("end_reason")
+  note         String?
+  createdById  String?   @map("created_by_id")
+  endedById    String?   @map("ended_by_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  allocation IrrigationHectareAllocation @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+  guardian   Farmer                      @relation("FarmerGuardianships", fields: [guardianId], references: [id], onDelete: Restrict)
+
+  @@index([allocationId])
+  @@index([guardianId, endedOn])
+  @@map("irrigation_hectare_guardians")
 }

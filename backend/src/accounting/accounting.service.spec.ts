@@ -7,7 +7,7 @@ describe('AccountingService', () => {
       service.postToLedger('Test', 'id', new Date(), 'bad', [
         { code: '1000', debit: 100 },
         { code: '4000', credit: 99 },
-      ]),
+      ], null),
     ).rejects.toThrow('must balance');
   });
   it('rejects manual journal entries with more than one debit or credit account', async () => {
@@ -20,7 +20,7 @@ describe('AccountingService', () => {
         { accountId: 'expense', debit: 50 },
         { accountId: 'equity', credit: 100 },
       ],
-    } as any)).rejects.toThrow('exactly two accounts');
+    } as any, {})).rejects.toThrow('exactly two accounts');
   });
   it('persists every balanced debit and credit line idempotently', async () => {
     const prisma = {
@@ -44,6 +44,7 @@ describe('AccountingService', () => {
         { code: '1000', debit: 100 },
         { code: '4000', credit: 100 },
       ],
+      null,
     );
     expect(prisma.ledgerEntry.upsert).toHaveBeenCalledTimes(2);
     expect(prisma.$transaction).toHaveBeenCalled();
@@ -77,7 +78,7 @@ describe('AccountingService', () => {
     } as any;
     const service = new AccountingService(prisma);
     jest.spyOn(service as any, 'accounts').mockResolvedValue([]);
-    const result = await service.balanceSheet('2026-12-31');
+    const result = await service.balanceSheet({}, '2026-12-31');
     expect(result.assets).toBe(1000);
     expect(result.retainedEarnings).toBe(100);
     expect(result.totalEquity).toBe(600);
@@ -94,7 +95,7 @@ describe('AccountingService', () => {
         ]),
       },
     } as any;
-    const result = await new AccountingService(prisma).cashFlow('2026-02-01', '2026-02-28');
+    const result = await new AccountingService(prisma).cashFlow({}, '2026-02-01', '2026-02-28');
     expect(result.openingCashBalance).toBe(100);
     expect(result.operating.netCashFlow).toBe(50);
     expect(result.investing.netCashFlow).toBe(-15);
@@ -116,7 +117,7 @@ describe('AccountingService', () => {
     } as any;
     const service = new AccountingService(prisma);
     jest.spyOn(service as any, 'accounts').mockResolvedValue([]);
-    const result = await service.trialBalance(undefined, '2026-12-31');
+    const result = await service.trialBalance({}, undefined, '2026-12-31');
     expect(prisma.ledgerEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { entryDate: { lte: new Date('2026-12-31T23:59:59.999+03:00') } },
     }));
@@ -142,7 +143,7 @@ describe('AccountingService', () => {
     } as any;
     const service = new AccountingService(prisma);
     jest.spyOn(service as any, 'accounts').mockResolvedValue([]);
-    const result = await service.accountBalances('2026-12-31');
+    const result = await service.accountBalances({}, '2026-12-31');
     expect(result.accountCount).toBe(2);
     expect(result.balances).toEqual([
       expect.objectContaining({ code: '1000', debitActivity: 100, creditActivity: 25, balance: 75, balanceSide: 'DEBIT' }),
@@ -177,7 +178,7 @@ describe('AccountingService', () => {
     expect(result.contributions[0].amount).toBe(100);
   });
   it('records member contributions as cooperative equity with a balanced ledger posting', async () => {
-    const contribution = { id: 'contribution-1', amount: 250, contributionDate: new Date('2026-02-03'), description: 'Member share' };
+    const contribution = { id: 'contribution-1', mamcosId: 'coop-1', amount: 250, contributionDate: new Date('2026-02-03'), description: 'Member share' };
     const prisma = {
       farmer: { findFirst: jest.fn().mockResolvedValue({ id: 'farmer-1', mamcosId: 'coop-1' }) },
       memberContribution: { create: jest.fn().mockResolvedValue(contribution) },
@@ -189,10 +190,10 @@ describe('AccountingService', () => {
     expect(prisma.farmer.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'farmer-1', mamcosId: 'coop-1' } }));
     expect(post).toHaveBeenCalledWith('MemberContribution', 'contribution-1', expect.any(Date), 'Member share', [
       { code: '1000', debit: 250 }, { code: '3000', credit: 250 },
-    ]);
+    ], 'coop-1');
   });
   it('records cooperative reserve appropriations as an equity-to-equity journal', async () => {
-    const allocation = { id: 'reserve-1', amount: 500, allocationDate: new Date('2026-03-01'), mamcos: { name: 'Coop One' } };
+    const allocation = { id: 'reserve-1', mamcosId: 'coop-1', amount: 500, allocationDate: new Date('2026-03-01'), mamcos: { name: 'Coop One' } };
     const prisma = {
       mamcos: { findUnique: jest.fn().mockResolvedValue({ id: 'coop-1' }) },
       reserveAllocation: { create: jest.fn().mockResolvedValue(allocation) },
@@ -204,7 +205,7 @@ describe('AccountingService', () => {
     expect(prisma.reserveAllocation.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ mamcosId: 'coop-1', amount: 500 }) }));
     expect(post).toHaveBeenCalledWith('ReserveAllocation', 'reserve-1', expect.any(Date), 'General reserve', [
       { code: '3200', debit: 500 }, { code: '3100', credit: 500 },
-    ]);
+    ], 'coop-1');
   });
   it('requires draft budgets to be approved and scopes the approval to the cooperative', async () => {
     const prisma = {

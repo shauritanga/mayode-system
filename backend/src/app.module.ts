@@ -55,6 +55,13 @@ import { SaleOrdersModule } from './sale-orders/sale-orders.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { ReportsModule } from './reports/reports.module';
 import { LoansModule } from './loans/loans.module';
+import { IrrigationModule } from './irrigation/irrigation.module';
+import { StaffModule } from './staff/staff.module';
+import { JoinRequestsModule } from './join-requests/join-requests.module';
+import { MachineryModule } from './machinery/machinery.module';
+import { AssetsModule } from './assets/assets.module';
+import { DuesModule } from './dues/dues.module';
+import { CommunicationsModule } from './communications/communications.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { GovernanceModule } from './governance/governance.module';
 import { BuyerPortalModule } from './buyer-portal/buyer-portal.module';
@@ -130,6 +137,13 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     ReportsModule,
     LoansModule,
     AccountingModule,
+    IrrigationModule,
+    StaffModule,
+    JoinRequestsModule,
+    MachineryModule,
+    AssetsModule,
+    DuesModule,
+    CommunicationsModule,
     GovernanceModule,
     BuyerPortalModule,
     PartnerApiModule,

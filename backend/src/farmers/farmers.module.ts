@@ -1,3 +1,4 @@
+import { FarmerCredentialsService } from './farmer-credentials.service';
 import { Module } from '@nestjs/common';
 import { FarmersService } from './farmers.service';
 import { FarmersController } from './farmers.controller';
@@ -7,7 +8,7 @@ import { UploadsModule } from '../uploads/uploads.module';
 @Module({
   imports: [FinanceModule, UploadsModule],
   controllers: [FarmersController],
-  providers: [FarmersService],
+  providers: [FarmersService, FarmerCredentialsService],
   exports: [FarmersService],
 })
 export class FarmersModule {}

@@ -198,8 +198,7 @@ export class InventoryService {
         [
           { code: '1200', debit: record.totalValue },
           { code: '2200', credit: record.totalValue },
-        ],
-      );
+        ], this.accounting.mamcosOfInventoryRecord(record.id));
     }
 
     await this.activities.log(
@@ -446,8 +445,7 @@ export class InventoryService {
         [
           { code: '1200', debit: updated.totalValue },
           { code: '2200', credit: updated.totalValue },
-        ],
-      );
+        ], this.accounting.mamcosOfInventoryRecord(updated.id));
     }
     return updated;
   }
@@ -501,8 +499,7 @@ export class InventoryService {
       [
         { code: '2200', debit: dto.amount },
         { code: '1000', credit: dto.amount },
-      ],
-    );
+      ], this.accounting.mamcosOfInventoryRecord(record.id));
     return updated;
   }
 

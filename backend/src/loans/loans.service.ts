@@ -47,8 +47,7 @@ export class LoansService {
       [
         { code: '1000', debit: loan.originalAmount },
         { code: '2000', credit: loan.originalAmount },
-      ],
-    );
+      ], this.accounting.mamcosOfLoan(loan.id));
     return loan;
   }
   /** Which farmers' loans this person may see: themselves, their cooperative's, or those who shared data with lenders. */
@@ -175,8 +174,7 @@ export class LoansService {
             [
               { code: '2200', debit: deduction.amount },
               { code: '2000', credit: deduction.amount },
-            ],
-          ),
+            ], this.accounting.mamcosOfLoanDeduction(deduction.id)),
         ),
       ),
     );
@@ -323,8 +321,7 @@ export class LoansService {
             [
               { code: '2000', debit: deduction.amount },
               { code: '1000', credit: deduction.amount },
-            ],
-          );
+            ], this.accounting.mamcosOfLoanDeduction(deduction.id));
         }
         if (payoutStatus === PayoutStatus.FAILED)
           await this.prisma.payment.updateMany({
@@ -355,8 +352,7 @@ export class LoansService {
             [
               { code: '2200', debit: payment.netAmount ?? payment.amount },
               { code: '1000', credit: payment.netAmount ?? payment.amount },
-            ],
-          );
+            ], this.accounting.mamcosOfPayment(payment.id));
         }
         if (status?.status === 'FAILED')
           await this.prisma.payment.update({

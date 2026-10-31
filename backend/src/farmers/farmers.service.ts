@@ -65,7 +65,7 @@ export class FarmersService {
   }
 
   /** Provision a login User + Farmer profile (admin / field-officer flow). */
-  async create(dto: CreateFarmerDto, actor?: RequestUser) {
+  async create(dto: CreateFarmerDto & { password: string }, actor?: RequestUser, options: { mustChangePassword?: boolean } = {}) {
     const tenantId = actor ? this.ownership.resolveTenantMamcosId(actor) : null;
     if (tenantId) dto = { ...dto, mamcosId: tenantId };
     const existing = await this.prisma.user.findFirst({
@@ -97,6 +97,7 @@ export class FarmersService {
           firstName: dto.firstName,
           lastName: dto.lastName,
           role: UserRole.FARMER,
+          mustChangePassword: options.mustChangePassword ?? false,
         },
       });
 
@@ -210,8 +211,10 @@ export class FarmersService {
    * paginated (max 100/page) for the searchable UI table — dashboards that
    * need every farmer must use this instead, not loop pages against `findAll`.
    */
-  findAllUnpaginated() {
+  findAllUnpaginated(user?: RequestUser) {
+    const tenantId = user ? this.ownership.resolveTenantMamcosId(user) : null;
     return this.prisma.farmer.findMany({
+      where: tenantId ? { mamcosId: tenantId } : {},
       select: {
         id: true,
         gender: true,
@@ -1156,11 +1159,14 @@ export class FarmersService {
   // Dashboard aggregates
   // --------------------------------------------------------------------------
 
-  async getOverview() {
+  async getOverview(user?: RequestUser) {
+    // A cooperative sees its own farmers' figures only; platform accounts see everything.
+    const tenantId = user ? this.ownership.resolveTenantMamcosId(user) : null;
+    const where: Prisma.FarmerWhereInput = tenantId ? { mamcosId: tenantId } : {};
     const [total, byStatus, byRegion] = await Promise.all([
-      this.prisma.farmer.count(),
-      this.prisma.farmer.groupBy({ by: ['verificationStatus'], _count: true }),
-      this.prisma.farmer.groupBy({ by: ['region'], _count: true }),
+      this.prisma.farmer.count({ where }),
+      this.prisma.farmer.groupBy({ by: ['verificationStatus'], where, _count: true }),
+      this.prisma.farmer.groupBy({ by: ['region'], where, _count: true }),
     ]);
 
     return {

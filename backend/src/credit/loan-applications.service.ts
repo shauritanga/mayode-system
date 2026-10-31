@@ -333,7 +333,7 @@ export class LoanApplicationsService {
     await this.accounting.postToLedger('LoanDisbursement', loan.id, when, `Loan disbursement: ${a.lender.name} (${a.reference})`, [
       { code: '1000', debit: principal },
       { code: '2000', credit: principal },
-    ]);
+    ], this.accounting.mamcosOfLoan(loan.id));
     await this.tell(
       a.farmerId,
       `MAYODE: mkopo wako ${a.reference} wa ${fmt(principal)} umetolewa. Marejesho: ${a.termMonths} ya kila mwezi ya ${fmt(total / a.termMonths)}. Sehemu ya mauzo yako itakatwa kulipa.`,

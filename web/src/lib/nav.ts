@@ -26,6 +26,9 @@ import {
   CloudSunRainIcon,
   ChartBarLineIcon,
   Store01Icon,
+  DropletIcon,
+  Task01Icon,
+  Mail01Icon,
 } from '@hugeicons/core-free-icons';
 
 export type IconData = typeof Home01Icon;
@@ -81,6 +84,36 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/farms', label: 'Farms', icon: Plant01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], anyResource: ['farms', 'ops_farm_tasks', 'ops_reports', 'ops_farm_inputs', 'ops_harvest'] },
       { href: '/dashboard/field-officers', label: 'Field Officers', icon: UserAdd01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'users' },
       { href: '/dashboard/rice-calendar', label: 'Rice Calendar', icon: BookOpen01Icon, roles: ['SUPER_ADMIN', 'ADMIN'], resource: 'rice_protocols' },
+    ],
+  },
+  {
+    label: 'Scheme Management',
+    items: [
+      { href: '/dashboard/irrigation', label: 'Scheme Management', icon: DropletIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], anyResource: ['irrigation', 'irrigation_allocations', 'irrigation_leadership'] },
+    ],
+  },
+  {
+    label: 'Task Management',
+    items: [
+      { href: '/dashboard/task-management', label: 'Task Management', icon: Task01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'machinery' },
+    ],
+  },
+  {
+    label: 'Farmer Dues',
+    items: [
+      { href: '/dashboard/dues', label: 'Farmer Dues', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'dues' },
+    ],
+  },
+  {
+    label: 'Asset Management',
+    items: [
+      { href: '/dashboard/assets', label: 'Assets Management', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'assets' },
+    ],
+  },
+  {
+    label: 'Communication',
+    items: [
+      { href: '/dashboard/communication', label: 'Communication', icon: Mail01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'communication' },
     ],
   },
   {
@@ -323,6 +356,7 @@ export function canView(
 
 function itemAllowed(item: NavItem, subject: AccessSubject | null | undefined): boolean {
   if (!subject?.role || !isPortalPath(item.href)) return false;
+  if (APP_MODE === 'cooperatives' && COOPERATIVE_PORTAL_HIDDEN_HREFS.has(item.href)) return false;
   if (subject.role === 'SUPER_ADMIN') return true;
   if (APP_MODE === 'farmers') return subject.role === 'FARMER' && item.roles.includes('FARMER');
   if (!subject.roleId) return false;
@@ -347,10 +381,59 @@ const ADMIN_PORTAL_HIDDEN_HREFS = new Set([
 ]);
 const ADMIN_PORTAL_HIDDEN_GROUPS = new Set(['Governance & Insights']);
 
+/**
+ * Not offered in the AMCOS (cooperatives) portal. The routes are blocked there as well as hidden, so a typed URL
+ * cannot reach them; the admin portal is unaffected.
+ */
+const COOPERATIVE_PORTAL_HIDDEN_HREFS = new Set([
+  '/dashboard/marketplace', // MLAX
+  '/dashboard/leases', // Renter Assignments
+  '/dashboard/premium-fund', // Fairtrade Premium Fund
+  '/dashboard/grantor', // Grantor Impact
+  '/dashboard/projects', // Community Projects
+  '/dashboard/compliance',
+  '/dashboard/corrections',
+  '/dashboard/insurance',
+  '/dashboard/finance', // Finance and Accounting (Business group); Accounting & Finance stays
+  '/dashboard/collection-centres',
+  '/dashboard/ops-field-work', // My Field Work
+  '/dashboard/market', // Market & Buyers
+  '/dashboard/inventory', // Harvest & Lots
+  '/dashboard/field-officers',
+  '/dashboard/farms',
+  '/dashboard/memberships',
+  '/dashboard/rice-calendar',
+  '/dashboard/users', // User Accounts
+  '/dashboard/field-surveys',
+  '/dashboard/crop-cycles',
+  '/dashboard/activities', // Crop Activities
+  '/dashboard/seasons',
+  '/dashboard/weather',
+  '/dashboard/credit', // Credit & Loans
+]);
+
+/**
+ * AMCOS portal sidebar: one flat list with no group headings, most-used first (day-to-day work, then money, then
+ * oversight, then setup). Anything not listed keeps its original relative order after these.
+ */
+const COOPERATIVE_MENU_ORDER = [
+  '/dashboard', '/dashboard/farmers', '/dashboard/irrigation', '/dashboard/dues', '/dashboard/ops-orders', '/dashboard/ops-warehouse', '/dashboard/task-management',
+  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/staff', '/dashboard/suppliers', '/dashboard/sales',
+  '/dashboard/reports', '/dashboard/credit', '/dashboard/traceability', '/dashboard/disputes', '/dashboard/governance', '/dashboard/ai',
+  '/dashboard/audit-log', '/dashboard/roles', '/dashboard/settings',
+];
+
+function flattenForCooperatives(groups: NavGroup[]): NavGroup[] {
+  const rank = (href: string) => { const i = COOPERATIVE_MENU_ORDER.indexOf(href); return i === -1 ? COOPERATIVE_MENU_ORDER.length : i; };
+  const items = groups.flatMap((g) => g.items).map((item, index) => ({ item, index }))
+    .sort((x, y) => rank(x.item.href) - rank(y.item.href) || x.index - y.index).map((x) => x.item);
+  return items.length ? [{ label: '', items }] : [];
+}
+
 export function getVisibleGroups(subject: AccessSubject | null | undefined): NavGroup[] {
   const seen = new Set<string>();
   const trimAdminPortal = APP_MODE === 'admin' && (subject?.role === 'SUPER_ADMIN' || subject?.role === 'ADMIN');
-  return navGroups.map((group) => ({ ...group, items: group.items.filter((item) => {
+  const visible = navGroups.map((group) => ({ ...group, items: group.items.filter((item) => {
     if (trimAdminPortal && (ADMIN_PORTAL_HIDDEN_GROUPS.has(group.label) || ADMIN_PORTAL_HIDDEN_HREFS.has(item.href))) return false;
     if (item.hidden || seen.has(item.href) || !itemAllowed(item, subject)) return false;
     if (item.persona && !(subject?.role && item.roles.includes(subject.role))) return false;
@@ -358,6 +441,7 @@ export function getVisibleGroups(subject: AccessSubject | null | undefined): Nav
     seen.add(item.href);
     return true;
   }) })).filter((group) => group.items.length > 0);
+  return APP_MODE === 'cooperatives' ? flattenForCooperatives(visible) : visible;
 }
 
 export function isPortalPath(pathname: string): boolean {

@@ -31,67 +31,79 @@ import {
 @Controller('accounting')
 export class AccountingController {
   constructor(private readonly accounting: AccountingService) {}
+  // Every report and posting below is confined to one cooperative's books: the caller's own, or — for Super Admin — the
+  // one named in ?mamcosId=, or everything when none is named. See AccountingService.scopeFor.
   @Get('statements') statements(
+    @CurrentUser() user: RequestUser,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('mamcosId') mamcosId?: string,
   ) {
-    return this.accounting.statements(from, to);
+    return this.accounting.statements(this.accounting.scopeFor(user, mamcosId), from, to);
   }
   @Get('profit-loss') pnl(
+    @CurrentUser() user: RequestUser,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('mamcosId') mamcosId?: string,
   ) {
-    return this.accounting.profitAndLoss(from, to);
+    return this.accounting.profitAndLoss(this.accounting.scopeFor(user, mamcosId), from, to);
   }
-  @Get('balance-sheet') balance(@Query('to') to?: string) {
-    return this.accounting.balanceSheet(to);
+  @Get('balance-sheet') balance(@CurrentUser() user: RequestUser, @Query('to') to?: string, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.balanceSheet(this.accounting.scopeFor(user, mamcosId), to);
   }
   @Get('cash-flow') cashFlow(
+    @CurrentUser() user: RequestUser,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('mamcosId') mamcosId?: string,
   ) {
-    return this.accounting.cashFlow(from, to);
+    return this.accounting.cashFlow(this.accounting.scopeFor(user, mamcosId), from, to);
   }
   @Get('trial-balance') trialBalance(
+    @CurrentUser() user: RequestUser,
     @Query('to') to?: string,
+    @Query('mamcosId') mamcosId?: string,
   ) {
-    return this.accounting.trialBalance(undefined, to);
+    return this.accounting.trialBalance(this.accounting.scopeFor(user, mamcosId), undefined, to);
   }
   @Get('account-balances')
   @RequirePermission('accounting', 'VIEW')
-  accountBalances(@Query('to') to?: string) {
-    return this.accounting.accountBalances(to);
+  accountBalances(@CurrentUser() user: RequestUser, @Query('to') to?: string, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.accountBalances(this.accounting.scopeFor(user, mamcosId), to);
   }
   @Get('journal-entries')
   @RequirePermission('accounting', 'VIEW')
-  journalEntries() {
-    return this.accounting.journalEntries();
+  journalEntries(@CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.journalEntries(this.accounting.scopeFor(user, mamcosId));
   }
   @Post('journal-entries')
   @RequirePermission('accounting', 'CREATE')
-  createJournalEntry(@Body() dto: CreateJournalEntryDto) {
-    return this.accounting.createJournalEntry(dto);
+  createJournalEntry(@Body() dto: CreateJournalEntryDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.createJournalEntry(dto, this.accounting.scopeFor(user, mamcosId));
   }
   @Get('ratios') ratios(
+    @CurrentUser() user: RequestUser,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('mamcosId') mamcosId?: string,
   ) {
-    return this.accounting.ratios(from, to);
+    return this.accounting.ratios(this.accounting.scopeFor(user, mamcosId), from, to);
   }
-  @Post('invoices') invoice(@Body() dto: CreateInvoiceDto) {
-    return this.accounting.createInvoice(dto);
+  @Post('invoices') invoice(@Body() dto: CreateInvoiceDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.createInvoice(dto, this.accounting.scopeFor(user, mamcosId));
   }
-  @Post('bills') bill(@Body() dto: CreateBillDto) {
-    return this.accounting.createBill(dto);
+  @Post('bills') bill(@Body() dto: CreateBillDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.createBill(dto, this.accounting.scopeFor(user, mamcosId));
   }
-  @Post('bills/:id/pay') payBill(@Param('id') id: string) {
-    return this.accounting.payBill(id);
+  @Post('bills/:id/pay') payBill(@Param('id') id: string, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.payBill(id, this.accounting.scopeFor(user, mamcosId));
   }
-  @Get('receivables') receivables() {
-    return this.accounting.receivables();
+  @Get('receivables') receivables(@CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.receivables(this.accounting.scopeFor(user, mamcosId));
   }
-  @Get('payables') payables() {
-    return this.accounting.payables();
+  @Get('payables') payables(@CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.payables(this.accounting.scopeFor(user, mamcosId));
   }
   @Get('accounts') accounts() {
     return this.accounting.listAccounts();

@@ -2633,8 +2633,7 @@ export class MarketplaceService {
         [
           { code: '1000', debit: completed.commissionAmount },
           { code: '4000', credit: completed.commissionAmount },
-        ],
-      )
+        ], this.accounting.mamcosOfFarmer(completed.farmerId))
       .catch((e) =>
         this.logger.warn(
           `Failed to post tractor booking to ledger: ${e?.message}`,

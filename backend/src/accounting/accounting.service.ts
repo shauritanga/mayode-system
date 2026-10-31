@@ -1,6 +1,6 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { AccountType, BudgetStatus } from '@prisma/client';
+import { AccountType, BudgetStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import {
@@ -20,6 +20,9 @@ const CHART = [
   ['1210', 'Finished rice inventory', AccountType.ASSET],
   ['1220', 'By-products inventory', AccountType.ASSET],
   ['1300', 'Farmer loans receivable', AccountType.ASSET],
+  ['1310', 'Fertiliser loans receivable', AccountType.ASSET],
+  ['1500', 'Property, plant and equipment', AccountType.ASSET],
+  ['1590', 'Accumulated depreciation', AccountType.ASSET],
   ['2000', 'Loan repayment payable', AccountType.LIABILITY],
   ['2100', 'Supplier accounts payable', AccountType.LIABILITY],
   ['2200', 'Farmer settlement payable', AccountType.LIABILITY],
@@ -29,11 +32,23 @@ const CHART = [
   ['4000', 'Rice sales revenue', AccountType.INCOME],
   ['4100', 'Fairtrade premium income', AccountType.INCOME],
   ['4200', 'Membership income', AccountType.INCOME],
+  ['4210', 'Levies and dues income', AccountType.INCOME],
+  ['4220', 'Canal maintenance fee income', AccountType.INCOME],
+  ['4230', 'Fertiliser sales to members', AccountType.INCOME],
+  ['4300', 'Gain or loss on disposal of assets', AccountType.INCOME],
   ['5000', 'Production input costs', AccountType.EXPENSE],
   ['5100', 'Loan repayment expense', AccountType.EXPENSE],
   ['5200', 'Farmer rice procurement', AccountType.EXPENSE],
   ['5300', 'Cost of goods sold', AccountType.EXPENSE],
+  ['5400', 'Depreciation expense', AccountType.EXPENSE],
+  ['5410', 'Repairs and maintenance', AccountType.EXPENSE],
 ] as const;
+
+/**
+ * Whose books a request may read. `{}` = every cooperative and the platform (Super Admin, no filter chosen);
+ * `{ mamcosId: id }` = one cooperative; `{ mamcosId: null }` = platform-level rows only.
+ */
+export type LedgerScope = { mamcosId?: string | null };
 
 @Injectable()
 export class AccountingService {
@@ -41,6 +56,19 @@ export class AccountingService {
     private readonly prisma: PrismaService,
     private readonly ownership: OwnershipService,
   ) {}
+  /**
+   * The books this user may read. A cooperative's staff see only their own cooperative; Super Admin sees everything,
+   * or one cooperative when `requested` is given; a platform account with no cooperative sees only platform-level rows.
+   */
+  scopeFor(user: RequestUser, requested?: string): LedgerScope {
+    const own = this.ownership.resolveTenantMamcosId(user);
+    if (own) {
+      if (requested && requested !== own) throw new ForbiddenException('You can only see your own cooperative’s accounts');
+      return { mamcosId: own };
+    }
+    if (user.role === UserRole.SUPER_ADMIN) return requested ? { mamcosId: requested } : {};
+    return { mamcosId: null };
+  }
   private async accounts() {
     // Sequential: Prisma upsert is SELECT-then-INSERT (not atomic), so
     // concurrent upserts of the same code — from Promise.all here, or two
@@ -56,16 +84,46 @@ export class AccountingService {
     }
     return this.prisma.account.findMany();
   }
+  // ───── Which cooperative's books a posting belongs to: resolved from the record that caused it (same rules as the ledger backfill migration) ─────
+  async mamcosOfFarmer(farmerId: string): Promise<string | null> {
+    return (await this.prisma.farmer.findUnique({ where: { id: farmerId }, select: { mamcosId: true } }))?.mamcosId ?? null;
+  }
+  async mamcosOfLoan(loanId: string): Promise<string | null> {
+    const loan = await this.prisma.loanRecord.findUnique({ where: { id: loanId }, select: { farmerId: true } });
+    return loan ? this.mamcosOfFarmer(loan.farmerId) : null;
+  }
+  async mamcosOfLoanDeduction(deductionId: string): Promise<string | null> {
+    const d = await this.prisma.loanDeduction.findUnique({ where: { id: deductionId }, select: { loanRecordId: true } });
+    return d ? this.mamcosOfLoan(d.loanRecordId) : null;
+  }
+  async mamcosOfPayment(paymentId: string): Promise<string | null> {
+    const p = await this.prisma.payment.findUnique({ where: { id: paymentId }, select: { farmerId: true } });
+    return p ? this.mamcosOfFarmer(p.farmerId) : null;
+  }
+  async mamcosOfSale(saleId: string): Promise<string | null> {
+    return (await this.prisma.sale.findUnique({ where: { id: saleId }, select: { mamcosId: true } }))?.mamcosId ?? null;
+  }
+  async mamcosOfInventoryRecord(recordId: string): Promise<string | null> {
+    return (await this.prisma.inventoryRecord.findUnique({ where: { id: recordId }, select: { mamcosId: true } }))?.mamcosId ?? null;
+  }
+  async mamcosOfCropCycle(cropCycleId: string): Promise<string | null> {
+    const c = await this.prisma.cropCycle.findUnique({ where: { id: cropCycleId }, select: { farm: { select: { mamcosId: true } } } });
+    return c?.farm.mamcosId ?? null;
+  }
   async postToLedger(
     sourceType: string,
     sourceId: string,
     entryDate: Date,
     description: string,
     lines: { code: string; debit?: number; credit?: number }[],
+    /** The cooperative whose books these are; null only for platform-level postings. May be a lookup still in flight. */
+    mamcosIdOrLookup: string | null | Promise<string | null>,
   ) {
+    const mamcosId = await mamcosIdOrLookup;
+    const cents = (n: number) => Math.round(n * 100);
     if (
-      lines.reduce((n, l) => n + (l.debit ?? 0), 0) !==
-      lines.reduce((n, l) => n + (l.credit ?? 0), 0)
+      lines.reduce((n, l) => n + cents(l.debit ?? 0), 0) !==
+      lines.reduce((n, l) => n + cents(l.credit ?? 0), 0)
     )
       throw new Error('Ledger postings must balance');
     const accounts = new Map(
@@ -91,21 +149,24 @@ export class AccountingService {
             sourceType,
             sourceId,
             description,
+            mamcosId,
           },
           update: {
             debit: line.debit ?? 0,
             credit: line.credit ?? 0,
             entryDate,
             description,
+            mamcosId,
           },
         }),
       ),
     );
   }
-  async profitAndLoss(from?: string, to?: string) {
+  async profitAndLoss(scope: LedgerScope, from?: string, to?: string) {
     await this.accounts();
     const entries = await this.prisma.ledgerEntry.findMany({
       where: {
+        ...scope,
         entryDate: {
           ...(from ? { gte: new Date(from) } : {}),
           ...(to ? { lte: new Date(to) } : {}),
@@ -127,11 +188,11 @@ export class AccountingService {
       expenseLines,
     };
   }
-  async balanceSheet(to?: string) {
+  async balanceSheet(scope: LedgerScope, to?: string) {
     await this.accounts();
     const asOf = to ? new Date(to) : undefined;
     const entries = await this.prisma.ledgerEntry.findMany({
-      where: asOf ? { entryDate: { lte: asOf } } : undefined,
+      where: { ...scope, ...(asOf ? { entryDate: { lte: asOf } } : {}) },
       include: { account: true },
     });
     const assetLines = this.linesByType(entries, AccountType.ASSET);
@@ -162,9 +223,10 @@ export class AccountingService {
       balanceCheck,
     };
   }
-  async cashFlow(from?: string, to?: string) {
+  async cashFlow(scope: LedgerScope, from?: string, to?: string) {
     const entries = await this.prisma.ledgerEntry.findMany({
       where: {
+        ...scope,
         entryDate: {
           ...(to ? { lte: new Date(to) } : {}),
         },
@@ -238,8 +300,9 @@ export class AccountingService {
       lines,
     };
   }
-  async journalEntries() {
+  async journalEntries(scope: LedgerScope) {
     const rows = await this.prisma.ledgerEntry.findMany({
+      where: scope,
       include: { account: true },
       orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }],
     });
@@ -272,7 +335,7 @@ export class AccountingService {
     return [...grouped.values()];
   }
 
-  async createJournalEntry(dto: CreateJournalEntryDto) {
+  async createJournalEntry(dto: CreateJournalEntryDto, scope: LedgerScope) {
     if (!dto.lines || dto.lines.length !== 2) {
       throw new BadRequestException('A journal entry must have exactly two accounts: one debit and one credit.');
     }
@@ -314,19 +377,20 @@ export class AccountingService {
         sourceType: 'MANUAL_JOURNAL',
         sourceId: journalId,
         description: line.description?.trim() || dto.description.trim(),
+        mamcosId: scope.mamcosId ?? null,
       },
     })));
-    return this.journalEntries().then((journals) => journals.find((journal) => journal.id === journalId));
+    return this.journalEntries(scope).then((journals) => journals.find((journal) => journal.id === journalId));
   }
 
-  async trialBalance(from?: string, to?: string) {
+  async trialBalance(scope: LedgerScope, from?: string, to?: string) {
     await this.accounts();
     const asOf = to
       ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(to) ? `${to}T23:59:59.999+03:00` : to)
       : new Date();
     const accounts = await this.prisma.account.findMany({ orderBy: { code: 'asc' } });
     const entries = await this.prisma.ledgerEntry.findMany({
-      where: { entryDate: { lte: asOf } },
+      where: { ...scope, entryDate: { lte: asOf } },
       include: { account: true },
     });
     const byAccount = new Map(accounts.map((account) => [account.id, {
@@ -367,14 +431,14 @@ export class AccountingService {
     };
   }
 
-  async accountBalances(to?: string) {
+  async accountBalances(scope: LedgerScope, to?: string) {
     await this.accounts();
     const asOf = to
       ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(to) ? `${to}T23:59:59.999+03:00` : to)
       : new Date();
     const accounts = await this.prisma.account.findMany({ orderBy: { code: 'asc' } });
     const entries = await this.prisma.ledgerEntry.findMany({
-      where: { entryDate: { lte: asOf } },
+      where: { ...scope, entryDate: { lte: asOf } },
       select: { accountId: true, debit: true, credit: true },
     });
     const totals = new Map<string, { debits: number; credits: number }>();
@@ -401,11 +465,11 @@ export class AccountingService {
     return { asOf: to ?? asOf.toISOString(), accountCount: balances.length, balances };
   }
 
-  async ratios(from?: string, to?: string) {
+  async ratios(scope: LedgerScope, from?: string, to?: string) {
     const [balance, pnl, cashFlow] = await Promise.all([
-      this.balanceSheet(to),
-      this.profitAndLoss(from, to),
-      this.cashFlow(undefined, to),
+      this.balanceSheet(scope, to),
+      this.profitAndLoss(scope, from, to),
+      this.cashFlow(scope, undefined, to),
     ]);
     return {
       period: { from: from ?? null, to: to ?? null },
@@ -418,7 +482,7 @@ export class AccountingService {
       }),
     };
   }
-  async statements(from?: string, to?: string) {
+  async statements(scope: LedgerScope, from?: string, to?: string) {
     const [
       profitAndLoss,
       balanceSheet,
@@ -428,13 +492,13 @@ export class AccountingService {
       receivables,
       payables,
     ] = await Promise.all([
-      this.profitAndLoss(from, to),
-      this.balanceSheet(to),
-      this.cashFlow(from, to),
-      this.trialBalance(from, to),
-      this.ratios(from, to),
-      this.receivables(),
-      this.payables(),
+      this.profitAndLoss(scope, from, to),
+      this.balanceSheet(scope, to),
+      this.cashFlow(scope, from, to),
+      this.trialBalance(scope, from, to),
+      this.ratios(scope, from, to),
+      this.receivables(scope),
+      this.payables(scope),
     ]);
     return {
       generatedAt: new Date().toISOString(),
@@ -449,12 +513,12 @@ export class AccountingService {
       payablesTotal: payables.reduce((sum, item) => sum + item.amount, 0),
     };
   }
-  createInvoice(dto: CreateInvoiceDto) {
+  createInvoice(dto: CreateInvoiceDto, scope: LedgerScope) {
     return this.prisma.invoice.create({
-      data: { ...dto, dueDate: new Date(dto.dueDate) },
+      data: { ...dto, dueDate: new Date(dto.dueDate), mamcosId: scope.mamcosId ?? null },
     });
   }
-  async createBill(dto: CreateBillDto) {
+  async createBill(dto: CreateBillDto, scope: LedgerScope) {
     let supplierName = dto.supplier;
     if (dto.supplierId) {
       const supplierRecord = await this.prisma.supplier.findUnique({
@@ -468,6 +532,7 @@ export class AccountingService {
         ...dto,
         supplier: supplierName,
         dueDate: new Date(dto.dueDate),
+        mamcosId: scope.mamcosId ?? null,
       },
     });
     await this.postToLedger(
@@ -479,10 +544,13 @@ export class AccountingService {
         { code: '5000', debit: bill.amount },
         { code: '2100', credit: bill.amount },
       ],
+      bill.mamcosId,
     );
     return bill;
   }
-  async payBill(id: string) {
+  async payBill(id: string, scope: LedgerScope) {
+    const existing = await this.prisma.bill.findFirst({ where: { id, ...scope }, select: { id: true } });
+    if (!existing) throw new NotFoundException('Bill not found');
     const bill = await this.prisma.bill.update({
       where: { id },
       data: { status: 'PAID', paidAt: new Date() },
@@ -496,29 +564,30 @@ export class AccountingService {
         { code: '2100', debit: bill.amount },
         { code: '1000', credit: bill.amount },
       ],
+      bill.mamcosId,
     );
     return bill;
   }
-  async receivables() {
+  async receivables(scope: LedgerScope) {
     const now = new Date();
     await this.prisma.invoice.updateMany({
       where: { status: 'OPEN', dueDate: { lt: now } },
       data: { status: 'OVERDUE' },
     });
     return this.prisma.invoice.findMany({
-      where: { status: { in: ['OPEN', 'OVERDUE'] } },
+      where: { ...scope, status: { in: ['OPEN', 'OVERDUE'] } },
       include: { buyer: true, sale: true },
       orderBy: { dueDate: 'asc' },
     });
   }
-  async payables() {
+  async payables(scope: LedgerScope) {
     const now = new Date();
     await this.prisma.bill.updateMany({
       where: { status: 'OPEN', dueDate: { lt: now } },
       data: { status: 'OVERDUE' },
     });
     return this.prisma.bill.findMany({
-      where: { status: { in: ['OPEN', 'OVERDUE'] } },
+      where: { ...scope, status: { in: ['OPEN', 'OVERDUE'] } },
       include: { supplierRef: true },
       orderBy: { dueDate: 'asc' },
     });
@@ -586,6 +655,7 @@ export class AccountingService {
         { code: '1000', debit: contribution.amount },
         { code: '3000', credit: contribution.amount },
       ],
+      contribution.mamcosId,
     );
     return contribution;
   }
@@ -630,6 +700,7 @@ export class AccountingService {
         { code: '3200', debit: allocation.amount },
         { code: '3100', credit: allocation.amount },
       ],
+      allocation.mamcosId,
     );
     return allocation;
   }

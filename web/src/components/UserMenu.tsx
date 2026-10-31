@@ -1,4 +1,5 @@
 'use client';
+import { roleLabel } from '@/lib/role-label';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -81,7 +82,7 @@ export default function UserMenu({ variant = 'header', collapsed = false }: { va
             <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {displayName}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{user?.role}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{roleLabel(user)}</div>
           </span>
         )}
         {!collapsed && (
@@ -102,7 +103,7 @@ export default function UserMenu({ variant = 'header', collapsed = false }: { va
         >
           <div style={{ padding: '8px 10px 10px' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>{displayName}</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>{user?.role}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>{roleLabel(user)}</div>
           </div>
           <div className="dropdown-divider" />
           <Link href="/dashboard/profile" className="dropdown-item" onClick={() => setOpen(false)}>

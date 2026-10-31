@@ -1756,6 +1756,7 @@ const DEFS: Record<string, EntityDef> = {
       const where: Prisma.InvoiceWhereInput = {};
       const range = dateRange(dto);
       if (range) where.dueDate = range;
+      if (dto.mamcosId) where.mamcosId = dto.mamcosId;
       return where;
     },
     map: (rec) => {
@@ -1867,6 +1868,7 @@ const DEFS: Record<string, EntityDef> = {
       const where: Prisma.LedgerEntryWhereInput = {};
       const range = dateRange(dto);
       if (range) where.entryDate = range;
+      if (dto.mamcosId) where.mamcosId = dto.mamcosId;
       return where;
     },
     map: (rec) => {

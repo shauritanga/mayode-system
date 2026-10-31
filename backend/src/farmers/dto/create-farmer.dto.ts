@@ -27,13 +27,14 @@ export class CreateFarmerDto {
   @IsNotEmpty()
   phone: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'ChangeMe123',
-    description: 'Initial password (min 6 chars)',
+    description: 'Initial password (min 6 chars). Leave out and the system generates a temporary one and sends it by SMS.',
   })
+  @IsOptional()
   @IsString()
   @MinLength(6)
-  password: string;
+  password?: string;
 
   @ApiProperty({ example: 'John' })
   @IsString()
