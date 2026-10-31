@@ -163,14 +163,14 @@ export class DuesService {
   async farmers(actor: RequestUser, q: { mamcosId?: string; q?: string }) {
     const mamcosId = this.tenant(actor, q.mamcosId);
     const text = (q.q ?? '').trim();
-    if (text.length < 2) return [];
+    // No text lists the first farmers alphabetically so the picker opens as a dropdown; typing narrows it.
     const farmers = await this.prisma.farmer.findMany({
       where: {
         mamcosId, isBlacklisted: false,
-        OR: [
+        ...(text ? { OR: [
           { firstName: { contains: text, mode: 'insensitive' } }, { lastName: { contains: text, mode: 'insensitive' } },
           { controlNumber: { contains: text, mode: 'insensitive' } }, { user: { phone: { contains: text } } },
-        ],
+        ] } : {}),
       },
       select: farmerSelect, orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }], take: 20,
     });

@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { API_BASE_URL, farmersApi, irrigationApi } from '@/lib/api';
-import { BASE, CardsSkeleton, Empty, LoadError, PageHeader, Panel, StatCard, StatusBadge, fmtDate, fmtHa, titleCase, useApi } from '../../irrigation/ui';
+import { BASE, CardsSkeleton, Empty, LoadError, Panel, StatCard, StatusBadge, fmtDate, fmtHa, titleCase, useApi } from '../../irrigation/ui';
 
 const photoSrc = (url?: string | null) => (!url ? null : /^https?:/.test(url) ? url : `${API_BASE_URL.replace(/\/api\/v\d+\/?$/, '')}${url}`);
 
@@ -26,7 +26,9 @@ export default function FarmerProfilePage() {
   const guided = d ? [...d.guided.current, ...d.guided.history] : [];
   return (
     <>
-      <PageHeader title={name} crumbs={[{ label: 'Farmers', href: '/dashboard/farmers' }, { label: name }]} />
+      <nav aria-label="Breadcrumb" className="muted" style={{ fontSize: 12, marginBottom: 14, display: 'flex', gap: 6 }}>
+        <Link href="/dashboard/farmers" style={{ color: 'inherit', textDecoration: 'underline' }}>Farmers</Link><span>/</span><span>{name}</span>
+      </nav>
       <LoadError message={person.error} onRetry={person.reload} />
       {person.loading ? <CardsSkeleton count={3} /> : !f ? null : (
         <>

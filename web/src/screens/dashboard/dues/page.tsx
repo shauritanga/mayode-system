@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Modal from '@/components/Modal';
 import { communicationsApi, duesApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
@@ -24,32 +24,52 @@ function Footer({ onClose, saving, form, label }: { onClose: () => void; saving:
   return <><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><button type="submit" form={form} className="btn-primary" disabled={saving}>{saving ? 'Saving…' : label}</button></>;
 }
 
+/** Searchable dropdown of the AMCOS's farmers: opens on click, narrows as you type, picks with the mouse or arrow keys. */
 function FarmerPicker({ value, onChange, error }: { value: any; onChange: (f: any) => void; error?: string }) {
   const [q, setQ] = useState('');
-  const term = useDebounced(q, 300);
-  const found = useApi<any[]>(!value && term.trim().length >= 2 ? () => duesApi.farmers(term.trim()) : null, [term, value]);
-  if (value) {
-    return (
-      <Field label="Farmer *">
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ flex: 1 }}><strong>{value.name}</strong> <span className="muted" style={{ fontSize: 12 }}>{value.memberNumber}{value.hectares != null ? ` · ${value.hectares} ha` : ''}</span></span>
-          <button type="button" className="btn-secondary" onClick={() => onChange(null)}>Change</button>
-        </div>
-      </Field>
-    );
-  }
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  const term = useDebounced(q.trim(), 250);
+  const found = useApi<any[]>(open ? () => duesApi.farmers(term) : null, [term, open]);
+  const list = found.data ?? [];
+  useEffect(() => {
+    const away = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', away);
+    return () => document.removeEventListener('mousedown', away);
+  }, []);
+  const pick = (f: any) => { onChange(f); setOpen(false); setQ(''); };
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((i) => Math.min(i + 1, list.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter' && open && list[active]) { e.preventDefault(); pick(list[active]); }
+    else if (e.key === 'Escape') setOpen(false);
+  };
   return (
-    <Field label="Farmer *" error={error} hint="Type at least 2 letters of the name, member number or phone">
-      <input className="input-field" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-      {found.data?.length ? (
-        <div style={{ border: '1px solid var(--border, #2a2f2c)', borderRadius: 8, marginTop: 6, maxHeight: 180, overflowY: 'auto' }}>
-          {found.data.map((f) => (
-            <button key={f.id} type="button" onClick={() => onChange(f)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 0, color: 'inherit', cursor: 'pointer' }}>
-              <strong>{f.name}</strong> <span className="muted" style={{ fontSize: 12 }}>{f.memberNumber} · {f.hectares} ha{f.phone ? ` · ${f.phone}` : ''}</span>
-            </button>
-          ))}
-        </div>
-      ) : term.trim().length >= 2 && !found.loading ? <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>No farmer of your AMCOS matches.</div> : null}
+    <Field label="Farmer *" error={error}>
+      <div ref={box} style={{ position: 'relative' }}>
+        <input className="input-field" role="combobox" aria-controls="farmer-picker-list" aria-expanded={open} aria-autocomplete="list" autoComplete="off"
+          value={open ? q : value ? `${value.name} · ${value.memberNumber}` : ''}
+          placeholder={value ? `${value.name} · ${value.memberNumber}` : 'Select or search a farmer'}
+          onFocus={() => { setOpen(true); setActive(0); }} onClick={() => setOpen(true)}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); setActive(0); }} onKeyDown={onKey}
+          style={{ cursor: 'pointer', paddingRight: 34 }} />
+        <span aria-hidden style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', opacity: 0.6, fontSize: 11 }}>▾</span>
+        {open && (
+          <div id="farmer-picker-list" role="listbox" style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: 'calc(100% + 4px)', maxHeight: 260, overflowY: 'auto', background: 'var(--surface-1, #111613)', border: '1px solid var(--border-subtle, #2a2f2c)', borderRadius: 10, boxShadow: '0 12px 28px rgba(0,0,0,.35)' }}>
+            {found.loading && !list.length ? <div className="muted" style={{ padding: 12, fontSize: 13 }}>Loading farmers…</div>
+              : !list.length ? <div className="muted" style={{ padding: 12, fontSize: 13 }}>{term ? 'No farmer of your AMCOS matches.' : 'No farmers registered yet.'}</div>
+              : list.map((f, i) => (
+                <button key={f.id} type="button" role="option" aria-selected={value?.id === f.id} onMouseEnter={() => setActive(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(f)}
+                  style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: 10, textAlign: 'left', padding: '9px 12px', border: 0, borderBottom: '1px solid var(--border-subtle, #2a2f2c)', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', background: i === active ? 'rgba(127,127,127,.14)' : 'none' }}>
+                  <span><strong style={{ fontSize: 13.5 }}>{f.name}</strong><span className="muted" style={{ display: 'block', fontSize: 12 }}>{f.memberNumber}{f.phone ? ` · ${f.phone}` : ''}</span></span>
+                  <span className="muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{f.hectares} ha</span>
+                </button>
+              ))}
+            {list.length >= 20 && <div className="muted" style={{ padding: '8px 12px', fontSize: 12 }}>Type to narrow the list…</div>}
+          </div>
+        )}
+      </div>
     </Field>
   );
 }

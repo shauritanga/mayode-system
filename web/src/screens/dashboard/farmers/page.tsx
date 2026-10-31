@@ -3,6 +3,7 @@ import ErrorBanner from '@/components/ErrorBanner';
 import { apiErrorMessage } from '@/lib/api-error';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
@@ -109,6 +110,7 @@ function pageNumbers(page: number, totalPages: number): (number | '…')[] {
 }
 
 export default function FarmersPage() {
+  const router = useRouter();
   const reduce = useReducedMotion();
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -387,6 +389,8 @@ export default function FarmersPage() {
                 {farmers.map((farmer, i) => (
                   <motion.tr
                     key={farmer.id}
+                    className="farmers-row"
+                    onClick={() => router.push(`/dashboard/farmers/${farmer.id}`)}
                     initial={reduce ? false : { opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.22, delay: Math.min(i * 0.03, 0.24), ease: [0.16, 1, 0.3, 1] }}
