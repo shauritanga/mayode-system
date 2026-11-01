@@ -91,7 +91,7 @@ describeDb('AMCOS codes and join requests (PostgreSQL)', () => {
     expect(list.amcos.code).toBe(madibira.code);
 
     await requests.approve(adminA, row.id);
-    expect((await farmerOf(res.user.id)).mamcosId).toBe(madibira.id);
+    expect(await farmerOf(res.user.id)).toMatchObject({ mamcosId: madibira.id, verificationStatus: 'VERIFIED' });
     expect((await prisma.amcosJoinRequest.findUniqueOrThrow({ where: { id: row.id } })).status).toBe('APPROVED');
     await expect(requests.approve(adminA, row.id)).rejects.toBeInstanceOf(ConflictException);
   });
@@ -166,6 +166,7 @@ describeDb('AMCOS codes and join requests (PostgreSQL)', () => {
     const created: any = await farmers.create({ phone: phone(), password: 'Secret123', firstName: 'Neema', lastName: 'Joseph', hectareId: hectare.id } as any, registrar);
     expect(created.controlNumber).toBe('5.15R12');
     expect(created.mamcosId).toBe(madibira.id);
+    expect(created.verificationStatus).toBe('VERIFIED');
     const allocation = await prisma.irrigationHectareAllocation.findFirstOrThrow({ where: { hectareId: hectare.id } });
     expect(allocation).toMatchObject({ farmerId: created.id, status: 'ACTIVE' });
 

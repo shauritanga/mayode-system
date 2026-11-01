@@ -129,6 +129,8 @@ export class FarmersService {
           consentedAt: dto.dataShareConsent ? new Date() : null,
           registeredByOfficerId: registeringOfficer?.id,
           assignedOfficerId: registeringOfficer?.id,
+          // The AMCOS's own admin vouches for a farmer they register, so there is nothing left to review.
+          ...(tenantId ? { verificationStatus: VerificationStatus.VERIFIED, verifiedAt: new Date() } : {}),
         },
         include: { user: { select: { phone: true, email: true } } },
       });

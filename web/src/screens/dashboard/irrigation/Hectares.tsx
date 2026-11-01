@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { irrigationApi } from '@/lib/api';
 import {
-  BASE, CardsSkeleton, Empty, Field, Filters, LoadError, PageHeader, Panel, Pager, StatCard, StatusBadge, TableSkeleton,
-  fmtDate, fmtHa, useApi, useCanalBlockOptions, useIrrigation,
+  BASE, Empty, Field, Filters, LoadError, Pager, StatCard, StatusBadge, TableSkeleton,
+  fmtDate, useApi, useCanalBlockOptions, useIrrigation,
 } from './ui';
 
 /** Page 7 — the register of individual hectare units, viewable by block. */
@@ -53,45 +53,6 @@ export function HectareRegister() {
         )}
         <Pager meta={data?.meta} onPage={setPage} />
       </section>
-    </>
-  );
-}
-
-/** A single hectare with its holder, allocation history and links across to the farmer profile. */
-export function HectareDetail({ id }: { id: string }) {
-  const { can } = useIrrigation();
-  const { data: h, loading, error, reload } = useApi<any>(() => irrigationApi.hectare(id), [id]);
-  return (
-    <>
-      <PageHeader title={h ? h.code : 'Hectare'} subtitle={h ? `${h.block.code} · ${h.canal.name} · ${h.scheme.name}` : undefined}
-        crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Hectare Register', href: `${BASE}/structure/hectares` }, { label: h?.code ?? '…' }]}
-        actions={h && <>
-          <StatusBadge value={h.allocationStatus} />
-          {h.allocationStatus === 'AVAILABLE' && can('irrigation_allocations', 'CREATE') && <Link className="btn-primary" href={`${BASE}/allocation/allocate?blockId=${h.block.id}&hectareId=${h.id}`}>Allocate</Link>}
-          {h.allocationStatus === 'ALLOCATED' && can('irrigation_allocations', 'CREATE') && <Link className="btn-secondary" href={`${BASE}/allocation/transfers?add=1&hectareId=${h.id}`}>Transfer</Link>}
-        </>} />
-      <LoadError message={error} onRetry={reload} />
-      {loading || !h ? <CardsSkeleton count={3} /> : (
-        <>
-          <div className="metric-grid" style={{ marginBottom: 16 }}>
-            <StatCard label="Area" value={fmtHa(h.areaHectares)} />
-            <StatCard label="Current farmer" value={h.farmer ? <Link href={`${BASE}/allocation/farmers/${h.farmer.id}`}>{h.farmer.name}</Link> : 'None'} hint={h.guardian ? `${h.farmer?.memberNumber} · guardian ${h.guardian.name}` : h.farmer?.memberNumber} />
-            <StatCard label="Allocated since" value={fmtDate(h.allocatedOn)} />
-            <StatCard label="Block" value={<Link href={`${BASE}/structure/blocks/${h.block.id}`}>{h.block.code}</Link>} />
-          </div>
-          <Panel title="Allocation history" pad={false}>
-            {!h.history.length ? <Empty title="This hectare has never been allocated" /> : (
-              <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Farmer</th><th>Status</th><th>From</th><th>To</th><th>How it ended</th><th>Requested by</th><th>Approved by</th></tr></thead><tbody>
-                {h.history.map((a: any) => (
-                  <tr key={a.id}><td><Link href={`${BASE}/allocation/farmers/${a.farmer.id}`}>{a.farmer.name}</Link> <span className="muted">· {a.farmer.memberNumber}</span></td>
-                    <td><StatusBadge value={a.status} /></td><td>{fmtDate(a.allocatedOn)}</td><td>{fmtDate(a.endedOn)}</td>
-                    <td>{a.endReason ?? a.rejectedReason ?? '—'}</td><td>{a.requestedBy ?? '—'}</td><td>{a.approvedBy ?? '—'}</td></tr>
-                ))}
-              </tbody></table></div>
-            )}
-          </Panel>
-        </>
-      )}
     </>
   );
 }

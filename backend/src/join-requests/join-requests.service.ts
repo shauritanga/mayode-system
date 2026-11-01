@@ -108,11 +108,15 @@ export class JoinRequestsService {
   async approve(actor: RequestUser, id: string, requested?: string) {
     const request = await this.pendingOf(actor, id, requested);
     return this.prisma.$transaction(async (tx) => {
-      const farmer = await tx.farmer.findUnique({ where: { id: request.farmerId }, select: { mamcosId: true } });
+      const farmer = await tx.farmer.findUnique({ where: { id: request.farmerId }, select: { mamcosId: true, verificationStatus: true } });
       if (farmer?.mamcosId && farmer.mamcosId !== request.mamcosId) {
         throw new ConflictException('This farmer has since joined another AMCOS');
       }
-      await tx.farmer.update({ where: { id: request.farmerId }, data: { mamcosId: request.mamcosId } });
+      // Approving someone into the AMCOS is the AMCOS vouching for them, so a farmer still waiting for review becomes verified.
+      await tx.farmer.update({
+        where: { id: request.farmerId },
+        data: { mamcosId: request.mamcosId, ...(farmer?.verificationStatus === 'PENDING' ? { verificationStatus: 'VERIFIED', verifiedAt: new Date() } : {}) },
+      });
       return tx.amcosJoinRequest.update({ where: { id }, data: { status: 'APPROVED', decidedById: actor.id, decidedAt: new Date() } });
     });
   }

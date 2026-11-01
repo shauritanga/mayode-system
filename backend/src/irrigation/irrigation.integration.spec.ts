@@ -164,7 +164,7 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
         }
       }
       const counts = await prisma.$queryRawUnsafe<{ block_id: string; n: bigint; lo: number; hi: number; area: string }[]>(
-        `select block_id, count(*) n, min(hectare_number) lo, max(hectare_number) hi, sum(area_hectares) area from irrigation_hectares group by block_id`);
+        `select block_id, count(*) n, min(hectare_number) lo, max(hectare_number) hi, sum(area_hectares) area from irrigation_hectares where block_id in (${blockIds.flat().map((b) => `'${b}'`).join(',')}) group by block_id`);
       expect(counts).toHaveLength(TOTAL_BLOCKS);
       expect(counts.every((r) => Number(r.n) === 30 && r.lo === 1 && r.hi === 30 && Number(r.area) === 30)).toBe(true);
     });

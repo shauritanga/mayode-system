@@ -523,11 +523,13 @@ export class StructureService {
       this.prisma.irrigationAllocationTransfer.findMany({ where: { hectareId: id }, orderBy: { createdAt: 'desc' } }),
     ]);
     const names = await userNames(this.prisma, allocations.flatMap((a) => [a.requestedById, a.approvedById, a.endedById]));
+    const farmerIds = [...new Set(transfers.flatMap((t) => [t.fromFarmerId, t.toFarmerId]))];
+    const transferFarmers = new Map((await this.prisma.farmer.findMany({ where: { id: { in: farmerIds } }, select: { id: true, firstName: true, lastName: true } })).map((f) => [f.id, fullName(f)]));
     const view = this.hectareView({ ...hectare, allocations: allocations.filter((a) => ['ACTIVE', 'PENDING_APPROVAL'].includes(a.status)) });
     return {
       ...view,
-      block: { id: hectare.block.id, code: hectare.block.code, name: hectare.block.name, blockNumber: hectare.block.blockNumber },
-      canal: { id: hectare.block.canal.id, code: hectare.block.canal.code, name: hectare.block.canal.name },
+      block: { id: hectare.block.id, code: hectare.block.code, name: hectare.block.name, blockNumber: hectare.block.blockNumber, side: hectare.block.side },
+      canal: { id: hectare.block.canal.id, code: hectare.block.canal.code, name: hectare.block.canal.name, canalNumber: hectare.block.canal.canalNumber },
       scheme: { id: hectare.block.canal.scheme.id, name: hectare.block.canal.scheme.name },
       history: allocations.map((a) => ({
         id: a.id, status: a.status, farmer: { id: a.farmer.id, name: fullName(a.farmer), memberNumber: a.farmer.controlNumber },
@@ -537,6 +539,10 @@ export class StructureService {
         guardians: a.guardians.map((g) => ({ id: g.guardianId, name: fullName(g.guardian), startedOn: g.startedOn, endedOn: g.endedOn, endReason: g.endReason })),
       })),
       transferIds: transfers.map((t) => t.id),
+      transfers: transfers.map((t) => ({
+        id: t.id, status: t.status, from: transferFarmers.get(t.fromFarmerId) ?? null, to: transferFarmers.get(t.toFarmerId) ?? null,
+        transferDate: t.transferDate, effectiveDate: t.effectiveDate, reason: t.reason, rejectedReason: t.rejectedReason,
+      })),
     };
   }
 }
