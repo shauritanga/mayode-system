@@ -3,7 +3,6 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { duesApi, irrigationApi, machineryApi } from '@/lib/api';
 import { CardsSkeleton, Empty, LoadError, Panel, StatCard, StatusBadge, Tabs, fmtDate, fmtHa, titleCase, useApi, useIrrigation } from './ui';
 
@@ -15,7 +14,6 @@ const KIND_COLOR: Record<Event['kind'], string> = { Allocation: '#34D399', Guard
 /** One hectare: where it is, who holds it, what has happened on it, and what its holder has been charged and has paid. */
 export function HectareDetail({ id }: { id: string }) {
   const { can } = useIrrigation();
-  const router = useRouter();
   const [tab, setTab] = useState<Tab>('activity');
   const { data: h, loading, error, reload } = useApi<any>(() => irrigationApi.hectare(id), [id]);
   const holder = h?.farmer;
@@ -55,7 +53,11 @@ export function HectareDetail({ id }: { id: string }) {
 
   return (
     <>
-      <button type="button" className="btn-secondary" onClick={() => router.back()} style={{ marginBottom: 14 }}>← Back</button>
+      <nav aria-label="Breadcrumb" className="muted" style={{ fontSize: 12, marginBottom: 14, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <Link href="/dashboard/scheme-structure" style={{ color: 'inherit', textDecoration: 'underline' }}>Scheme Structure</Link><span>/</span>
+        <Link href="/dashboard/scheme-structure?tab=hectares" style={{ color: 'inherit', textDecoration: 'underline' }}>Hectare register</Link><span>/</span>
+        <span>{h?.code ?? '…'}</span>
+      </nav>
       <LoadError message={error} onRetry={reload} />
       {loading || !h ? <CardsSkeleton count={3} /> : (
         <>
