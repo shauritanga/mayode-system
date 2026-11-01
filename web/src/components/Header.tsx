@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Notification03Icon, Sun01Icon, Moon02Icon, Menu02Icon, PanelLeftCloseIcon, PanelLeftOpenIcon } from '@hugeicons/core-free-icons';
+import { Notification01Icon, Sun01Icon, Moon02Icon, Menu02Icon, PanelLeftCloseIcon, PanelLeftOpenIcon } from '@hugeicons/core-free-icons';
 import { notificationsApi } from '@/lib/api';
 import { useThemeStore } from '@/store/theme.store';
 import { useUiStore } from '@/store/ui.store';
@@ -208,7 +208,7 @@ export default function Header() {
 
       <div ref={ref} style={{ position: 'relative' }}>
         <button className="icon-btn" onClick={openPanel} title="Notifications" aria-label="Notifications">
-          <HugeiconsIcon icon={Notification03Icon} size={18} strokeWidth={1.8} />
+          <HugeiconsIcon icon={Notification01Icon} size={18} strokeWidth={1.8} />
           <AnimatePresence>
             {unreadCount > 0 && (
               <motion.span

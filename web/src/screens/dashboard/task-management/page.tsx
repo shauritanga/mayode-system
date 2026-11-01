@@ -318,11 +318,11 @@ export default function TaskManagementPage() {
   const canWrite = can('machinery', 'CREATE');
 
   if (!user?.mamcosId) {
-    return <><PageHeader title="Task Management" /><Empty title="Task Management belongs to an AMCOS" hint="Sign in with an AMCOS account to see its machinery and jobs." /></>;
+    return <><PageHeader title="Tools & Equipment Task Management" /><Empty title="This belongs to an AMCOS" hint="Sign in with an AMCOS account to see its machinery and jobs." /></>;
   }
   return (
     <div>
-      <PageHeader title="Task Management" subtitle="Everything your AMCOS machinery has done: preparation, harvesting and more, with hectares covered and fees contributed to the AMCOS." />
+      <PageHeader title="Tools & Equipment Task Management" subtitle="Everything your AMCOS machinery has done: preparation, harvesting and more, with hectares covered and fees contributed to the AMCOS." />
       <Tabs tabs={[{ id: 'activities', label: 'Jobs done' }, { id: 'equipment', label: 'Machines' }]} active={tab} onChange={setTab} />
       {tab === 'activities'
         ? <Activities equipment={equipment.data ?? []} blocks={blocks.data?.data ?? []} canWrite={canWrite} />
