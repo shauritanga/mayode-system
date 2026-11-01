@@ -93,12 +93,6 @@ function formatGender(gender?: string | null): string {
   return gender.charAt(0) + gender.slice(1).toLowerCase();
 }
 
-function formatFarmSize(ha?: number): string {
-  if (ha === undefined || ha === null || Number.isNaN(ha)) return '—';
-  if (ha === 0) return '0 ha';
-  return `${ha.toLocaleString(undefined, { maximumFractionDigits: 2 })} ha`;
-}
-
 function pageNumbers(page: number, totalPages: number): (number | '…')[] {
   if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
   const window = new Set([1, totalPages, page - 1, page, page + 1]);
@@ -411,7 +405,7 @@ export default function FarmersPage({ embedded = false }: { embedded?: boolean }
                   <th>Ward</th>
                   <th>Village</th>
                   {multiAmcos && <th>Group Name / AMCOS</th>}
-                  <th className="num">Farm Size</th>
+                  <th>Farm ID</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -445,9 +439,7 @@ export default function FarmersPage({ embedded = false }: { embedded?: boolean }
                         {farmer.mamcos?.name ?? '—'}
                       </span>
                     </td>}
-                    <td className="num">
-                      <span className="farmers-size">{formatFarmSize(farmer.farmSizeHa)}</span>
-                    </td>
+                    <td className="farmers-cell" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{farmer.controlNumber || '—'}</td>
                     <td>
                       <StatusBadge status={farmer.verificationStatus} blacklisted={farmer.isBlacklisted} />
                     </td>

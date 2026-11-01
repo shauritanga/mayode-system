@@ -29,9 +29,9 @@ export default function FarmerProfilePage() {
   const name = f ? `${f.firstName} ${f.lastName}` : 'Farmer';
   const photo = photoSrc(f?.photoUrl);
   const details: [string, any][] = f ? [
-    ['Phone', f.user?.phone ?? '—'], ['Email', f.user?.email ?? '—'], ['Gender', titleCase(f.gender) || '—'], ['Date of birth', fmtDate(f.dateOfBirth)],
+    ['Farmer ID', f.controlNumber ?? '—'], ['Phone', f.user?.phone ?? '—'], ['Email', f.user?.email ?? '—'], ['Gender', titleCase(f.gender) || '—'], ['Date of birth', fmtDate(f.dateOfBirth)],
     ['Village', f.village ?? '—'], ['Ward', f.ward ?? '—'], ['District', f.district ?? '—'], ['AMCOS', f.mamcos?.name ?? '—'],
-    ['Farm size', f.farmSizeHa != null ? fmtHa(Number(f.farmSizeHa)) : '—'], ['Registered', fmtDate(f.createdAt)],
+    ['Registered', fmtDate(f.createdAt)],
   ] : [];
   const d = land.data;
   const guided = d ? [...d.guided.current, ...d.guided.history] : [];
