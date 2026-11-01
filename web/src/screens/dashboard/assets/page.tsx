@@ -98,8 +98,8 @@ function AssetModal({ canLinkMachines, onClose, onSaved }: { canLinkMachines: bo
           <Field label="Warranty ends"><input type="date" className="input-field" value={form.warrantyExpiresOn} onChange={(e) => set('warrantyExpiresOn', e.target.value)} /></Field>
           <Field label="Insurance ends"><input type="date" className="input-field" value={form.insuranceExpiresOn} onChange={(e) => set('insuranceExpiresOn', e.target.value)} /></Field>
           {canLinkMachines && linkable.length > 0 && (
-            <Field label="Same as machine in Tools & Equipment Task Management" hint="Shows the machine's jobs and hectares beside this asset">
-              <select className="input-field" value={form.equipmentId} onChange={(e) => set('equipmentId', e.target.value)}><option value="">Not a Task Management machine</option>{linkable.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+            <Field label="Same as machine in Tools & Equipment" hint="Shows the machine's jobs and hectares beside this asset">
+              <select className="input-field" value={form.equipmentId} onChange={(e) => set('equipmentId', e.target.value)}><option value="">Not a Tools & Equipment machine</option>{linkable.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
             </Field>
           )}
           <Field label="Notes" wide><textarea className="input-field" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} /></Field>

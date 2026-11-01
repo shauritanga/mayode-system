@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import {
-  CreateActivityDto, CreateEquipmentDto, ListQueryDto, UpdateActivityDto, UpdateEquipmentDto,
+  CreateActivityDto, CreateEquipmentDto, ListQueryDto, UpdateActivityDto, UpdateEquipmentDto, UpdateRatesDto,
 } from './dto/machinery.dto';
 
 const num = (v: unknown) => (v == null ? 0 : Number(v));
@@ -41,28 +41,56 @@ export class MachineryService {
       }),
     ]);
     const used = new Map(totals.map((t) => [t.equipmentId, t]));
+    const { toolFeePerHectare } = await this.rates(actor, q.mamcosId);
     return items.map((e) => ({
-      ...e, feePerHectare: e.feePerHectare == null ? null : num(e.feePerHectare),
+      ...e, feePerHectare: e.feePerHectare == null ? null : num(e.feePerHectare), registrationFee: num(e.registrationFee),
+      effectiveFeePerHectare: e.feePerHectare == null ? toolFeePerHectare : num(e.feePerHectare),
       jobs: used.get(e.id)?._count._all ?? 0, hectaresWorked: num(used.get(e.id)?._sum.hectares), feesEarned: num(used.get(e.id)?._sum.feeAmount),
     }));
   }
 
-  private checkOwnership(dto: { ownership?: string; ownerName?: string | null; feePerHectare?: number | null }) {
+  private checkOwnership(dto: { ownership?: string; ownerName?: string | null; registrationFee?: number | null }) {
     if (dto.ownership === 'EXTERNAL' && !dto.ownerName?.trim()) throw new BadRequestException('Give the owner of this external machine');
-    if (dto.ownership === 'AMCOS' && (dto.ownerName || dto.feePerHectare)) {
-      throw new BadRequestException('An AMCOS-owned machine has no outside owner and earns no contribution fee');
-    }
+    if (dto.ownership === 'AMCOS' && dto.ownerName) throw new BadRequestException('An AMCOS-owned machine has no outside owner');
+    if (dto.ownership === 'AMCOS' && dto.registrationFee) throw new BadRequestException('Only tools owned by someone else pay a registration fee');
+  }
+
+  // ───────────────────────── rates ─────────────────────────
+
+  /** The AMCOS's default registration fee and per-hectare contribution for tools. */
+  async rates(actor: RequestUser, mamcosIdParam?: string) {
+    const mamcosId = this.tenant(actor, mamcosIdParam);
+    const m = await this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { toolRegistrationFee: true, toolFeePerHectare: true } });
+    return {
+      toolRegistrationFee: m?.toolRegistrationFee == null ? null : num(m.toolRegistrationFee),
+      toolFeePerHectare: m?.toolFeePerHectare == null ? null : num(m.toolFeePerHectare),
+    };
+  }
+
+  async updateRates(actor: RequestUser, dto: UpdateRatesDto, mamcosIdParam?: string) {
+    const mamcosId = this.tenant(actor, mamcosIdParam);
+    await this.prisma.mamcos.update({
+      where: { id: mamcosId },
+      data: {
+        ...(dto.toolRegistrationFee !== undefined ? { toolRegistrationFee: dto.toolRegistrationFee } : {}),
+        ...(dto.toolFeePerHectare !== undefined ? { toolFeePerHectare: dto.toolFeePerHectare } : {}),
+      },
+    });
+    return this.rates(actor, mamcosIdParam);
   }
 
   async createEquipment(actor: RequestUser, dto: CreateEquipmentDto, mamcosIdParam?: string) {
     const mamcosId = this.tenant(actor, mamcosIdParam);
     this.checkOwnership(dto);
+    // Tools owned by someone else pay the AMCOS's registration fee once (or the amount agreed for this tool); the AMCOS's own tools do not.
+    const registrationFee = dto.ownership === 'EXTERNAL' ? dto.registrationFee ?? (await this.rates(actor, mamcosIdParam)).toolRegistrationFee ?? 0 : 0;
     try {
       return await this.prisma.amcosEquipment.create({
         data: {
           mamcosId, name: dto.name.trim(), type: dto.type, registrationNo: dto.registrationNo?.trim() || null, ownership: dto.ownership,
           ownerName: dto.ownerName?.trim() || null, ownerPhone: dto.ownerPhone?.trim() || null,
-          feePerHectare: dto.ownership === 'EXTERNAL' ? dto.feePerHectare ?? null : null, notes: dto.notes?.trim() || null, createdById: actor.id,
+          feePerHectare: dto.feePerHectare ?? null, notes: dto.notes?.trim() || null, createdById: actor.id,
+          registrationFee, registrationFeeStatus: registrationFee > 0 ? 'PENDING' : 'NOT_APPLICABLE',
         },
       });
     } catch (e: any) {
@@ -75,7 +103,7 @@ export class MachineryService {
     const mamcosId = this.tenant(actor, mamcosIdParam);
     const current = await this.prisma.amcosEquipment.findFirst({ where: { id, mamcosId } });
     if (!current) throw new NotFoundException('Equipment not found');
-    this.checkOwnership({ ownership: current.ownership, ownerName: dto.ownerName ?? current.ownerName, feePerHectare: dto.feePerHectare ?? (current.feePerHectare == null ? null : num(current.feePerHectare)) });
+    this.checkOwnership({ ownership: current.ownership, ownerName: dto.ownerName ?? current.ownerName });
     try {
       return await this.prisma.amcosEquipment.update({
         where: { id },
@@ -105,13 +133,10 @@ export class MachineryService {
     return block;
   }
 
-  /** Fee rules: AMCOS-owned machines earn nothing; external machines owe hectares × their rate unless an amount is given. */
-  private fee(equipment: { ownership: string; feePerHectare: Prisma.Decimal | null }, hectares: number, explicit?: number) {
-    if (equipment.ownership === 'AMCOS') {
-      if (explicit && explicit > 0) throw new BadRequestException('An AMCOS-owned machine does not earn a contribution fee');
-      return { feeAmount: 0, feeStatus: 'NOT_APPLICABLE' as const };
-    }
-    const amount = explicit ?? Math.round(hectares * num(equipment.feePerHectare) * 100) / 100;
+  /** Every tool, the AMCOS's own or not, contributes hectares × its rate (its own, else the AMCOS default) unless an amount is given. */
+  private fee(equipment: { feePerHectare: Prisma.Decimal | null }, defaultRate: number | null, hectares: number, explicit?: number) {
+    const rate = equipment.feePerHectare == null ? defaultRate ?? 0 : num(equipment.feePerHectare);
+    const amount = explicit ?? Math.round(hectares * rate * 100) / 100;
     return amount > 0 ? { feeAmount: amount, feeStatus: 'PENDING' as const } : { feeAmount: 0, feeStatus: 'NOT_APPLICABLE' as const };
   }
 
@@ -129,7 +154,7 @@ export class MachineryService {
     const status = dto.status ?? 'COMPLETED';
     const date = day(dto.activityDate);
     this.assertDate(date, status);
-    const fee = status === 'CANCELLED' ? { feeAmount: 0, feeStatus: 'NOT_APPLICABLE' as const } : this.fee(equipment, dto.hectares, dto.feeAmount);
+    const fee = status === 'CANCELLED' ? { feeAmount: 0, feeStatus: 'NOT_APPLICABLE' as const } : this.fee(equipment, (await this.rates(actor, mamcosIdParam)).toolFeePerHectare, dto.hectares, dto.feeAmount);
     return this.prisma.machineryActivity.create({
       data: {
         mamcosId, activityDate: date, type: dto.type, equipmentId: equipment.id, operatorName: dto.operatorName?.trim() || null,
@@ -162,7 +187,7 @@ export class MachineryService {
     let fee: { feeAmount: number; feeStatus: 'NOT_APPLICABLE' | 'PENDING' | 'PAID' } | null = null;
     if (!paid) {
       if (status === 'CANCELLED') fee = { feeAmount: 0, feeStatus: 'NOT_APPLICABLE' };
-      else if (feeChanged || current.status === 'CANCELLED') fee = this.fee(equipment, hectares, dto.feeAmount);
+      else if (feeChanged || current.status === 'CANCELLED') fee = this.fee(equipment, (await this.rates(actor, mamcosIdParam)).toolFeePerHectare, hectares, dto.feeAmount);
     }
     return this.prisma.machineryActivity.update({
       where: { id },
@@ -174,6 +199,18 @@ export class MachineryService {
         ...(fee ?? {}), updatedById: actor.id,
       },
     });
+  }
+
+  async markRegistrationFeePaid(actor: RequestUser, id: string, paidOn?: string, mamcosIdParam?: string) {
+    const mamcosId = this.tenant(actor, mamcosIdParam);
+    const current = await this.prisma.amcosEquipment.findFirst({ where: { id, mamcosId } });
+    if (!current) throw new NotFoundException('Equipment not found');
+    if (current.registrationFeeStatus !== 'PENDING') {
+      throw new ConflictException(current.registrationFeeStatus === 'PAID' ? 'The registration fee is already recorded as paid' : 'This tool has no registration fee to collect');
+    }
+    const date = paidOn ? day(paidOn) : today();
+    if (date > today()) throw new BadRequestException('The payment date cannot be in the future');
+    return this.prisma.amcosEquipment.update({ where: { id }, data: { registrationFeeStatus: 'PAID', registrationFeePaidOn: date } });
   }
 
   async markFeePaid(actor: RequestUser, id: string, paidOn?: string, mamcosIdParam?: string) {

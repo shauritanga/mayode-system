@@ -66,10 +66,10 @@ describeDb('Machinery and task management (PostgreSQL)', () => {
     it('registers AMCOS-owned and external machines and refuses nonsense combinations', async () => {
       tractor = await svc.createEquipment(adminA, { name: 'Tractor MF-385', type: 'TRACTOR', ownership: 'AMCOS', registrationNo: 'T 123 ABC' });
       harvester = await svc.createEquipment(adminA, { name: 'Combine Kubota', type: 'COMBINE_HARVESTER', ownership: 'EXTERNAL', ownerName: 'Juma Hamisi', ownerPhone: '+255712000111', feePerHectare: 15000 });
-      expect(tractor).toMatchObject({ ownership: 'AMCOS', feePerHectare: null, ownerName: null });
+      expect(tractor).toMatchObject({ ownership: 'AMCOS', feePerHectare: null, ownerName: null, registrationFeeStatus: 'NOT_APPLICABLE' });
       expect(Number(harvester.feePerHectare)).toBe(15000);
       await expect(svc.createEquipment(adminA, { name: 'Mystery', type: 'OTHER', ownership: 'EXTERNAL' })).rejects.toThrow(/owner of this external machine/);
-      await expect(svc.createEquipment(adminA, { name: 'Own with fee', type: 'OTHER', ownership: 'AMCOS', feePerHectare: 100 })).rejects.toThrow(/earns no contribution fee/);
+      await expect(svc.createEquipment(adminA, { name: 'Own with fee', type: 'OTHER', ownership: 'AMCOS', registrationFee: 100 })).rejects.toThrow(/registration fee/);
       await expect(svc.createEquipment(adminA, { name: 'Tractor MF-385', type: 'TRACTOR', ownership: 'AMCOS' })).rejects.toBeInstanceOf(ConflictException);
       // another AMCOS may use the same name
       await svc.createEquipment(adminB, { name: 'Tractor MF-385', type: 'TRACTOR', ownership: 'AMCOS' });
@@ -79,7 +79,7 @@ describeDb('Machinery and task management (PostgreSQL)', () => {
   describe('activities and fees', () => {
     let job: any;
 
-    it('AMCOS-owned machines earn nothing; external machines owe hectares × their rate', async () => {
+    it('with no rate set an AMCOS-owned machine earns nothing; external machines owe hectares × their rate', async () => {
       const own = await svc.createActivity(adminA, { activityDate: iso(-3), type: 'PLOUGHING', equipmentId: tractor.id, hectares: 8.5, operatorName: 'Salim', blockId: blockA });
       expect(own).toMatchObject({ feeStatus: 'NOT_APPLICABLE' });
       expect(Number(own.feeAmount)).toBe(0);
@@ -88,7 +88,6 @@ describeDb('Machinery and task management (PostgreSQL)', () => {
       expect(Number(job.feeAmount)).toBe(180000);
       const custom = await svc.createActivity(adminA, { activityDate: iso(-2), type: 'THRESHING', equipmentId: harvester.id, hectares: 4, feeAmount: 50000 });
       expect(Number(custom.feeAmount)).toBe(50000);
-      await expect(svc.createActivity(adminA, { activityDate: iso(-1), type: 'PLOUGHING', equipmentId: tractor.id, hectares: 2, feeAmount: 500 })).rejects.toThrow(/does not earn a contribution fee/);
     });
 
     it('checks dates, blocks and machines', async () => {
@@ -124,6 +123,44 @@ describeDb('Machinery and task management (PostgreSQL)', () => {
       expect(cancelled).toMatchObject({ status: 'CANCELLED', feeStatus: 'NOT_APPLICABLE' });
       expect(Number(cancelled.feeAmount)).toBe(0);
       await expect(svc.markFeePaid(adminA, j.id)).rejects.toThrow(/completed job/);
+    });
+  });
+
+  describe('registration fee and contribution per hectare', () => {
+    it('charges tools owned by someone else a registration fee, from the AMCOS default or an agreed amount, never the AMCOS’s own', async () => {
+      const mamcosC = (await prisma.mamcos.create({ data: { name: `Mbuyuni F ${randomUUID().slice(0, 5)}` } })).id;
+      const adminC: RequestUser = { id: randomUUID(), role: UserRole.CUSTOM, mamcosId: mamcosC };
+      expect(await svc.rates(adminC)).toEqual({ toolRegistrationFee: null, toolFeePerHectare: null });
+      await svc.updateRates(adminC, { toolRegistrationFee: 50_000, toolFeePerHectare: 3_000 });
+      expect(await svc.rates(adminC)).toEqual({ toolRegistrationFee: 50_000, toolFeePerHectare: 3_000 });
+
+      const own = await svc.createEquipment(adminC, { name: 'Own tractor', type: 'TRACTOR', ownership: 'AMCOS' });
+      const hired = await svc.createEquipment(adminC, { name: 'Hired combine', type: 'COMBINE_HARVESTER', ownership: 'EXTERNAL', ownerName: 'Asha' });
+      const agreed = await svc.createEquipment(adminC, { name: 'Hired sprayer', type: 'SPRAYER', ownership: 'EXTERNAL', ownerName: 'Musa', registrationFee: 20_000, feePerHectare: 1_000 });
+      const free = await svc.createEquipment(adminC, { name: 'Hired pump', type: 'OTHER', ownership: 'EXTERNAL', ownerName: 'Neema', registrationFee: 0 });
+      expect([own, hired, agreed, free].map((e) => [Number(e.registrationFee), e.registrationFeeStatus])).toEqual([
+        [0, 'NOT_APPLICABLE'], [50_000, 'PENDING'], [20_000, 'PENDING'], [0, 'NOT_APPLICABLE'],
+      ]);
+
+      // paid once, with a sensible date; nothing to pay for the AMCOS's own tool
+      await expect(svc.markRegistrationFeePaid(adminC, own.id)).rejects.toThrow(/no registration fee/);
+      await expect(svc.markRegistrationFeePaid(adminC, hired.id, iso(3))).rejects.toThrow(/future/);
+      expect(await svc.markRegistrationFeePaid(adminC, hired.id, iso(-1))).toMatchObject({ registrationFeeStatus: 'PAID' });
+      await expect(svc.markRegistrationFeePaid(adminC, hired.id)).rejects.toThrow(/already recorded as paid/);
+      await expect(svc.markRegistrationFeePaid(adminA, agreed.id)).rejects.toBeInstanceOf(NotFoundException);
+
+      // every tool contributes per hectare: its own rate, else the AMCOS default, whoever owns it
+      const job = (equipmentId: string, hectares: number) => svc.createActivity(adminC, { activityDate: iso(-1), type: 'PLOUGHING', equipmentId, hectares });
+      expect(await job(own.id, 4)).toMatchObject({ feeStatus: 'PENDING' });
+      expect(Number((await job(own.id, 4)).feeAmount)).toBe(12_000);
+      expect(Number((await job(hired.id, 2)).feeAmount)).toBe(6_000);
+      expect(Number((await job(agreed.id, 5)).feeAmount)).toBe(5_000);
+      const listed: any[] = await svc.listEquipment(adminC, {});
+      expect(listed.find((e) => e.id === agreed.id)).toMatchObject({ effectiveFeePerHectare: 1_000, registrationFee: 20_000 });
+      expect(listed.find((e) => e.id === own.id)).toMatchObject({ effectiveFeePerHectare: 3_000 });
+
+      // the database refuses a fee that disagrees with its status
+      await expect(prisma.$executeRawUnsafe(`update amcos_equipment set registration_fee_status = 'PAID' where id = '${agreed.id}'`)).rejects.toThrow(/consistent|check/);
     });
   });
 
@@ -192,7 +229,7 @@ describeDb('Machinery and task management (PostgreSQL)', () => {
   it('declares an explicit permission on every machinery route', () => {
     const proto = MachineryController.prototype as any;
     const handlers = Object.getOwnPropertyNames(proto).filter((n) => n !== 'constructor' && typeof proto[n] === 'function');
-    expect(handlers.length).toBe(7);
+    expect(handlers.length).toBe(10);
     for (const name of handlers) {
       const required = Reflect.getMetadata(PERMISSION_KEY, proto[name]);
       expect({ name, resource: required?.resource }).toEqual({ name, resource: 'machinery' });

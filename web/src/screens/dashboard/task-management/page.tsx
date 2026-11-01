@@ -30,8 +30,8 @@ function ActivityModal({ activity, equipment, blocks, onClose, onSaved }: { acti
   const [error, setError] = useState('');
   const set = (k: string, v: string) => { setForm((f) => ({ ...f, [k]: v })); setErrors((e) => ({ ...e, [k]: '' })); };
   const machine = equipment.find((e) => e.id === form.equipmentId);
-  const external = machine?.ownership === 'EXTERNAL';
-  const suggested = external && Number(form.hectares) > 0 ? Math.round(Number(form.hectares) * Number(machine.feePerHectare ?? 0) * 100) / 100 : 0;
+  const rate = Number(machine?.effectiveFeePerHectare ?? 0);
+  const suggested = machine && Number(form.hectares) > 0 ? Math.round(Number(form.hectares) * rate * 100) / 100 : 0;
   const paid = activity?.feeStatus === 'PAID';
 
   const save = async () => {
@@ -49,7 +49,7 @@ function ActivityModal({ activity, equipment, blocks, onClose, onSaved }: { acti
       blockId: form.blockId || (editing ? null : undefined), location: form.location.trim() || undefined, hectares: Number(form.hectares),
       status: form.status, notes: form.notes.trim() || undefined,
     };
-    if (external && form.feeAmount !== '') body.feeAmount = Number(form.feeAmount);
+    if (form.feeAmount !== '') body.feeAmount = Number(form.feeAmount);
     try {
       if (editing) await machineryApi.updateActivity(activity.id, body); else await machineryApi.createActivity(body);
       onSaved(editing ? 'Job updated.' : 'Job recorded.');
@@ -76,12 +76,11 @@ function ActivityModal({ activity, equipment, blocks, onClose, onSaved }: { acti
           )}
           <Field label="Location / farm" hint="For work outside the scheme"><input className="input-field" value={form.location} onChange={(e) => set('location', e.target.value)} /></Field>
           <Field label="Status"><select className="input-field" value={form.status} onChange={(e) => set('status', e.target.value)}>{STATUSES.map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}</select></Field>
-          {external && !paid && (
-            <Field label="Fee to the AMCOS (TZS)" error={errors.feeAmount} hint={suggested ? `Standard: ${tzs(suggested)} (${form.hectares} ha × ${tzs(machine.feePerHectare)})` : 'Leave empty to use hectares × the machine rate'}>
+          {machine && !paid && (
+            <Field label="Contribution to the AMCOS (TZS)" error={errors.feeAmount} hint={suggested ? `Standard: ${tzs(suggested)} (${form.hectares} ha × ${tzs(rate)})` : rate ? 'Leave empty to use hectares × the rate' : 'No rate is set yet. Set the standard rate on the Machines tab.'}>
               <input type="number" min="0" className="input-field" value={form.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} placeholder={suggested ? String(suggested) : ''} />
             </Field>
           )}
-          {machine && !external && <div className="muted" style={{ fontSize: 12, alignSelf: 'end' }}>An AMCOS-owned machine earns no fee.</div>}
           <Field label="Notes" wide><textarea className="input-field" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
         </FormGrid>
         {paid && <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>The fee is already paid, so the machine, hectares and fee are locked.</p>}
@@ -91,11 +90,11 @@ function ActivityModal({ activity, equipment, blocks, onClose, onSaved }: { acti
   );
 }
 
-function EquipmentModal({ item, onClose, onSaved }: { item?: any; onClose: () => void; onSaved: (m: string) => void }) {
+function EquipmentModal({ item, rates, onClose, onSaved }: { item?: any; rates: any; onClose: () => void; onSaved: (m: string) => void }) {
   const editing = !!item;
   const [form, setForm] = useState({
     name: item?.name ?? '', type: item?.type ?? 'TRACTOR', registrationNo: item?.registrationNo ?? '', ownership: item?.ownership ?? 'AMCOS',
-    ownerName: item?.ownerName ?? '', ownerPhone: item?.ownerPhone ?? '', feePerHectare: item?.feePerHectare == null ? '' : String(item.feePerHectare),
+    ownerName: item?.ownerName ?? '', ownerPhone: item?.ownerPhone ?? '', feePerHectare: item?.feePerHectare == null ? '' : String(item.feePerHectare), registrationFee: '',
     isActive: item?.isActive ?? true, notes: item?.notes ?? '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -109,6 +108,7 @@ function EquipmentModal({ item, onClose, onSaved }: { item?: any; onClose: () =>
     if (!form.name.trim()) found.name = 'Give the machine a name';
     if (external && !form.ownerName.trim()) found.ownerName = 'Who owns this machine?';
     if (form.feePerHectare !== '' && !(Number(form.feePerHectare) >= 0)) found.feePerHectare = 'Enter zero or more';
+    if (form.registrationFee !== '' && !(Number(form.registrationFee) >= 0)) found.registrationFee = 'Enter zero or more';
     setErrors(found);
     if (Object.keys(found).length) return;
     setSaving(true); setError('');
@@ -116,12 +116,14 @@ function EquipmentModal({ item, onClose, onSaved }: { item?: any; onClose: () =>
       if (editing) {
         await machineryApi.updateEquipment(item.id, {
           name: form.name.trim(), type: form.type, registrationNo: form.registrationNo.trim(), isActive: form.isActive, notes: form.notes.trim(),
-          ...(external ? { ownerName: form.ownerName.trim(), ownerPhone: form.ownerPhone.trim(), ...(form.feePerHectare !== '' ? { feePerHectare: Number(form.feePerHectare) } : {}) } : {}),
+          ...(external ? { ownerName: form.ownerName.trim(), ownerPhone: form.ownerPhone.trim() } : {}),
+          ...(form.feePerHectare !== '' ? { feePerHectare: Number(form.feePerHectare) } : {}),
         });
       } else {
         await machineryApi.createEquipment({
           name: form.name.trim(), type: form.type, ownership: form.ownership, registrationNo: form.registrationNo.trim() || undefined, notes: form.notes.trim() || undefined,
-          ...(external ? { ownerName: form.ownerName.trim(), ownerPhone: form.ownerPhone.trim() || undefined, feePerHectare: form.feePerHectare === '' ? undefined : Number(form.feePerHectare) } : {}),
+          feePerHectare: form.feePerHectare === '' ? undefined : Number(form.feePerHectare),
+          ...(external ? { ownerName: form.ownerName.trim(), ownerPhone: form.ownerPhone.trim() || undefined, registrationFee: form.registrationFee === '' ? undefined : Number(form.registrationFee) } : {}),
         });
       }
       onSaved(editing ? 'Machine updated.' : 'Machine registered.');
@@ -144,8 +146,9 @@ function EquipmentModal({ item, onClose, onSaved }: { item?: any; onClose: () =>
           {external && <>
             <Field label="Owner *" error={errors.ownerName}><input className="input-field" value={form.ownerName} onChange={(e) => set('ownerName', e.target.value)} /></Field>
             <Field label="Owner phone"><input className="input-field" inputMode="tel" value={form.ownerPhone} onChange={(e) => set('ownerPhone', e.target.value)} /></Field>
-            <Field label="Fee to the AMCOS per hectare (TZS)" error={errors.feePerHectare} hint="Default for each job; you can adjust it per job"><input type="number" min="0" className="input-field" value={form.feePerHectare} onChange={(e) => set('feePerHectare', e.target.value)} /></Field>
+            {!editing && <Field label="Registration fee (TZS)" error={errors.registrationFee} hint={rates?.toolRegistrationFee ? `Leave empty for the standard ${tzs(rates.toolRegistrationFee)}` : 'Paid once to the AMCOS. No standard fee is set.'}><input type="number" min="0" className="input-field" value={form.registrationFee} onChange={(e) => set('registrationFee', e.target.value)} placeholder={rates?.toolRegistrationFee ? String(rates.toolRegistrationFee) : ''} /></Field>}
           </>}
+          <Field label="Contribution per hectare (TZS)" error={errors.feePerHectare} hint={rates?.toolFeePerHectare ? `Leave empty for the standard ${tzs(rates.toolFeePerHectare)}` : 'Every tool contributes this for each hectare it works. No standard rate is set.'}><input type="number" min="0" className="input-field" value={form.feePerHectare} onChange={(e) => set('feePerHectare', e.target.value)} placeholder={rates?.toolFeePerHectare ? String(rates.toolFeePerHectare) : ''} /></Field>
           {editing && <label className="form-label" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={form.isActive} onChange={(e) => set('isActive', e.target.checked)} />In service (can be used for new jobs)</label>}
           <Field label="Notes" wide><textarea className="input-field" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
         </FormGrid>
@@ -262,15 +265,74 @@ function Activities({ equipment, blocks, canWrite }: { equipment: any[]; blocks:
   );
 }
 
+function RatesModal({ rates, onClose, onSaved }: { rates: any; onClose: () => void; onSaved: (m: string) => void }) {
+  const [registration, setRegistration] = useState(rates?.toolRegistrationFee == null ? '' : String(rates.toolRegistrationFee));
+  const [perHectare, setPerHectare] = useState(rates?.toolFeePerHectare == null ? '' : String(rates.toolFeePerHectare));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const save = async () => {
+    if ((registration !== '' && !(Number(registration) >= 0)) || (perHectare !== '' && !(Number(perHectare) >= 0))) { setError('Enter amounts of zero or more'); return; }
+    setSaving(true); setError('');
+    try {
+      await machineryApi.updateRates({ toolRegistrationFee: registration === '' ? null : Number(registration), toolFeePerHectare: perHectare === '' ? null : Number(perHectare) });
+      onSaved('Standard rates saved. They apply to tools and jobs recorded from now on.');
+    } catch (e) { setError(errMsg(e)); setSaving(false); }
+  };
+  return (
+    <Modal title="Standard rates" onClose={() => !saving && onClose()} width="480px"
+      footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><button type="button" className="btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save rates'}</button></>}>
+      <div style={{ display: 'grid', gap: 12 }}>
+        <Field label="Registration fee (TZS)" hint="Paid once by every tool owned by someone else when it is registered. The AMCOS's own tools do not pay it."><input type="number" min="0" className="input-field" value={registration} onChange={(e) => setRegistration(e.target.value)} autoFocus /></Field>
+        <Field label="Contribution per hectare (TZS)" hint="Every tool, the AMCOS's own or not, contributes this for each hectare it works. A tool can have its own rate."><input type="number" min="0" className="input-field" value={perHectare} onChange={(e) => setPerHectare(e.target.value)} /></Field>
+        {error && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 13 }}>{error}</div>}
+      </div>
+    </Modal>
+  );
+}
+
+function RegistrationPaidModal({ item, onClose, onSaved }: { item: any; onClose: () => void; onSaved: (m: string) => void }) {
+  const [date, setDate] = useState(todayISO());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const save = async () => {
+    setSaving(true); setError('');
+    try { await machineryApi.registrationFeePaid(item.id, date); onSaved('Registration fee recorded as paid.'); } catch (e) { setError(errMsg(e)); setSaving(false); }
+  };
+  return (
+    <Modal title="Record registration fee" onClose={() => !saving && onClose()} width="440px"
+      footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><button type="button" className="btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Record payment'}</button></>}>
+      <p style={{ fontSize: 14, marginTop: 0 }}>{item.ownerName} paid <strong>{tzs(item.registrationFee)}</strong> to register {item.name} with the AMCOS.</p>
+      <Field label="Date paid"><input type="date" className="input-field" max={todayISO()} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+      {error && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 13 }}>{error}</div>}
+    </Modal>
+  );
+}
+
 function Equipment({ canWrite }: { canWrite: boolean }) {
   const [showAll, setShowAll] = useState(false);
   const { data, loading, error, reload } = useApi<any[]>(() => machineryApi.equipment({ includeInactive: showAll ? 'true' : undefined }), [showAll]);
+  const rates = useApi<any>(() => machineryApi.rates(), []);
   const [form, setForm] = useState<{ item?: any } | null>(null);
+  const [editRates, setEditRates] = useState(false);
+  const [payReg, setPayReg] = useState<any>(null);
   const [message, setMessage] = useState('');
+  const regDue = (data ?? []).filter((e) => e.registrationFeeStatus === 'PENDING');
+  const done = (m: string) => { setMessage(m); reload(); rates.reload(); };
   return (
     <>
       {message && <Notice tone="success" onDismiss={() => setMessage('')}>{message}</Notice>}
       <LoadError message={error} onRetry={reload} />
+      <section className="table-panel" style={{ marginBottom: 16 }}>
+        <div className="section-toolbar">
+          <strong>Standard rates</strong>
+          {canWrite && <button type="button" className="btn-secondary" onClick={() => setEditRates(true)}>Set rates</button>}
+        </div>
+        <div className="metric-grid" style={{ padding: 16 }}>
+          <StatCard label="Registration fee (tools owned by others)" value={rates.data?.toolRegistrationFee ? tzs(rates.data.toolRegistrationFee) : 'Not set'} hint="Paid once when the tool is registered" />
+          <StatCard label="Contribution per hectare (every tool)" value={rates.data?.toolFeePerHectare ? tzs(rates.data.toolFeePerHectare) : 'Not set'} hint="Charged on each hectare a tool works" />
+          <StatCard label="Registration fees unpaid" value={regDue.length ? tzs(regDue.reduce((n, e) => n + e.registrationFee, 0)) : '—'} hint={regDue.length ? `${regDue.length} tool${regDue.length === 1 ? '' : 's'}` : 'None owing'} tone={regDue.length ? 'warn' : undefined} />
+        </div>
+      </section>
       <section className="table-panel">
         <div className="section-toolbar">
           <strong>Machines registered with your AMCOS</strong>
@@ -285,14 +347,21 @@ function Equipment({ canWrite }: { canWrite: boolean }) {
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
-              <thead><tr><th>Machine</th><th>Type</th><th>Owned by</th><th className="num">Fee / ha</th><th className="num">Jobs</th><th className="num">Hectares</th><th className="num">Fees earned</th><th>Status</th><th /></tr></thead>
+              <thead><tr><th>Machine</th><th>Type</th><th>Owned by</th><th>Registration fee</th><th className="num">Per ha</th><th className="num">Jobs</th><th className="num">Hectares</th><th className="num">Contributed</th><th>Status</th><th /></tr></thead>
               <tbody>
                 {data.map((e) => (
                   <tr key={e.id}>
                     <td><div style={{ fontWeight: 600 }}>{e.name}</div>{e.registrationNo && <div className="muted" style={{ fontSize: 11 }}>{e.registrationNo}</div>}</td>
                     <td>{titleCase(e.type)}</td>
                     <td>{e.ownership === 'AMCOS' ? 'AMCOS' : <>{e.ownerName}<div className="muted" style={{ fontSize: 11 }}>{e.ownerPhone ?? 'External'}</div></>}</td>
-                    <td className="num">{e.feePerHectare == null ? '—' : tzs(e.feePerHectare)}</td>
+                    <td>
+                      {e.registrationFeeStatus === 'NOT_APPLICABLE' ? <span className="muted">—</span> : (
+                        <><div>{tzs(e.registrationFee)}</div>
+                          {e.registrationFeeStatus === 'PAID' ? <span className="badge badge-green">Paid {fmtDate(e.registrationFeePaidOn)}</span>
+                            : canWrite ? <button type="button" className="btn-secondary" style={{ marginTop: 4 }} onClick={() => setPayReg(e)}>Record payment</button> : <span className="badge badge-gold">Unpaid</span>}</>
+                      )}
+                    </td>
+                    <td className="num">{e.effectiveFeePerHectare ? tzs(e.effectiveFeePerHectare) : '—'}{e.feePerHectare != null && <div className="muted" style={{ fontSize: 11 }}>own rate</div>}</td>
                     <td className="num">{e.jobs}</td><td className="num">{fmtNum(e.hectaresWorked, 1)}</td><td className="num">{e.feesEarned ? tzs(e.feesEarned) : '—'}</td>
                     <td><span className={`badge ${e.isActive ? 'badge-green' : 'badge-gray'}`}>{e.isActive ? 'In service' : 'Out of service'}</span></td>
                     <td>{canWrite && <button type="button" className="btn-secondary" onClick={() => setForm({ item: e })}>Edit</button>}</td>
@@ -303,7 +372,9 @@ function Equipment({ canWrite }: { canWrite: boolean }) {
           </div>
         )}
       </section>
-      {form && <EquipmentModal item={form.item} onClose={() => setForm(null)} onSaved={(m) => { setForm(null); setMessage(m); reload(); }} />}
+      {form && <EquipmentModal item={form.item} rates={rates.data} onClose={() => setForm(null)} onSaved={(m) => { setForm(null); done(m); }} />}
+      {editRates && <RatesModal rates={rates.data} onClose={() => setEditRates(false)} onSaved={(m) => { setEditRates(false); done(m); }} />}
+      {payReg && <RegistrationPaidModal item={payReg} onClose={() => setPayReg(null)} onSaved={(m) => { setPayReg(null); done(m); }} />}
     </>
   );
 }
@@ -318,11 +389,11 @@ export default function TaskManagementPage() {
   const canWrite = can('machinery', 'CREATE');
 
   if (!user?.mamcosId) {
-    return <><PageHeader title="Tools & Equipment Task Management" /><Empty title="This belongs to an AMCOS" hint="Sign in with an AMCOS account to see its machinery and jobs." /></>;
+    return <><PageHeader title="Tools & Equipment" /><Empty title="Tools & Equipment belongs to an AMCOS" hint="Sign in with an AMCOS account to see its machinery and jobs." /></>;
   }
   return (
     <div>
-      <PageHeader title="Tools & Equipment Task Management" subtitle="Everything your AMCOS machinery has done: preparation, harvesting and more, with hectares covered and fees contributed to the AMCOS." />
+      <PageHeader title="Tools & Equipment" subtitle="Everything your AMCOS machinery has done: preparation, harvesting and more, with hectares covered and fees contributed to the AMCOS." />
       <Tabs tabs={[{ id: 'activities', label: 'Jobs done' }, { id: 'equipment', label: 'Machines' }]} active={tab} onChange={setTab} />
       {tab === 'activities'
         ? <Activities equipment={equipment.data ?? []} blocks={blocks.data?.data ?? []} canWrite={canWrite} />

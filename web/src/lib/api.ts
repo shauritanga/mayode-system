@@ -948,6 +948,9 @@ export const machineryApi = {
   createActivity: (data: object) => api.post('/machinery/activities', data),
   updateActivity: (id: string, data: object) => api.patch(`/machinery/activities/${id}`, data),
   feePaid: (id: string, paidOn?: string) => api.post(`/machinery/activities/${id}/fee-paid`, { paidOn }),
+  registrationFeePaid: (id: string, paidOn?: string) => api.post(`/machinery/equipment/${id}/registration-fee-paid`, { paidOn }),
+  rates: () => api.get('/machinery/rates'),
+  updateRates: (data: object) => api.patch('/machinery/rates', data),
 };
 
 export const assetsApi = {

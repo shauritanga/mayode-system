@@ -113,9 +113,9 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Tools & Equipment Task Management',
+    label: 'Tools & Equipment',
     items: [
-      { href: '/dashboard/task-management', label: 'Tools & Equipment Task Management', icon: Task01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'machinery' },
+      { href: '/dashboard/task-management', label: 'Tools & Equipment', icon: Task01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'machinery' },
     ],
   },
   {

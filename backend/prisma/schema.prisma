@@ -276,18 +276,22 @@ model MamcosStaff {
 // ============================================================
 
 model Mamcos {
-  id            String   @id @default(uuid())
-  name          String   @unique
+  id                  String   @id @default(uuid())
+  name                String   @unique
   /// Short code a farmer types on sign-up to ask to join this AMCOS (e.g. MDB-4F2A91).
-  code          String?  @unique
-  location      String?
-  district      String?  @default("Mbarali")
-  totalHectares Float?   @map("total_hectares")
-  chairmanName  String?  @map("chairman_name")
-  chairmanPhone String?  @map("chairman_phone")
-  isActive      Boolean  @default(true) @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  code                String?  @unique
+  location            String?
+  district            String?  @default("Mbarali")
+  totalHectares       Float?   @map("total_hectares")
+  chairmanName        String?  @map("chairman_name")
+  chairmanPhone       String?  @map("chairman_phone")
+  /// What a tool owned by someone else pays once to be registered with this AMCOS (TZS). Null/0 = no fee.
+  toolRegistrationFee Decimal? @map("tool_registration_fee") @db.Decimal(12, 2)
+  /// What any tool, owned by the AMCOS or not, contributes per hectare it works (TZS), unless the tool has its own rate.
+  toolFeePerHectare   Decimal? @map("tool_fee_per_hectare") @db.Decimal(12, 2)
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   premiumFundEntries PremiumFundEntry[]
   projects           CommunityProject[]
@@ -4894,20 +4898,25 @@ enum ActivityFeeStatus {
 /// A machine the AMCOS works with: its own, or one owned by someone else and registered with the AMCOS, whose use
 /// earns the AMCOS a contribution (fee_per_hectare is the default; each activity records the amount actually due).
 model AmcosEquipment {
-  id             String             @id @default(uuid())
-  mamcosId       String             @map("mamcos_id")
-  name           String
-  type           EquipmentType
-  registrationNo String?            @map("registration_no")
-  ownership      EquipmentOwnership @default(AMCOS)
-  ownerName      String?            @map("owner_name")
-  ownerPhone     String?            @map("owner_phone")
-  feePerHectare  Decimal?           @map("fee_per_hectare") @db.Decimal(12, 2)
-  isActive       Boolean            @default(true) @map("is_active")
-  notes          String?
-  createdById    String?            @map("created_by_id")
-  createdAt      DateTime           @default(now()) @map("created_at")
-  updatedAt      DateTime           @updatedAt @map("updated_at")
+  id                    String             @id @default(uuid())
+  mamcosId              String             @map("mamcos_id")
+  name                  String
+  type                  EquipmentType
+  registrationNo        String?            @map("registration_no")
+  ownership             EquipmentOwnership @default(AMCOS)
+  ownerName             String?            @map("owner_name")
+  ownerPhone            String?            @map("owner_phone")
+  /// This tool's own contribution rate per hectare; null uses the AMCOS default rate.
+  feePerHectare         Decimal?           @map("fee_per_hectare") @db.Decimal(12, 2)
+  /// One-off fee for registering a tool owned by someone else; always 0 for the AMCOS's own tools.
+  registrationFee       Decimal            @default(0) @map("registration_fee") @db.Decimal(12, 2)
+  registrationFeeStatus ActivityFeeStatus  @default(NOT_APPLICABLE) @map("registration_fee_status")
+  registrationFeePaidOn DateTime?          @map("registration_fee_paid_on") @db.Date
+  isActive              Boolean            @default(true) @map("is_active")
+  notes                 String?
+  createdById           String?            @map("created_by_id")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
 
   mamcos     Mamcos              @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
   activities MachineryActivity[]

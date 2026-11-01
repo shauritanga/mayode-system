@@ -12,9 +12,18 @@ export class CreateEquipmentDto {
   /** Required when the machine belongs to someone else. */
   @IsOptional() @IsString() @MaxLength(120) ownerName?: string;
   @IsOptional() @IsString() @MaxLength(30) ownerPhone?: string;
-  /** What the AMCOS earns per hectare worked with external equipment; the default for each activity's fee. */
+  /** This tool's own contribution per hectare; leave out to use the AMCOS's default rate. */
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) feePerHectare?: number;
+  /** One-off registration fee for a tool owned by someone else; leave out to use the AMCOS's default. */
+  @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) registrationFee?: number;
   @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+}
+
+export class UpdateRatesDto {
+  /** What a tool owned by someone else pays once to be registered. Send null to clear. */
+  @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) toolRegistrationFee?: number | null;
+  /** What any tool contributes per hectare it works. Send null to clear. */
+  @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) toolFeePerHectare?: number | null;
 }
 
 export class UpdateEquipmentDto {

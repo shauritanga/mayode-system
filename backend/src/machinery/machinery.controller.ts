@@ -8,7 +8,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { MachineryService } from './machinery.service';
 import {
-  CreateActivityDto, CreateEquipmentDto, ListQueryDto, MarkFeePaidDto, UpdateActivityDto, UpdateEquipmentDto,
+  CreateActivityDto, CreateEquipmentDto, ListQueryDto, MarkFeePaidDto, UpdateActivityDto, UpdateEquipmentDto, UpdateRatesDto,
 } from './dto/machinery.dto';
 
 @ApiTags('machinery')
@@ -24,6 +24,13 @@ export class MachineryController {
   createEquipment(@CurrentUser() u: RequestUser, @Body() dto: CreateEquipmentDto, @Query('mamcosId') m?: string) { return this.machinery.createEquipment(u, dto, m); }
   @Patch('equipment/:id') @RequirePermission('machinery', 'EDIT')
   updateEquipment(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: UpdateEquipmentDto, @Query('mamcosId') m?: string) { return this.machinery.updateEquipment(u, id, dto, m); }
+
+  @Post('equipment/:id/registration-fee-paid') @RequirePermission('machinery', 'EDIT')
+  registrationFeePaid(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: MarkFeePaidDto, @Query('mamcosId') m?: string) { return this.machinery.markRegistrationFeePaid(u, id, dto.paidOn, m); }
+  @Get('rates') @RequirePermission('machinery', 'VIEW')
+  rates(@CurrentUser() u: RequestUser, @Query('mamcosId') m?: string) { return this.machinery.rates(u, m); }
+  @Patch('rates') @RequirePermission('machinery', 'EDIT')
+  updateRates(@CurrentUser() u: RequestUser, @Body() dto: UpdateRatesDto, @Query('mamcosId') m?: string) { return this.machinery.updateRates(u, dto, m); }
 
   @Get('activities') @RequirePermission('machinery', 'VIEW')
   listActivities(@CurrentUser() u: RequestUser, @Query() q: ListQueryDto) { return this.machinery.listActivities(u, q); }
