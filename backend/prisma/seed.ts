@@ -152,6 +152,7 @@ async function seedRolesAndPermissions() {
     { key: 'irrigation_leadership', label: 'Irrigation Leadership' },
     { key: 'machinery', label: 'Machinery & Task Management' },
     { key: 'assets', label: 'Asset Management' },
+    { key: 'payroll', label: 'Payroll (salaries & pay runs)' },
     { key: 'dues', label: 'Farmer Dues & Payments' },
     { key: 'communication', label: 'Communication with Farmers' },
     { key: 'loans', label: 'Loans' },

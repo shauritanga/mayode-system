@@ -25,6 +25,7 @@ import {
   VerifyFarmerDto,
   RejectFarmerDto,
   SuspendFarmerDto,
+  RemoveFromMamcosDto,
   UpsertHouseholdDto,
   LinkDocumentDto,
   SubmitIdentityDto,
@@ -437,6 +438,18 @@ export class FarmersController {
     @CurrentUser() user: { id: string },
   ) {
     return this.farmersService.rejectFarmer(user.id, id, dto);
+  }
+
+  @Post(':id/remove-from-amcos')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('farmers', 'DELETE')
+  @ApiOperation({ summary: 'Remove a farmer from the AMCOS: ends their hectare, keeps their history' })
+  removeFromMamcos(
+    @Param('id') id: string,
+    @Body() dto: RemoveFromMamcosDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.farmersService.removeFromMamcos(id, dto, user);
   }
 
   @Post(':id/suspend')

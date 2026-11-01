@@ -60,6 +60,7 @@ import { StaffModule } from './staff/staff.module';
 import { JoinRequestsModule } from './join-requests/join-requests.module';
 import { MachineryModule } from './machinery/machinery.module';
 import { AssetsModule } from './assets/assets.module';
+import { PayrollModule } from './payroll/payroll.module';
 import { DuesModule } from './dues/dues.module';
 import { CommunicationsModule } from './communications/communications.module';
 import { AccountingModule } from './accounting/accounting.module';
@@ -142,6 +143,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     JoinRequestsModule,
     MachineryModule,
     AssetsModule,
+    PayrollModule,
     DuesModule,
     CommunicationsModule,
     GovernanceModule,

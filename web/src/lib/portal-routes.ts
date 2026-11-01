@@ -34,6 +34,7 @@ export const PORTAL_SECTIONS = {
     "leadership",
     "task-management",
     "assets",
+    "payroll",
     "dues",
     "communication",
     "governance",

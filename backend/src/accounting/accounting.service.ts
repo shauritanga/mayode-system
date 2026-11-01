@@ -26,6 +26,7 @@ const CHART = [
   ['2000', 'Loan repayment payable', AccountType.LIABILITY],
   ['2100', 'Supplier accounts payable', AccountType.LIABILITY],
   ['2200', 'Farmer settlement payable', AccountType.LIABILITY],
+  ['2300', 'Payroll deductions payable', AccountType.LIABILITY],
   ['3000', 'Cooperative equity', AccountType.EQUITY],
   ['3100', 'Cooperative reserves', AccountType.EQUITY],
   ['3200', 'Unappropriated retained earnings', AccountType.EQUITY],
@@ -42,6 +43,7 @@ const CHART = [
   ['5300', 'Cost of goods sold', AccountType.EXPENSE],
   ['5400', 'Depreciation expense', AccountType.EXPENSE],
   ['5410', 'Repairs and maintenance', AccountType.EXPENSE],
+  ['5500', 'Salaries and wages', AccountType.EXPENSE],
 ] as const;
 
 /**

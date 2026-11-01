@@ -2,10 +2,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { isPathAllowed } from '@/lib/nav';
+import { useParams, useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { hasPermission, isPathAllowed } from '@/lib/nav';
 import { useAuthStore } from '@/store/auth.store';
 import { API_BASE_URL, farmersApi, irrigationApi } from '@/lib/api';
+import { EditFarmerModal, RemoveFarmerModal } from './FarmerActions';
 import { BASE, CardsSkeleton, Empty, LoadError, Panel, StatCard, StatusBadge, fmtDate, fmtHa, titleCase, useApi } from '../../irrigation/ui';
 
 const photoSrc = (url?: string | null) => (!url ? null : /^https?:/.test(url) ? url : `${API_BASE_URL.replace(/\/api\/v\d+\/?$/, '')}${url}`);
@@ -16,6 +18,10 @@ export default function FarmerProfilePage() {
   const user = useAuthStore((st) => st.user);
   // In the AMCOS portal the farmer list is a tab of Farmers & Plot Allocation.
   const listHref = user && isPathAllowed('/dashboard/plot-allocation', user) ? '/dashboard/plot-allocation' : '/dashboard/farmers';
+  const router = useRouter();
+  const [dialog, setDialog] = useState<'edit' | 'remove' | null>(null);
+  const canEdit = hasPermission(user, 'farmers', 'EDIT');
+  const canRemove = hasPermission(user, 'farmers', 'DELETE');
   const person = useApi<any>(() => farmersApi.getOne(id), [id]);
   // Hectare records come from the irrigation scheme; a farmer outside it, or a user without that grant, simply has none to show.
   const land = useApi<any>(() => irrigationApi.farmer(id), [id]);
@@ -49,6 +55,12 @@ export default function FarmerProfilePage() {
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
                   <h2 style={{ margin: 0, fontSize: 20 }}>{name}</h2>
                   <StatusBadge value={f.isBlacklisted ? 'BLACKLISTED' : f.verificationStatus} />
+                  {(canEdit || (canRemove && f.mamcosId)) && (
+                    <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                      {canEdit && <button type="button" className="btn-secondary" onClick={() => setDialog('edit')}>Edit</button>}
+                      {canRemove && f.mamcosId && <button type="button" className="btn-secondary" style={{ color: 'var(--red-400)' }} onClick={() => setDialog('remove')}>Remove from AMCOS</button>}
+                    </span>
+                  )}
                 </div>
                 <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, margin: 0 }}>
                   {details.map(([k, v]) => <div key={k}><dt className="muted" style={{ fontSize: 12 }}>{k}</dt><dd style={{ margin: '2px 0 0' }}>{v}</dd></div>)}
@@ -103,6 +115,8 @@ export default function FarmerProfilePage() {
           </Panel>
         </>
       )}
+      {dialog === 'edit' && f && <EditFarmerModal farmer={f} onClose={() => setDialog(null)} onSaved={person.reload} />}
+      {dialog === 'remove' && f && <RemoveFarmerModal farmer={f} onClose={() => setDialog(null)} onRemoved={() => router.push(listHref)} />}
     </>
   );
 }

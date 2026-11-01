@@ -40,6 +40,10 @@ describe('Sale workflow role templates', () => {
       'Warehouse Keeper',
       'Sales Manager',
       'Sales Auditor',
+      'Cashier',
+      'Accountant',
+      'Manager',
+      'Procurement Officer',
     ]);
     expect(created.every((c) => c.mamcosId === 'm1')).toBe(true);
     // never marked as system roles, so the owner can edit or delete them
@@ -103,5 +107,23 @@ describe('Sale workflow role templates', () => {
       expect(keys.has(forbidden)).toBe(false);
     }
     expect(keys.has('farmers')).toBe(true);
+  });
+});
+
+describe('Back-office role templates', () => {
+  it('only the Accountant can run payroll; the Manager reads it; the Cashier and Procurement Officer cannot see it', async () => {
+    const { tx, grants } = db();
+    await createRoleTemplates(tx, 'm1', ['Cashier', 'Accountant', 'Manager', 'Procurement Officer']);
+    const can = (role: string, resource: string, action: string) =>
+      grants.some((x) => x.roleId === `role-${role}` && x.resourceId === `res-${resource}` && x.action === action);
+    expect(can('Accountant', 'payroll', 'CREATE')).toBe(true);
+    expect(can('Manager', 'payroll', 'VIEW')).toBe(true);
+    expect(can('Manager', 'payroll', 'EDIT')).toBe(false);
+    for (const r of ['Cashier', 'Procurement Officer']) expect(can(r, 'payroll', 'VIEW')).toBe(false);
+    expect(can('Cashier', 'dues', 'CREATE')).toBe(true);
+    expect(can('Procurement Officer', 'suppliers', 'CREATE')).toBe(true);
+    // nobody but the cooperative admin deletes, and none of these manage users or roles
+    expect(grants.some((x) => x.action === 'DELETE')).toBe(false);
+    expect(grants.some((x) => x.resourceId === 'res-users' || x.resourceId === 'res-roles')).toBe(false);
   });
 });

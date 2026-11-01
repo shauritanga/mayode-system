@@ -50,6 +50,7 @@ model User {
   mamcos        Mamcos?           @relation("UserMamcos", fields: [mamcosId], references: [id], onDelete: SetNull)
   farmer        Farmer?
   mamcosStaff   MamcosStaff?
+  payrollPayees PayrollPayee[]
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
   notifications Notification[]
@@ -319,6 +320,8 @@ model Mamcos {
   budgets               Budget[]
   assets                Asset[]
   assetDepreciationRuns AssetDepreciationRun[]
+  payrollPayees         PayrollPayee[]
+  payrollRuns           PayrollRun[]
   farmerDueTypes        FarmerDueType[]
   farmerDues            FarmerDue[]
   duePayments           DuePayment[]
@@ -406,27 +409,27 @@ model IrrigationCanal {
 }
 
 model IrrigationBlock {
-  id                  String           @id @default(uuid())
-  canalId             String           @map("canal_id")
-  blockNumber         Int              @map("block_number")
+  id                  String               @id @default(uuid())
+  canalId             String               @map("canal_id")
+  blockNumber         Int                  @map("block_number")
   code                String
   name                String?
   /// Left or right of the canal. Null only for blocks created before this was recorded.
   side                IrrigationBlockSide?
-  areaHectares        Decimal          @map("area_hectares") @db.Decimal(10, 2)
+  areaHectares        Decimal              @map("area_hectares") @db.Decimal(10, 2)
   /// Number of 1-hectare allocation units generated for this block.
-  hectareCount        Int              @map("hectare_count")
-  status              IrrigationStatus @default(ACTIVE)
+  hectareCount        Int                  @map("hectare_count")
+  status              IrrigationStatus     @default(ACTIVE)
   description         String?
-  boundaryCoordinates Json?            @map("boundary_coordinates")
-  centerLatitude      Float?           @map("center_latitude")
-  centerLongitude     Float?           @map("center_longitude")
-  boundaryNotes       String?          @map("boundary_notes")
-  createdById         String?          @map("created_by_id")
-  updatedById         String?          @map("updated_by_id")
-  archivedAt          DateTime?        @map("archived_at")
-  createdAt           DateTime         @default(now()) @map("created_at")
-  updatedAt           DateTime         @updatedAt @map("updated_at")
+  boundaryCoordinates Json?                @map("boundary_coordinates")
+  centerLatitude      Float?               @map("center_latitude")
+  centerLongitude     Float?               @map("center_longitude")
+  boundaryNotes       String?              @map("boundary_notes")
+  createdById         String?              @map("created_by_id")
+  updatedById         String?              @map("updated_by_id")
+  archivedAt          DateTime?            @map("archived_at")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
 
   canal               IrrigationCanal        @relation(fields: [canalId], references: [id], onDelete: Restrict)
   hectares            IrrigationHectare[]
@@ -5335,4 +5338,86 @@ model IrrigationHectareGuardian {
   @@index([allocationId])
   @@index([guardianId, endedOn])
   @@map("irrigation_hectare_guardians")
+}
+
+// ============================================================
+// PAYROLL (AMCOS staff and leaders)
+// ============================================================
+
+enum PayrollRunStatus {
+  DRAFT
+  POSTED
+}
+
+enum PayrollPayMethod {
+  CASH
+  MOBILE_MONEY
+  BANK
+}
+
+/// A person the AMCOS pays a monthly salary: a staff member or a canal/block leader (both have a login).
+model PayrollPayee {
+  id            String   @id @default(uuid())
+  mamcosId      String   @map("mamcos_id")
+  userId        String   @map("user_id")
+  /// What they are paid as, e.g. Cashier or Canal leader C01.
+  title         String
+  monthlySalary Decimal  @map("monthly_salary") @db.Decimal(14, 2)
+  startDate     DateTime @map("start_date") @db.Date
+  isActive      Boolean  @default(true) @map("is_active")
+  createdById   String?  @map("created_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  mamcos Mamcos        @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  user   User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  lines  PayrollLine[]
+
+  @@unique([mamcosId, userId])
+  @@map("payroll_payees")
+}
+
+/// One month's pay run. A DRAFT can be edited freely; POSTED pays it and writes the AMCOS ledger, and is then final.
+model PayrollRun {
+  id              String            @id @default(uuid())
+  mamcosId        String            @map("mamcos_id")
+  /// YYYY-MM
+  period          String
+  status          PayrollRunStatus  @default(DRAFT)
+  totalGross      Decimal           @default(0) @map("total_gross") @db.Decimal(14, 2)
+  totalDeductions Decimal           @default(0) @map("total_deductions") @db.Decimal(14, 2)
+  totalNet        Decimal           @default(0) @map("total_net") @db.Decimal(14, 2)
+  payMethod       PayrollPayMethod? @map("pay_method")
+  paidOn          DateTime?         @map("paid_on") @db.Date
+  note            String?
+  createdById     String?           @map("created_by_id")
+  postedById      String?           @map("posted_by_id")
+  postedAt        DateTime?         @map("posted_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  mamcos Mamcos        @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  lines  PayrollLine[]
+
+  @@unique([mamcosId, period])
+  @@map("payroll_runs")
+}
+
+/// What one person is paid in one run. Name and title are copied so a payslip never changes after the fact.
+model PayrollLine {
+  id            String  @id @default(uuid())
+  runId         String  @map("run_id")
+  payeeId       String  @map("payee_id")
+  name          String
+  title         String
+  gross         Decimal @db.Decimal(14, 2)
+  deductions    Decimal @default(0) @db.Decimal(14, 2)
+  deductionNote String? @map("deduction_note")
+  net           Decimal @db.Decimal(14, 2)
+
+  run   PayrollRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  payee PayrollPayee @relation(fields: [payeeId], references: [id], onDelete: Restrict)
+
+  @@unique([runId, payeeId])
+  @@map("payroll_lines")
 }

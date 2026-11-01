@@ -29,6 +29,7 @@ import {
   VerifyFarmerDto,
   RejectFarmerDto,
   SuspendFarmerDto,
+  RemoveFromMamcosDto,
   UpsertHouseholdDto,
   LinkDocumentDto,
   SubmitIdentityDto,
@@ -345,6 +346,81 @@ export class FarmersService {
           : {}),
       },
       include: { user: { select: { phone: true, email: true } } },
+    });
+  }
+
+  /**
+   * Takes a farmer out of an AMCOS without erasing anything: the open hectare allocation is ended (so the hectare is free
+   * again), the farmer is detached from the AMCOS and gets a platform control number (their old one is the hectare code,
+   * which the next member of that hectare needs). Blocked while they owe the AMCOS or hold an active loan unless forced.
+   */
+  async removeFromMamcos(id: string, dto: RemoveFromMamcosDto, user: RequestUser) {
+    await this.ownership.assertFarmerAccess(user, id);
+    const farmer = await this.findOne(id, user);
+    if (!farmer.mamcosId) throw new BadRequestException('This farmer does not belong to an AMCOS');
+    const mamcosId = farmer.mamcosId;
+    const reason = dto.reason.trim();
+    if (!reason) throw new BadRequestException('A reason is required');
+
+    const dues = await this.prisma.farmerDue.findMany({
+      where: { mamcosId, farmerId: id, status: 'ACTIVE' },
+      include: { payments: { where: { voidedAt: null }, select: { amount: true } } },
+    });
+    const owed = Math.round(
+      dues.reduce((n, d) => n + Number(d.amount) - Number(d.waivedAmount) - d.payments.reduce((m, p) => m + Number(p.amount), 0), 0) * 100,
+    ) / 100;
+    const activeLoans = farmer.loanRecords.filter((l) => l.isActive && l.amountOwed > 0).length;
+    if (!dto.force && (owed > 0 || activeLoans > 0)) {
+      const parts = [
+        owed > 0 ? `owes the AMCOS ${owed.toLocaleString('en-US')} TZS` : '',
+        activeLoans > 0 ? `has ${activeLoans} active loan(s)` : '',
+      ].filter(Boolean);
+      throw new ConflictException(`This farmer ${parts.join(' and ')}. Settle it first, or remove anyway to keep the record as is.`);
+    }
+
+    const newControlNumber = await this.generateControlNumber();
+    return this.prisma.$transaction(async (tx) => {
+      const today = new Date(new Date().toISOString().slice(0, 10));
+      const open = await tx.irrigationHectareAllocation.findMany({
+        where: { farmerId: id, status: { in: ['ACTIVE', 'PENDING_APPROVAL'] } },
+      });
+      for (const a of open) {
+        await tx.$executeRaw`SELECT id FROM irrigation_hectares WHERE id = ${a.hectareId} FOR UPDATE`;
+        const pending = await tx.irrigationAllocationTransfer.count({ where: { hectareId: a.hectareId, status: 'PENDING_APPROVAL' } });
+        if (pending) throw new ConflictException('A transfer is awaiting approval for this farmer\'s hectare. Resolve it first.');
+        const endedOn = a.allocatedOn > today ? a.allocatedOn : today;
+        if (a.status === 'ACTIVE') {
+          await tx.irrigationHectareAllocation.update({
+            where: { id: a.id }, data: { status: 'ENDED', endedOn, endReason: `REMOVED FROM AMCOS: ${reason}`, endedById: user.id },
+          });
+        } else {
+          await tx.irrigationHectareAllocation.update({
+            where: { id: a.id }, data: { status: 'REJECTED', rejectedReason: `Farmer removed from AMCOS: ${reason}` },
+          });
+        }
+        const guardian = await tx.irrigationHectareGuardian.findFirst({ where: { allocationId: a.id, endedOn: null } });
+        if (guardian) {
+          await tx.irrigationHectareGuardian.update({
+            where: { id: guardian.id },
+            data: { endedOn: endedOn < guardian.startedOn ? guardian.startedOn : endedOn, endReason: 'RELEASED', endedById: user.id },
+          });
+        }
+        await writeAudit(tx, user, 'irrigation_hectare', a.hectareId, 'release', { status: a.status, farmerId: id }, { status: 'ENDED', reason: `Removed from AMCOS: ${reason}` });
+      }
+      // Guardianships this farmer holds over other members' hectares end too.
+      await tx.irrigationHectareGuardian.updateMany({
+        where: { guardianId: id, endedOn: null },
+        data: { endedOn: today, endReason: 'GUARDIAN REMOVED FROM AMCOS', endedById: user.id },
+      });
+      const updated = await tx.farmer.update({
+        where: { id }, data: { mamcosId: null, controlNumber: newControlNumber },
+      });
+      await writeAudit(
+        tx, user, 'farmer', id, 'remove_from_amcos',
+        { mamcosId, controlNumber: farmer.controlNumber },
+        { mamcosId: null, controlNumber: newControlNumber, reason, forced: !!dto.force, owed, activeLoans },
+      );
+      return { id: updated.id, controlNumber: updated.controlNumber, releasedHectares: open.length };
     });
   }
 

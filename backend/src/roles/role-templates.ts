@@ -98,6 +98,33 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       reports: V,
     },
   },
+  {
+    name: 'Cashier',
+    description: 'Collects and records member payments and charges. Cannot change accounts, pay salaries or manage staff.',
+    grants: { workspace: V, farmers: V, dues: VCE, accounting: V },
+  },
+  {
+    name: 'Accountant',
+    description: 'Keeps the books: ledger, charges, assets and the monthly payroll. Cannot manage users or roles.',
+    grants: {
+      workspace: V, farmers: V, accounting: VCE, finance: VCE, dues: VCE, payroll: VCE, assets: VE,
+      loans: V, suppliers: V, reports: V, audit_logs: V,
+    },
+  },
+  {
+    name: 'Manager',
+    description: 'Oversees the whole AMCOS with read access to operations, finance and payroll; changes nothing.',
+    grants: {
+      workspace: V, farmers: V, accounting: V, finance: V, dues: V, payroll: V, assets: V, machinery: V,
+      irrigation: V, irrigation_allocations: V, irrigation_leadership: V, communication: V, governance: V,
+      suppliers: V, inventory: V, warehouses: V, reports: V, audit_logs: V,
+    },
+  },
+  {
+    name: 'Procurement Officer',
+    description: 'Buys for the AMCOS: manages suppliers and stock coming in. No payments, payroll or accounts.',
+    grants: { workspace: V, suppliers: VCE, inventory: VCE, warehouses: V, assets: V, reports: V },
+  },
 ];
 
 /**

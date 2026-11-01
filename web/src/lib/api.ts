@@ -966,6 +966,20 @@ export const assetsApi = {
   runDepreciation: (period: string) => api.post('/assets/depreciation/run', null, { params: { period } }),
 };
 
+export const payrollApi = {
+  payees: () => api.get('/payroll/payees'),
+  candidates: () => api.get('/payroll/candidates'),
+  addPayee: (data: object) => api.post('/payroll/payees', data),
+  updatePayee: (id: string, data: object) => api.patch(`/payroll/payees/${id}`, data),
+  runs: () => api.get('/payroll/runs'),
+  createRun: (data: object) => api.post('/payroll/runs', data),
+  run: (id: string) => api.get(`/payroll/runs/${id}`),
+  deleteRun: (id: string) => api.delete(`/payroll/runs/${id}`),
+  updateLine: (id: string, lineId: string, data: object) => api.patch(`/payroll/runs/${id}/lines/${lineId}`, data),
+  post: (id: string, data: object) => api.post(`/payroll/runs/${id}/post`, data),
+  payslip: (id: string, lineId: string) => api.get(`/payroll/runs/${id}/payslips/${lineId}`),
+};
+
 export const duesApi = {
   list: (params?: object) => api.get('/dues', { params }),
   get: (id: string) => api.get(`/dues/${id}`),

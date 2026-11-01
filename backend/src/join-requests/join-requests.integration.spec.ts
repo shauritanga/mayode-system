@@ -174,6 +174,26 @@ describeDb('AMCOS codes and join requests (PostgreSQL)', () => {
     await expect(farmers.create({ phone: phone(), password: 'Secret123', firstName: 'Juma', lastName: 'Ali', hectareId: hectare.id } as any, registrar)).rejects.toBeInstanceOf(ConflictException);
     // Another AMCOS cannot use it either.
     await expect(farmers.create({ phone: phone(), password: 'Secret123', firstName: 'Juma', lastName: 'Ali', hectareId: hectare.id } as any, adminB)).rejects.toBeInstanceOf(NotFoundException);
+
+    // Removing the farmer: another AMCOS cannot, an unpaid charge blocks it unless forced, and the hectare is freed with history kept.
+    await expect(farmers.removeFromMamcos(created.id, { reason: 'Moved' } as any, adminB)).rejects.toBeInstanceOf(NotFoundException);
+    await prisma.farmerDue.create({
+      data: { mamcosId: madibira.id, farmerId: created.id, category: 'OTHER', description: 'Unpaid levy', amount: 5000, issuedOn: new Date() } as any,
+    });
+    await expect(farmers.removeFromMamcos(created.id, { reason: 'Moved' } as any, registrar)).rejects.toBeInstanceOf(ConflictException);
+    const removed = await farmers.removeFromMamcos(created.id, { reason: 'Moved away', force: true } as any, registrar);
+    expect(removed.releasedHectares).toBe(1);
+    expect(removed.controlNumber).not.toBe('5.15R12');
+    const after = await prisma.farmer.findUniqueOrThrow({ where: { id: created.id } });
+    expect(after.mamcosId).toBeNull();
+    const ended = await prisma.irrigationHectareAllocation.findFirstOrThrow({ where: { hectareId: hectare.id } });
+    expect(ended.status).toBe('ENDED');
+    expect(ended.endReason).toContain('Moved away');
+    // The dues record stays, and the hectare (with its code) can be given to someone new.
+    expect(await prisma.farmerDue.count({ where: { farmerId: created.id } })).toBe(1);
+    const next: any = await farmers.create({ phone: phone(), password: 'Secret123', firstName: 'Juma', lastName: 'Ali', hectareId: hectare.id } as any, registrar);
+    expect(next.controlNumber).toBe('5.15R12');
+    await expect(farmers.removeFromMamcos(created.id, { reason: 'Again' } as any, registrar)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('texts a new farmer their sign-in details without the password reaching the log', async () => {

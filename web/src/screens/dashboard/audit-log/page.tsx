@@ -17,12 +17,26 @@ const PAST: Record<string, string> = {
   adjust: 'Adjusted stock in', keepers: 'Changed keepers of', 'close-short': 'Closed short', login: 'Signed in', lots: 'Created a lot in', records: 'Recorded in',
 };
 
-/** "sale-orders.confirm" -> "Confirmed · sale orders" */
+const words = (v: string) => v.replace(/[_-]+/g, ' ').trim();
+const cap = (v: string) => v.replace(/^./, (c) => c.toUpperCase());
+Object.assign(PAST, { preview: 'Previewed', send: 'Sent', refresh: 'Renewed the session of', logout: 'Signed out', post: 'Posted', run: 'Ran', release: 'Released', remove_from_amcos: 'Removed from AMCOS' });
+
+/** "sale-orders.confirm" -> "Confirmed · sale orders"; path-style entries such as "irrigation.blocks" read "Changed blocks · irrigation". */
 function describe(action: string) {
   const [area, rawVerb = ''] = action.split('.');
   const verb = LEGACY_VERB[rawVerb] ?? rawVerb;
-  const label = PAST[verb] ?? verb.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
-  return `${label} · ${area.replace(/-/g, ' ')}`;
+  const known = PAST[verb];
+  const where = words(area);
+  if (known) return `${known} · ${where}`;
+  return rawVerb ? `Changed ${words(rawVerb)} · ${where}` : cap(where);
+}
+
+/** The record an entry is about: its kind and short id. Nothing when there is no specific record, and no repeating the area. */
+function recordOf(r: Entry) {
+  if (!r.entityId || r.entityId === 'n/a') return '—';
+  const kind = words(r.entityType);
+  const area = words(r.action.split('.')[0]);
+  return kind === area ? `#${r.entityId.slice(0, 8)}` : `${cap(kind)} #${r.entityId.slice(0, 8)}`;
 }
 
 export default function AuditLogPage() {
@@ -68,7 +82,7 @@ export default function AuditLogPage() {
                       <td className="ua-muted">{new Date(r.createdAt).toLocaleString()}</td>
                       <td>{r.actorName ?? 'System'}</td>
                       <td style={{ fontWeight: 600 }} title={r.action}>{describe(r.action)}</td>
-                      <td className="ua-muted">{r.entityType} · {r.entityId.slice(0, 8)}</td>
+                      <td className="ua-muted">{recordOf(r)}</td>
                       <td style={{ textAlign: 'right' }}>{r.newData && <button className="btn-secondary ua-action" onClick={() => setOpen(open === r.id ? null : r.id)}>{open === r.id ? 'Hide' : 'Details'}</button>}</td>
                     </tr>
                     {open === r.id && <tr><td colSpan={5}><pre className="so-json">{JSON.stringify(r.newData, null, 2)}</pre></td></tr>}

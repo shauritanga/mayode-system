@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import type { RequestUser } from '../common/ownership.service';
 import type { Db } from './irrigation-common';
 
-export type AuditEntity = 'irrigation_scheme' | 'irrigation_canal' | 'irrigation_block' | 'irrigation_hectare';
+export type AuditEntity = 'irrigation_scheme' | 'irrigation_canal' | 'irrigation_block' | 'irrigation_hectare' | 'farmer' | 'payroll';
 
 const strip = (row: Record<string, unknown> | null | undefined) =>
   row ? JSON.parse(JSON.stringify(row)) : undefined;

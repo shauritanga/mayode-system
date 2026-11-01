@@ -307,3 +307,12 @@ test('Communication follows its own grant and exists only in the AMCOS portal', 
   assert.equal(loadNavigation('admin').isPathAllowed('/dashboard/communication', { role: 'SUPER_ADMIN' }), false);
   assert.equal(loadNavigation('farmers').isPathAllowed('/dashboard/communication', { role: 'FARMER' }), false);
 });
+
+test('Payroll follows its own grant and exists only in the AMCOS portal', () => {
+  const user = { role: 'CUSTOM', roleId: 'r', mamcosId: 'm1', permissions: [{ resource: 'payroll', action: 'VIEW' }] };
+  const coop = loadNavigation('cooperatives');
+  assert.ok(coop.getVisibleGroups(user).flatMap((g) => g.items.map((i) => i.href)).includes('/dashboard/payroll'));
+  assert.equal(coop.isPathAllowed('/dashboard/payroll', user), true);
+  assert.equal(coop.isPathAllowed('/dashboard/payroll', { ...user, permissions: [{ resource: 'assets', action: 'VIEW' }] }), false);
+  assert.equal(loadNavigation('admin').isPathAllowed('/dashboard/payroll', { role: 'SUPER_ADMIN' }), false);
+});

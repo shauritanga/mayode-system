@@ -85,6 +85,19 @@ export class SuspendFarmerDto {
   reason: string;
 }
 
+/** Take a farmer out of an AMCOS: ends their hectare and detaches them; history is kept. */
+export class RemoveFromMamcosDto {
+  @ApiProperty({ example: 'Moved away from the scheme.' })
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
+
+  @ApiPropertyOptional({ description: 'Remove even though the farmer still owes the AMCOS or has an active loan.' })
+  @IsBoolean()
+  @IsOptional()
+  force?: boolean;
+}
+
 /** Create/replace the household record for a farmer. */
 export class UpsertHouseholdDto {
   @ApiPropertyOptional({ example: 6 })
