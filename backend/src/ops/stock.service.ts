@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { Actor, assertVisible, batchBalances, lockBatches, nextRef, owner, OpsNotifyService, scope } from './ops-common';
 import { r3 } from './ops-rules';
+import { isValued, StockAccountingService } from './stock-accounting.service';
 import { AdjustStockDto, BatchStatusDto, CreateStockCountDto, ReceiveTransferDto, StockCountLineDto, TransferDto } from './dto/warehouse.dto';
 
 const day = (d?: string) => (d ? new Date(d) : undefined);
@@ -18,6 +19,7 @@ export class StockService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notify: OpsNotifyService,
+    private readonly stockBooks: StockAccountingService,
   ) {}
 
   /** Batches with how much is at each warehouse: physical, reserved for orders, and free to sell. */
@@ -54,7 +56,7 @@ export class StockService {
       for (const r of rows.filter((x) => x.batchId === b.id)) {
         const bal = (await batchBalances(this.prisma, [b.id], r.warehouseId)).get(b.id)!;
         if (f.inStock === 'true' && bal.physicalKg <= 0) continue;
-        out.push({ ...b, warehouseId: r.warehouseId, warehouseName: wh.get(r.warehouseId) ?? null, ...bal });
+        out.push({ ...b, warehouseId: r.warehouseId, warehouseName: wh.get(r.warehouseId) ?? null, ...bal, stockValue: isValued(b) ? Math.round(bal.physicalKg * b.unitCost! * 100) / 100 : null });
       }
     }
     return out;
@@ -123,7 +125,10 @@ export class StockService {
       }
       for (const line of count.lines) {
         const variance = r3(line.countedKg! - line.systemKg);
-        if (variance) await tx.stockLedgerEntry.create({ data: { batchId: line.batchId, warehouseId: count.warehouseId, type: 'ADJUSTMENT', quantityKg: variance, reason: `Approved stock count ${count.reference}${line.note ? `: ${line.note}` : ''}`, refType: 'stock-count', refId: count.id, createdByUserId: actor.id, approvedByUserId: actor.id } });
+        if (variance) {
+          const entry = await tx.stockLedgerEntry.create({ data: { batchId: line.batchId, warehouseId: count.warehouseId, type: 'ADJUSTMENT', quantityKg: variance, reason: `Approved stock count ${count.reference}${line.note ? `: ${line.note}` : ''}`, refType: 'stock-count', refId: count.id, createdByUserId: actor.id, approvedByUserId: actor.id } });
+          await this.stockBooks.postAdjustment(tx, entry, actor.id);
+        }
       }
       return tx.stockCount.update({ where: { id }, data: { status: 'APPROVED', approvedByUserId: actor.id, approvedAt: new Date() } });
     });
@@ -144,16 +149,20 @@ export class StockService {
         ...(f.warehouseId ? { warehouseId: f.warehouseId } : {}),
         ...(to ? { createdAt: { lte: to } } : {}),
       },
-      select: { type: true, quantityKg: true, createdAt: true, warehouseId: true, batch: { select: { id: true, productId: true, stockStatus: true } } },
+      select: { type: true, quantityKg: true, createdAt: true, warehouseId: true, batch: { select: { id: true, productId: true, stockStatus: true, ownerType: true, unitCost: true } } },
     });
     const products = new Map((await this.prisma.product.findMany({ where: { id: { in: [...new Set(entries.map((e) => e.batch.productId))] } } })).map((p) => [p.id, p]));
     const wh = new Map((await this.prisma.warehouse.findMany({ select: { id: true, name: true } })).map((w) => [w.id, w.name]));
-    type Row = { productId: string; warehouseId: string; opening: number; received: number; processedOut: number; produced: number; dispatched: number; adjustments: number; transfers: number; closing: number; unavailable: number };
+    type Row = { productId: string; warehouseId: string; opening: number; received: number; processedOut: number; produced: number; dispatched: number; adjustments: number; transfers: number; closing: number; unavailable: number; value: number; uncostedKg: number };
     const rows = new Map<string, Row>();
     for (const e of entries) {
       const key = `${e.batch.productId}|${e.warehouseId}`;
-      const r = rows.get(key) ?? { productId: e.batch.productId, warehouseId: e.warehouseId, opening: 0, received: 0, processedOut: 0, produced: 0, dispatched: 0, adjustments: 0, transfers: 0, closing: 0, unavailable: 0 };
+      const r = rows.get(key) ?? { productId: e.batch.productId, warehouseId: e.warehouseId, opening: 0, received: 0, processedOut: 0, produced: 0, dispatched: 0, adjustments: 0, transfers: 0, closing: 0, unavailable: 0, value: 0, uncostedKg: 0 };
       r.closing += e.quantityKg;
+      if (e.batch.ownerType === 'COOPERATIVE') {
+        if (e.batch.unitCost != null) r.value += e.quantityKg * e.batch.unitCost;
+        else r.uncostedKg += e.quantityKg;
+      }
       if (e.batch.stockStatus !== 'AVAILABLE') r.unavailable += e.quantityKg;
       if (from && e.createdAt < from) r.opening += e.quantityKg;
       else {
@@ -182,7 +191,8 @@ export class StockService {
         warehouseId: r.warehouseId, warehouse: wh.get(r.warehouseId) ?? null,
         openingKg: r3(r.opening), receivedKg: r3(r.received), processedOutKg: r3(r.processedOut), producedKg: r3(r.produced), dispatchedKg: r3(r.dispatched),
         adjustmentsKg: r3(r.adjustments), transfersKg: r3(r.transfers), closingKg: r3(r.closing), unavailableKg: r3(r.unavailable), reservedKg: r3(reservedKg), availableKg: r3(Math.max(0, r.closing - r.unavailable - reservedKg)), inTransitKg: r3(inTransitKg),
-        indicativeValue: p.unitPrice ? Math.round(r.closing * p.unitPrice) : null,
+        stockValue: r.value > 0 ? Math.round(r.value * 100) / 100 : null,
+        uncostedKg: r3(r.uncostedKg),
         lowStock: p.reorderLevelKg != null && r.closing - r.unavailable - reservedKg < p.reorderLevelKg,
         reorderLevelKg: p.reorderLevelKg,
       };
@@ -218,9 +228,11 @@ export class StockService {
       const bal = (await batchBalances(tx, [batch.id], dto.warehouseId)).get(batch.id)!;
       if (dto.quantityKg < 0 && -dto.quantityKg > bal.availableKg + 0.0005)
         throw new ConflictException(`Only ${bal.availableKg} kg is free to remove (${bal.reservedKg} kg is reserved for orders)`);
-      return tx.stockLedgerEntry.create({
+      const entry = await tx.stockLedgerEntry.create({
         data: { batchId: batch.id, warehouseId: dto.warehouseId, type: dto.type, quantityKg: dto.quantityKg, reason: dto.reason.trim(), refType: 'adjustment', createdByUserId: actor.id, approvedByUserId: actor.id },
       });
+      await this.stockBooks.postAdjustment(tx, entry, actor.id);
+      return entry;
     });
   }
 
@@ -235,9 +247,11 @@ export class StockService {
       const bal = (await batchBalances(tx, [e!.batchId], e!.warehouseId)).get(e!.batchId)!;
       if (e!.quantityKg > 0 && e!.quantityKg > bal.availableKg + 0.0005) throw new ConflictException('That stock has already been used or reserved');
       try {
-        return await tx.stockLedgerEntry.create({
+        const entry = await tx.stockLedgerEntry.create({
           data: { batchId: e!.batchId, warehouseId: e!.warehouseId, type: e!.type, quantityKg: -e!.quantityKg, reason: `Reversal: ${reason.trim()}`, refType: 'reversal', refId: e!.id, reversalOfId: e!.id, createdByUserId: actor.id, approvedByUserId: actor.id },
         });
+        await this.stockBooks.postAdjustment(tx, entry, actor.id);
+        return entry;
       } catch (err) {
         if ((err as { code?: string }).code === 'P2002') throw new ConflictException('This entry has already been reversed');
         throw err;
@@ -294,6 +308,7 @@ export class StockService {
       const short = r3(t.quantityKg - dto.receivedKg);
       // Anything that did not arrive is a loss, recorded against the sending warehouse so the books balance.
       if (short > 0) await tx.stockLedgerEntry.create({ data: { batchId: t.batchId, warehouseId: t.fromWarehouseId, type: 'WRITE_OFF', quantityKg: 0, reason: `Short on arrival by ${short} kg (${dto.note ?? 'no note'})`, refType: 'transfer', refId: id, createdByUserId: actor.id } });
+      if (short > 0) await this.stockBooks.postAdjustment(tx, { id: `transfer-short:${id}`, batchId: t.batchId, quantityKg: -short, reason: `Short on arrival (${t.reference})` }, actor.id);
       return { transfer: t, short };
     });
     if (result.short > 0) await this.notify.tellPermission('ops_stock', 'EDIT', result.transfer.mamcosId, { type: 'OPS_TRANSFER_SHORT', title: 'Transfer arrived short', body: `${result.transfer.reference}: ${result.short} kg did not arrive.`, data: { transferId: id } });

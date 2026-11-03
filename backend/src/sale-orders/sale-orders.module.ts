@@ -5,9 +5,10 @@ import { SaleOrdersController } from './sale-orders.controller';
 import { SaleOrdersService } from './sale-orders.service';
 import { SaleOrdersSchedulerService } from './sale-orders.scheduler';
 import { SettingsModule } from '../settings/settings.module';
+import { OpsModule } from '../ops/ops.module';
 
 @Module({
-  imports: [SalesModule, WarehousesModule, SettingsModule],
+  imports: [SalesModule, WarehousesModule, SettingsModule, OpsModule],
   controllers: [SaleOrdersController],
   providers: [SaleOrdersService, SaleOrdersSchedulerService],
 })

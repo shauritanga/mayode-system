@@ -5,6 +5,16 @@ import {
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { SaleOrdersService } from './sale-orders.service';
+import { drawFromBatches } from '../warehouses/batch-draw';
+
+jest.mock('../warehouses/batch-draw', () => ({ drawFromBatches: jest.fn().mockResolvedValue([]) }));
+const books = (): any => ({ postDispatch: jest.fn() });
+/** What the stock record says about a warehouse: kilograms on the shelf, none allocated to operations orders, and the open sale-order reservations. */
+const stockMocks = (physicalKg: number, reservedKg: number) => ({
+  stockLedgerEntry: { aggregate: jest.fn().mockResolvedValue({ _sum: { quantityKg: physicalKg } }) },
+  orderAllocation: { findMany: jest.fn().mockResolvedValue([]) },
+  stockMovementGroup: jest.fn().mockResolvedValue(reservedKg ? [{ type: 'RESERVE', _sum: { quantityKg: reservedKg } }] : []),
+});
 
 const coopUser = (mamcosId: string | null = 'm1', id = 'u1') =>
   ({ id, role: UserRole.CUSTOM, mamcosId }) as any;
@@ -39,18 +49,14 @@ function setup(
   } = {},
 ) {
   const available = over.available ?? 1000;
-  const sums = { IN: available, RESERVE: 0, UNRESERVE: 0, OUT: 0, ADJUST: 0 };
+  const stock = stockMocks(available, 0);
   const tx: any = {
     $queryRaw: jest.fn().mockResolvedValue([{ value: 7 }]),
+    stockLedgerEntry: stock.stockLedgerEntry,
+    orderAllocation: stock.orderAllocation,
     stockMovement: {
-      groupBy: jest.fn().mockResolvedValue(
-        Object.entries(sums).map(([type, v]) => ({
-          type,
-          _sum: { quantityKg: v },
-        })),
-      ),
+      groupBy: stock.stockMovementGroup,
       create: jest.fn().mockResolvedValue({}),
-      createMany: jest.fn().mockResolvedValue({}),
     },
     saleOrder: {
       aggregate: jest.fn().mockResolvedValue({
@@ -86,7 +92,7 @@ function setup(
     userNames: jest.fn().mockResolvedValue(new Map()),
   };
   return {
-    service: new SaleOrdersService(prisma, {} as any, warehouses, settings()),
+    service: new SaleOrdersService(prisma, {} as any, warehouses, settings(), books()),
     prisma,
     tx,
     warehouses,
@@ -201,23 +207,25 @@ describe('Loading trucks', () => {
     };
     const movements: any[] = [];
     const loadedBefore = priorLoads.reduce((t, l) => t + l.weightKg, 0);
+    const stock = stockMocks(available - loadedBefore, base.quantityKg - loadedBefore);
+    (drawFromBatches as jest.Mock).mockImplementation(async (_tx, p) => {
+      movements.push({ type: 'OUT', quantityKg: p.quantityKg });
+      return [];
+    });
     const tx: any = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       saleOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       orderLoad: {
         findMany: jest.fn().mockResolvedValue(priorLoads),
-        create: jest.fn(),
+        create: jest.fn().mockResolvedValue({ id: 'l1' }),
       },
+      stockLedgerEntry: stock.stockLedgerEntry,
+      orderAllocation: stock.orderAllocation,
       stockMovement: {
-        createMany: jest.fn(async ({ data }) => {
-          movements.push(...data);
+        create: jest.fn(async ({ data }) => {
+          movements.push(data);
         }),
-        groupBy: jest.fn().mockResolvedValue([
-          { type: 'IN', _sum: { quantityKg: available } },
-          { type: 'RESERVE', _sum: { quantityKg: base.quantityKg } },
-          { type: 'UNRESERVE', _sum: { quantityKg: loadedBefore } },
-          { type: 'OUT', _sum: { quantityKg: loadedBefore } },
-        ]),
+        groupBy: stock.stockMovementGroup,
       },
       dispatch: { create: jest.fn() },
       inventoryRecord: { updateMany: jest.fn() },
@@ -250,7 +258,7 @@ describe('Loading trucks', () => {
       userNames: jest.fn().mockResolvedValue(new Map()),
     };
     return {
-      service: new SaleOrdersService(prisma, {} as any, warehouses, settings()),
+      service: new SaleOrdersService(prisma, {} as any, warehouses, settings(), books()),
       tx,
       movements,
     };
@@ -263,7 +271,8 @@ describe('Loading trucks', () => {
     await expect(service.loadTruck('o1', truck, coopUser())).rejects.toThrow(
       'Payment has not been received',
     );
-    expect(tx.stockMovement.createMany).not.toHaveBeenCalled();
+    expect(tx.stockMovement.create).not.toHaveBeenCalled();
+    expect(drawFromBatches).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -448,6 +457,7 @@ describe('Cancelling', () => {
       {} as any,
       {} as any,
       settings(),
+      books(),
     );
     await expect(
       service.cancel('o1', 'changed mind', coopUser()),
@@ -463,15 +473,11 @@ describe('Tolerance and expiry come from Settings', () => {
         saleOrder: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
         orderLoad: {
           findMany: jest.fn().mockResolvedValue([]),
-          create: jest.fn(),
+          create: jest.fn().mockResolvedValue({ id: 'l1' }),
         },
-        stockMovement: {
-          createMany: jest.fn(),
-          groupBy: jest.fn().mockResolvedValue([
-            { type: 'IN', _sum: { quantityKg: 5000 } },
-            { type: 'RESERVE', _sum: { quantityKg: 1000 } },
-          ]),
-        },
+        stockLedgerEntry: stockMocks(5000, 1000).stockLedgerEntry,
+        orderAllocation: { findMany: jest.fn().mockResolvedValue([]) },
+        stockMovement: { create: jest.fn(), groupBy: stockMocks(5000, 1000).stockMovementGroup },
         dispatch: { create: jest.fn() },
         inventoryRecord: { updateMany: jest.fn() },
         saleOrderEvent: { create: jest.fn() },
@@ -518,6 +524,7 @@ describe('Tolerance and expiry come from Settings', () => {
           userNames: jest.fn().mockResolvedValue(new Map()),
         } as any,
         settings({ loadTolerancePct: pct }),
+        books(),
       );
     };
     const load = {
@@ -555,6 +562,7 @@ describe('Tolerance and expiry come from Settings', () => {
       {} as any,
       {} as any,
       settings({ reservationExpiryDays: 3 }),
+      books(),
     );
     expect(await service.expireStale()).toBe(1);
     expect(prisma.saleOrder.findMany).toHaveBeenCalledWith(
@@ -580,6 +588,7 @@ describe('Tolerance and expiry come from Settings', () => {
       {} as any,
       {} as any,
       settings({ reservationExpiryDays: 0 }),
+      books(),
     );
     expect(await service.expireStale()).toBe(0);
     expect(prisma.saleOrder.findMany).not.toHaveBeenCalled();
@@ -598,6 +607,7 @@ describe('Tolerance and expiry come from Settings', () => {
       {} as any,
       {} as any,
       settings(),
+      books(),
     );
     await expect(
       service.closeShort('o1', 'buyer left', coopUser()),

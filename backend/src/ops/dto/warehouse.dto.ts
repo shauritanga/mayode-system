@@ -16,6 +16,8 @@ export class CreateReceiptDto {
   @IsOptional() @IsString() harvestRecordId?: string;
   @IsOptional() @IsString() harvestBatchRef?: string;
   @IsOptional() @IsString() riceVariety?: string;
+  @ApiPropertyOptional({ description: 'TZS per kg the cooperative pays. Leave empty when the rice is only being stored for the farmer.' })
+  @IsOptional() @IsNumber() @Min(0) pricePerKg?: number;
   @IsOptional() @IsDateString() receivedAt?: string;
   @IsNumber() @IsPositive() grossKg: number;
   @IsOptional() @IsInt() @Min(1) bags?: number;
@@ -88,3 +90,5 @@ export class CreateRunDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => RunInputDto) inputs: RunInputDto[];
   @IsArray() @ValidateNested({ each: true }) @Type(() => RunOutputDto) outputs: RunOutputDto[];
 }
+
+export class OpeningValueDto { @IsNumber() @IsPositive() unitCost: number; }

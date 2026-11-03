@@ -12,7 +12,7 @@ export default function StockPanel({ canAdjust, canTransfer, canManageQuality = 
   const [sub, setSub] = useState<Sub>(initialTab);
   return (
     <>
-      {!hideTabs && <Tabs tabs={[{ id: 'position', label: 'Stock position' }, { id: 'batches', label: 'Batches' }, { id: 'ledger', label: 'Stock history' }, { id: 'transfers', label: 'Transfers' }]} value={sub} onChange={setSub} />}
+      {!hideTabs && <Tabs tabs={[{ id: 'position', label: 'What we have' }, { id: 'batches', label: 'Batches' }, { id: 'ledger', label: 'History' }, { id: 'transfers', label: 'Transfers' }]} value={sub} onChange={setSub} />}
       {sub === 'position' && <Position />}
       {sub === 'batches' && <Batches canAdjust={canAdjust} canTransfer={canTransfer} canManageQuality={canManageQuality} onChanged={onChanged} />}
       {sub === 'ledger' && <Ledger canAdjust={canAdjust} />}
@@ -25,22 +25,31 @@ function Position() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [category, setCategory] = useState('');
+  const [detail, setDetail] = useState(false);
   const { data, error, loading } = useLoad<any[]>(() => opsApi.position({ from: from || undefined, to: to || undefined, category: category || undefined }), [from, to, category]);
   return (
     <>
-      <Toolbar>
-        <Field label="Product kind"><select className="input-field" value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All</option><option value="PADDY">Paddy</option><option value="PROCESSED">Processed rice</option><option value="BROKEN">Broken rice</option><option value="BYPRODUCT">By-products</option></select></Field>
-        <Field label="From"><input className="input-field" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
-        <Field label="To"><input className="input-field" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+      <Toolbar right={<label style={{ fontSize: 13, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={detail} onChange={(e) => setDetail(e.target.checked)} />Show how it moved (received, milled, dispatched…)</label>}>
+        <Field label="Show"><select className="input-field" value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All stock</option><option value="PADDY">Paddy</option><option value="PROCESSED">Rice</option><option value="BROKEN">Broken rice</option><option value="BYPRODUCT">By-products</option></select></Field>
+        {detail && <Field label="From"><input className="input-field" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>}
+        {detail && <Field label="To"><input className="input-field" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>}
       </Toolbar>
       <ErrorNote message={error} />
       {loading && !data ? <Loading /> : (
-        <DataTable rows={data ?? []} rowKey={(r) => r.productId + r.warehouseId} empty="No stock yet."
-          columns={[{ header: 'Product', render: (r) => <span>{r.product}{r.lowStock && <span className="badge badge-red" style={{ marginLeft: 6 }}>Low</span>}</span> }, { header: 'Brand', render: (r) => r.brand ?? '—' }, { header: 'Warehouse', render: (r) => r.warehouse },
-            { header: 'Opening', align: 'right', render: (r) => kg(r.openingKg) }, { header: 'Received', align: 'right', render: (r) => kg(r.receivedKg) }, { header: 'Milled', align: 'right', render: (r) => kg(r.processedOutKg) },
-            { header: 'Produced', align: 'right', render: (r) => kg(r.producedKg) }, { header: 'Dispatched', align: 'right', render: (r) => kg(r.dispatchedKg) }, { header: 'Adjusted', align: 'right', render: (r) => kg(r.adjustmentsKg) },
-            { header: 'Closing', align: 'right', render: (r) => <strong>{kg(r.closingKg)}</strong> }, { header: 'Reserved', align: 'right', render: (r) => kg(r.reservedKg) }, { header: 'Available', align: 'right', render: (r) => <strong>{kg(r.availableKg)}</strong> },
-            { header: 'In transit', align: 'right', render: (r) => kg(r.inTransitKg) }, { header: 'Value', align: 'right', render: (r) => (r.indicativeValue != null ? tzs(r.indicativeValue) : '—') }]} />
+        <DataTable rows={data ?? []} rowKey={(r) => r.productId + r.warehouseId} empty="No stock yet. Receive paddy to get started."
+          columns={[
+            { header: 'Product', render: (r) => <span><strong>{r.product}</strong>{r.lowStock && <span className="badge badge-red" style={{ marginLeft: 6 }}>Running low</span>}</span> },
+            { header: 'Warehouse', render: (r) => r.warehouse },
+            ...(detail ? [
+              { header: 'Opening', align: 'right' as const, render: (r: any) => kg(r.openingKg) }, { header: 'Received', align: 'right' as const, render: (r: any) => kg(r.receivedKg) }, { header: 'Milled', align: 'right' as const, render: (r: any) => kg(r.processedOutKg) },
+              { header: 'Produced', align: 'right' as const, render: (r: any) => kg(r.producedKg) }, { header: 'Sent out', align: 'right' as const, render: (r: any) => kg(r.dispatchedKg) }, { header: 'Corrected', align: 'right' as const, render: (r: any) => kg(r.adjustmentsKg) },
+            ] : []),
+            { header: 'In stock', align: 'right', render: (r) => <strong>{kg(r.closingKg)}</strong> },
+            { header: 'Promised to orders', align: 'right', render: (r) => kg(r.reservedKg) },
+            { header: 'Free to sell', align: 'right', render: (r) => <strong>{kg(r.availableKg)}</strong> },
+            ...(detail ? [{ header: 'On the way', align: 'right' as const, render: (r: any) => kg(r.inTransitKg) }] : []),
+            { header: 'Value at cost', align: 'right', render: (r) => (r.stockValue != null ? tzs(r.stockValue) : r.uncostedKg > 0 ? <span className="badge badge-gold">Cost not set</span> : '—') },
+          ]} />
       )}
     </>
   );
@@ -52,6 +61,7 @@ function Batches({ canAdjust, canTransfer, canManageQuality, onChanged }: { canA
   const [adjust, setAdjust] = useState<any>(null);
   const [transfer, setTransfer] = useState<any>(null);
   const [statusBatch, setStatusBatch] = useState<any>(null);
+  const [costBatch, setCostBatch] = useState<any>(null);
   const { data, error, loading, reload } = useLoad<any[]>(() => opsApi.batches({ q: q || undefined, inStock: inStock ? 'true' : undefined }), [q, inStock]);
   return (
     <>
@@ -64,17 +74,34 @@ function Batches({ canAdjust, canTransfer, canManageQuality, onChanged }: { canA
         <DataTable rows={data ?? []} rowKey={(b) => b.id + b.warehouseId} empty="No batches."
           columns={[{ header: 'Batch', render: (b) => <strong>{b.reference}</strong> }, { header: 'Product', render: (b) => `${b.product.name}${b.product.brand ? ` · ${b.product.brand}` : ''}` }, { header: 'Variety', render: (b) => b.riceVariety ?? '—' },
             { header: 'Source', render: (b) => (b.receipt?.farmer ? `${b.receipt.farmer.firstName} ${b.receipt.farmer.lastName}` : b.receipt?.sellerName ?? label(b.origin)) }, { header: 'Owner', render: (b) => b.ownerType === 'FARMER' ? `Farmer · ${b.receipt?.farmer ? `${b.receipt.farmer.firstName} ${b.receipt.farmer.lastName}` : 'recorded'}` : label(b.ownerType || 'COOPERATIVE') }, { header: 'Status', render: (b) => <Status value={b.stockStatus || 'AVAILABLE'} /> }, { header: 'Created', render: (b) => day(b.createdAt) }, { header: 'Warehouse', render: (b) => b.warehouseName ?? '—' },
-            { header: 'Physical', align: 'right', render: (b) => kg(b.physicalKg) }, { header: 'Reserved', align: 'right', render: (b) => kg(b.reservedKg) }, { header: 'Available', align: 'right', render: (b) => <strong>{kg(b.availableKg)}</strong> },
+            { header: 'In stock', align: 'right', render: (b) => kg(b.physicalKg) }, { header: 'Promised', align: 'right', render: (b) => kg(b.reservedKg) }, { header: 'Free', align: 'right', render: (b) => <strong>{kg(b.availableKg)}</strong> },
+            { header: 'Cost per kg', align: 'right', render: (b) => (b.ownerType !== 'COOPERATIVE' ? <span style={{ color: 'var(--neutral-500)' }}>Not ours</span> : b.unitCost != null ? tzs(b.unitCost) : <span className="badge badge-gold">Not set</span>) }, { header: 'Value', align: 'right', render: (b) => (b.stockValue != null ? tzs(b.stockValue) : '—') },
             { header: '', render: (b) => <span style={{ display: 'flex', gap: 6 }}>
-              {canAdjust && <button className="btn-secondary" onClick={(e) => { e.stopPropagation(); setAdjust(b); }}>Adjust</button>}
-              {canManageQuality && <button className="btn-secondary" onClick={(e) => { e.stopPropagation(); setStatusBatch(b); }}>Stock status</button>}
+              {canAdjust && b.ownerType === 'COOPERATIVE' && b.unitCost == null && b.physicalKg > 0 && <button className="btn-secondary" onClick={(e) => { e.stopPropagation(); setCostBatch(b); }}>Set cost</button>}
+              {canAdjust && <button className="btn-secondary" onClick={(e) => { e.stopPropagation(); setAdjust(b); }}>Correct</button>}
+              {canManageQuality && <button className="btn-secondary" onClick={(e) => { e.stopPropagation(); setStatusBatch(b); }}>Mark as…</button>}
               {canTransfer && b.availableKg > 0 && <button className="btn-secondary" onClick={(e) => { e.stopPropagation(); setTransfer(b); }}>Transfer</button>}</span> }]} />
       )}
       {adjust && <AdjustModal batch={adjust} onClose={() => setAdjust(null)} onSaved={() => { setAdjust(null); reload(); onChanged?.(); }} />}
       {transfer && <TransferModal batch={transfer} onClose={() => setTransfer(null)} onSaved={() => { setTransfer(null); reload(); onChanged?.(); }} />}
+      {costBatch && <CostModal batch={costBatch} onClose={() => setCostBatch(null)} onSaved={() => { setCostBatch(null); reload(); onChanged?.(); }} />}
       {statusBatch && <BatchStatusModal batch={statusBatch} onClose={() => setStatusBatch(null)} onSaved={() => { setStatusBatch(null); reload(); onChanged?.(); }} />}
     </>
   );
+}
+
+function CostModal({ batch, onClose, onSaved }: { batch: any; onClose: () => void; onSaved: () => void }) {
+  const [cost, setCost] = useState('');
+  const { busy, error, run } = useAction();
+  const value = (Number(cost) || 0) * batch.physicalKg;
+  const submit = async () => { if ((await run(() => opsApi.setOpeningValue(batch.id, Number(cost)))) !== undefined) onSaved(); };
+  return <Modal title={`Set cost · ${batch.reference}`} subtitle={`${batch.product.name} · ${kg(batch.physicalKg)} in stock`} onClose={onClose}
+    footer={<><button className="btn-secondary" onClick={onClose}>Close</button><button className="btn-primary" disabled={busy || !(Number(cost) > 0)} onClick={submit}>{busy ? 'Saving…' : 'Save cost'}</button></>}>
+    <ErrorNote message={error} />
+    <p style={{ fontSize: 13, marginTop: 0 }}>This stock has no cost yet, so it is missing from the accounts. Enter what one kilogram cost and the stock is added to the books as opening stock. This can be done once.</p>
+    <FormGrid><Field label="Cost per kg (TZS)"><input className="input-field" type="number" min="0" value={cost} onChange={(e) => setCost(e.target.value)} /></Field></FormGrid>
+    {value > 0 && <p className="glass-card" style={{ padding: 10, marginTop: 12, fontSize: 14 }}>Value added to the books: <strong>{tzs(value)}</strong></p>}
+  </Modal>;
 }
 
 function BatchStatusModal({ batch, onClose, onSaved }: { batch: any; onClose: () => void; onSaved: () => void }) {

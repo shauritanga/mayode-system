@@ -1042,4 +1042,9 @@ export const SW_MESSAGES: Record<string, string> = {
   "Say why this is being cancelled (at least a few words).": "Eleza kwa nini hii inafutwa (angalau maneno machache).",
   "Record not found": "Rekodi haijapatikana",
   "This record is already cancelled": "Rekodi hii tayari imefutwa",
+  "Enter a cost per kg above zero": "Weka gharama kwa kilo iliyo juu ya sifuri",
+  "This stock belongs to someone else, so it is not part of the cooperative’s books": "Hifadhi hii ni ya mtu mwingine, kwa hiyo haimo kwenye vitabu vya ushirika",
+  "This batch already has a cost": "Kundi hili tayari lina gharama",
+  "There is no stock left in this batch to value": "Hakuna hifadhi iliyobaki katika kundi hili ya kutathmini",
+  "Only {0} kg of stock is free in this warehouse to load": "Ni kilo {0} tu za hifadhi zilizo huru katika ghala hili za kupakia",
 };

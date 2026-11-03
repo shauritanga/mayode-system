@@ -3,14 +3,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Actor, assertVisible, nextRef, owner, OpsNotifyService, scope, Tx } from './ops-common';
 import { r3 } from './ops-rules';
 import { CreateReceiptDto } from './dto/warehouse.dto';
+import { StockAccountingService } from './stock-accounting.service';
 
 type User = Actor & { id: string };
+export type ReceiptInternal = { valuedBySource?: string; mamcosId?: string | null };
 
 @Injectable()
 export class ReceivingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notify: OpsNotifyService,
+    private readonly stockBooks: StockAccountingService,
   ) {}
 
   private include = {
@@ -93,59 +96,75 @@ export class ReceivingService {
     return { farmerId, farmId, plotId, cycleId, variety, harvest, warehouse, product };
   }
 
-  async create(dto: CreateReceiptDto, actor: User) {
+  /** `internal` is for server code only (a farmer delivery that is already in the books, or the cooperative a keeper works for), never from a request. */
+  async create(dto: CreateReceiptDto, actor: User, internal: ReceiptInternal = {}) {
     const v = await this.validate(dto, actor);
-    const receipt = await this.prisma.$transaction(async (tx) => {
-      const reference = await nextRef(tx, 'GR');
-      return tx.goodsReceipt.create({
-        data: {
-          mamcosId: owner(actor), reference, warehouseId: dto.warehouseId, productId: dto.productId, sourceType: dto.sourceType,
-          farmerId: v.farmerId, sellerName: dto.sellerName?.trim() || null, sellerPhone: dto.sellerPhone?.trim() || null,
-          farmId: v.farmId, plotId: v.plotId, cropCycleId: v.cycleId, harvestRecordId: v.harvest?.id ?? null,
-          harvestBatchRef: dto.harvestBatchRef?.trim() || v.harvest?.batchRef || null, riceVariety: v.variety,
-          receivedAt: dto.receivedAt ? new Date(dto.receivedAt) : new Date(), grossKg: dto.grossKg, bags: dto.bags ?? null, bagWeightKg: dto.bagWeightKg ?? null,
-          moisturePct: dto.moisturePct ?? null, qualityGrade: dto.qualityGrade?.trim() || null, inspection: dto.inspection ?? 'NOT_REQUIRED',
-          rejectedKg: dto.rejectedKg ?? 0, inspectionNotes: dto.inspectionNotes?.trim() || null, notes: dto.notes?.trim() || null,
-          attachments: dto.attachments ?? [], receivedByUserId: actor.id,
-        },
-      });
-    });
+    const receipt = await this.prisma.$transaction((tx) => this.insert(tx, dto, actor, v, internal));
     return dto.confirmNow ? this.confirm(receipt.id, actor) : this.detail(receipt.id, actor);
+  }
+
+  private async insert(tx: Tx, dto: CreateReceiptDto, actor: User, v: Awaited<ReturnType<ReceivingService['validate']>>, internal: ReceiptInternal) {
+    const reference = await nextRef(tx, 'GR');
+    return tx.goodsReceipt.create({
+      data: {
+        mamcosId: internal.mamcosId !== undefined ? internal.mamcosId : owner(actor), reference, warehouseId: dto.warehouseId, productId: dto.productId, sourceType: dto.sourceType,
+        farmerId: v.farmerId, sellerName: dto.sellerName?.trim() || null, sellerPhone: dto.sellerPhone?.trim() || null,
+        farmId: v.farmId, plotId: v.plotId, cropCycleId: v.cycleId, harvestRecordId: v.harvest?.id ?? null,
+        harvestBatchRef: dto.harvestBatchRef?.trim() || v.harvest?.batchRef || null, riceVariety: v.variety, pricePerKg: dto.pricePerKg ?? null, valuedBySource: internal.valuedBySource ?? null,
+        receivedAt: dto.receivedAt ? new Date(dto.receivedAt) : new Date(), grossKg: dto.grossKg, bags: dto.bags ?? null, bagWeightKg: dto.bagWeightKg ?? null,
+        moisturePct: dto.moisturePct ?? null, qualityGrade: dto.qualityGrade?.trim() || null, inspection: dto.inspection ?? 'NOT_REQUIRED',
+        rejectedKg: dto.rejectedKg ?? 0, inspectionNotes: dto.inspectionNotes?.trim() || null, notes: dto.notes?.trim() || null,
+        attachments: dto.attachments ?? [], receivedByUserId: actor.id,
+      },
+    });
+  }
+
+  /** Records and confirms a receipt inside the caller's transaction, so a warehouse counter receive lands completely or not at all. */
+  async receiveWithin(tx: Tx, dto: CreateReceiptDto, actor: User, internal: ReceiptInternal = {}) {
+    const v = await this.validate(dto, actor);
+    const receipt = await this.insert(tx, dto, actor, v, internal);
+    return this.confirmWithin(tx, receipt.id, actor);
   }
 
   /** Confirming is what adds stock: a batch is created, linked to the source, and the ledger gets one RECEIPT row. */
   async confirm(id: string, actor: User) {
-    const result = await this.prisma.$transaction(async (tx: Tx) => {
-      const r = await tx.goodsReceipt.findUnique({ where: { id }, include: { product: true } });
-      assertVisible(actor, r, 'Receipt');
-      const acceptedKg = r3(r.grossKg - r.rejectedKg);
-      if (acceptedKg <= 0) throw new BadRequestException('Nothing was accepted, so there is no stock to add. Cancel the receipt instead.');
-      const claimed = await tx.goodsReceipt.updateMany({ where: { id, status: 'DRAFT' }, data: { status: 'CONFIRMED', confirmedByUserId: actor.id, confirmedAt: new Date() } });
-      if (!claimed.count) throw new ConflictException('This receipt has already been confirmed or cancelled');
-      const batch = await tx.stockBatch.create({
-        data: {
-          mamcosId: r.mamcosId, reference: await nextRef(tx, 'BT'), productId: r.productId, warehouseId: r.warehouseId, riceVariety: r.riceVariety,
-          grade: r.qualityGrade, receiptId: r.id,
-          ownerType: r.farmerId ? 'FARMER' : r.sellerName ? 'OTHER' : 'COOPERATIVE', ownerFarmerId: r.farmerId,
-          ...(r.inspection === 'FAILED' ? { stockStatus: 'QUARANTINED', statusReason: 'Receipt inspection failed', statusChangedAt: new Date(), statusChangedByUserId: actor.id } : {}),
-        },
-      });
-      if (r.inspection === 'FAILED') await tx.stockStatusEvent.create({ data: { batchId: batch.id, fromStatus: null, toStatus: 'QUARANTINED', reason: 'Receipt inspection failed', createdByUserId: actor.id } });
-      await tx.stockLedgerEntry.create({ data: { batchId: batch.id, warehouseId: r.warehouseId, type: 'RECEIPT', quantityKg: acceptedKg, refType: 'receipt', refId: r.id, createdByUserId: actor.id } });
-      // Keep the crop record in step with what actually reached the warehouse.
-      if (r.cropCycleId) {
-        await tx.harvestQualityCheck.upsert({
-          where: { cropCycleId: r.cropCycleId },
-          create: { cropCycleId: r.cropCycleId, bagCount: r.bags, bagWeightKg: r.bagWeightKg, dryingMoisturePct: r.moisturePct, warehouseReceivedAt: r.receivedAt },
-          update: { bagCount: r.bags ?? undefined, bagWeightKg: r.bagWeightKg ?? undefined, dryingMoisturePct: r.moisturePct ?? undefined, warehouseReceivedAt: r.receivedAt },
-        });
-      }
-      return { receipt: r, batch, acceptedKg };
-    });
+    const result = await this.prisma.$transaction((tx: Tx) => this.confirmWithin(tx, id, actor));
     if (result.receipt.rejectedKg > 0) {
       await this.notify.tellPermission('ops_stock', 'EDIT', result.receipt.mamcosId, { type: 'OPS_RECEIPT_REJECTED', title: 'Rice rejected at receiving', body: `${result.receipt.reference}: ${result.receipt.rejectedKg} kg rejected.`, data: { receiptId: id } });
     }
     return this.detail(id, actor);
+  }
+
+  private async confirmWithin(tx: Tx, id: string, actor: User) {
+    const r = await tx.goodsReceipt.findUnique({ where: { id }, include: { product: true } });
+    assertVisible(actor, r, 'Receipt');
+    const acceptedKg = r3(r.grossKg - r.rejectedKg);
+    const purchased = (r.pricePerKg ?? 0) > 0;
+    if (acceptedKg <= 0) throw new BadRequestException('Nothing was accepted, so there is no stock to add. Cancel the receipt instead.');
+    const claimed = await tx.goodsReceipt.updateMany({ where: { id, status: 'DRAFT' }, data: { status: 'CONFIRMED', confirmedByUserId: actor.id, confirmedAt: new Date() } });
+    if (!claimed.count) throw new ConflictException('This receipt has already been confirmed or cancelled');
+    const batch = await tx.stockBatch.create({
+      data: {
+        mamcosId: r.mamcosId, reference: await nextRef(tx, 'BT'), productId: r.productId, warehouseId: r.warehouseId, riceVariety: r.riceVariety,
+        grade: r.qualityGrade, receiptId: r.id,
+        // A price means the cooperative bought this rice, so it owns it and carries its cost; without one it is held for the seller.
+        ownerType: purchased ? 'COOPERATIVE' : r.farmerId ? 'FARMER' : r.sellerName ? 'OTHER' : 'COOPERATIVE', ownerFarmerId: purchased ? null : r.farmerId,
+        unitCost: purchased ? r.pricePerKg : null,
+        ...(r.inspection === 'FAILED' ? { stockStatus: 'QUARANTINED', statusReason: 'Receipt inspection failed', statusChangedAt: new Date(), statusChangedByUserId: actor.id } : {}),
+      },
+    });
+    if (r.inspection === 'FAILED') await tx.stockStatusEvent.create({ data: { batchId: batch.id, fromStatus: null, toStatus: 'QUARANTINED', reason: 'Receipt inspection failed', createdByUserId: actor.id } });
+    await tx.stockLedgerEntry.create({ data: { batchId: batch.id, warehouseId: r.warehouseId, type: 'RECEIPT', quantityKg: acceptedKg, refType: 'receipt', refId: r.id, createdByUserId: actor.id } });
+    if (purchased && !r.valuedBySource) await this.stockBooks.postReceipt(tx, r, acceptedKg, r.pricePerKg!, actor.id);
+    // Keep the crop record in step with what actually reached the warehouse.
+    if (r.cropCycleId) {
+      await tx.harvestQualityCheck.upsert({
+        where: { cropCycleId: r.cropCycleId },
+        create: { cropCycleId: r.cropCycleId, bagCount: r.bags, bagWeightKg: r.bagWeightKg, dryingMoisturePct: r.moisturePct, warehouseReceivedAt: r.receivedAt },
+        update: { bagCount: r.bags ?? undefined, bagWeightKg: r.bagWeightKg ?? undefined, dryingMoisturePct: r.moisturePct ?? undefined, warehouseReceivedAt: r.receivedAt },
+      });
+    }
+    return { receipt: r, batch, acceptedKg };
   }
 
   async cancel(id: string, reason: string, actor: User) {

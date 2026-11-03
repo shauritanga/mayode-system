@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InventoryStatus } from '@prisma/client';
+import { InventoryStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   canSeeTenantRow,
@@ -22,10 +22,18 @@ import {
   UpdateWarehouseDto,
 } from './dto/warehouse.dto';
 import { lockWarehouse, unlottedKg, warehouseBalance } from './stock';
+import { drawFromBatches } from './batch-draw';
+import { nextRef } from '../ops/ops-common';
+import { ReceivingService } from '../ops/receiving.service';
+import { StockAccountingService } from '../ops/stock-accounting.service';
 
 @Injectable()
 export class WarehousesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly receiving: ReceivingService,
+    private readonly stockBooks: StockAccountingService,
+  ) {}
 
   /** Warehouse ids this user keeps; empty means unrestricted within their scope. */
   async keptWarehouseIds(userId: string): Promise<string[]> {
@@ -146,6 +154,32 @@ export class WarehousesService {
   }
 
   /** Keeper weighs a delivery in: stock goes up through the ledger, records are tied to the warehouse. */
+  /** The paddy product a warehouse's counter receipts are recorded under, created the first time it is needed. */
+  private async counterProduct(tx: Prisma.TransactionClient, warehouse: { id: string; mamcosId: string | null }) {
+    const existing = await tx.product.findFirst({
+      where: { mamcosId: warehouse.mamcosId, category: 'PADDY', isActive: true, NOT: { code: { startsWith: 'OPENING-' } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (existing) return existing;
+    return tx.product.upsert({
+      where: { code: `PADDY-${(warehouse.mamcosId ?? 'PLATFORM').slice(0, 8)}` },
+      update: {},
+      create: { mamcosId: warehouse.mamcosId, code: `PADDY-${(warehouse.mamcosId ?? 'PLATFORM').slice(0, 8)}`, name: 'Paddy', category: 'PADDY', unit: 'kg' },
+    });
+  }
+
+  /** Stock counted in by hand (no delivery record): one batch owned by the cooperative, with a note of why it is there. */
+  private async countIn(tx: Prisma.TransactionClient, warehouse: { id: string; mamcosId: string | null }, quantityKg: number, note: string | undefined, actorId: string) {
+    const product = await this.counterProduct(tx, warehouse);
+    const batch = await tx.stockBatch.create({
+      data: { mamcosId: warehouse.mamcosId, reference: await nextRef(tx, 'BT'), productId: product.id, warehouseId: warehouse.id, ownerType: 'COOPERATIVE' },
+    });
+    await tx.stockLedgerEntry.create({
+      data: { batchId: batch.id, warehouseId: warehouse.id, type: 'RECEIPT', quantityKg, refType: 'counted-stock', reason: note?.trim() || 'Counted in at the warehouse', createdByUserId: actorId },
+    });
+    return batch;
+  }
+
   async receive(id: string, dto: ReceiveStockDto, actor: TenantActor) {
     const warehouse = await this.requireWarehouse(id, actor, { forDesk: true });
     if (!warehouse.isActive)
@@ -166,16 +200,7 @@ export class WarehousesService {
       await lockWarehouse(tx, id);
       let quantityKg = dto.quantityKg ?? 0;
       if (ids.length) {
-        const records = await tx.inventoryRecord.findMany({
-          where: { id: { in: ids } },
-          select: {
-            id: true,
-            weightKg: true,
-            warehouseId: true,
-            lotNumber: true,
-            trackingCode: true,
-          },
-        });
+        const records = await tx.inventoryRecord.findMany({ where: { id: { in: ids } } });
         if (records.length !== new Set(ids).size)
           throw new NotFoundException('Some inventory records were not found');
         const already = records.filter((r) => r.warehouseId);
@@ -185,6 +210,30 @@ export class WarehousesService {
           );
         }
         quantityKg = records.reduce((sum, r) => sum + r.weightKg, 0);
+        if (warehouse.capacityKg) {
+          const { onHandKg } = await warehouseBalance(tx, id);
+          if (onHandKg + quantityKg > warehouse.capacityKg) {
+            throw new BadRequestException(
+              `Receiving ${quantityKg} kg would exceed the warehouse capacity of ${warehouse.capacityKg} kg`,
+            );
+          }
+        }
+        const product = await this.counterProduct(tx, warehouse);
+        for (const r of records) {
+          // A delivery that was priced at the centre is already in the books; the receipt carries its cost but does not book it again.
+          const priced = r.totalValue != null && r.totalValue > 0 && r.weightKg > 0;
+          await this.receiving.receiveWithin(
+            tx,
+            {
+              warehouseId: id, productId: product.id, sourceType: 'EXTERNAL_FARMER', farmerId: r.farmerId, farmId: r.farmId, cropCycleId: r.cropCycleId ?? undefined,
+              riceVariety: r.riceVariety ?? undefined, receivedAt: r.receivedDate.toISOString(), grossKg: r.weightKg, bags: r.bags ?? undefined,
+              moisturePct: r.moistureContentPct ?? undefined, qualityGrade: r.qualityGrade ?? undefined, notes: `Delivery ${r.trackingCode}`,
+              pricePerKg: priced ? r.totalValue! / r.weightKg : undefined,
+            },
+            actor,
+            { mamcosId: warehouse.mamcosId, valuedBySource: priced ? 'PaddyDelivery' : undefined },
+          );
+        }
         await tx.inventoryRecord.updateMany({
           where: { id: { in: ids }, lotNumber: null },
           data: { warehouseId: id, status: InventoryStatus.IN_STORAGE },
@@ -205,32 +254,24 @@ export class WarehousesService {
             data: { warehouseId: id },
           });
         }
-      }
-      if (warehouse.capacityKg) {
-        const { onHandKg } = await warehouseBalance(tx, id);
-        if (onHandKg + quantityKg > warehouse.capacityKg) {
-          throw new BadRequestException(
-            `Receiving ${quantityKg} kg would exceed the warehouse capacity of ${warehouse.capacityKg} kg`,
-          );
+      } else {
+        if (warehouse.capacityKg) {
+          const { onHandKg } = await warehouseBalance(tx, id);
+          if (onHandKg + quantityKg > warehouse.capacityKg) {
+            throw new BadRequestException(
+              `Receiving ${quantityKg} kg would exceed the warehouse capacity of ${warehouse.capacityKg} kg`,
+            );
+          }
         }
+        await this.countIn(tx, warehouse, quantityKg, dto.note, actor.id);
       }
-      await tx.stockMovement.create({
-        data: {
-          warehouseId: id,
-          type: 'IN',
-          quantityKg,
-          refType: ids.length ? 'inventory_records' : 'manual_count',
-          refId: ids.length ? ids.join(',').slice(0, 250) : null,
-          note: dto.note,
-          createdByUserId: actor.id,
-        },
-      });
       return { received: quantityKg, balance: await warehouseBalance(tx, id) };
     });
   }
 
+  /** Corrects the count of a warehouse: more is counted in as a new batch, less is taken from the oldest stock and booked as a loss. */
   async adjust(id: string, dto: AdjustStockDto, actor: TenantActor) {
-    await this.requireWarehouse(id, actor, { forDesk: true });
+    const warehouse = await this.requireWarehouse(id, actor, { forDesk: true });
     if (!dto.deltaKg)
       throw new BadRequestException('Adjustment cannot be zero');
     return this.prisma.$transaction(async (tx) => {
@@ -241,16 +282,14 @@ export class WarehousesService {
           'Adjustment would take available stock below zero (reserved stock cannot be written off)',
         );
       }
-      await tx.stockMovement.create({
-        data: {
-          warehouseId: id,
-          type: 'ADJUST',
-          quantityKg: dto.deltaKg,
-          refType: 'adjustment',
-          note: dto.reason,
-          createdByUserId: actor.id,
-        },
-      });
+      if (dto.deltaKg > 0) {
+        await this.countIn(tx, warehouse, dto.deltaKg, dto.reason, actor.id);
+      } else {
+        const taken = await drawFromBatches(tx, {
+          warehouseId: id, quantityKg: -dto.deltaKg, refType: 'adjustment', refId: id, actorId: actor.id, note: dto.reason, type: 'ADJUSTMENT',
+        });
+        for (const t of taken) await this.stockBooks.postAdjustment(tx, { id: t.entryId, batchId: t.batchId, quantityKg: -t.quantityKg, reason: dto.reason }, actor.id);
+      }
       return warehouseBalance(tx, id);
     });
   }
@@ -288,19 +327,27 @@ export class WarehousesService {
     });
   }
 
+  /** Everything that moved in or out of the warehouse, newest first, in plain words (in, out, adjusted, reserved, released). */
   async movements(id: string, actor: TenantActor, take = 100) {
     await this.requireWarehouse(id, actor);
-    const rows = await this.prisma.stockMovement.findMany({
-      where: { warehouseId: id },
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(Math.max(take, 1), 500),
-    });
+    const limit = Math.min(Math.max(take, 1), 500);
+    const [ledger, reservations] = await Promise.all([
+      this.prisma.stockLedgerEntry.findMany({ where: { warehouseId: id }, orderBy: { createdAt: 'desc' }, take: limit }),
+      this.prisma.stockMovement.findMany({ where: { warehouseId: id, type: { in: ['RESERVE', 'UNRESERVE'] } }, orderBy: { createdAt: 'desc' }, take: limit }),
+    ]);
+    const rows = [
+      ...ledger.map((e) => ({
+        id: e.id,
+        type: e.type === 'ADJUSTMENT' || e.type === 'WRITE_OFF' ? 'ADJUST' : e.quantityKg >= 0 ? 'IN' : 'OUT',
+        quantityKg: Math.abs(e.quantityKg),
+        refType: e.refType, refId: e.refId, note: e.reason, createdByUserId: e.createdByUserId, createdAt: e.createdAt,
+      })),
+      ...reservations.map((m) => ({ id: m.id, type: m.type as string, quantityKg: m.quantityKg, refType: m.refType, refId: m.refId, note: m.note, createdByUserId: m.createdByUserId, createdAt: m.createdAt })),
+    ].sort((x, y) => y.createdAt.getTime() - x.createdAt.getTime()).slice(0, limit);
     const names = await this.userNames(rows.map((r) => r.createdByUserId));
     return rows.map((r) => ({
       ...r,
-      createdByName: r.createdByUserId
-        ? (names.get(r.createdByUserId) ?? null)
-        : null,
+      createdByName: r.createdByUserId ? (names.get(r.createdByUserId) ?? null) : null,
     }));
   }
 

@@ -11,6 +11,8 @@ import { SalesService } from '../sales/sales.service';
 import { SettingsService } from '../settings/settings.service';
 import { WarehousesService } from '../warehouses/warehouses.service';
 import { lockWarehouse, warehouseBalance } from '../warehouses/stock';
+import { drawFromBatches } from '../warehouses/batch-draw';
+import { StockAccountingService } from '../ops/stock-accounting.service';
 import {
   canSeeTenantRow,
   tenantWhere,
@@ -41,6 +43,7 @@ export class SaleOrdersService {
     private readonly sales: SalesService,
     private readonly warehouses: WarehousesService,
     private readonly settings: SettingsService,
+    private readonly stockBooks: StockAccountingService,
   ) {}
 
   // ---------- helpers ----------
@@ -623,35 +626,24 @@ export class SaleOrdersService {
       const shortfall = complete
         ? Math.max(order.quantityKg - loadedAfter, 0)
         : 0;
-      const movements: Prisma.StockMovementCreateManyInput[] = [
-        {
-          warehouseId: order.warehouseId,
-          type: 'OUT' as const,
-          quantityKg: weightKg,
-          refType: 'sale_order',
-          refId: id,
-          note: `Load ${loads.length + 1} on ${order.reference}`,
-          createdByUserId: actor.id,
-        },
-      ];
+      // Rice leaves through the batch ledger (below); the stock_movements table only holds order reservations now.
       if (fromReserved + shortfall > 0) {
-        movements.unshift({
-          warehouseId: order.warehouseId,
-          type: 'UNRESERVE' as const,
-          quantityKg: fromReserved + shortfall,
-          refType: 'sale_order',
-          refId: id,
-          note: shortfall
-            ? `Released ${Math.round(shortfall)} kg short of the order`
-            : undefined,
-          createdByUserId: actor.id,
+        await tx.stockMovement.create({
+          data: {
+            warehouseId: order.warehouseId,
+            type: 'UNRESERVE',
+            quantityKg: fromReserved + shortfall,
+            refType: 'sale_order',
+            refId: id,
+            note: shortfall ? `Released ${Math.round(shortfall)} kg short of the order` : undefined,
+            createdByUserId: actor.id,
+          },
         });
       }
-      await tx.stockMovement.createMany({ data: movements });
 
       const sequence = Math.max(0, ...loads.map((l) => l.sequence)) + 1;
       const delivered = mode === 'BUYER_PICKUP';
-      await tx.orderLoad.create({
+      const load = await tx.orderLoad.create({
         data: {
           saleOrderId: id,
           sequence,
@@ -677,6 +669,12 @@ export class SaleOrdersService {
             : {}),
         },
       });
+
+      const drawn = await drawFromBatches(tx, {
+        warehouseId: order.warehouseId, quantityKg: weightKg, grade: order.grade, variety: order.riceVariety,
+        refType: 'sale_order_load', refId: load.id, actorId: actor.id, note: `Load ${sequence} on ${order.reference}`,
+      });
+      await this.stockBooks.postDispatch(tx, { id: load.id, reference: order.reference, mamcosId: order.mamcosId }, drawn, actor.id, 'StockLoad');
 
       const next = complete ? 'RELEASED' : 'PARTIALLY_RELEASED';
       const claimed = await tx.saleOrder.updateMany({

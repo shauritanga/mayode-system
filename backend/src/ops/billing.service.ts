@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClickPesaService } from '../payments/clickpesa.service';
+import { AccountingService } from '../accounting/accounting.service';
 import { hasGrant } from '../auth/role-access';
 import type { RequestUser } from '../common/ownership.service';
 import { Actor, assertVisible, nextRef, OpsNotifyService, scope, Tx } from './ops-common';
@@ -40,6 +41,7 @@ export class BillingService {
     private readonly config: ConfigService,
     private readonly clickPesa: ClickPesaService,
     private readonly notify: OpsNotifyService,
+    private readonly accounting: AccountingService,
   ) {}
 
   // ---------- invoices ----------
@@ -84,6 +86,7 @@ export class BillingService {
         },
       });
       await tx.opsOrder.update({ where: { id: orderId }, data: { status: 'INVOICED' } });
+      await this.book(tx, invoice.id, actor.id);
       await tx.opsOrderEvent.create({ data: { orderId, type: 'invoice.issued', actorUserId: actor.id, fromStatus: o.status, toStatus: 'INVOICED', note: invoice.invoiceNumber } });
       return { invoice, order: o };
     });
@@ -99,6 +102,7 @@ export class BillingService {
       if (i.amountPaid > 0) throw new ConflictException('Payments are recorded against this invoice, so it cannot be voided');
       const claimed = await tx.opsInvoice.updateMany({ where: { id, status: { not: 'VOID' } }, data: { status: 'VOID', voidReason: reason.trim() } });
       if (!claimed.count) throw new ConflictException('This invoice is already void');
+      await this.book(tx, id, actor.id);
       await tx.opsOrder.updateMany({ where: { id: i.orderId, status: 'INVOICED' }, data: { status: 'APPROVED_FOR_INVOICING', fulfilState: 'NOT_AUTHORIZED' } });
       await tx.opsOrderEvent.create({ data: { orderId: i.orderId, type: 'invoice.voided', actorUserId: actor.id, fromStatus: 'INVOICED', toStatus: 'APPROVED_FOR_INVOICING', note: `${i.invoiceNumber}: ${reason.trim()}` } });
     });
@@ -171,7 +175,32 @@ export class BillingService {
     const state = paymentState(inv.total, paid);
     await tx.opsInvoice.update({ where: { id: invoiceId }, data: { amountPaid: paid, status: state === 'PAID' ? 'PAID' : state === 'PARTIALLY_PAID' ? 'PARTIALLY_PAID' : 'ISSUED' } });
     const order = await tx.opsOrder.update({ where: { id: inv.orderId }, data: { amountPaid: paid, paymentStatus: state } });
+    await this.book(tx, invoiceId);
     return { inv, order, paid, state };
+  }
+
+  /**
+   * Keeps the books in step with an invoice and its payments: revenue (and VAT) when it is issued, cash when a payment is confirmed.
+   * Safe to call again after any change: only differences are booked, and a void invoice or a rejected payment books nothing.
+   */
+  private async book(tx: Tx, invoiceId: string, actorId?: string | null) {
+    const inv = await tx.opsInvoice.findUnique({ where: { id: invoiceId }, include: { payments: true } });
+    if (!inv) return;
+    const tax = r2(inv.taxTotal);
+    const revenue = r2(inv.total - tax);
+    const live = inv.status !== 'VOID' && inv.total > 0;
+    await this.accounting.postToLedger(
+      'OpsInvoice', inv.id, inv.invoiceDate, `Invoice ${inv.invoiceNumber}`,
+      live ? [{ code: '1100', debit: inv.total }, { code: '4000', credit: revenue }, ...(tax > 0 ? [{ code: '2400', credit: tax }] : [])] : [],
+      inv.mamcosId, actorId, tx,
+    );
+    for (const p of inv.payments) {
+      await this.accounting.postToLedger(
+        'OpsPayment', p.id, p.paidAt ?? p.createdAt, `Payment for ${inv.invoiceNumber}`,
+        p.status === 'CONFIRMED' && p.amount > 0 ? [{ code: '1000', debit: p.amount }, { code: '1100', credit: p.amount }] : [],
+        inv.mamcosId, actorId, tx,
+      );
+    }
   }
 
   private async lockInvoice(tx: Tx, id: string) {

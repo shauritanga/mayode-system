@@ -1,8 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ProductCategory } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { Actor, assertVisible, batchBalances, lockBatches, nextRef, owner, OpsNotifyService, scope, Tx } from './ops-common';
 import { outputsExceedInput, r3, runBalance } from './ops-rules';
 import { CreateRunDto } from './dto/warehouse.dto';
+import { StockAccountingService } from './stock-accounting.service';
 
 type User = Actor & { id: string };
 /** Runs losing more than this share of what went in are flagged for management. */
@@ -15,6 +17,7 @@ export class ProcessingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notify: OpsNotifyService,
+    private readonly stockBooks: StockAccountingService,
   ) {}
 
   /** Records a run and moves the stock in one transaction: inputs leave, outputs arrive, the difference is the recorded loss. */
@@ -72,6 +75,7 @@ export class ProcessingService {
         await tx.processingInput.create({ data: { runId: run.id, batchId, quantityKg } });
         await tx.stockLedgerEntry.create({ data: { batchId, warehouseId: dto.warehouseId, type: 'PROCESS_OUT', quantityKg: -quantityKg, refType: 'processing', refId: run.id, createdByUserId: actor.id } });
       }
+      const costed: { batchId: string; category: ProductCategory; quantityKg: number; unitPrice: number | null }[] = [];
       for (const o of dto.outputs) {
         let batchId: string | null = null;
         if (o.productId) {
@@ -84,10 +88,12 @@ export class ProcessingService {
             },
           });
           batchId = b.id;
+          costed.push({ batchId: b.id, category: p.category, quantityKg: o.quantityKg, unitPrice: p.unitPrice });
           await tx.stockLedgerEntry.create({ data: { batchId: b.id, warehouseId: dto.warehouseId, type: 'PROCESS_IN', quantityKg: o.quantityKg, refType: 'processing', refId: run.id, createdByUserId: actor.id } });
         }
         await tx.processingOutput.create({ data: { runId: run.id, batchId, productId: o.productId ?? null, kind: o.kind, quantityKg: o.quantityKg, destinationLocation: o.destinationLocation?.trim() || null, note: o.note?.trim() || null } });
       }
+      await this.stockBooks.postRun(tx, run, batches.map((b) => ({ batch: b, quantityKg: merged.get(b.id)! })), costed, actor.id);
       return { run, balance };
     });
 
@@ -166,6 +172,7 @@ export class ProcessingService {
         const other = await tx.processingInput.count({ where: { batchId: p.batchId } });
         if (other) throw new ConflictException('This run’s output has already been processed again');
       }
+      await this.stockBooks.voidRun(tx, run, actor.id);
       for (const p of produced) {
         await tx.stockLedgerEntry.create({ data: { batchId: p.batchId, warehouseId: run.warehouseId, type: 'PROCESS_OUT', quantityKg: -p.quantityKg, reason: `Run ${run.reference} reversed: ${reason.trim()}`, refType: 'processing-reversal', refId: id, reversalOfId: p.id, createdByUserId: actor.id } });
       }

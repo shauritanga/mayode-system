@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Modal from '@/components/Modal';
 import { opsApi } from '@/lib/api';
-import { dateTime, day, kg, label } from '@/lib/ops';
+import { dateTime, day, kg, label, tzs } from '@/lib/ops';
 import { DataTable, ErrorNote, Facts, Field, FormGrid, Loading, Status, Toolbar, useAction, useLoad } from './ui';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -25,7 +25,8 @@ export default function ReceivingPanel({ canCreate, canConfirm, canCancel, initi
             { header: 'From', render: (r) => (r.farmer ? `${r.farmer.firstName} ${r.farmer.lastName}` : r.sellerName ?? (r.farm ? r.farm.name : '—')) },
             { header: 'Source', render: (r) => label(r.sourceType) }, { header: 'Warehouse', render: (r) => r.warehouse.name },
             { header: 'Delivered', align: 'right', render: (r) => kg(r.grossKg) }, { header: 'Rejected', align: 'right', render: (r) => kg(r.rejectedKg) },
-            { header: 'Accepted', align: 'right', render: (r) => kg(r.grossKg - r.rejectedKg) }, { header: 'Status', render: (r) => <Status value={r.status} /> }]} />
+            { header: 'Accepted', align: 'right', render: (r) => kg(r.grossKg - r.rejectedKg) },
+            { header: 'We pay', align: 'right', render: (r) => (r.pricePerKg ? tzs((r.grossKg - r.rejectedKg) * r.pricePerKg) : 'Stored for seller') }, { header: 'Status', render: (r) => <Status value={r.status} /> }]} />
       )}
       {open && <ReceiptModal id={open} canConfirm={canConfirm} canCancel={canCancel} onClose={() => setOpen(null)} onChanged={reload} />}
       {creating && <NewReceiptModal canConfirm={canConfirm} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); reload(); }} />}
@@ -56,6 +57,7 @@ function ReceiptModal({ id, canConfirm, canCancel, onClose, onChanged }: { id: s
         ['Crop season', r.cropCycle ? `${r.cropCycle.season} · ${r.cropCycle.riceVariety ?? ''}` : '—'], ['Harvest batch', r.harvestBatchRef ?? '—'], ['Variety', r.riceVariety ?? '—'],
         ['Delivered', kg(r.grossKg)], ['Rejected', kg(r.rejectedKg)], ['Accepted', kg(r.grossKg - r.rejectedKg)], ['Bags', r.bags ?? '—'], ['Moisture', r.moisturePct != null ? `${r.moisturePct}%` : '—'],
         ['Quality', r.qualityGrade ?? '—'], ['Inspection', label(r.inspection)], ['Stock batch', r.batch?.reference ?? 'Not created yet'],
+        ['Price per kg', r.pricePerKg ? tzs(r.pricePerKg) : 'Not buying: stored for the seller'], ['Value in the books', r.pricePerKg ? tzs((r.grossKg - r.rejectedKg) * r.pricePerKg) : '—'],
       ]} />
       {r.inspectionNotes && <p style={{ fontSize: 13 }}><strong>Inspection notes:</strong> {r.inspectionNotes}</p>}
       {r.cancelReason && <p style={{ fontSize: 13 }}><strong>Cancelled because:</strong> {r.cancelReason}</p>}
@@ -72,7 +74,7 @@ function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean
   const [farmer, setFarmer] = useState<any>(null);
   const [cycles, setCycles] = useState<any[]>([]);
   const [harvests, setHarvests] = useState<any[]>([]);
-  const [f, setF] = useState({ warehouseId: '', productId: '', sellerName: '', sellerPhone: '', farmId: '', cropCycleId: '', harvestRecordId: '', riceVariety: '', receivedAt: new Date().toISOString().slice(0, 10), grossKg: '', bags: '', bagWeightKg: '', moisturePct: '', qualityGrade: '', inspection: 'NOT_REQUIRED', rejectedKg: '', inspectionNotes: '', notes: '' });
+  const [f, setF] = useState({ warehouseId: '', productId: '', sellerName: '', sellerPhone: '', farmId: '', cropCycleId: '', harvestRecordId: '', riceVariety: '', receivedAt: new Date().toISOString().slice(0, 10), grossKg: '', bags: '', bagWeightKg: '', moisturePct: '', pricePerKg: '', qualityGrade: '', inspection: 'NOT_REQUIRED', rejectedKg: '', inspectionNotes: '', notes: '' });
   const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }));
   const { busy, error, run } = useAction();
 
@@ -98,7 +100,7 @@ function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean
   const save = async (confirmNow: boolean) => {
     const body: Record<string, unknown> = {
       warehouseId: f.warehouseId, productId: f.productId, sourceType: source, receivedAt: new Date(f.receivedAt).toISOString(), grossKg: Number(f.grossKg),
-      bags: n(f.bags), bagWeightKg: n(f.bagWeightKg), moisturePct: n(f.moisturePct), qualityGrade: f.qualityGrade || undefined, inspection: f.inspection, rejectedKg: n(f.rejectedKg),
+      bags: n(f.bags), bagWeightKg: n(f.bagWeightKg), moisturePct: n(f.moisturePct), pricePerKg: n(f.pricePerKg), qualityGrade: f.qualityGrade || undefined, inspection: f.inspection, rejectedKg: n(f.rejectedKg),
       inspectionNotes: f.inspectionNotes || undefined, notes: f.notes || undefined, riceVariety: f.riceVariety || pickedCycle?.riceVariety || pickedHarvest?.riceVariety || undefined, confirmNow,
     };
     if (source === 'EXTERNAL_FARMER') {
@@ -158,9 +160,10 @@ function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean
         </FormGrid>
       )}
 
-      <h4 style={{ margin: '16px 0 8px', fontSize: 13 }}>Quantity and quality</h4>
+      <h4 style={{ margin: '16px 0 8px', fontSize: 13 }}>Quantity, price and quality</h4>
       <FormGrid>
         <Field label="Weight delivered (kg)"><input className="input-field" type="number" value={f.grossKg} onChange={(e) => set('grossKg', e.target.value)} /></Field>
+        <Field label="Price we pay (TZS per kg)" hint="Fill in only if we are buying this paddy. Leave empty if we are just storing it for the farmer."><input className="input-field" type="number" min="0" placeholder="Not buying" value={f.pricePerKg} onChange={(e) => set('pricePerKg', e.target.value)} /></Field>
         <Field label="Bags"><input className="input-field" type="number" value={f.bags} onChange={(e) => set('bags', e.target.value)} /></Field>
         <Field label="Weight per bag (kg)"><input className="input-field" type="number" value={f.bagWeightKg} onChange={(e) => set('bagWeightKg', e.target.value)} /></Field>
         <Field label="Moisture (%)"><input className="input-field" type="number" value={f.moisturePct} onChange={(e) => set('moisturePct', e.target.value)} /></Field>
@@ -170,6 +173,11 @@ function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean
         <Field label="Rejected (kg)"><input className="input-field" type="number" value={f.rejectedKg} onChange={(e) => set('rejectedKg', e.target.value)} /></Field>
         <Field label="Inspection notes" wide><input className="input-field" value={f.inspectionNotes} onChange={(e) => set('inspectionNotes', e.target.value)} /></Field>
       </FormGrid>
+      {Number(f.pricePerKg) > 0 && Number(f.grossKg) > 0 && (
+        <p className="glass-card" style={{ padding: 10, marginTop: 12, fontSize: 14 }}>
+          We will owe the farmer <strong>{tzs(Math.max(Number(f.grossKg) - (Number(f.rejectedKg) || 0), 0) * Number(f.pricePerKg))}</strong> for {kg(Math.max(Number(f.grossKg) - (Number(f.rejectedKg) || 0), 0))} accepted. This is recorded in the accounts when the stock is added.
+        </p>
+      )}
     </Modal>
   );
 }

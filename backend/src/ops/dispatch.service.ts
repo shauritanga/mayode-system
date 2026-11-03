@@ -5,6 +5,7 @@ import { Actor, assertVisible, batchBalances, lockBatches, nextRef, OpsNotifySer
 import { r3, suggestAllocation } from './ops-rules';
 import { lineKg } from './sales-ops.service';
 import { AllocateDto, DeliveryDto, PrepareDispatchDto } from './dto/commercial.dto';
+import { StockAccountingService } from './stock-accounting.service';
 
 type User = Actor & { id: string };
 const OPEN_STATES = ['AUTHORIZED', 'SHORTAGE', 'ALLOCATED', 'PARTIALLY_DISPATCHED'] as const;
@@ -14,6 +15,7 @@ export class DispatchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notify: OpsNotifyService,
+    private readonly stockBooks: StockAccountingService,
   ) {}
 
   /** Only orders accounts have released appear here; nothing else is the warehouse's to prepare. */
@@ -292,6 +294,7 @@ export class DispatchService {
       for (const [batchId, qty] of perBatch) {
         await tx.stockLedgerEntry.create({ data: { batchId, warehouseId: d.warehouseId, type: 'DISPATCH', quantityKg: -qty, refType: 'dispatch', refId: d.id, createdByUserId: actor.id } });
       }
+      await this.stockBooks.postDispatch(tx, d, [...perBatch].map(([batchId, quantityKg]) => ({ batchId, quantityKg })), actor.id);
       for (const l of d.lines) {
         // Take the quantity off the oldest reservation for this line and batch first.
         let left = l.quantityKg;

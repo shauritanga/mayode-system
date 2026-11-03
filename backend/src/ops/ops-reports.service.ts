@@ -148,7 +148,7 @@ export class OpsReportsService {
         return (await this.stock.position(actor, { from: f.from, to: f.to, productId: f.productId, brand: f.brand, category: f.category, warehouseId: f.warehouseId, batchId: f.batchId })).map((p) => ({
           Product: p.product, Brand: p.brand ?? '', Category: p.category, Variety: p.variety ?? '', Grade: p.grade ?? '', 'Pack (kg)': p.packSizeKg ?? '', Warehouse: p.warehouse ?? '',
           'Opening kg': p.openingKg, 'Received kg': p.receivedKg, 'Processed out kg': p.processedOutKg, 'Produced kg': p.producedKg, 'Dispatched kg': p.dispatchedKg, 'Adjustments kg': p.adjustmentsKg, 'Transfers kg': p.transfersKg,
-          'Closing kg': p.closingKg, 'Reserved kg': p.reservedKg, 'Available kg': p.availableKg, 'In transit kg': p.inTransitKg, 'Indicative value (TZS)': p.indicativeValue ?? '', 'Low stock': p.lowStock ? 'Yes' : '',
+          'Closing kg': p.closingKg, 'Reserved kg': p.reservedKg, 'Available kg': p.availableKg, 'In transit kg': p.inTransitKg, 'Stock value at cost (TZS)': p.stockValue ?? '', 'Low stock': p.lowStock ? 'Yes' : '',
         }));
       case 'goods-received':
         return (await this.receiving.list(actor, { from: f.from, to: f.to, status: f.status, farmerId: f.farmerId, sourceType: f.sourceType })).map((r) => ({

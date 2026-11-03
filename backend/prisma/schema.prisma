@@ -4248,6 +4248,8 @@ model StockBatch {
   statusReason          String?        @map("status_reason")
   statusChangedByUserId String?        @map("status_changed_by_user_id")
   statusChangedAt       DateTime?      @map("status_changed_at")
+  /// What one kilogram cost the cooperative (TZS). Null = cost not set, so the batch is not valued in the books.
+  unitCost              Float?         @map("unit_cost")
   createdAt             DateTime       @default(now()) @map("created_at")
 
   product         Product            @relation(fields: [productId], references: [id])
@@ -4382,6 +4384,10 @@ model GoodsReceipt {
   harvestRecordId   String?          @map("harvest_record_id")
   harvestBatchRef   String?          @map("harvest_batch_ref")
   riceVariety       String?          @map("rice_variety")
+  /// TZS per kg the cooperative pays. Set = the cooperative is buying this rice (it owns it and the purchase is booked); empty = held for the farmer.
+  pricePerKg        Float?           @map("price_per_kg")
+  /// Set when another record already booked this rice in the accounts (a farmer delivery), so the receipt must not book it again.
+  valuedBySource    String?          @map("valued_by_source")
   receivedAt        DateTime         @map("received_at")
   grossKg           Float            @map("gross_kg")
   bags              Int?

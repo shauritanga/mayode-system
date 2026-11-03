@@ -51,6 +51,7 @@ const CHART = [
   ['5100', 'Loan repayment expense', AccountType.EXPENSE],
   ['5200', 'Farmer rice procurement', AccountType.EXPENSE],
   ['5300', 'Cost of goods sold', AccountType.EXPENSE],
+  ['5310', 'Stock losses and shrinkage', AccountType.EXPENSE],
   ['5400', 'Depreciation expense', AccountType.EXPENSE],
   ['5410', 'Repairs and maintenance', AccountType.EXPENSE],
   ['5500', 'Salaries and wages', AccountType.EXPENSE],

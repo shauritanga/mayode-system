@@ -11,6 +11,7 @@ import type { RequestUser } from '../common/ownership.service';
 import { ExportService } from '../common/export.service';
 import { CatalogService } from './catalog.service';
 import { StockService } from './stock.service';
+import { StockAccountingService } from './stock-accounting.service';
 import { ReceivingService } from './receiving.service';
 import { ProcessingService } from './processing.service';
 import { TraceabilityService } from './traceability.service';
@@ -24,7 +25,7 @@ import { FarmInputsService } from './farm-inputs.service';
 import { HarvestService } from './harvest.service';
 import { OpsReportsService } from './ops-reports.service';
 import { UpsertCustomerDto, UpsertProductDto } from './dto/catalog.dto';
-import { AdjustStockDto, BatchStatusDto, CreateReceiptDto, CreateRunDto, CreateStockCountDto, ReasonDto, ReceiveTransferDto, StockCountLineDto, TransferDto } from './dto/warehouse.dto';
+import { AdjustStockDto, BatchStatusDto, CreateReceiptDto, CreateRunDto, CreateStockCountDto, OpeningValueDto, ReasonDto, ReceiveTransferDto, StockCountLineDto, TransferDto } from './dto/warehouse.dto';
 import { AllocateDto, AuthorizeDto, ControlNumberDto, CreateOrderDto, CreateQuotationDto, DeliveryDto, IssueInvoiceDto, MobilePaymentDto, PrepareDispatchDto, RecordPaymentDto, ReviewOrderDto, ShortageDto, UpdateOrderDto } from './dto/commercial.dto';
 import { AdjustInputDto, CheckInDto, CreateHarvestDto, CreateInspectionDto, CreateMayodeFarmDto, CreateTaskDto, NewCropCycleDto, NewPlotDto, ReviewTaskDto, StartWithoutGpsDto, StockInDto, SubmitInspectionDto, SubmitReportDto, TransportDto, UpsertFarmDto, UpsertInputItemDto } from './dto/farm.dto';
 
@@ -75,6 +76,7 @@ export class OpsWarehouseController {
     private readonly processing: ProcessingService,
     private readonly trace: TraceabilityService,
     private readonly farm: FarmOpsService,
+    private readonly stockBooks: StockAccountingService,
   ) {}
 
   // lookups used by the receiving screen
@@ -104,6 +106,10 @@ export class OpsWarehouseController {
   position(@CurrentUser() u: U, @Query() q: Record<string, string>) { return this.stock.position(u, q); }
   @Get('stock/summary') @RequirePermission('ops_stock', 'VIEW')
   summary(@CurrentUser() u: U) { return this.stock.summary(u); }
+  @Get('stock/valuation') @RequirePermission('ops_stock', 'VIEW')
+  valuation(@CurrentUser() u: U) { return this.stockBooks.valuation(u); }
+  @Post('stock/batches/:id/opening-value') @RequirePermission('ops_stock', 'EDIT')
+  openingValue(@Param('id') id: string, @Body() dto: OpeningValueDto, @CurrentUser() u: U) { return this.stockBooks.setOpeningValue(id, dto.unitCost, u); }
   @Get('stock/ledger') @RequirePermission('ops_stock', 'VIEW')
   ledger(@CurrentUser() u: U, @Query() q: Record<string, string>) { return this.stock.ledger(u, q); }
   @Post('stock/adjust') @RequirePermission('ops_stock', 'EDIT')
