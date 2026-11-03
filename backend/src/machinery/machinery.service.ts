@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
+import { AccountingService } from '../accounting/accounting.service';
 import {
   CreateActivityDto, CreateEquipmentDto, ListQueryDto, UpdateActivityDto, UpdateEquipmentDto, UpdateRatesDto,
 } from './dto/machinery.dto';
@@ -16,6 +17,7 @@ export class MachineryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ownership: OwnershipService,
+    private readonly accounting: AccountingService,
   ) {}
 
   private tenant(actor: RequestUser, requested?: string): string {
@@ -210,6 +212,9 @@ export class MachineryService {
     }
     const date = paidOn ? day(paidOn) : today();
     if (date > today()) throw new BadRequestException('The payment date cannot be in the future');
+    // Book the income first: re-posting the same source changes nothing, so a retry after a failed status update is safe.
+    await this.accounting.postToLedger('ToolRegistrationFee', current.id, new Date(`${date.toISOString().slice(0, 10)}T09:00:00.000Z`), `Tool registration fee: ${current.name}`,
+      [{ code: '1000', debit: num(current.registrationFee) }, { code: '4240', credit: num(current.registrationFee) }], mamcosId, actor.id);
     return this.prisma.amcosEquipment.update({ where: { id }, data: { registrationFeeStatus: 'PAID', registrationFeePaidOn: date } });
   }
 
@@ -222,6 +227,9 @@ export class MachineryService {
     const date = paidOn ? day(paidOn) : today();
     if (date > today()) throw new BadRequestException('The payment date cannot be in the future');
     if (date < current.activityDate) throw new BadRequestException('The payment date is before the job date');
+    const equipment = await this.prisma.amcosEquipment.findUnique({ where: { id: current.equipmentId }, select: { name: true } });
+    await this.accounting.postToLedger('ToolContribution', current.id, new Date(`${date.toISOString().slice(0, 10)}T09:00:00.000Z`), `Tool contribution: ${equipment?.name ?? 'tool'}, ${num(current.hectares)} ha`,
+      [{ code: '1000', debit: num(current.feeAmount) }, { code: '4250', credit: num(current.feeAmount) }], mamcosId, actor.id);
     return this.prisma.machineryActivity.update({ where: { id }, data: { feeStatus: 'PAID', feePaidOn: date, updatedById: actor.id } });
   }
 

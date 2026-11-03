@@ -206,11 +206,9 @@ export const navGroups: NavGroup[] = [
                 { href: '/dashboard/accounting/purchases-suppliers/supplier-payments', label: 'Supplier Payments', icon: Wallet01Icon, roles: [] },
                 { href: '/dashboard/accounting/purchases-suppliers/outstanding-balances', label: 'Outstanding Balances', icon: Wallet01Icon, roles: [] },
               ] },
-              { href: '/dashboard/accounting/expenses-petty-cash', label: 'Expenses & Petty Cash', icon: Wallet01Icon, roles: [], resource: 'accounting', children: [
-                { href: '/dashboard/accounting/expenses-petty-cash/expense-claims', label: 'Expense Claims', icon: File01Icon, roles: [] },
-                { href: '/dashboard/accounting/expenses-petty-cash/payment-vouchers', label: 'Payment Vouchers', icon: FileEditIcon, roles: [] },
-                { href: '/dashboard/accounting/expenses-petty-cash/cash-advances', label: 'Cash Advances', icon: Wallet01Icon, roles: [] },
-                { href: '/dashboard/accounting/expenses-petty-cash/expense-approvals', label: 'Expense Approvals', icon: Shield01Icon, roles: [] },
+              { href: '/dashboard/accounting/expenses-income', label: 'Expenses & Income', icon: Wallet01Icon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/expenses-income/expenses', label: 'Expenses', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/expenses-income/other-income', label: 'Other Income', icon: Wallet01Icon, roles: [] },
               ] },
               { href: '/dashboard/accounting/assets-loans', label: 'Assets & Loans', icon: Building05Icon, roles: [], resource: 'accounting', children: [
                 { href: '/dashboard/accounting/assets-loans/equipment-register', label: 'Equipment Register', icon: Package01Icon, roles: [] },
@@ -223,6 +221,7 @@ export const navGroups: NavGroup[] = [
                 { href: '/dashboard/accounting/general-ledger/journal-entries', label: 'Journal Entries', icon: FileEditIcon, roles: [] },
                 { href: '/dashboard/accounting/general-ledger/trial-balance', label: 'Trial Balance', icon: BookOpen01Icon, roles: [] },
                 { href: '/dashboard/accounting/general-ledger/account-balances', label: 'Account Balances', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/general-ledger/period-close', label: 'Period Close', icon: File01Icon, roles: [] },
               ] },
               { href: '/dashboard/accounting/budgets-cooperative-funds', label: 'Budgets & Cooperative Funds', icon: GiftIcon, roles: [], resource: 'accounting', children: [
                 { href: '/dashboard/accounting/budgets-cooperative-funds/annual-budgets', label: 'Annual Budgets', icon: File01Icon, roles: [] },
@@ -235,6 +234,10 @@ export const navGroups: NavGroup[] = [
                 { href: '/dashboard/accounting/financial-reports/balance-sheet', label: 'Balance Sheet', icon: File01Icon, roles: [] },
                 { href: '/dashboard/accounting/financial-reports/cash-flow-statement', label: 'Cash Flow Statement', icon: Wallet01Icon, roles: [] },
                 { href: '/dashboard/accounting/financial-reports/farmer-liabilities', label: 'Farmer Liabilities', icon: UserGroupIcon, roles: [] },
+              ] },
+              { href: '/dashboard/accounting/tax-compliance', label: 'Tax & Compliance', icon: File01Icon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/tax-compliance/vat-return', label: 'VAT Return', icon: File01Icon, roles: [] },
+                { href: '/dashboard/accounting/tax-compliance/tax-settings', label: 'Tax Settings', icon: File01Icon, roles: [] },
               ] },
             ],
           },

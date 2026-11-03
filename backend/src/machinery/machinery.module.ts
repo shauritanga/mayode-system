@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
+import { AccountingModule } from '../accounting/accounting.module';
 import { MachineryController } from './machinery.controller';
 import { MachineryService } from './machinery.service';
 
-@Module({ controllers: [MachineryController], providers: [MachineryService] })
+@Module({ imports: [AccountingModule], controllers: [MachineryController], providers: [MachineryService] })
 export class MachineryModule {}

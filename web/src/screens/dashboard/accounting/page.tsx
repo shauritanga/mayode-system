@@ -3,11 +3,12 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import { BookOpen, Building2, ChartNoAxesCombined, ChevronRight, Factory, FileChartColumn, HandCoins, Landmark, Package, ReceiptText, ShoppingCart, UsersRound, Wheat } from 'lucide-react';
+import { BookOpen, Building2, ChartNoAxesCombined, ChevronRight, Factory, FileChartColumn, HandCoins, Landmark, Package, ReceiptText, Scale, ShoppingCart, UsersRound, Wheat } from 'lucide-react';
 import { accountingApi, financeApi, inventoryApi, loansApi, mamcosApi, salesApi, suppliersApi } from '@/lib/api';
 import ErrorBanner from '@/components/ErrorBanner';
 import Modal from '@/components/Modal';
 import { useAuthStore } from '@/store/auth.store';
+import { BankReconciliationView, CashTransactionsView, DocumentsView, PeriodCloseView, TaxSettingsView, VatReturnView } from './controls';
 
 const MENU = [
   ['Farmer Financial Accounts', 'farmer-financial-accounts', ['Farmer Ledger', 'Farmer Balances', 'Advances', 'Deductions', 'Farmer Statements']],
@@ -17,14 +18,15 @@ const MENU = [
   ['Milling Cost Accounting', 'milling-cost-accounting', ['Production Costs', 'Milling Yield', 'By-products', 'Cost per Kilogram']],
   ['Cash & Banking', 'cash-banking', ['Cashbooks', 'Bank Accounts', 'Mobile Money', 'Bank Reconciliation']],
   ['Purchases & Suppliers', 'purchases-suppliers', ['Supplier Bills', 'Supplier Payments', 'Outstanding Balances']],
-  ['Expenses & Petty Cash', 'expenses-petty-cash', ['Expense Claims', 'Payment Vouchers', 'Cash Advances', 'Expense Approvals']],
+  ['Expenses & Income', 'expenses-income', ['Expenses', 'Other Income']],
   ['Assets & Loans', 'assets-loans', ['Equipment Register', 'Depreciation', 'Borrowings', 'Interest']],
-  ['General Ledger', 'general-ledger', ['Chart of Accounts', 'Journal Entries', 'Trial Balance', 'Account Balances']],
+  ['General Ledger', 'general-ledger', ['Chart of Accounts', 'Journal Entries', 'Trial Balance', 'Account Balances', 'Period Close']],
   ['Budgets & Cooperative Funds', 'budgets-cooperative-funds', ['Annual Budgets', 'Member Contributions', 'Reserves', 'Approved Allocations']],
   ['Financial Reports', 'financial-reports', ['Income Statement', 'Balance Sheet', 'Cash Flow Statement', 'Farmer Liabilities']],
+  ['Tax & Compliance', 'tax-compliance', ['VAT Return', 'Tax Settings']],
 ] as const;
 
-const MENU_ICONS = [UsersRound, Wheat, HandCoins, ShoppingCart, Factory, Landmark, Package, ReceiptText, Building2, BookOpen, ChartNoAxesCombined, FileChartColumn];
+const MENU_ICONS = [UsersRound, Wheat, HandCoins, ShoppingCart, Factory, Landmark, Package, ReceiptText, Building2, BookOpen, ChartNoAxesCombined, FileChartColumn, Scale];
 
 const slug = (label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 const titleCase = (value: string) => value.split('-').map((part) => part ? part[0].toUpperCase() + part.slice(1) : '').join(' ');
@@ -64,6 +66,10 @@ export default function AccountingPage() {
   const [accountBalancesAsOf, setAccountBalancesAsOf] = useState(todayEAT);
   const [accountBalanceSearch, setAccountBalanceSearch] = useState('');
   const [accountBalanceType, setAccountBalanceType] = useState('ALL');
+  const [journalSearch, setJournalSearch] = useState('');
+  const [journalFrom, setJournalFrom] = useState('');
+  const [journalTo, setJournalTo] = useState('');
+  const [journalOrigin, setJournalOrigin] = useState('');
 
   useEffect(() => {
     if (path[0]) setOpenCategory(path[0]);
@@ -88,7 +94,7 @@ export default function AccountingPage() {
       'rice-sales-receivables/sales-invoices': () => salesApi.list(),
       'rice-sales-receivables/customer-receipts': () => accountingApi.receivables(),
       'rice-sales-receivables/credit-sales': () => accountingApi.receivables(),
-      'rice-sales-receivables/customer-debtors': () => accountingApi.receivables(),
+      'rice-sales-receivables/customer-debtors': () => Promise.resolve({ data: [] }),
       'milling-cost-accounting/production-costs': () => financeApi.getAllCosts(),
       'milling-cost-accounting/milling-yield': () => inventoryApi.dashboardSummary(),
       'milling-cost-accounting/by-products': () => inventoryApi.lots(),
@@ -96,20 +102,16 @@ export default function AccountingPage() {
       'cash-banking/cashbooks': () => accountingApi.cashFlow(),
       'cash-banking/bank-accounts': () => Promise.resolve({ data: [] }),
       'cash-banking/mobile-money': () => accountingApi.cashFlow(),
-      'cash-banking/bank-reconciliation': () => accountingApi.cashFlow(),
-      'purchases-suppliers/supplier-bills': () => accountingApi.payables(),
+      'cash-banking/bank-reconciliation': () => Promise.resolve({ data: [] }),
+      'purchases-suppliers/supplier-bills': () => Promise.resolve({ data: [] }),
       'purchases-suppliers/supplier-payments': () => accountingApi.payables(),
       'purchases-suppliers/outstanding-balances': () => accountingApi.payables(),
-      'expenses-petty-cash/expense-claims': () => financeApi.getAllCosts(),
-      'expenses-petty-cash/payment-vouchers': () => financeApi.getAllCosts(),
-      'expenses-petty-cash/cash-advances': () => loansApi.getAll(),
-      'expenses-petty-cash/expense-approvals': () => financeApi.getAllCosts(),
       'assets-loans/equipment-register': () => Promise.resolve({ data: [] }),
       'assets-loans/depreciation': () => accountingApi.trialBalance(),
       'assets-loans/borrowings': () => loansApi.getAll(),
       'assets-loans/interest': () => loansApi.getAll(),
       'general-ledger/chart-of-accounts': () => accountingApi.accounts(),
-      'general-ledger/journal-entries': () => accountingApi.journalEntries(),
+      'general-ledger/journal-entries': () => accountingApi.journalEntries({ q: journalSearch.trim() || undefined, from: journalFrom || undefined, to: journalTo || undefined, sourceType: journalOrigin || undefined }),
       'general-ledger/trial-balance': () => accountingApi.trialBalance({ to: trialBalanceAsOf }),
       'general-ledger/account-balances': () => accountingApi.accountBalances({ to: accountBalancesAsOf }),
       'budgets-cooperative-funds/annual-budgets': () => accountingApi.listBudgets(),
@@ -120,9 +122,14 @@ export default function AccountingPage() {
       'financial-reports/balance-sheet': () => accountingApi.balanceSheet(),
       'financial-reports/cash-flow-statement': () => accountingApi.cashFlow(),
       'financial-reports/farmer-liabilities': () => accountingApi.farmerLiabilities(),
+      'general-ledger/period-close': () => Promise.resolve({ data: [] }),
+      'expenses-income/expenses': () => Promise.resolve({ data: [] }),
+      'expenses-income/other-income': () => Promise.resolve({ data: [] }),
+      'tax-compliance/vat-return': () => Promise.resolve({ data: [] }),
+      'tax-compliance/tax-settings': () => Promise.resolve({ data: [] }),
     };
     return calls[key] ?? (() => accountingApi.statements());
-  }, [path[0], path[1], selectedCategory, submenu, trialBalanceAsOf, accountBalancesAsOf]);
+  }, [path[0], path[1], selectedCategory, submenu, trialBalanceAsOf, accountBalancesAsOf, journalSearch, journalFrom, journalTo, journalOrigin]);
 
   useEffect(() => {
     let active = true;
@@ -153,11 +160,17 @@ export default function AccountingPage() {
   const [reserveError, setReserveError] = useState('');
   const [reserveCooperatives, setReserveCooperatives] = useState<{ id: string; name: string }[]>([]);
   const [reserveForm, setReserveForm] = useState({ mamcosId: '', amount: '', allocationDate: new Date().toISOString().slice(0, 10), description: '' });
+  const [reversing, setReversing] = useState<any>(null);
+  const [reverseReason, setReverseReason] = useState('');
+  const [reverseDate, setReverseDate] = useState(todayEAT);
+  const [reverseSaving, setReverseSaving] = useState(false);
+  const [reverseError, setReverseError] = useState('');
   const [journalFormOpen, setJournalFormOpen] = useState(false);
   const [journalSaving, setJournalSaving] = useState(false);
   const [journalError, setJournalError] = useState('');
   const [journalForm, setJournalForm] = useState({ entryDate: new Date().toISOString().slice(0, 10), description: '' });
-  const [journalLines, setJournalLines] = useState([{ accountId: '', debit: '', credit: '' }, { accountId: '', debit: '', credit: '' }]);
+  const emptyJournalLines = () => [{ accountId: '', side: 'debit', amount: '' }, { accountId: '', side: 'credit', amount: '' }];
+  const [journalLines, setJournalLines] = useState(emptyJournalLines);
 
   useEffect(() => {
     if (!isAnnualBudget && submenu !== 'Journal Entries') return;
@@ -268,6 +281,23 @@ export default function AccountingPage() {
     }
   };
 
+  const reverseJournal = async () => {
+    if (!reversing) return;
+    setReverseSaving(true);
+    setReverseError('');
+    try {
+      await accountingApi.reverseJournal(reversing.id, { reason: reverseReason, date: reverseDate });
+      setReversing(null);
+      setReverseReason('');
+      setReload((value) => value + 1);
+    } catch (reason: any) {
+      const message = reason?.response?.data?.message;
+      setReverseError(Array.isArray(message) ? message.join(', ') : message || 'Could not reverse this journal.');
+    } finally {
+      setReverseSaving(false);
+    }
+  };
+
   const saveJournalEntry = async () => {
     setJournalSaving(true);
     setJournalError('');
@@ -275,11 +305,11 @@ export default function AccountingPage() {
       await accountingApi.createJournalEntry({
         entryDate: journalForm.entryDate,
         description: journalForm.description,
-        lines: journalLines.map((line) => ({ accountId: line.accountId, debit: Number(line.debit || 0), credit: Number(line.credit || 0) })),
+        lines: journalLines.map((line) => ({ accountId: line.accountId, debit: line.side === 'debit' ? Number(line.amount || 0) : 0, credit: line.side === 'credit' ? Number(line.amount || 0) : 0 })),
       });
       setJournalFormOpen(false);
       setJournalForm({ entryDate: new Date().toISOString().slice(0, 10), description: '' });
-      setJournalLines([{ accountId: '', debit: '', credit: '' }, { accountId: '', debit: '', credit: '' }]);
+      setJournalLines(emptyJournalLines());
       setReload((value) => value + 1);
     } catch (reason: any) {
       setJournalError(reason?.response?.data?.message || 'Could not post this journal entry.');
@@ -319,6 +349,7 @@ export default function AccountingPage() {
     return matchesType && matchesSearch;
   });
   const canEditAccounting = currentUser?.role === 'SUPER_ADMIN' || currentUser?.permissions?.some((permission) => permission.resource === 'accounting' && permission.action === 'EDIT');
+  const canDeleteAccounting = currentUser?.role === 'SUPER_ADMIN' || currentUser?.permissions?.some((permission) => permission.resource === 'accounting' && permission.action === 'DELETE');
   const canCreateAccounting = currentUser?.role === 'SUPER_ADMIN' || currentUser?.permissions?.some((permission) => permission.resource === 'accounting' && permission.action === 'CREATE');
   const reportDate = (value?: string | null) => {
     if (!value) return null;
@@ -332,10 +363,20 @@ export default function AccountingPage() {
       : 'All available dates'
     : '';
 
+  const customKey = `${selectedCategory[1]}/${slug(submenu)}`;
+  const customView = customKey === 'cash-banking/bank-reconciliation' ? <BankReconciliationView canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} canDelete={!!canDeleteAccounting} />
+    : customKey === 'general-ledger/period-close' ? <PeriodCloseView canClose={!!canEditAccounting} canReopen={!!canDeleteAccounting} />
+    : customKey === 'expenses-income/expenses' ? <CashTransactionsView kind="EXPENSE" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
+    : customKey === 'expenses-income/other-income' ? <CashTransactionsView kind="INCOME" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
+    : customKey === 'tax-compliance/vat-return' ? <VatReturnView canCreate={!!canCreateAccounting} />
+    : customKey === 'tax-compliance/tax-settings' ? <TaxSettingsView canEdit={!!canEditAccounting} />
+    : customKey === 'rice-sales-receivables/customer-debtors' ? <DocumentsView kind="invoice" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
+    : customKey === 'purchases-suppliers/supplier-bills' ? <DocumentsView kind="bill" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
+    : null;
+
   return <main>
     <div style={{ marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ width: 4, height: 26, borderRadius: 9, background: 'var(--gold-400)' }} /><h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 24, fontWeight: 800, margin: 0 }}>{title}</h1></div>
-      <p className="muted" style={{ margin: '6px 0 0 14px' }}>Cooperative accounting records linked to procurement, farmer payments, inventory, sales, suppliers and the general ledger.</p>
     </div>
     <ErrorBanner message={error} onDismiss={() => setError('')} />
     <div className="accounting-layout">
@@ -366,7 +407,7 @@ export default function AccountingPage() {
       </aside>
       <div className="accounting-workspace">
       <>
-      {approvedAllocationReport ? <div className="approved-allocation-report">
+      {customView ? customView : approvedAllocationReport ? <div className="approved-allocation-report">
         <section className="glass-card" style={{ padding: 20, marginBottom: 16 }}><h2 style={{ margin: 0, fontSize: 20 }}>Approved Allocations</h2><p className="muted" style={{ margin: '6px 0 0' }}>Account allocations from budgets approved by an accounting editor.</p></section>
         <div className="metric-grid" style={{ marginBottom: 16 }}>
           <div className="glass-card" style={{ padding: 16 }}><div className="muted" style={{ fontSize: 12 }}>Approved allocation total</div><strong style={{ display: 'block', marginTop: 6, fontSize: 20 }}>{formatTzs(approvedAllocationReport.totalApproved)}</strong></div>
@@ -575,30 +616,54 @@ export default function AccountingPage() {
         <FarmerLiabilitySection title="Loan balances owed by farmers" empty="No outstanding farmer loan balances." rows={farmerLiabilities.loanObligations ?? []} />
         <FarmerProcurementSection rows={farmerLiabilities.procurementPayables ?? []} />
       </div> : journalEntries ? <div className="journal-entry-workspace">
-        <section className="glass-card" style={{ padding: 20, marginBottom: 16 }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}><div><h2 style={{ margin: 0, fontSize: 20 }}>Journal Entries</h2><p className="muted" style={{ margin: '6px 0 0' }}>Review journals from connected transactions and post a balanced debit and credit adjustment.</p></div>{canCreateAccounting && <button type="button" className="btn-primary" onClick={() => { setJournalError(''); setJournalFormOpen(true); }}>New journal entry</button>}</div></section>
-        <section className="table-panel"><div className="section-toolbar"><strong>Journal register</strong><span className="muted">{journalEntries.length} entries</span></div>
+        {canCreateAccounting && <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}><button type="button" className="btn-primary" onClick={() => { setJournalError(''); setJournalFormOpen(true); }}>New journal entry</button></div>}
+        <section className="table-panel"><div className="section-toolbar" style={{ flexWrap: 'wrap', gap: 10 }}><strong>Journal register</strong>
+          <input className="input-field" style={{ width: 200 }} placeholder="Search number or description" value={journalSearch} onChange={(event) => setJournalSearch(event.target.value)} />
+          <input className="input-field" style={{ width: 150 }} type="date" aria-label="From date" value={journalFrom} onChange={(event) => setJournalFrom(event.target.value)} />
+          <input className="input-field" style={{ width: 150 }} type="date" aria-label="To date" value={journalTo} onChange={(event) => setJournalTo(event.target.value)} />
+          <select className="input-field" style={{ width: 170 }} aria-label="Origin" value={journalOrigin} onChange={(event) => setJournalOrigin(event.target.value)}><option value="">All origins</option><option value="MANUAL_JOURNAL">Manual journals</option><option value="REVERSAL">Reversals</option><option value="Invoice">Invoices</option><option value="Bill">Bills</option><option value="Sale">Sales</option><option value="Payroll">Payroll</option></select>
+          <span className="muted" style={{ marginLeft: 'auto' }}>{journalEntries.length} entries</span></div>
           {loading ? <div style={{ padding: 32, textAlign: 'center' }}>Loading journal entries…</div> : !journalEntries.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No journal entries have been posted.</div> : <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Journal number</th><th>Date</th><th>Origin</th><th>Description</th><th>Account</th><th className="num">Debit (TZS)</th><th className="num">Credit (TZS)</th></tr></thead><tbody>{journalEntries.map((entry: any) => <Fragment key={`${entry.sourceType}:${entry.id}`}>
             {(entry.lines ?? []).map((line: any, index: number) => <tr key={`${entry.sourceType}:${entry.id}:${line.accountId}`}>
-              <td style={{ fontWeight: 600 }}>{index === 0 ? entry.entryNumber : ''}</td>
+              <td style={{ fontWeight: 600 }}>{index === 0 ? <>{entry.entryNumber}{entry.revision > 1 && <div className="muted" style={{ fontSize: 12 }}>Adjustment</div>}{entry.reversed && <div style={{ fontSize: 12, color: 'var(--red-400)' }}>Reversed</div>}{entry.reversesJournalId && <div className="muted" style={{ fontSize: 12 }}>Reversal</div>}</> : ''}</td>
               <td>{index === 0 ? scalar(entry.entryDate) : ''}</td>
-              <td>{index === 0 ? <>{entry.sourceType === 'MANUAL_JOURNAL' ? 'Manual journal' : entry.sourceType}<div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{entry.sourceId}</div></> : ''}</td>
+              <td>{index === 0 ? (entry.sourceType === 'MANUAL_JOURNAL' ? 'Manual' : String(entry.sourceType).replace(/([a-z])([A-Z])/g, '$1 $2')) : ''}</td>
               <td>{index === 0 ? entry.description || '—' : ''}</td>
               <td>{line.account?.code} · {line.account?.name}</td>
               <td className="num">{line.debit ? formatTzs(line.debit) : '—'}</td>
               <td className="num">{line.credit ? formatTzs(line.credit) : '—'}</td>
             </tr>)}
-            <tr key={`${entry.sourceType}:${entry.id}:total`}><td colSpan={5} style={{ textAlign: 'right', fontWeight: 700 }}>Journal total</td><td className="num" style={{ fontWeight: 700 }}>{formatTzs(entry.totalDebit)}</td><td className="num" style={{ fontWeight: 700 }}>{formatTzs(entry.totalCredit)}</td></tr>
+            <tr key={`${entry.sourceType}:${entry.id}:total`}><td colSpan={5} style={{ textAlign: 'right', fontWeight: 700 }}>{canEditAccounting && entry.sourceType === 'MANUAL_JOURNAL' && !entry.reversed && <button type="button" className="btn-secondary" style={{ marginRight: 12 }} onClick={() => { setReverseError(''); setReverseReason(''); setReversing(entry); }}>Reverse</button>}Journal total</td><td className="num" style={{ fontWeight: 700 }}>{formatTzs(entry.totalDebit)}</td><td className="num" style={{ fontWeight: 700 }}>{formatTzs(entry.totalCredit)}</td></tr>
           </Fragment>)}</tbody></table></div>}
         </section>
         {journalFormOpen && <Modal title="New journal entry" onClose={() => !journalSaving && setJournalFormOpen(false)} width="760px" footer={<><button type="button" className="btn-secondary" onClick={() => setJournalFormOpen(false)} disabled={journalSaving}>Cancel</button><button type="submit" form="journal-entry-form" className="btn-primary" disabled={journalSaving}>{journalSaving ? 'Posting…' : 'Post journal'}</button></>}>
           <form id="journal-entry-form" onSubmit={(event) => { event.preventDefault(); void saveJournalEntry(); }} style={{ display: 'grid', gap: 10 }}>
             <label className="form-label">Description<input className="input-field" required value={journalForm.description} onChange={(event) => setJournalForm({ ...journalForm, description: event.target.value })} placeholder="Reason for this adjustment" /></label>
             <label className="form-label">Entry date<input className="input-field" type="date" required value={journalForm.entryDate} onChange={(event) => setJournalForm({ ...journalForm, entryDate: event.target.value })} /></label>
-            <div style={{ display: 'grid', gap: 8 }}><div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 100px 160px', gap: 8, fontSize: 12, fontWeight: 700 }}><span>Account</span><span>Entry</span><span>Amount (TZS)</span></div>
-              {journalLines.map((line, index) => <div key={index} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 100px 160px', gap: 8, alignItems: 'center' }}><select className="input-field" required value={line.accountId} onChange={(event) => setJournalLines((current) => current.map((item, i) => i === index ? { ...item, accountId: event.target.value } : item))}><option value="">Choose account</option>{budgetAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select><strong>{index === 0 ? 'Debit' : 'Credit'}</strong><input className="input-field" type="number" min="0.01" step="0.01" required placeholder="0.00" value={index === 0 ? line.debit : line.credit} onChange={(event) => setJournalLines((current) => current.map((item, i) => i === index ? index === 0 ? { ...item, debit: event.target.value, credit: '' } : { ...item, credit: event.target.value, debit: '' } : item))} /></div>)}
+            <div style={{ display: 'grid', gap: 8 }}><div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 100px 160px 32px', gap: 8, fontSize: 12, fontWeight: 700 }}><span>Account</span><span>Entry</span><span>Amount (TZS)</span><span /></div>
+              {journalLines.map((line, index) => <div key={index} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 100px 160px 32px', gap: 8, alignItems: 'center' }}>
+                <select className="input-field" required value={line.accountId} onChange={(event) => setJournalLines((current) => current.map((item, i) => i === index ? { ...item, accountId: event.target.value } : item))}><option value="">Choose account</option>{budgetAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select>
+                <select className="input-field" value={line.side} onChange={(event) => setJournalLines((current) => current.map((item, i) => i === index ? { ...item, side: event.target.value } : item))}><option value="debit">Debit</option><option value="credit">Credit</option></select>
+                <input className="input-field" type="number" min="0.01" step="0.01" required placeholder="0.00" value={line.amount} onChange={(event) => setJournalLines((current) => current.map((item, i) => i === index ? { ...item, amount: event.target.value } : item))} />
+                {journalLines.length > 2 ? <button type="button" className="btn-secondary" aria-label="Remove line" onClick={() => setJournalLines((current) => current.filter((_, i) => i !== index))}>×</button> : <span />}
+              </div>)}
+              <div><button type="button" className="btn-secondary" onClick={() => setJournalLines((current) => [...current, { accountId: '', side: 'debit', amount: '' }])}>Add line</button></div>
             </div>
-            <div className="muted" style={{ fontSize: 13 }}>Debits: {formatTzs(journalLines.reduce((sum, line) => sum + Number(line.debit || 0), 0))} · Credits: {formatTzs(journalLines.reduce((sum, line) => sum + Number(line.credit || 0), 0))}</div>
+            {(() => {
+              const debits = journalLines.filter((line) => line.side === 'debit').reduce((sum, line) => sum + Number(line.amount || 0), 0);
+              const credits = journalLines.filter((line) => line.side === 'credit').reduce((sum, line) => sum + Number(line.amount || 0), 0);
+              const balanced = Math.round(debits * 100) === Math.round(credits * 100) && debits > 0;
+              return <div className="muted" style={{ fontSize: 13 }}>Debits: {formatTzs(debits)} · Credits: {formatTzs(credits)} · {balanced ? <span style={{ color: '#4ade80' }}>Balanced</span> : <span style={{ color: 'var(--red-400)' }}>Difference {formatTzs(Math.abs(debits - credits))}</span>}</div>;
+            })()}
             {journalError && <div style={{ color: 'var(--red-400)', fontSize: 13 }}>{journalError}</div>}
+          </form>
+        </Modal>}
+        {reversing && <Modal title={`Reverse ${reversing.entryNumber}`} onClose={() => !reverseSaving && setReversing(null)} width="520px" footer={<><button type="button" className="btn-secondary" onClick={() => setReversing(null)} disabled={reverseSaving}>Cancel</button><button type="submit" form="reverse-journal-form" className="btn-primary" disabled={reverseSaving}>{reverseSaving ? 'Reversing…' : 'Post reversal'}</button></>}>
+          <form id="reverse-journal-form" onSubmit={(event) => { event.preventDefault(); void reverseJournal(); }} style={{ display: 'grid', gap: 10 }}>
+            <p className="muted" style={{ margin: 0, fontSize: 13 }}>The original stays; a mirror journal cancels it.</p>
+            <label className="form-label">Reversal date<input className="input-field" type="date" required value={reverseDate} onChange={(event) => setReverseDate(event.target.value)} /></label>
+            <label className="form-label">Reason<textarea className="input-field" rows={3} required minLength={5} value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} placeholder="Why is this journal being reversed?" /></label>
+            {reverseError && <div style={{ color: 'var(--red-400)', fontSize: 13 }}>{reverseError}</div>}
           </form>
         </Modal>}
       </div> : <section className="table-panel"><div className="section-toolbar"><strong>{title}</strong></div>

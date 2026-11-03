@@ -79,7 +79,10 @@ describeDb('Per-AMCOS ledger (PostgreSQL)', () => {
       // other suites share this schema, so compare with the parts rather than a fixed figure
       const income = async (scope: any) => (await svc.profitAndLoss(scope)).income;
       const parts = (await income({ mamcosId: mamcosA })) + (await income({ mamcosId: mamcosB })) + (await income({ mamcosId: null }));
-      expect(await income(svc.scopeFor(superAdmin))).toBeGreaterThanOrEqual(1470);
+      // Whatever else sits in the shared test schema, "everything" must equal the sum of every cooperative plus the platform rows.
+      const owners = (await prisma.ledgerEntry.findMany({ distinct: ['mamcosId'], select: { mamcosId: true } })).map((r) => r.mamcosId);
+      const everyOwner = (await Promise.all(owners.map((id) => income({ mamcosId: id })))).reduce((n, v) => n + v, 0);
+      expect(await income(svc.scopeFor(superAdmin))).toBeCloseTo(everyOwner, 2);
       expect(parts).toBe(1470);
       expect((await svc.profitAndLoss(svc.scopeFor(superAdmin, mamcosB))).income).toBe(400);
       expect((await svc.journalEntries(svc.scopeFor(superAdmin))).length).toBeGreaterThanOrEqual(3);
@@ -138,6 +141,11 @@ describeDb('Per-AMCOS ledger (PostgreSQL)', () => {
     const backfill = readFileSync(join(__dirname, '../../prisma/migrations/20261109090000_ledger_per_amcos/migration.sql'), 'utf8');
     // Every statement after the first UPDATE is part of the backfill; strip comment lines and split on the statement terminator.
     const statements = backfill.slice(backfill.indexOf('UPDATE "ledger_entries"')).replace(/^--[^\n]*$/gm, '').split(/;\s*\n/).map((x) => x.trim()).filter(Boolean);
+    // Posted rows are immutable; the one-off backfill is a maintenance operation, which the DB only allows when explicitly switched on.
+    const runBackfill = () => prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.ledger_maintenance', 'on', true)`;
+      for (const sql of statements) await tx.$executeRawUnsafe(sql);
+    });
     it('has a backfill to test', () => { expect(statements.length).toBeGreaterThanOrEqual(10); expect(statements.every((x) => /^UPDATE/.test(x))).toBe(true); });
 
     it('attributes legacy rows to the AMCOS of the record behind them and leaves the rest unattributed', async () => {
@@ -163,7 +171,7 @@ describeDb('Per-AMCOS ledger (PostgreSQL)', () => {
       await legacy('LoanDisbursement', randomUUID()); // record no longer exists
       expect(await prisma.ledgerEntry.count({ where: { sourceType: { in: ['LoanDisbursement', 'LoanDeduction', 'LenderRemittance', 'MembershipPayment', 'MemberContribution', 'ReserveAllocation', 'MANUAL_JOURNAL'] }, mamcosId: null } })).toBeGreaterThanOrEqual(16);
 
-      for (const sql of statements) await prisma.$executeRawUnsafe(sql);
+      await runBackfill();
       const owner = async (type: string, id: string) => (await prisma.ledgerEntry.findFirst({ where: { sourceType: type, sourceId: id } }))?.mamcosId;
       expect(await owner('LoanDisbursement', loan)).toBe(mamcosA);
       expect(await owner('LoanDeduction', dedRow)).toBe(mamcosA);
@@ -177,7 +185,7 @@ describeDb('Per-AMCOS ledger (PostgreSQL)', () => {
 
       // totals are preserved: the backfill only labels rows, it never changes amounts or removes any
       const before = await prisma.ledgerEntry.aggregate({ _sum: { debit: true, credit: true }, _count: true });
-      for (const sql of statements) await prisma.$executeRawUnsafe(sql); // re-running is harmless
+      await runBackfill(); // re-running is harmless
       expect(await prisma.ledgerEntry.aggregate({ _sum: { debit: true, credit: true }, _count: true })).toEqual(before);
       expect(await owner('LoanDisbursement', loan)).toBe(mamcosA);
     });

@@ -2,7 +2,7 @@ import { AccountingService } from './accounting.service';
 import { calculateFinancialRatios } from './ratios';
 describe('AccountingService', () => {
   it('rejects an unbalanced double-entry posting before touching the database', async () => {
-    const service = new AccountingService({} as any);
+    const service = new AccountingService({} as any, {} as any);
     await expect(
       service.postToLedger('Test', 'id', new Date(), 'bad', [
         { code: '1000', debit: 100 },
@@ -10,44 +10,76 @@ describe('AccountingService', () => {
       ], null),
     ).rejects.toThrow('must balance');
   });
-  it('rejects manual journal entries with more than one debit or credit account', async () => {
-    const service = new AccountingService({} as any);
+  it('rejects manual journal lines that carry both a debit and a credit, or neither', async () => {
+    const service = new AccountingService({} as any, {} as any);
     await expect(service.createJournalEntry({
       entryDate: '2026-10-27',
       description: 'Adjustment',
       lines: [
-        { accountId: 'cash', debit: 50 },
-        { accountId: 'expense', debit: 50 },
-        { accountId: 'equity', credit: 100 },
+        { accountId: 'cash', debit: 50, credit: 50 },
+        { accountId: 'equity', credit: 50 },
       ],
-    } as any, {})).rejects.toThrow('exactly two accounts');
+    } as any, {})).rejects.toThrow('either a debit or a credit');
   });
-  it('persists every balanced debit and credit line idempotently', async () => {
-    const prisma = {
-      account: {
-        upsert: jest.fn(),
-        findMany: jest.fn().mockResolvedValue([
-          { id: 'cash', code: '1000' },
-          { id: 'income', code: '4000' },
-        ]),
-      },
-      ledgerEntry: { upsert: jest.fn() },
-      $transaction: jest.fn(),
-    } as any;
-    const service = new AccountingService(prisma);
-    await service.postToLedger(
-      'Sale',
-      'sale-1',
-      new Date('2026-01-01'),
-      'sale',
-      [
-        { code: '1000', debit: 100 },
-        { code: '4000', credit: 100 },
-      ],
-      null,
-    );
-    expect(prisma.ledgerEntry.upsert).toHaveBeenCalledTimes(2);
-    expect(prisma.$transaction).toHaveBeenCalled();
+  describe('postToLedger writes only what changed', () => {
+    const accounts = [{ id: 'cash', code: '1000' }, { id: 'income', code: '4000' }];
+    const setup = (existing: any[]) => {
+      const created: any[] = [];
+      const tx = {
+        $executeRaw: jest.fn(),
+        $queryRaw: jest.fn().mockResolvedValue([{ last_value: 7 }]),
+        ledgerEntry: { findMany: jest.fn().mockResolvedValue(existing), create: jest.fn(async ({ data }: any) => { created.push(data); return data; }) },
+        accountingLock: { findUnique: jest.fn().mockResolvedValue(null) },
+      };
+      const prisma = {
+        account: { upsert: jest.fn(), findMany: jest.fn().mockResolvedValue(accounts) },
+        $transaction: jest.fn(async (fn: any) => fn(tx)),
+      } as any;
+      return { service: new AccountingService(prisma, {} as any), created, tx };
+    };
+    const sale = (service: AccountingService, amount = 100) =>
+      service.postToLedger('Sale', 'sale-1', new Date('2026-01-01'), 'sale', [{ code: '1000', debit: amount }, { code: '4000', credit: amount }], 'coop-1');
+    it('books the first posting as revision 1 with a sequential number', async () => {
+      const { service, created } = setup([]);
+      await sale(service);
+      expect(created).toHaveLength(2);
+      expect(created.every((r) => r.revision === 1 && r.entryNumber === 'GL-2026-000007' && r.mamcosId === 'coop-1')).toBe(true);
+      expect(new Set(created.map((r) => r.journalId)).size).toBe(1);
+    });
+    it('does nothing when the same posting is repeated', async () => {
+      const { service, created } = setup([
+        { accountId: 'cash', debit: 100, credit: 0, revision: 1 }, { accountId: 'income', debit: 0, credit: 100, revision: 1 },
+      ]);
+      expect(await sale(service)).toEqual([]);
+      expect(created).toHaveLength(0);
+    });
+    it('books only the difference, as a new revision, when the amount changes', async () => {
+      const { service, created } = setup([
+        { accountId: 'cash', debit: 100, credit: 0, revision: 1 }, { accountId: 'income', debit: 0, credit: 100, revision: 1 },
+      ]);
+      await sale(service, 130);
+      expect(created).toEqual([
+        expect.objectContaining({ accountId: 'cash', debit: 30, credit: 0, revision: 2 }),
+        expect.objectContaining({ accountId: 'income', debit: 0, credit: 30, revision: 2 }),
+      ]);
+    });
+    it('cancels a source by posting its mirror image when no lines remain', async () => {
+      const { service, created } = setup([
+        { accountId: 'cash', debit: 100, credit: 0, revision: 1 }, { accountId: 'income', debit: 0, credit: 100, revision: 1 },
+      ]);
+      await service.postToLedger('Sale', 'sale-1', new Date('2026-01-01'), 'void', [], 'coop-1');
+      expect(created).toEqual([
+        expect.objectContaining({ accountId: 'cash', debit: 0, credit: 100, revision: 2 }),
+        expect.objectContaining({ accountId: 'income', debit: 100, credit: 0, revision: 2 }),
+      ]);
+    });
+    it('dates a posting on the first open day when its own day is in a closed period', async () => {
+      const { service, created, tx } = setup([]);
+      tx.accountingLock.findUnique.mockResolvedValue({ closedThrough: new Date('2026-01-31T00:00:00Z') });
+      await sale(service);
+      expect(created[0].entryDate.toISOString()).toBe('2026-02-01T09:00:00.000Z');
+      expect(created[0].description).toContain('that period is closed');
+    });
   });
   it('calculates liquidity, profitability and solvency as pure ratios', () => {
     expect(
@@ -76,7 +108,7 @@ describe('AccountingService', () => {
         ]),
       },
     } as any;
-    const service = new AccountingService(prisma);
+    const service = new AccountingService(prisma, {} as any);
     jest.spyOn(service as any, 'accounts').mockResolvedValue([]);
     const result = await service.balanceSheet({}, '2026-12-31');
     expect(result.assets).toBe(1000);
@@ -95,7 +127,7 @@ describe('AccountingService', () => {
         ]),
       },
     } as any;
-    const result = await new AccountingService(prisma).cashFlow({}, '2026-02-01', '2026-02-28');
+    const result = await new AccountingService(prisma, {} as any).cashFlow({}, '2026-02-01', '2026-02-28');
     expect(result.openingCashBalance).toBe(100);
     expect(result.operating.netCashFlow).toBe(50);
     expect(result.investing.netCashFlow).toBe(-15);
@@ -115,7 +147,7 @@ describe('AccountingService', () => {
         { accountId: 'capital', debit: 0, credit: 750, account: { code: '3000', name: 'Capital', type: 'EQUITY' } },
       ]) },
     } as any;
-    const service = new AccountingService(prisma);
+    const service = new AccountingService(prisma, {} as any);
     jest.spyOn(service as any, 'accounts').mockResolvedValue([]);
     const result = await service.trialBalance({}, undefined, '2026-12-31');
     expect(prisma.ledgerEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({
@@ -141,7 +173,7 @@ describe('AccountingService', () => {
         { accountId: 'capital', debit: 0, credit: 75 },
       ]) },
     } as any;
-    const service = new AccountingService(prisma);
+    const service = new AccountingService(prisma, {} as any);
     jest.spyOn(service as any, 'accounts').mockResolvedValue([]);
     const result = await service.accountBalances({}, '2026-12-31');
     expect(result.accountCount).toBe(2);

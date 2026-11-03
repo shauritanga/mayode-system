@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { AccountType, BudgetStatus, UserRole } from '@prisma/client';
+import { computeTax, localDate, nextOpenInstant, round2 } from './tax';
+import { AccountType, BudgetStatus, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import {
@@ -20,6 +21,8 @@ const CHART = [
   ['1210', 'Finished rice inventory', AccountType.ASSET],
   ['1220', 'By-products inventory', AccountType.ASSET],
   ['1300', 'Farmer loans receivable', AccountType.ASSET],
+  ['1400', 'VAT input recoverable', AccountType.ASSET],
+  ['1410', 'Withholding tax credit', AccountType.ASSET],
   ['1310', 'Fertiliser loans receivable', AccountType.ASSET],
   ['1500', 'Property, plant and equipment', AccountType.ASSET],
   ['1590', 'Accumulated depreciation', AccountType.ASSET],
@@ -27,6 +30,8 @@ const CHART = [
   ['2100', 'Supplier accounts payable', AccountType.LIABILITY],
   ['2200', 'Farmer settlement payable', AccountType.LIABILITY],
   ['2300', 'Payroll deductions payable', AccountType.LIABILITY],
+  ['2400', 'VAT output payable', AccountType.LIABILITY],
+  ['2410', 'Withholding tax payable', AccountType.LIABILITY],
   ['3000', 'Cooperative equity', AccountType.EQUITY],
   ['3100', 'Cooperative reserves', AccountType.EQUITY],
   ['3200', 'Unappropriated retained earnings', AccountType.EQUITY],
@@ -36,7 +41,12 @@ const CHART = [
   ['4210', 'Levies and dues income', AccountType.INCOME],
   ['4220', 'Canal maintenance fee income', AccountType.INCOME],
   ['4230', 'Fertiliser sales to members', AccountType.INCOME],
+  ['4240', 'Tool registration fees', AccountType.INCOME],
+  ['4250', 'Tool contribution income', AccountType.INCOME],
   ['4300', 'Gain or loss on disposal of assets', AccountType.INCOME],
+  ['4400', 'Grants and donations', AccountType.INCOME],
+  ['4410', 'Service and hire income', AccountType.INCOME],
+  ['4490', 'Other income', AccountType.INCOME],
   ['5000', 'Production input costs', AccountType.EXPENSE],
   ['5100', 'Loan repayment expense', AccountType.EXPENSE],
   ['5200', 'Farmer rice procurement', AccountType.EXPENSE],
@@ -44,6 +54,12 @@ const CHART = [
   ['5400', 'Depreciation expense', AccountType.EXPENSE],
   ['5410', 'Repairs and maintenance', AccountType.EXPENSE],
   ['5500', 'Salaries and wages', AccountType.EXPENSE],
+  ['5600', 'Fuel and transport', AccountType.EXPENSE],
+  ['5610', 'Utilities and communication', AccountType.EXPENSE],
+  ['5620', 'Office and administration', AccountType.EXPENSE],
+  ['5630', 'Meetings and allowances', AccountType.EXPENSE],
+  ['5640', 'Bank charges', AccountType.EXPENSE],
+  ['5690', 'Other expenses', AccountType.EXPENSE],
 ] as const;
 
 /**
@@ -71,19 +87,19 @@ export class AccountingService {
     if (user.role === UserRole.SUPER_ADMIN) return requested ? { mamcosId: requested } : {};
     return { mamcosId: null };
   }
+  private chartEnsured: Promise<void> | null = null;
   private async accounts() {
-    // Sequential: Prisma upsert is SELECT-then-INSERT (not atomic), so
-    // concurrent upserts of the same code — from Promise.all here, or two
-    // statements requests racing on a fresh DB — collide on the unique
-    // `code` constraint (P2002). The chart remains small, so serial upserts
-    // are negligible cost.
-    for (const [code, name, type] of CHART) {
-      await this.prisma.account.upsert({
-        where: { code },
-        create: { code, name, type },
-        update: {},
-      });
+    // Sequential: Prisma upsert is SELECT-then-INSERT (not atomic), so concurrent upserts of the same code — from
+    // Promise.all, or two requests racing on a fresh DB — collide on the unique `code` constraint (P2002). The chart is
+    // ensured once per process; after that a posting only reads it.
+    if (!this.chartEnsured) {
+      this.chartEnsured = (async () => {
+        for (const [code, name, type] of CHART) {
+          await this.prisma.account.upsert({ where: { code }, create: { code, name, type }, update: {} });
+        }
+      })().catch((e) => { this.chartEnsured = null; throw e; });
     }
+    await this.chartEnsured;
     return this.prisma.account.findMany();
   }
   // ───── Which cooperative's books a posting belongs to: resolved from the record that caused it (same rules as the ledger backfill migration) ─────
@@ -112,6 +128,30 @@ export class AccountingService {
     const c = await this.prisma.cropCycle.findUnique({ where: { id: cropCycleId }, select: { farm: { select: { mamcosId: true } } } });
     return c?.farm.mamcosId ?? null;
   }
+  /**
+   * The next gap-free document number for a cooperative, kind and year (e.g. GL-2026-000123). Runs inside the posting's
+   * transaction, so a rolled-back posting never burns a number.
+   */
+  async nextNumber(tx: Prisma.TransactionClient, mamcosId: string | null, on: Date, prefix: string, kind = ''): Promise<string> {
+    const year = Number(localDate(on).slice(0, 4));
+    const key = `${mamcosId ?? 'platform'}${kind ? `:${kind}` : ''}`;
+    const rows = await tx.$queryRaw<{ last_value: number }[]>`
+      INSERT INTO ledger_counters (scope_key, year, last_value) VALUES (${key}, ${year}, 1)
+      ON CONFLICT (scope_key, year) DO UPDATE SET last_value = ledger_counters.last_value + 1
+      RETURNING last_value`;
+    return `${prefix}-${year}-${String(rows[0].last_value).padStart(6, '0')}`;
+  }
+  /** The date the books are closed through for a cooperative (YYYY-MM-DD), or null while nothing is closed. */
+  async closedThrough(mamcosId: string | null, tx: Prisma.TransactionClient | PrismaService = this.prisma): Promise<string | null> {
+    const lock = await tx.accountingLock.findUnique({ where: { scopeKey: mamcosId ?? 'platform' } });
+    return lock ? lock.closedThrough.toISOString().slice(0, 10) : null;
+  }
+  /**
+   * Posts a balanced journal for a business event, once. Posting the same source again is safe: only the *difference* from what
+   * the ledger already holds for that source is booked, as a new adjustment journal (revision 2, 3 …), and nothing at all when
+   * nothing changed. Posted rows are never edited. Passing no lines cancels the source (what a void does).
+   * If the day is in a closed period the journal is dated the first open day instead, with a note.
+   */
   async postToLedger(
     sourceType: string,
     sourceId: string,
@@ -120,6 +160,9 @@ export class AccountingService {
     lines: { code: string; debit?: number; credit?: number }[],
     /** The cooperative whose books these are; null only for platform-level postings. May be a lookup still in flight. */
     mamcosIdOrLookup: string | null | Promise<string | null>,
+    postedById?: string | null,
+    /** Run inside the caller's transaction so a record and its journal commit (or roll back) together. */
+    outer?: Prisma.TransactionClient,
   ) {
     const mamcosId = await mamcosIdOrLookup;
     const cents = (n: number) => Math.round(n * 100);
@@ -131,38 +174,48 @@ export class AccountingService {
     const accounts = new Map(
       (await this.accounts()).map((account) => [account.code, account]),
     );
-    const entryNumber = `GL-${entryDate.getFullYear()}-${sourceId.slice(0, 8)}`;
-    return this.prisma.$transaction(
-      lines.map((line) =>
-        this.prisma.ledgerEntry.upsert({
-          where: {
-            sourceType_sourceId_accountId: {
-              sourceType,
-              sourceId,
-              accountId: accounts.get(line.code)!.id,
-            },
+    const desired = new Map<string, number>();
+    for (const line of lines) {
+      const account = accounts.get(line.code);
+      if (!account) throw new BadRequestException(`Unknown ledger account ${line.code}`);
+      desired.set(account.id, (desired.get(account.id) ?? 0) + cents(line.debit ?? 0) - cents(line.credit ?? 0));
+    }
+    const work = async (tx: Prisma.TransactionClient) => {
+      // One posting per source at a time, so two requests cannot both book the same revision.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ledger:${sourceType}:${sourceId}`}))`;
+      const existing = await tx.ledgerEntry.findMany({ where: { sourceType, sourceId }, select: { accountId: true, debit: true, credit: true, revision: true } });
+      const current = new Map<string, number>();
+      for (const row of existing) current.set(row.accountId, (current.get(row.accountId) ?? 0) + cents(row.debit) - cents(row.credit));
+      const delta: [string, number][] = [];
+      for (const id of new Set([...desired.keys(), ...current.keys()])) {
+        const d = (desired.get(id) ?? 0) - (current.get(id) ?? 0);
+        if (d !== 0) delta.push([id, d]);
+      }
+      if (!delta.length) return [];
+      const revision = existing.reduce((m, r) => Math.max(m, r.revision), 0) + 1;
+      let when = entryDate;
+      let note = '';
+      const closed = await this.closedThrough(mamcosId, tx);
+      if (closed && localDate(entryDate) <= closed) {
+        when = nextOpenInstant(closed);
+        note = ` (dated ${localDate(entryDate)}; that period is closed)`;
+      }
+      const entryNumber = await this.nextNumber(tx, mamcosId, when, 'GL');
+      const journalId = randomUUID();
+      const text = `${revision > 1 ? 'Adjustment: ' : ''}${description}${note}`;
+      const created: Prisma.LedgerEntryGetPayload<object>[] = [];
+      for (const [accountId, d] of delta) {
+        created.push(await tx.ledgerEntry.create({
+          data: {
+            entryNumber, journalId, revision, accountId,
+            debit: d > 0 ? d / 100 : 0, credit: d < 0 ? -d / 100 : 0,
+            entryDate: when, sourceType, sourceId, description: text, mamcosId, postedById: postedById ?? null,
           },
-          create: {
-            entryNumber,
-            accountId: accounts.get(line.code)!.id,
-            debit: line.debit ?? 0,
-            credit: line.credit ?? 0,
-            entryDate,
-            sourceType,
-            sourceId,
-            description,
-            mamcosId,
-          },
-          update: {
-            debit: line.debit ?? 0,
-            credit: line.credit ?? 0,
-            entryDate,
-            description,
-            mamcosId,
-          },
-        }),
-      ),
-    );
+        }));
+      }
+      return created;
+    };
+    return outer ? work(outer) : this.prisma.$transaction(work);
   }
   async profitAndLoss(scope: LedgerScope, from?: string, to?: string) {
     await this.accounts();
@@ -302,23 +355,47 @@ export class AccountingService {
       lines,
     };
   }
-  async journalEntries(scope: LedgerScope) {
+  /** Journals (grouped ledger lines), newest first. Filters are optional; the list is capped (default 1000). */
+  async journalEntries(scope: LedgerScope, filter: { from?: string; to?: string; sourceType?: string; q?: string; limit?: number } = {}) {
+    const where: Prisma.LedgerEntryWhereInput = { ...scope };
+    if (filter.from || filter.to) {
+      where.entryDate = {
+        ...(filter.from ? { gte: new Date(`${filter.from}T00:00:00+03:00`) } : {}),
+        ...(filter.to ? { lte: new Date(`${filter.to}T23:59:59.999+03:00`) } : {}),
+      };
+    }
+    if (filter.sourceType) where.sourceType = filter.sourceType;
+    if (filter.q?.trim()) {
+      const q = filter.q.trim();
+      where.OR = [{ entryNumber: { contains: q, mode: 'insensitive' } }, { description: { contains: q, mode: 'insensitive' } }];
+    }
     const rows = await this.prisma.ledgerEntry.findMany({
-      where: scope,
+      where,
       include: { account: true },
-      orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }, { entryNumber: 'desc' }],
+      take: Math.min(Math.max(filter.limit ?? 1000, 1), 5000) * 4, // a journal has several lines
     });
+    const reversedIds = new Set(
+      (await this.prisma.ledgerEntry.findMany({
+        where: { ...scope, reversesJournalId: { in: [...new Set(rows.map((r) => r.journalId))] } },
+        select: { reversesJournalId: true },
+      })).map((r) => r.reversesJournalId),
+    );
     const grouped = new Map<string, any>();
     for (const row of rows) {
-      const key = `${row.sourceType}:${row.sourceId}`;
-      const journal = grouped.get(key) ?? {
-        id: row.sourceId,
+      const journal = grouped.get(row.journalId) ?? {
+        id: row.journalId,
+        journalId: row.journalId,
         sourceType: row.sourceType,
         sourceId: row.sourceId,
+        revision: row.revision,
         entryNumber: row.entryNumber,
         entryDate: row.entryDate,
         description: row.description,
         createdAt: row.createdAt,
+        postedById: row.postedById,
+        reversesJournalId: row.reversesJournalId,
+        reversed: reversedIds.has(row.journalId),
         lines: [],
         totalDebit: 0,
         totalCredit: 0,
@@ -330,25 +407,19 @@ export class AccountingService {
         credit: row.credit,
         description: row.description,
       });
-      journal.totalDebit += row.debit;
-      journal.totalCredit += row.credit;
-      grouped.set(key, journal);
+      journal.totalDebit = round2(journal.totalDebit + row.debit);
+      journal.totalCredit = round2(journal.totalCredit + row.credit);
+      grouped.set(row.journalId, journal);
     }
-    return [...grouped.values()];
+    return [...grouped.values()].slice(0, Math.min(Math.max(filter.limit ?? 1000, 1), 5000));
   }
 
-  async createJournalEntry(dto: CreateJournalEntryDto, scope: LedgerScope) {
-    if (!dto.lines || dto.lines.length !== 2) {
-      throw new BadRequestException('A journal entry must have exactly two accounts: one debit and one credit.');
+  /** A manual journal: two or more lines, each a debit or a credit, balanced. Dated inside an open period only. */
+  async createJournalEntry(dto: CreateJournalEntryDto, scope: LedgerScope, actorId?: string | null) {
+    if (!dto.lines || dto.lines.length < 2) {
+      throw new BadRequestException('A journal entry needs at least two lines: a debit and a credit.');
     }
-    const debitTotal = dto.lines.reduce((sum, line) => sum + (line.debit ?? 0), 0);
-    const creditTotal = dto.lines.reduce((sum, line) => sum + (line.credit ?? 0), 0);
-    if (Math.round(debitTotal * 100) !== Math.round(creditTotal * 100) || debitTotal <= 0) {
-      throw new BadRequestException('Journal debits and credits must be equal and greater than zero.');
-    }
-    if (new Set(dto.lines.map((line) => line.accountId)).size !== dto.lines.length) {
-      throw new BadRequestException('Use each account once per journal entry.');
-    }
+    const cents = (n: number) => Math.round(n * 100);
     for (const line of dto.lines) {
       const debit = line.debit ?? 0;
       const credit = line.credit ?? 0;
@@ -356,9 +427,13 @@ export class AccountingService {
         throw new BadRequestException('Each journal line must have either a debit or a credit amount.');
       }
     }
-    if (dto.lines.filter((line) => (line.debit ?? 0) > 0).length !== 1 ||
-        dto.lines.filter((line) => (line.credit ?? 0) > 0).length !== 1) {
-      throw new BadRequestException('A journal entry must contain one debit line and one credit line.');
+    const debitTotal = dto.lines.reduce((sum, line) => sum + cents(line.debit ?? 0), 0);
+    const creditTotal = dto.lines.reduce((sum, line) => sum + cents(line.credit ?? 0), 0);
+    if (debitTotal !== creditTotal || debitTotal <= 0) {
+      throw new BadRequestException('Journal debits and credits must be equal and greater than zero.');
+    }
+    if (new Set(dto.lines.map((line) => line.accountId)).size !== dto.lines.length) {
+      throw new BadRequestException('Use each account once per journal entry.');
     }
     const accounts = await this.prisma.account.findMany({
       where: { id: { in: dto.lines.map((line) => line.accountId) }, isActive: true },
@@ -366,23 +441,77 @@ export class AccountingService {
     if (accounts.length !== new Set(dto.lines.map((line) => line.accountId)).size) {
       throw new BadRequestException('Choose active accounts for every journal line.');
     }
+    const mamcosId = scope.mamcosId ?? null;
+    const entryDate = new Date(/^\d{4}-\d{2}-\d{2}$/.test(dto.entryDate) ? `${dto.entryDate}T09:00:00.000Z` : dto.entryDate);
     const journalId = randomUUID();
-    const entryDate = new Date(dto.entryDate);
-    const entryNumber = `JE-${entryDate.getFullYear()}-${journalId.slice(0, 8).toUpperCase()}`;
-    await this.prisma.$transaction(dto.lines.map((line) => this.prisma.ledgerEntry.create({
-      data: {
-        entryNumber,
-        accountId: line.accountId,
-        debit: line.debit ?? 0,
-        credit: line.credit ?? 0,
-        entryDate,
-        sourceType: 'MANUAL_JOURNAL',
-        sourceId: journalId,
-        description: line.description?.trim() || dto.description.trim(),
-        mamcosId: scope.mamcosId ?? null,
-      },
-    })));
-    return this.journalEntries(scope).then((journals) => journals.find((journal) => journal.id === journalId));
+    await this.prisma.$transaction(async (tx) => {
+      const closed = await this.closedThrough(mamcosId, tx);
+      if (closed && localDate(entryDate) <= closed) {
+        throw new BadRequestException(`The books are closed through ${closed}. Date this entry after that day.`);
+      }
+      const entryNumber = await this.nextNumber(tx, mamcosId, entryDate, 'JE');
+      for (const line of dto.lines) {
+        await tx.ledgerEntry.create({
+          data: {
+            entryNumber, journalId, revision: 1,
+            accountId: line.accountId,
+            debit: line.debit ?? 0,
+            credit: line.credit ?? 0,
+            entryDate,
+            sourceType: 'MANUAL_JOURNAL',
+            sourceId: journalId,
+            description: line.description?.trim() || dto.description.trim(),
+            mamcosId,
+            postedById: actorId ?? null,
+          },
+        });
+      }
+    });
+    return this.journalEntries(scope, { limit: 5000 }).then((journals) => journals.find((journal) => journal.id === journalId));
+  }
+
+  /**
+   * Cancels a manual journal by posting its mirror image, dated `date` (default today). The original stays on the books.
+   * System-made journals (sales, loans, payroll …) are corrected at their source record instead, so the two never disagree.
+   */
+  async reverseJournal(journalId: string, dto: { reason: string; date?: string }, scope: LedgerScope, actorId?: string | null) {
+    const rows = await this.prisma.ledgerEntry.findMany({ where: { ...scope, journalId }, include: { account: true } });
+    if (!rows.length) throw new NotFoundException('Journal not found');
+    const head = rows[0];
+    if (head.sourceType !== 'MANUAL_JOURNAL') {
+      throw new BadRequestException('Only manual journals can be reversed here. Correct system entries from the record that created them.');
+    }
+    if (await this.prisma.ledgerEntry.findFirst({ where: { reversesJournalId: journalId }, select: { id: true } })) {
+      throw new ConflictException('This journal has already been reversed');
+    }
+    const reason = dto.reason?.trim();
+    if (!reason || reason.length < 5) throw new BadRequestException('Say why the journal is being reversed (at least a few words).');
+    const entryDate = dto.date ? new Date(`${dto.date}T09:00:00.000Z`) : new Date();
+    const newId = randomUUID();
+    const mamcosId = head.mamcosId;
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const closed = await this.closedThrough(mamcosId, tx);
+        if (closed && localDate(entryDate) <= closed) {
+          throw new BadRequestException(`The books are closed through ${closed}. Date the reversal after that day.`);
+        }
+        const entryNumber = await this.nextNumber(tx, mamcosId, entryDate, 'JE');
+        for (const r of rows) {
+          await tx.ledgerEntry.create({
+            data: {
+              entryNumber, journalId: newId, revision: 1, accountId: r.accountId,
+              debit: r.credit, credit: r.debit, entryDate,
+              sourceType: 'REVERSAL', sourceId: newId, reversesJournalId: journalId,
+              description: `Reversal of ${head.entryNumber}: ${reason}`, mamcosId, postedById: actorId ?? null,
+            },
+          });
+        }
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2002') throw new ConflictException('This journal has already been reversed');
+      throw e;
+    }
+    return this.journalEntries(scope, { limit: 5000 }).then((journals) => journals.find((journal) => journal.id === newId));
   }
 
   async trialBalance(scope: LedgerScope, from?: string, to?: string) {
@@ -515,12 +644,82 @@ export class AccountingService {
       payablesTotal: payables.reduce((sum, item) => sum + item.amount, 0),
     };
   }
-  createInvoice(dto: CreateInvoiceDto, scope: LedgerScope) {
-    return this.prisma.invoice.create({
-      data: { ...dto, dueDate: new Date(dto.dueDate), mamcosId: scope.mamcosId ?? null },
-    });
+  /** Tax settings of the cooperative whose books these are (a platform-level document is never VAT-registered). */
+  private async taxSettings(mamcosId: string | null) {
+    const m = mamcosId
+      ? await this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { vatRegistered: true, vatRate: true } })
+      : null;
+    return { vatRegistered: m?.vatRegistered ?? false, vatRate: Number(m?.vatRate ?? 18) };
   }
-  async createBill(dto: CreateBillDto, scope: LedgerScope) {
+  private async revenueOrExpenseAccount(code: string | undefined, types: AccountType[], fallback: string) {
+    const chosen = code ?? fallback;
+    const account = (await this.accounts()).find((a) => a.code === chosen);
+    if (!account || !account.isActive || !types.includes(account.type)) {
+      throw new BadRequestException(`Account ${chosen} cannot be used here`);
+    }
+    return account.code;
+  }
+  private async documentNumber(supplied: string | undefined, mamcosId: string | null, prefix: string, kind: string) {
+    if (supplied?.trim()) return supplied.trim();
+    return this.prisma.$transaction((tx) => this.nextNumber(tx, mamcosId, new Date(), prefix, kind));
+  }
+
+  /** Records a customer invoice and books it: receivable, revenue and output VAT. */
+  async createInvoice(dto: CreateInvoiceDto, scope: LedgerScope, actorId?: string | null) {
+    const mamcosId = scope.mamcosId ?? null;
+    const tax = computeTax({ net: dto.amount, ...(await this.taxSettings(mamcosId)), vatApplies: dto.vatApplies, withholdingPercent: dto.withholdingPercent });
+    const revenue = await this.revenueOrExpenseAccount(dto.revenueAccountCode, [AccountType.INCOME], '4000');
+    const invoiceNumber = await this.documentNumber(dto.invoiceNumber, mamcosId, 'INV', 'INV');
+    let invoice;
+    try {
+      invoice = await this.prisma.invoice.create({
+        data: {
+          invoiceNumber, saleId: dto.saleId, buyerId: dto.buyerId, description: dto.description?.trim() || null,
+          amount: tax.total, subtotal: tax.subtotal, vatAmount: tax.vatAmount, withholdingAmount: tax.withholdingAmount,
+          dueDate: new Date(dto.dueDate), mamcosId,
+        },
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2002') throw new ConflictException(`Invoice number ${invoiceNumber} is already used`);
+      throw e;
+    }
+    await this.postToLedger('Invoice', invoice.id, invoice.createdAt, `Invoice ${invoice.invoiceNumber}`, [
+      { code: '1100', debit: tax.total },
+      { code: revenue, credit: tax.subtotal },
+      ...(tax.vatAmount ? [{ code: '2400', credit: tax.vatAmount }] : []),
+    ], mamcosId, actorId);
+    return invoice;
+  }
+  /** The customer pays: cash in (less any tax they withheld), receivable cleared. */
+  async payInvoice(id: string, scope: LedgerScope, actorId?: string | null) {
+    const existing = await this.prisma.invoice.findFirst({ where: { id, ...scope } });
+    if (!existing) throw new NotFoundException('Invoice not found');
+    if (existing.status === 'PAID') throw new ConflictException('This invoice is already paid');
+    if (existing.status === 'VOID') throw new BadRequestException('A void invoice cannot be paid');
+    const invoice = await this.prisma.invoice.update({ where: { id }, data: { status: 'PAID', paidAt: new Date() } });
+    if (invoice.postedToLedger) {
+      await this.postToLedger('InvoicePayment', invoice.id, invoice.paidAt!, `Payment of invoice ${invoice.invoiceNumber}`, [
+        { code: '1000', debit: round2(invoice.amount - invoice.withholdingAmount) },
+        ...(invoice.withholdingAmount ? [{ code: '1410', debit: invoice.withholdingAmount }] : []),
+        { code: '1100', credit: invoice.amount },
+      ], invoice.mamcosId, actorId);
+    }
+    return invoice;
+  }
+  /** Cancels an unpaid invoice and its ledger postings (the postings are offset, not deleted). */
+  async voidInvoice(id: string, scope: LedgerScope, actorId?: string | null) {
+    const existing = await this.prisma.invoice.findFirst({ where: { id, ...scope } });
+    if (!existing) throw new NotFoundException('Invoice not found');
+    if (existing.status === 'PAID') throw new BadRequestException('A paid invoice cannot be voided');
+    if (existing.status === 'VOID') return existing;
+    const invoice = await this.prisma.invoice.update({ where: { id }, data: { status: 'VOID' } });
+    if (invoice.postedToLedger) await this.postToLedger('Invoice', invoice.id, new Date(), `Void invoice ${invoice.invoiceNumber}`, [], invoice.mamcosId, actorId);
+    return invoice;
+  }
+
+  /** Records a supplier bill and books it: cost, input VAT (when recoverable) and what we owe the supplier. */
+  async createBill(dto: CreateBillDto, scope: LedgerScope, actorId?: string | null) {
+    const mamcosId = scope.mamcosId ?? null;
     let supplierName = dto.supplier;
     if (dto.supplierId) {
       const supplierRecord = await this.prisma.supplier.findUnique({
@@ -529,49 +728,58 @@ export class AccountingService {
       });
       if (supplierRecord) supplierName = supplierRecord.name;
     }
-    const bill = await this.prisma.bill.create({
-      data: {
-        ...dto,
-        supplier: supplierName,
-        dueDate: new Date(dto.dueDate),
-        mamcosId: scope.mamcosId ?? null,
-      },
-    });
-    await this.postToLedger(
-      'Bill',
-      bill.id,
-      bill.createdAt,
-      `Supplier bill: ${bill.supplier}`,
-      [
-        { code: '5000', debit: bill.amount },
-        { code: '2100', credit: bill.amount },
-      ],
-      bill.mamcosId,
-    );
+    const tax = computeTax({ net: dto.amount, ...(await this.taxSettings(mamcosId)), vatApplies: dto.vatApplies, withholdingPercent: dto.withholdingPercent });
+    const expense = await this.revenueOrExpenseAccount(dto.expenseAccountCode, [AccountType.EXPENSE, AccountType.ASSET], '5000');
+    const billNumber = await this.documentNumber(dto.billNumber, mamcosId, 'BILL', 'BILL');
+    let bill;
+    try {
+      bill = await this.prisma.bill.create({
+        data: {
+          billNumber, supplier: supplierName, supplierId: dto.supplierId, description: dto.description,
+          amount: tax.total, subtotal: tax.subtotal, vatAmount: tax.vatAmount, withholdingAmount: tax.withholdingAmount,
+          expenseAccountCode: expense, dueDate: new Date(dto.dueDate), mamcosId,
+        },
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2002') throw new ConflictException(`Bill number ${billNumber} is already used`);
+      throw e;
+    }
+    await this.postToLedger('Bill', bill.id, bill.createdAt, `Supplier bill: ${bill.supplier}`, [
+      { code: expense, debit: tax.subtotal },
+      ...(tax.vatAmount ? [{ code: '1400', debit: tax.vatAmount }] : []),
+      { code: '2100', credit: tax.payable },
+      ...(tax.withholdingAmount ? [{ code: '2410', credit: tax.withholdingAmount }] : []),
+    ], mamcosId, actorId);
     return bill;
   }
-  async payBill(id: string, scope: LedgerScope) {
-    const existing = await this.prisma.bill.findFirst({ where: { id, ...scope }, select: { id: true } });
+  async payBill(id: string, scope: LedgerScope, actorId?: string | null) {
+    const existing = await this.prisma.bill.findFirst({ where: { id, ...scope } });
     if (!existing) throw new NotFoundException('Bill not found');
+    if (existing.status === 'PAID') throw new ConflictException('This bill is already paid');
+    if (existing.status === 'VOID') throw new BadRequestException('A void bill cannot be paid');
     const bill = await this.prisma.bill.update({
       where: { id },
       data: { status: 'PAID', paidAt: new Date() },
     });
-    await this.postToLedger(
-      'BillPayment',
-      bill.id,
-      bill.paidAt!,
-      `Supplier bill payment: ${bill.billNumber}`,
-      [
-        { code: '2100', debit: bill.amount },
-        { code: '1000', credit: bill.amount },
-      ],
-      bill.mamcosId,
-    );
+    const payable = round2(bill.amount - bill.withholdingAmount);
+    await this.postToLedger('BillPayment', bill.id, bill.paidAt!, `Supplier bill payment: ${bill.billNumber}`, [
+      { code: '2100', debit: payable },
+      { code: '1000', credit: payable },
+    ], bill.mamcosId, actorId);
+    return bill;
+  }
+  async voidBill(id: string, scope: LedgerScope, actorId?: string | null) {
+    const existing = await this.prisma.bill.findFirst({ where: { id, ...scope } });
+    if (!existing) throw new NotFoundException('Bill not found');
+    if (existing.status === 'PAID') throw new BadRequestException('A paid bill cannot be voided');
+    if (existing.status === 'VOID') return existing;
+    const bill = await this.prisma.bill.update({ where: { id }, data: { status: 'VOID' } });
+    await this.postToLedger('Bill', bill.id, new Date(), `Void supplier bill: ${bill.supplier}`, [], bill.mamcosId, actorId);
     return bill;
   }
   async receivables(scope: LedgerScope) {
-    const now = new Date();
+    // Due today is not overdue until today is over (Tanzania time).
+    const now = new Date(`${localDate(new Date())}T00:00:00+03:00`);
     await this.prisma.invoice.updateMany({
       where: { status: 'OPEN', dueDate: { lt: now } },
       data: { status: 'OVERDUE' },
@@ -583,7 +791,7 @@ export class AccountingService {
     });
   }
   async payables(scope: LedgerScope) {
-    const now = new Date();
+    const now = new Date(`${localDate(new Date())}T00:00:00+03:00`);
     await this.prisma.bill.updateMany({
       where: { status: 'OPEN', dueDate: { lt: now } },
       data: { status: 'OVERDUE' },

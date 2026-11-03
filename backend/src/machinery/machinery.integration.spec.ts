@@ -12,6 +12,7 @@ import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { PERMISSION_KEY } from '../auth/decorators/require-permission.decorator';
 import { MachineryController } from './machinery.controller';
 import { MachineryService } from './machinery.service';
+import { AccountingService } from '../accounting/accounting.service';
 
 const BASE_URL = process.env.IRRIGATION_TEST_DATABASE_URL;
 const SCHEMA = 'irrigation_test';
@@ -39,7 +40,8 @@ describeDb('Machinery and task management (PostgreSQL)', () => {
     prisma = new PrismaClient({ adapter: new PrismaPg(pool, { schema: SCHEMA }) });
     const [{ current_schema }] = await prisma.$queryRawUnsafe<{ current_schema: string }[]>('select current_schema()');
     expect(current_schema).toBe(SCHEMA);
-    svc = new MachineryService(prisma as any, new OwnershipService(prisma as any));
+    const ownership = new OwnershipService(prisma as any);
+    svc = new MachineryService(prisma as any, ownership, new AccountingService(prisma as any, ownership));
 
     const tag = randomUUID().slice(0, 5);
     mamcosA = (await prisma.mamcos.create({ data: { name: `Madibira M ${tag}`, code: `MAD-${tag.toUpperCase()}1` } })).id;
@@ -107,6 +109,12 @@ describeDb('Machinery and task management (PostgreSQL)', () => {
       await expect(svc.markFeePaid(adminA, job.id, iso(3))).rejects.toThrow(/future/);
       const paid = await svc.markFeePaid(adminA, job.id, iso(-1));
       expect(paid).toMatchObject({ feeStatus: 'PAID' });
+      // the contribution is income in the AMCOS's books: cash in, tool contribution income
+      const booked = await prisma.ledgerEntry.findMany({ where: { sourceType: 'ToolContribution', sourceId: job.id }, include: { account: true } });
+      expect(booked.map((r) => [r.account.code, r.debit, r.credit, r.mamcosId])).toEqual(expect.arrayContaining([
+        ['1000', Number(paid.feeAmount), 0, mamcosA], ['4250', 0, Number(paid.feeAmount), mamcosA],
+      ]));
+      expect(booked).toHaveLength(2);
       await expect(svc.markFeePaid(adminA, job.id)).rejects.toThrow(/already recorded as paid/);
       await expect(svc.updateActivity(adminA, job.id, { hectares: 20 })).rejects.toThrow(/already paid/);
       await expect(svc.updateActivity(adminA, job.id, { status: 'CANCELLED' })).rejects.toBeInstanceOf(ConflictException);
@@ -146,6 +154,8 @@ describeDb('Machinery and task management (PostgreSQL)', () => {
       await expect(svc.markRegistrationFeePaid(adminC, own.id)).rejects.toThrow(/no registration fee/);
       await expect(svc.markRegistrationFeePaid(adminC, hired.id, iso(3))).rejects.toThrow(/future/);
       expect(await svc.markRegistrationFeePaid(adminC, hired.id, iso(-1))).toMatchObject({ registrationFeeStatus: 'PAID' });
+      const regBooked = await prisma.ledgerEntry.findMany({ where: { sourceType: 'ToolRegistrationFee', sourceId: hired.id }, include: { account: true } });
+      expect(regBooked.map((r) => [r.account.code, r.debit, r.credit]).sort()).toEqual([['1000', 50_000, 0], ['4240', 0, 50_000]]);
       await expect(svc.markRegistrationFeePaid(adminC, hired.id)).rejects.toThrow(/already recorded as paid/);
       await expect(svc.markRegistrationFeePaid(adminA, agreed.id)).rejects.toBeInstanceOf(NotFoundException);
 

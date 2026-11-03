@@ -286,6 +286,12 @@ model Mamcos {
   chairmanName        String?  @map("chairman_name")
   chairmanPhone       String?  @map("chairman_phone")
   /// What a tool owned by someone else pays once to be registered with this AMCOS (TZS). Null/0 = no fee.
+  /// Tax identity and VAT status, printed on invoices and used by the VAT return.
+  tin                 String?
+  vrn                 String?
+  vatRegistered       Boolean  @default(false) @map("vat_registered")
+  /// Standard VAT rate in percent (Tanzania: 18).
+  vatRate             Decimal  @default(18) @map("vat_rate") @db.Decimal(5, 2)
   toolRegistrationFee Decimal? @map("tool_registration_fee") @db.Decimal(12, 2)
   /// What any tool, owned by the AMCOS or not, contributes per hectare it works (TZS), unless the tool has its own rate.
   toolFeePerHectare   Decimal? @map("tool_fee_per_hectare") @db.Decimal(12, 2)
@@ -312,6 +318,9 @@ model Mamcos {
   equipment             AmcosEquipment[]
   communications        Communication[]
   ledgerEntries         LedgerEntry[]
+  accountingLock        AccountingLock?
+  bankStatements        BankStatement[]
+  cashTransactions      CashTransaction[]
   invoices              Invoice[]
   bills                 Bill[]
   machineryActivities   MachineryActivity[]
@@ -1492,68 +1501,223 @@ model Account {
 }
 
 model LedgerEntry {
-  id          String   @id @default(uuid())
-  entryNumber String   @map("entry_number")
-  accountId   String   @map("account_id")
-  debit       Float    @default(0)
-  credit      Float    @default(0)
-  entryDate   DateTime @map("entry_date")
-  sourceType  String   @map("source_type")
-  sourceId    String   @map("source_id")
-  description String?
+  id                String   @id @default(uuid())
+  entryNumber       String   @map("entry_number")
+  accountId         String   @map("account_id")
+  debit             Float    @default(0)
+  credit            Float    @default(0)
+  entryDate         DateTime @map("entry_date")
+  sourceType        String   @map("source_type")
+  sourceId          String   @map("source_id")
+  description       String?
   /// Cooperative whose books this belongs to. Null = platform-level (Mayode corporate, or could not be attributed); visible to Super Admin only.
-  mamcosId    String?  @map("mamcos_id")
-  createdAt   DateTime @default(now()) @map("created_at")
+  mamcosId          String?  @map("mamcos_id")
+  /// All lines of one journal share this id. A journal always balances (enforced by a deferred trigger).
+  journalId         String   @map("journal_id")
+  /// 1 for a source's first posting; later postings of the same source are adjustments carrying only the difference.
+  revision          Int      @default(1)
+  /// Set on a reversing journal: the journal it cancels.
+  reversesJournalId String?  @map("reverses_journal_id")
+  postedById        String?  @map("posted_by_id")
+  createdAt         DateTime @default(now()) @map("created_at")
 
-  account Account @relation(fields: [accountId], references: [id])
-  mamcos  Mamcos? @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  account  Account            @relation(fields: [accountId], references: [id])
+  mamcos   Mamcos?            @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  bankLine BankStatementLine?
 
-  @@unique([sourceType, sourceId, accountId])
+  @@unique([sourceType, sourceId, accountId, revision])
+  @@unique([reversesJournalId, accountId])
   @@index([entryDate])
   @@index([mamcosId, entryDate])
+  @@index([journalId])
   @@map("ledger_entries")
 }
 
-model Invoice {
-  id             String        @id @default(uuid())
-  invoiceNumber  String        @unique @map("invoice_number")
-  saleId         String?       @unique @map("sale_id")
-  buyerId        String?       @map("buyer_id")
-  amount         Float
-  dueDate        DateTime      @map("due_date")
-  /// Cooperative these books belong to (null = platform-level).
-  mamcosId       String?       @map("mamcos_id")
-  status         InvoiceStatus @default(OPEN)
-  paidAt         DateTime?     @map("paid_at")
-  lastReminderAt DateTime?     @map("last_reminder_at")
-  reminderCount  Int           @default(0) @map("reminder_count")
-  createdAt      DateTime      @default(now()) @map("created_at")
-  sale           Sale?         @relation(fields: [saleId], references: [id])
-  buyer          Buyer?        @relation(fields: [buyerId], references: [id])
-  mamcos         Mamcos?       @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+/// Last document number handed out for one (cooperative, kind, year), so numbers run 1, 2, 3 … without gaps or repeats.
+model LedgerCounter {
+  scopeKey  String @map("scope_key")
+  year      Int
+  lastValue Int    @default(0) @map("last_value")
 
+  @@id([scopeKey, year])
+  @@map("ledger_counters")
+}
+
+/// Books are closed up to and including `closedThrough`: nothing can be posted on or before that day.
+model AccountingLock {
+  scopeKey      String   @id @map("scope_key")
+  mamcosId      String?  @unique @map("mamcos_id")
+  closedThrough DateTime @map("closed_through") @db.Date
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedById   String?  @map("updated_by_id")
+
+  mamcos Mamcos? @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+
+  @@map("accounting_locks")
+}
+
+/// Append-only history of closing and reopening the books.
+model AccountingLockEvent {
+  id        String    @id @default(uuid())
+  scopeKey  String    @map("scope_key")
+  mamcosId  String?   @map("mamcos_id")
+  action    String
+  fromDate  DateTime? @map("from_date") @db.Date
+  toDate    DateTime? @map("to_date") @db.Date
+  reason    String?
+  byUserId  String?   @map("by_user_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([scopeKey, createdAt])
+  @@map("accounting_lock_events")
+}
+
+enum CashTransactionKind {
+  EXPENSE
+  INCOME
+}
+
+enum CashTransactionStatus {
+  POSTED
+  VOID
+}
+
+/// A simple money-out or money-in the AMCOS records without bookkeeping knowledge; each one posts a journal to the ledger.
+model CashTransaction {
+  id              String                @id @default(uuid())
+  mamcosId        String                @map("mamcos_id")
+  kind            CashTransactionKind
+  /// EXP-2026-000001 / INC-2026-000001, running per cooperative and year.
+  number          String
+  transactionDate DateTime              @map("transaction_date") @db.Date
+  /// The total money that moved, VAT included.
+  amount          Decimal               @db.Decimal(14, 2)
+  vatAmount       Decimal               @default(0) @map("vat_amount") @db.Decimal(14, 2)
+  /// Ledger account the cost or income is booked to.
+  accountCode     String                @map("account_code")
+  party           String?
+  /// How the money moved. Informational: it all goes through the cash and mobile money account.
+  method          String                @default("CASH")
+  reference       String?
+  note            String?
+  status          CashTransactionStatus @default(POSTED)
+  voidedAt        DateTime?             @map("voided_at")
+  voidedById      String?               @map("voided_by_id")
+  voidReason      String?               @map("void_reason")
+  createdById     String?               @map("created_by_id")
+  createdAt       DateTime              @default(now()) @map("created_at")
+
+  mamcos Mamcos @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+
+  @@unique([mamcosId, number])
+  @@index([mamcosId, transactionDate])
+  @@map("cash_transactions")
+}
+
+enum StatementStatus {
+  DRAFT
+  RECONCILED
+}
+
+/// A bank, mobile-money or cash-count statement being checked against the cash book (account 1000).
+model BankStatement {
+  id             String          @id @default(uuid())
+  mamcosId       String          @map("mamcos_id")
+  accountLabel   String          @map("account_label")
+  kind           String          @default("BANK")
+  periodStart    DateTime        @map("period_start") @db.Date
+  periodEnd      DateTime        @map("period_end") @db.Date
+  openingBalance Decimal         @map("opening_balance") @db.Decimal(14, 2)
+  closingBalance Decimal         @map("closing_balance") @db.Decimal(14, 2)
+  status         StatementStatus @default(DRAFT)
+  reconciledAt   DateTime?       @map("reconciled_at")
+  reconciledById String?         @map("reconciled_by_id")
+  createdById    String?         @map("created_by_id")
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  mamcos Mamcos              @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  lines  BankStatementLine[]
+
+  @@index([mamcosId, periodEnd])
+  @@map("bank_statements")
+}
+
+model BankStatementLine {
+  id            String    @id @default(uuid())
+  statementId   String    @map("statement_id")
+  lineDate      DateTime  @map("line_date") @db.Date
+  description   String
+  reference     String?
+  /// Money in is positive, money out negative.
+  amount        Decimal   @db.Decimal(14, 2)
+  ledgerEntryId String?   @unique @map("ledger_entry_id")
+  matchedAt     DateTime? @map("matched_at")
+  matchedById   String?   @map("matched_by_id")
+
+  statement   BankStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  ledgerEntry LedgerEntry?  @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
+
+  @@index([statementId])
+  @@map("bank_statement_lines")
+}
+
+model Invoice {
+  id                String        @id @default(uuid())
+  invoiceNumber     String        @map("invoice_number")
+  saleId            String?       @unique @map("sale_id")
+  buyerId           String?       @map("buyer_id")
+  /// Total the customer owes, VAT included.
+  amount            Float
+  subtotal          Float?
+  vatAmount         Float         @default(0) @map("vat_amount")
+  /// Tax the customer withholds from this invoice and pays to the revenue authority for us.
+  withholdingAmount Float         @default(0) @map("withholding_amount")
+  description       String?
+  /// False for older invoices recorded before invoices posted to the ledger.
+  postedToLedger    Boolean       @default(true) @map("posted_to_ledger")
+  dueDate           DateTime      @map("due_date")
+  /// Cooperative these books belong to (null = platform-level).
+  mamcosId          String?       @map("mamcos_id")
+  status            InvoiceStatus @default(OPEN)
+  paidAt            DateTime?     @map("paid_at")
+  lastReminderAt    DateTime?     @map("last_reminder_at")
+  reminderCount     Int           @default(0) @map("reminder_count")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  sale              Sale?         @relation(fields: [saleId], references: [id])
+  buyer             Buyer?        @relation(fields: [buyerId], references: [id])
+  mamcos            Mamcos?       @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+
+  @@unique([mamcosId, invoiceNumber])
   @@index([dueDate, status])
   @@index([mamcosId])
   @@map("invoices")
 }
 
 model Bill {
-  id          String        @id @default(uuid())
-  billNumber  String        @unique @map("bill_number")
-  supplier    String
-  supplierId  String?       @map("supplier_id")
-  amount      Float
-  dueDate     DateTime      @map("due_date")
+  id                 String        @id @default(uuid())
+  billNumber         String        @map("bill_number")
+  supplier           String
+  supplierId         String?       @map("supplier_id")
+  /// Total on the supplier's bill, VAT included.
+  amount             Float
+  subtotal           Float?
+  vatAmount          Float         @default(0) @map("vat_amount")
+  /// Tax we hold back from the supplier and owe the revenue authority.
+  withholdingAmount  Float         @default(0) @map("withholding_amount")
+  /// Account code the cost is booked to (default 5000).
+  expenseAccountCode String?       @map("expense_account_code")
+  dueDate            DateTime      @map("due_date")
   /// Cooperative these books belong to (null = platform-level).
-  mamcosId    String?       @map("mamcos_id")
-  status      InvoiceStatus @default(OPEN)
-  paidAt      DateTime?     @map("paid_at")
-  description String?
-  createdAt   DateTime      @default(now()) @map("created_at")
+  mamcosId           String?       @map("mamcos_id")
+  status             InvoiceStatus @default(OPEN)
+  paidAt             DateTime?     @map("paid_at")
+  description        String?
+  createdAt          DateTime      @default(now()) @map("created_at")
 
   supplierRef Supplier? @relation(fields: [supplierId], references: [id])
   mamcos      Mamcos?   @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
 
+  @@unique([mamcosId, billNumber])
   @@index([dueDate, status])
   @@index([mamcosId])
   @@map("bills")
