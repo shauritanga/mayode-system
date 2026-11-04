@@ -324,6 +324,7 @@ model Mamcos {
   equipmentTypes        AmcosEquipmentType[]
   cashAccounts          CashAccount[]
   cashTransfers         CashTransfer[]
+  suppliers             Supplier[]
   farmerPayouts         FarmerPayout[]
   accountingLock        AccountingLock?
   bankStatements        BankStatement[]
@@ -1011,20 +1012,38 @@ model InputCost {
 }
 
 model Supplier {
-  id            String   @id @default(uuid())
+  id            String       @id @default(uuid())
+  /// Cooperative this supplier belongs to. Null = an older shared entry: every cooperative can see it, only Super Admin can change it.
+  mamcosId      String?      @map("mamcos_id")
+  /// A person (full name in `name`) or a company (company name in `name`, a person to contact in `contactPerson`).
+  kind          SupplierKind @default(COMPANY)
   name          String
-  contactPerson String?  @map("contact_person")
-  contactPhone  String?  @map("contact_phone")
-  contactEmail  String?  @map("contact_email")
-  itemsSupplied String[] @map("items_supplied")
-  isActive      Boolean  @default(true) @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  contactPerson String?      @map("contact_person")
+  contactPhone  String?      @map("contact_phone")
+  contactEmail  String?      @map("contact_email")
+  tin           String?
+  /// National ID number, for an individual.
+  idNumber      String?      @map("id_number")
+  /// Business registration number, for a company.
+  businessRegNo String?      @map("business_reg_no")
+  address       String?
+  notes         String?
+  itemsSupplied String[]     @map("items_supplied")
+  isActive      Boolean      @default(true) @map("is_active")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
 
+  mamcos     Mamcos?     @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
   inputCosts InputCost[]
   bills      Bill[]
 
+  @@index([mamcosId])
   @@map("suppliers")
+}
+
+enum SupplierKind {
+  INDIVIDUAL
+  COMPANY
 }
 
 model Revenue {

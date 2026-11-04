@@ -745,8 +745,10 @@ export class AccountingService {
     if (dto.supplierId) {
       const supplierRecord = await this.prisma.supplier.findUnique({
         where: { id: dto.supplierId },
-        select: { name: true },
+        select: { name: true, mamcosId: true },
       });
+      // A bill can be linked to the cooperative's own suppliers or to a shared one, never to another cooperative's.
+      if (supplierRecord && supplierRecord.mamcosId != null && supplierRecord.mamcosId !== mamcosId) throw new BadRequestException('Choose one of your own suppliers.');
       if (supplierRecord) supplierName = supplierRecord.name;
     }
     const tax = computeTax({ net: dto.amount, ...(await this.taxSettings(mamcosId)), vatApplies: dto.vatApplies, withholdingPercent: dto.withholdingPercent });

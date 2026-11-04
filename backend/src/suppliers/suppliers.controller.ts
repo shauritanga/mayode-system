@@ -17,7 +17,9 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { SuppliersService } from './suppliers.service';
-import { UpsertSupplierDto } from './dto/supplier.dto';
+import { UpdateSupplierDto, UpsertSupplierDto } from './dto/supplier.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { RequestUser } from '../common/ownership.service';
 
 @ApiTags('suppliers')
 @ApiBearerAuth()
@@ -30,8 +32,8 @@ export class SuppliersController {
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @RequirePermission('suppliers', 'CREATE')
-  create(@Body() dto: UpsertSupplierDto) {
-    return this.suppliers.create(dto);
+  create(@Body() dto: UpsertSupplierDto, @CurrentUser() user: RequestUser) {
+    return this.suppliers.create(dto, user);
   }
 
   @Get()
@@ -43,8 +45,8 @@ export class SuppliersController {
     UserRole.FARMER,
   )
   @RequirePermission('suppliers', 'VIEW')
-  findAll() {
-    return this.suppliers.findAll();
+  findAll(@CurrentUser() user: RequestUser) {
+    return this.suppliers.findAll(user);
   }
 
   @Get(':id')
@@ -56,21 +58,21 @@ export class SuppliersController {
     UserRole.FARMER,
   )
   @RequirePermission('suppliers', 'VIEW')
-  findOne(@Param('id') id: string) {
-    return this.suppliers.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.suppliers.findOne(id, user);
   }
 
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @RequirePermission('suppliers', 'EDIT')
-  update(@Param('id') id: string, @Body() dto: UpsertSupplierDto) {
-    return this.suppliers.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateSupplierDto, @CurrentUser() user: RequestUser) {
+    return this.suppliers.update(id, dto, user);
   }
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @RequirePermission('suppliers', 'DELETE')
-  remove(@Param('id') id: string) {
-    return this.suppliers.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.suppliers.remove(id, user);
   }
 }

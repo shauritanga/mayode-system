@@ -1089,4 +1089,10 @@ export const SW_MESSAGES: Record<string, string> = {
   "Only {0} is owed to this person.": "Anayedai ni {0} pekee.",
   "Payout not found.": "Malipo hayajapatikana.",
   "This payout is already cancelled.": "Malipo haya tayari yamefutwa.",
+  "Choose one of your own suppliers.": "Chagua mmoja wa wasambazaji wako.",
+  "Supplier not found": "Msambazaji hajapatikana",
+  "This is a shared supplier. Only the platform administrator can change it.": "Huyu ni msambazaji wa pamoja. Ni msimamizi mkuu pekee anayeweza kumbadilisha.",
+  "A supplier called \"{0}\" already exists": "Msambazaji anayeitwa \"{0}\" tayari yupo",
+  "Give the supplier a name of at least two letters": "Mpe msambazaji jina lenye angalau herufi mbili",
+  "A supplier with recorded costs or bills cannot be deleted; deactivate it instead to preserve traceability.": "Msambazaji mwenye gharama au ankara zilizorekodiwa hawezi kufutwa; mzime badala yake ili kuhifadhi ufuatiliaji.",
 };
