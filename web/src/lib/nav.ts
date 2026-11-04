@@ -230,7 +230,6 @@ export const navGroups: NavGroup[] = [
               ] },
               { href: '/dashboard/accounting/tax-compliance', label: 'Tax & Compliance', icon: File01Icon, roles: [], resource: 'accounting', children: [
                 { href: '/dashboard/accounting/tax-compliance/vat-return', label: 'VAT Return', icon: File01Icon, roles: [] },
-                { href: '/dashboard/accounting/tax-compliance/tax-settings', label: 'Tax Settings', icon: File01Icon, roles: [] },
               ] },
             ],
           },

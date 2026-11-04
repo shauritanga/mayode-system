@@ -19,7 +19,7 @@ const SECTIONS: { id: Section; slug: string; label: string; description: string;
   { id: 'tools', slug: 'tools-machines', label: 'Tools & machines', description: 'The machines your AMCOS has, and what tools pay to be registered and to work.', icon: Tractor },
   { id: 'warehouse', slug: 'warehouse-milling', label: 'Warehouse & milling', description: 'Fees for milling, storing and delivering rice.', icon: Warehouse },
   { id: 'penalties', slug: 'late-payments', label: 'Late payments', description: 'What happens when a farmer pays late.', icon: Clock },
-  { id: 'tax', slug: 'vat', label: 'VAT', description: 'The VAT rate on your sales and purchases.', icon: Percent },
+  { id: 'tax', slug: 'vat', label: 'VAT & tax numbers', description: 'VAT registration and rate, and the AMCOS’s tax numbers.', icon: Percent },
 ];
 
 /** One line of the price list: a charge, how it works, where it takes effect, and its amount. */
@@ -80,6 +80,32 @@ function NewLevyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (m: 
         <Field label={f.basis === 'PER_HECTARE' ? 'Amount per hectare (TZS)' : 'Amount (TZS)'}><input className="input-field" type="number" min="1" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} /></Field>
         <Field label="Season (optional)"><input className="input-field" value={f.season} onChange={(e) => setF({ ...f, season: e.target.value })} placeholder="e.g. 2026/27" /></Field>
       </div>
+    </Modal>
+  );
+}
+
+// ───────────────────────── tax details ─────────────────────────
+function TaxDetailsModal({ tax, onClose, onSaved }: { tax: any; onClose: () => void; onSaved: (m: string) => void }) {
+  const [f, setF] = useState({ tin: tax.tin ?? '', vrn: tax.vrn ?? '', vatRegistered: !!tax.vatRegistered, vatRate: String(tax.vatRate ?? 18) });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const save = async () => {
+    setBusy(true); setError('');
+    try { await accountingApi.updateTaxSettings({ tin: f.tin, vrn: f.vrn, vatRegistered: f.vatRegistered, vatRate: Number(f.vatRate) }); onSaved('Tax details saved.'); } catch (e) { setError(errMsg(e, 'Could not save the tax details.')); setBusy(false); }
+  };
+  return (
+    <Modal title="Tax details" subtitle="TIN, VAT registration and the VAT rate" onClose={() => !busy && onClose()} width="520px"
+      footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button><button type="submit" form="tax-form" className="btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button></>}>
+      <form id="tax-form" onSubmit={(e) => { e.preventDefault(); void save(); }} style={{ display: 'grid', gap: 14 }}>
+        {error && <div role="alert" className="alert-box alert-danger">{error}</div>}
+        <Field label="TIN (taxpayer number)"><input className="input-field" autoFocus value={f.tin} onChange={(e) => setF({ ...f, tin: e.target.value })} /></Field>
+        <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 14 }}>
+          <input type="checkbox" style={{ marginTop: 3 }} checked={f.vatRegistered} onChange={(e) => setF({ ...f, vatRegistered: e.target.checked })} />
+          <span><strong>This AMCOS is registered for VAT</strong><span className="muted" style={{ display: 'block', fontSize: 12 }}>VAT is added to invoices and bills only when this is ticked.</span></span>
+        </label>
+        <Field label="VRN (VAT registration number)" hint={f.vatRegistered ? 'Required for a VAT-registered AMCOS.' : undefined}><input className="input-field" value={f.vrn} onChange={(e) => setF({ ...f, vrn: e.target.value })} /></Field>
+        <Field label="VAT rate (%)"><input className="input-field" type="number" min="0" max="100" step="0.01" value={f.vatRate} onChange={(e) => setF({ ...f, vatRate: e.target.value })} /></Field>
+      </form>
     </Modal>
   );
 }
@@ -174,6 +200,7 @@ export default function AmcosSettingsPage() {
   const can = useCan();
   const [message, setMessage] = useState('');
   const [adding, setAdding] = useState(false);
+  const [taxOpen, setTaxOpen] = useState(false);
   const [editing, setEditing] = useState<null | {
     title: string; subtitle: string; unit: string; amount: number | null; active?: boolean; graceDays?: number; note?: string;
     save: (v: { amount: number | null; active: boolean; graceDays?: number }) => Promise<void>;
@@ -250,12 +277,16 @@ export default function AmcosSettingsPage() {
       note: 'For example 5% with a 30 day grace period: a farmer who still owes 100,000 thirty days after the due date is charged 5,000 each month. You choose when to apply it, from the Dues page.',
       save: async (v) => { await chargesApi.update('LATE_PENALTY', { amount: v.amount ?? 0, isActive: v.active, graceDays: v.graceDays }); done('Late payment penalty saved.'); charges.reload(); setEditing(null); } }) : undefined,
   }] : [];
-  const taxRows: Row[] = tax.data ? [{
-    key: 'VAT', section: 'tax', name: 'VAT rate', how: tax.data.vatRegistered ? 'Added to your invoices and bills' : 'Used once your AMCOS is registered for VAT', usedIn: 'Accounting → invoices, bills and the VAT return',
-    amount: `${Number(tax.data.vatRate)}%`, on: tax.data.vatRegistered,
-    edit: canTax ? () => open({ title: 'VAT rate', subtitle: 'VAT', unit: '%', amount: Number(tax.data.vatRate), note: 'Whether the AMCOS is registered for VAT, and its TIN and VRN, are kept in Accounting → Tax Settings.',
-      save: async (v) => { await accountingApi.updateTaxSettings({ vatRate: v.amount ?? 0 }); done('VAT rate saved.'); tax.reload(); setEditing(null); } }) : undefined,
-  }] : [];
+  const taxRows: Row[] = tax.data ? [
+    {
+      key: 'VAT', section: 'tax', name: 'VAT', how: tax.data.vatRegistered ? 'The AMCOS is registered for VAT: it is added to invoices and bills' : 'Not registered for VAT: no VAT is added', usedIn: 'Accounting → invoices, bills and the VAT return',
+      amount: `${Number(tax.data.vatRate)}%`, on: tax.data.vatRegistered, edit: canTax ? () => setTaxOpen(true) : undefined,
+    },
+    {
+      key: 'TAXNOS', section: 'tax', name: 'Tax numbers', how: 'Printed on invoices and used in the VAT return', usedIn: 'Accounting → invoices and the VAT return',
+      amount: `TIN ${tax.data.tin || 'not set'} · VRN ${tax.data.vrn || 'not set'}`, on: null, edit: canTax ? () => setTaxOpen(true) : undefined,
+    },
+  ] : [];
 
   const allRows = [...levyRows, ...toolRows, ...warehouseRows, ...penaltyRows, ...taxRows];
   const counts: Record<Section, string> = {
@@ -264,7 +295,7 @@ export default function AmcosSettingsPage() {
     tools: `${(machineTypes.data ?? []).filter((t) => t.isActive).length} types`,
     warehouse: `${warehouseRows.filter((r) => r.on).length} on`,
     penalties: penaltyRows[0]?.on ? 'On' : 'Off',
-    tax: taxRows[0] ? taxRows[0].amount : '',
+    tax: taxRows[0] ? (tax.data?.vatRegistered ? taxRows[0].amount : 'Not on VAT') : '',
   };
 
   return (
@@ -334,7 +365,6 @@ export default function AmcosSettingsPage() {
               {selected.id === 'tax' && (
                 <>
                   <ChargeTable rows={taxRows} empty="Not available." />
-                  <p className="muted" style={{ fontSize: 13 }}>The TIN, VRN and whether the AMCOS is registered for VAT are in <Link href="/dashboard/accounting/tax-compliance/tax-settings">Accounting → Tax Settings</Link>.</p>
                 </>
               )}
             </>
@@ -342,6 +372,7 @@ export default function AmcosSettingsPage() {
         </section>
       </div>
 
+      {taxOpen && tax.data && <TaxDetailsModal tax={tax.data} onClose={() => setTaxOpen(false)} onSaved={(m) => { setTaxOpen(false); done(m); tax.reload(); }} />}
       {adding && <NewLevyModal onClose={() => setAdding(false)} onSaved={(m) => { setAdding(false); done(m); types.reload(); }} />}
       {editing && <EditAmountModal title={editing.title} subtitle={editing.subtitle} unit={editing.unit} amount={editing.amount} active={editing.active} graceDays={editing.graceDays} note={editing.note} onClose={() => setEditing(null)} onSave={editing.save} />}
     </main>

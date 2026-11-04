@@ -10,7 +10,7 @@ import Modal from '@/components/Modal';
 import { useAuthStore } from '@/store/auth.store';
 import { CashBookView, MoneyAccountsView } from './money';
 import { FarmerAccountsView, PayoutsView } from './farmers';
-import { BankReconciliationView, CashTransactionsView, DocumentsView, PeriodCloseView, TaxSettingsView, VatReturnView } from './controls';
+import { BankReconciliationView, CashTransactionsView, DocumentsView, PeriodCloseView, VatReturnView } from './controls';
 
 const MENU = [
   ['Farmers', 'farmer-accounts', ['Owed to Farmers', 'Payouts', 'Farmer Statements']],
@@ -23,7 +23,7 @@ const MENU = [
   ['General Ledger', 'general-ledger', ['Chart of Accounts', 'Journal Entries', 'Trial Balance', 'Account Balances', 'Period Close']],
   ['Budgets & Cooperative Funds', 'budgets-cooperative-funds', ['Annual Budgets', 'Member Contributions', 'Reserves', 'Approved Allocations']],
   ['Financial Reports', 'financial-reports', ['Income Statement', 'Balance Sheet', 'Cash Flow Statement', 'Farmer Liabilities']],
-  ['Tax & Compliance', 'tax-compliance', ['VAT Return', 'Tax Settings']],
+  ['Tax & Compliance', 'tax-compliance', ['VAT Return']],
 ] as const;
 
 
@@ -127,7 +127,6 @@ export default function AccountingPage() {
       'expenses-income/expenses': () => Promise.resolve({ data: [] }),
       'expenses-income/other-income': () => Promise.resolve({ data: [] }),
       'tax-compliance/vat-return': () => Promise.resolve({ data: [] }),
-      'tax-compliance/tax-settings': () => Promise.resolve({ data: [] }),
     };
     return calls[key] ?? (() => accountingApi.statements());
   }, [path[0], path[1], selectedCategory, submenu, trialBalanceAsOf, accountBalancesAsOf, journalSearch, journalFrom, journalTo, journalOrigin]);
@@ -376,7 +375,6 @@ export default function AccountingPage() {
     : customKey === 'expenses-income/expenses' ? <CashTransactionsView kind="EXPENSE" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
     : customKey === 'expenses-income/other-income' ? <CashTransactionsView kind="INCOME" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
     : customKey === 'tax-compliance/vat-return' ? <VatReturnView canCreate={!!canCreateAccounting} />
-    : customKey === 'tax-compliance/tax-settings' ? <TaxSettingsView canEdit={!!canEditAccounting} />
     : customKey === 'rice-sales-receivables/customer-debtors' ? <DocumentsView kind="invoice" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
     : customKey === 'purchases-suppliers/supplier-bills' ? <DocumentsView kind="bill" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
     : null;

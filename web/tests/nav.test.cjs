@@ -194,7 +194,7 @@ test('Accounting & Finance navigation exposes all workspaces behind the accounti
   assert.equal(parent.label, 'Accounting & Finance');
   assert.equal(parent.resource, 'accounting');
   assert.equal(parent.children.length, 11);
-  assert.equal(parent.children.reduce((count, category) => count + category.children.length, 0), 39);
+  assert.equal(parent.children.reduce((count, category) => count + category.children.length, 0), 38);
   const granted = { role: 'CUSTOM', roleId: 'r', permissions: [{ resource: 'accounting', action: 'VIEW' }] };
   assert.equal(nav.isPathAllowed('/dashboard/accounting', granted), true);
   assert.equal(nav.isPathAllowed('/dashboard/accounting/general-ledger/trial-balance', granted), true);

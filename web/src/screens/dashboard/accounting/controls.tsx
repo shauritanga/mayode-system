@@ -3,7 +3,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { accountingApi } from '@/lib/api';
-import Link from 'next/link';
 import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 
@@ -303,36 +302,6 @@ function StatementDetail({ id, canEdit, canDelete, onBack }: { id: string; canEd
 }
 
 // ───────────────────────── VAT and withholding tax ─────────────────────────
-export function TaxSettingsView({ canEdit }: { canEdit: boolean }) {
-  const t = useLoad<any>(() => accountingApi.taxSettings(), []);
-  const base = { tin: t.data?.tin ?? '', vrn: t.data?.vrn ?? '', vatRegistered: !!t.data?.vatRegistered, vatRate: String(t.data?.vatRate ?? 18) };
-  const [edits, setEdits] = useState<Partial<typeof base> | null>(null);
-  const f = { ...base, ...(edits ?? {}) };
-  const setF = (next: typeof base) => setEdits(next);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const [saved, setSaved] = useState(false);
-  const save = async () => {
-    setBusy(true); setErr(''); setSaved(false);
-    try { await accountingApi.updateTaxSettings({ tin: f.tin, vrn: f.vrn, vatRegistered: f.vatRegistered, vatRate: Number(f.vatRate) }); setSaved(true); setEdits(null); t.reload(); } catch (e) { setErr(errText(e, 'Could not save the tax settings.')); } finally { setBusy(false); }
-  };
-  return <div>
-    <Head text="VAT is added to invoices and bills only when the cooperative is VAT-registered." />
-    <ErrorBanner message={t.error || err} onDismiss={() => { t.setError(''); setErr(''); }} />
-    <section className="glass-card" style={{ padding: 20, maxWidth: 640 }}>
-      <form onSubmit={(e) => { e.preventDefault(); void save(); }} style={{ display: 'grid', gap: 12 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <label className="form-label">TIN (taxpayer number)<input className="input-field" disabled={!canEdit} value={f.tin} onChange={(e) => setF({ ...f, tin: e.target.value })} /></label>
-          <label className="form-label">VRN (VAT registration number)<input className="input-field" disabled={!canEdit} value={f.vrn} onChange={(e) => setF({ ...f, vrn: e.target.value })} /></label>
-        </div>
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" disabled={!canEdit} checked={f.vatRegistered} onChange={(e) => setF({ ...f, vatRegistered: e.target.checked })} /> This cooperative is registered for VAT</label>
-        <label className="form-label">VAT rate (%)<input className="input-field" type="number" disabled value={f.vatRate} readOnly /><span className="muted" style={{ fontSize: 11 }}>Set in <Link href="/dashboard/amcos-settings">Settings</Link></span></label>
-        {canEdit && <div><button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>{saved && <span className="muted" style={{ marginLeft: 12 }}>Saved</span>}</div>}
-      </form>
-    </section>
-  </div>;
-}
-
 export function VatReturnView({ canCreate }: { canCreate: boolean }) {
   const [from, setFrom] = useState(`${today().slice(0, 8)}01`);
   const [to, setTo] = useState(today());
