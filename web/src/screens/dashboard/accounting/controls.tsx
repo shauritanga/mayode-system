@@ -382,7 +382,7 @@ export function DocumentsView({ kind, canCreate, canEdit }: { kind: 'invoice' | 
           {rows.map((x: any) => <tr key={x.id}><td>{isBill ? x.billNumber : x.invoiceNumber}</td><td>{isBill ? x.supplier : x.buyer?.companyName ?? x.buyer?.name ?? '—'}</td><td>{shortDate(x.dueDate)}</td>
             {showVat && <td className="num">{x.vatAmount ? tzs(x.vatAmount) : '—'}</td>}{showWht && <td className="num">{x.withholdingAmount ? tzs(x.withholdingAmount) : '—'}</td>}<td className="num">{tzs(x.amount)}</td>
             <td>{x.status === 'OVERDUE' ? <Badge tone="bad">Overdue</Badge> : <Badge tone="muted">Open</Badge>}</td>
-            <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{canEdit && <>
+            <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{x.source === 'ORDERS' ? <a className="btn-secondary" href="/dashboard/ops-orders">Take payment in Orders &amp; Sales</a> : canEdit && <>
               <button type="button" className="btn-secondary" onClick={() => void run(() => (isBill ? accountingApi.payBill(x.id) : accountingApi.payInvoice(x.id)))}>{isBill ? 'Mark paid' : 'Mark received'}</button>{' '}
               <details style={{ display: 'inline-block', position: 'relative' }}><summary className="btn-secondary" style={{ cursor: 'pointer', listStyle: 'none' }} aria-label="More actions">⋯</summary>
                 <div style={{ position: 'absolute', right: 0, zIndex: 5, marginTop: 4 }}><button type="button" className="btn-secondary" style={{ color: 'var(--red-400)' }} onClick={() => { if (window.confirm('Void this document? Its ledger postings are offset, not deleted.')) void run(() => (isBill ? accountingApi.voidBill(x.id) : accountingApi.voidInvoice(x.id))); }}>Void</button></div>

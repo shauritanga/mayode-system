@@ -28,8 +28,8 @@ type Dialog =
 
 const kg = (n: number) => `${n.toLocaleString()} kg`;
 
-/** The warehouse counter and warehouse list. `embedded` drops the page heading when shown as a tab of the Warehouse page. */
-export function WarehouseView({ embedded = false }: { embedded?: boolean }) {
+/** The warehouse counter and warehouse list. `embedded` drops the page heading when shown as a tab of the Warehouse page; `setupOnly` also hides the counter actions (receiving and corrections now have their own pages). */
+export function WarehouseView({ embedded = false, setupOnly = false }: { embedded?: boolean; setupOnly?: boolean }) {
   const user = useAuthStore((s) => s.user);
   const can = (r: string, a: string) => hasPermission(user, r, a);
   const canDesk = can('warehouse_desk', 'VIEW');
@@ -112,13 +112,13 @@ export function WarehouseView({ embedded = false }: { embedded?: boolean }) {
                   {(w.unlottedKg ?? 0) > 0 && (
                     <div className="so-note">
                       <b>{kg(w.unlottedKg!)}</b>{' '}counted in but not in a lot, so it can&rsquo;t be sold yet.
-                      {can('warehouse_desk', 'EDIT') && <button className="so-link" onClick={() => setDialog({ kind: 'lot', warehouse: w })}>Make a lot</button>}
+                      {!setupOnly && can('warehouse_desk', 'EDIT') && <button className="so-link" onClick={() => setDialog({ kind: 'lot', warehouse: w })}>Make a lot</button>}
                     </div>
                   )}
                   <div className="ua-hint">Keepers: {w.keepers.length ? w.keepers.map((k) => `${k.user.firstName ?? ''} ${k.user.lastName ?? ''}`.trim()).join(', ') : 'none assigned (any permitted user can act)'}</div>
                   <footer>
-                    {can('warehouse_desk', 'EDIT') && <button className="btn-secondary ua-action" onClick={() => setDialog({ kind: 'receive', warehouse: w })}>Receive harvest</button>}
-                    {can('warehouse_desk', 'EDIT') && <button className="btn-secondary ua-action" onClick={() => setDialog({ kind: 'adjust', warehouse: w })}>Adjust</button>}
+                    {!setupOnly && can('warehouse_desk', 'EDIT') && <button className="btn-secondary ua-action" onClick={() => setDialog({ kind: 'receive', warehouse: w })}>Receive harvest</button>}
+                    {!setupOnly && can('warehouse_desk', 'EDIT') && <button className="btn-secondary ua-action" onClick={() => setDialog({ kind: 'adjust', warehouse: w })}>Adjust</button>}
                     {can('warehouses', 'EDIT') && <button className="btn-secondary ua-action" onClick={() => setDialog({ kind: 'keepers', warehouse: w })}>Keepers</button>}
                   </footer>
                 </article>
@@ -128,7 +128,7 @@ export function WarehouseView({ embedded = false }: { embedded?: boolean }) {
         </section>
       )}
 
-      {canDesk && can('sales', 'VIEW') && (
+      {!setupOnly && canDesk && can('sales', 'VIEW') && (
         <details className="ua-panel so-desk">
           <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-1)' }}>Older sales (made before sale orders)</summary>
           <p className="ua-hint" style={{ margin: '10px 0' }}>For sales recorded the old way, look up the invoice number and record the gate pass. New sales are loaded from their sale order above.</p>

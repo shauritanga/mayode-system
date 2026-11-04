@@ -49,7 +49,11 @@ export class AuditInterceptor implements NestInterceptor {
       tap((response) => {
         const userId: string | undefined = req.user?.id;
         const entityId: string =
-          (response && (response.id as string)) || req.params?.id || 'n/a';
+          (response && (response.id as string)) ||
+          req.params?.id ||
+          // Routes that name their record differently (journalId, lineId) still say what was changed.
+          (Object.values(req.params ?? {})[0] as string | undefined) ||
+          'n/a';
 
         // Fire-and-forget; swallow errors so auditing never affects the response.
         this.prisma.auditLog

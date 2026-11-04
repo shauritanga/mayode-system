@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import { BookOpen, Building2, ChartNoAxesCombined, ChevronRight, Factory, FileChartColumn, HandCoins, Landmark, Package, ReceiptText, Scale, ShoppingCart, UsersRound, Wheat } from 'lucide-react';
+import { BookOpen, ChevronRight, Factory, Landmark, ReceiptText, ShoppingCart, UsersRound } from 'lucide-react';
 import { accountingApi, financeApi, inventoryApi, loansApi, mamcosApi, salesApi, suppliersApi } from '@/lib/api';
 import ErrorBanner from '@/components/ErrorBanner';
 import Modal from '@/components/Modal';
@@ -26,7 +26,16 @@ const MENU = [
   ['Tax & Compliance', 'tax-compliance', ['VAT Return', 'Tax Settings']],
 ] as const;
 
-const MENU_ICONS = [UsersRound, Wheat, HandCoins, ShoppingCart, Factory, Landmark, Package, ReceiptText, Building2, BookOpen, ChartNoAxesCombined, FileChartColumn, Scale];
+
+/** What the sidebar shows: six headings in the order a bookkeeper works. Every page keeps its own address, so old links still open. */
+const DISPLAY_GROUPS = [
+  { label: 'Sales & customers', icon: ShoppingCart, sections: ['rice-sales-receivables'] },
+  { label: 'Purchases & expenses', icon: ReceiptText, sections: ['purchases-suppliers', 'expenses-income'] },
+  { label: 'Farmers', icon: UsersRound, sections: ['farmer-financial-accounts', 'paddy-procurement', 'farmer-settlements'] },
+  { label: 'Cash & banking', icon: Landmark, sections: ['cash-banking'] },
+  { label: 'Production, assets & funds', icon: Factory, sections: ['milling-cost-accounting', 'assets-loans', 'budgets-cooperative-funds'] },
+  { label: 'Books & reports', icon: BookOpen, sections: ['general-ledger', 'financial-reports', 'tax-compliance'] },
+] as const;
 
 const slug = (label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 const titleCase = (value: string) => value.split('-').map((part) => part ? part[0].toUpperCase() + part.slice(1) : '').join(' ');
@@ -54,8 +63,9 @@ export default function AccountingPage() {
   const currentUser = useAuthStore((state) => state.user);
   const path = params?.slug ?? [];
   const category = MENU.find((item) => item[1] === path[0]);
-  const [openCategory, setOpenCategory] = useState(path[0] ?? MENU[0][1]);
-  const selectedCategory = category ?? MENU.find((item) => item[1] === openCategory) ?? MENU[0];
+  const selectedCategory = category ?? MENU[0];
+  const groupOf = (section: string) => DISPLAY_GROUPS.find((g) => (g.sections as readonly string[]).includes(section))?.label ?? '';
+  const [openGroup, setOpenGroup] = useState(groupOf(selectedCategory[1]));
   const submenu = selectedCategory[2].find((item) => slug(item) === path[1]) ?? selectedCategory[2][0];
   const title = submenu;
   const [records, setRecords] = useState<any[]>([]);
@@ -72,7 +82,8 @@ export default function AccountingPage() {
   const [journalOrigin, setJournalOrigin] = useState('');
 
   useEffect(() => {
-    if (path[0]) setOpenCategory(path[0]);
+    if (path[0]) setOpenGroup(groupOf(path[0]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path[0]]);
 
   const request = useMemo(() => {
@@ -382,25 +393,26 @@ export default function AccountingPage() {
     <div className="accounting-layout">
       <aside className="accounting-subsidebar" aria-label="Accounting & Finance sections">
         <div className="accounting-subsidebar-heading">Accounting &amp; Finance</div>
-        {MENU.map(([label, section, pages], index) => {
-          const Icon = MENU_ICONS[index];
-          const expanded = openCategory === section;
-          return <div key={section} className="accounting-nav-group">
+        {DISPLAY_GROUPS.map((group) => {
+          const Icon = group.icon;
+          const expanded = openGroup === group.label;
+          const links = group.sections.flatMap((section) => (MENU.find((m) => m[1] === section)?.[2] ?? []).map((page) => ({ section, page })));
+          return <div key={group.label} className="accounting-nav-group">
             <button type="button" aria-expanded={expanded} onClick={() => {
-              if (expanded) setOpenCategory('');
+              if (expanded) setOpenGroup('');
               else {
-                setOpenCategory(section);
-                router.push(`/dashboard/accounting/${section}/${slug(pages[0])}`);
+                setOpenGroup(group.label);
+                if (!(group.sections as readonly string[]).includes(selectedCategory[1])) router.push(`/dashboard/accounting/${links[0].section}/${slug(links[0].page)}`);
               }
             }} className={`accounting-nav-category ${expanded ? 'is-open' : ''}`}>
               <Icon size={18} strokeWidth={1.8} />
-              <span>{label}</span>
+              <span>{group.label}</span>
               <ChevronRight size={16} className="accounting-nav-chevron" />
             </button>
-            {expanded && <div className="accounting-nav-children">{pages.map((page) => {
+            {expanded && <div className="accounting-nav-children">{links.map(({ section, page }) => {
               const href = `/dashboard/accounting/${section}/${slug(page)}`;
-              const active = pathname === href || ((!path[1] && section === selectedCategory[1]) && page === selectedCategory[2][0]);
-              return <Link key={page} href={href} className={`accounting-nav-child ${active ? 'is-active' : ''}`}>{page}</Link>;
+              const active = pathname === href || (!path[1] && section === selectedCategory[1] && page === selectedCategory[2][0]);
+              return <Link key={href} href={href} className={`accounting-nav-child ${active ? 'is-active' : ''}`}>{page}</Link>;
             })}</div>}
           </div>;
         })}

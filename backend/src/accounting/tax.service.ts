@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AccountingService, LedgerScope } from './accounting.service';
-import { round2 } from './tax';
+import { round2, bookingMoment } from './tax';
 
 export class TaxSettingsInput {
   tin?: string | null;
@@ -101,7 +101,7 @@ export class TaxService {
       { code: '1400', credit: inn > 0 ? inn : 0, debit: inn < 0 ? -inn : 0 },
       { code: '1000', credit: payment > 0 ? payment : 0, debit: payment < 0 ? -payment : 0 },
     ].filter((l) => l.debit || l.credit);
-    await this.accounting.postToLedger('VatSettlement', id, new Date(`${dto.paidOn}T09:00:00.000Z`),
+    await this.accounting.postToLedger('VatSettlement', id, bookingMoment(dto.paidOn),
       `VAT ${payment >= 0 ? 'paid to' : 'refunded by'} the revenue authority up to ${dto.through}${dto.reference ? ` (${dto.reference})` : ''}`, lines, mamcosId, actorId);
     return { settled: id, outputVat: out, inputVat: inn, paid: payment };
   }
@@ -113,7 +113,7 @@ export class TaxService {
     const amount = round2(dto.amount);
     if (amount <= 0) throw new BadRequestException('Enter the amount paid.');
     if (amount > owed + 0.005) throw new BadRequestException(`Only ${owed.toLocaleString('en-US')} of withheld tax is owed.`);
-    await this.accounting.postToLedger('WithholdingRemittance', randomUUID(), new Date(`${dto.paidOn}T09:00:00.000Z`),
+    await this.accounting.postToLedger('WithholdingRemittance', randomUUID(), bookingMoment(dto.paidOn),
       `Withholding tax paid to the revenue authority${dto.reference ? ` (${dto.reference})` : ''}`,
       [{ code: '2410', debit: amount }, { code: '1000', credit: amount }], mamcosId, actorId);
     return { remitted: amount, stillOwed: round2(owed - amount) };

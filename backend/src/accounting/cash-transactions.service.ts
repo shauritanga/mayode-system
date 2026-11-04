@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { AccountType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AccountingService, LedgerScope } from './accounting.service';
-import { localDate, round2 } from './tax';
+import { localDate, round2, bookingMoment } from './tax';
 
 export type CashKind = 'EXPENSE' | 'INCOME';
 export type CashInput = {
@@ -79,7 +79,7 @@ export class CashTransactionsService {
     const rate = Number(m.vatRate);
     const vat = m.vatRegistered && dto.includesVat ? round2((amount * rate) / (100 + rate)) : 0;
     const net = round2(amount - vat);
-    const date = new Date(`${dto.date}T09:00:00.000Z`); // midday in Tanzania, so the day is unambiguous
+    const date = bookingMoment(dto.date); // midday in Tanzania, or now when that is still ahead
     const prefix = dto.kind === 'EXPENSE' ? 'EXP' : 'INC';
     const account = (await this.accounting.listAccounts()).find((a) => a.code === dto.accountCode);
     if (!account || !account.isActive || account.type !== (dto.kind === 'EXPENSE' ? AccountType.EXPENSE : AccountType.INCOME)) {

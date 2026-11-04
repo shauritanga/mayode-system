@@ -125,7 +125,7 @@ function SetupWorkspace({ can }: { can: Can }) {
   const [tab, setTab] = useState<'warehouses' | 'products' | 'reports'>(available[0]?.id ?? 'reports');
   return <>
     <Tabs tabs={available} value={tab} onChange={setTab} />
-    {tab === 'warehouses' && <WarehouseView embedded />}
+    {tab === 'warehouses' && <WarehouseView embedded setupOnly />}
     {tab === 'products' && <ProductsPanel canCreate={can('ops_catalog', 'CREATE')} canEdit={can('ops_catalog', 'EDIT')} />}
     {tab === 'reports' && <ReportsRunner groups={['Warehouse']} />}
   </>;

@@ -19,6 +19,13 @@ const PAST: Record<string, string> = {
 
 const words = (v: string) => v.replace(/[_-]+/g, ' ').trim();
 const cap = (v: string) => v.replace(/^./, (c) => c.toUpperCase());
+Object.assign(PAST, {
+  // Accounting: say what was done to the books, not the name of the route.
+  invoices: 'Recorded an invoice', bills: 'Recorded a supplier bill', 'journal-entries': 'Posted a journal', 'cash-transactions': 'Recorded an expense or income', pay: 'Marked as paid', void: 'Cancelled',
+  reverse: 'Reversed a journal', reopen: 'Reopened', 'vat-settlement': 'Settled VAT', 'withholding-remittance': 'Paid withholding tax', reconcile: 'Reconciled a bank statement', 'auto-match': 'Matched bank lines automatically',
+  match: 'Matched a bank line', unmatch: 'Unmatched a bank line', statements: 'Added a bank statement', reserves: 'Set aside a reserve', 'member-contributions': 'Recorded a member contribution', budgets: 'Created a budget',
+  settings: 'Changed settings', 'opening-value': 'Set the opening value of stock', receipts: 'Recorded a delivery', processing: 'Recorded milling', counts: 'Started a stock count', transfers: 'Moved stock',
+});
 Object.assign(PAST, { preview: 'Previewed', send: 'Sent', refresh: 'Renewed the session of', logout: 'Signed out', post: 'Posted', run: 'Ran', release: 'Released', remove_from_amcos: 'Removed from AMCOS' });
 
 /** "sale-orders.confirm" -> "Confirmed · sale orders"; path-style entries such as "irrigation.blocks" read "Changed blocks · irrigation". */

@@ -37,3 +37,12 @@ export function computeTax(i: TaxInput): TaxResult {
   const withholdingAmount = round2((subtotal * (i.withholdingPercent ?? 0)) / 100);
   return { subtotal, vatAmount, total, withholdingAmount, payable: round2(total - withholdingAmount) };
 }
+
+/**
+ * The moment a record dated `ymd` (a Tanzania calendar day) is booked: midday, so the day is unambiguous. If that is still ahead of us
+ * (a record dated today, made in the morning), it is booked now instead, so it shows in reports straight away and is never in the future.
+ */
+export function bookingMoment(ymd: string, now = new Date()): Date {
+  const midday = new Date(`${ymd}T09:00:00.000Z`);
+  return midday > now && localDate(now) === ymd ? now : midday;
+}

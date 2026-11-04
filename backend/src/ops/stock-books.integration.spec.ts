@@ -297,6 +297,23 @@ describeDb('Stock record and accounts (PostgreSQL)', () => {
       expect(await balance(c, '1100')).toBe(680);
     });
 
+    it('the debtors list shows the unpaid part of Orders & Sales invoices, and drops them once paid', async () => {
+      const c = await coop();
+      const o = await order(c, 1000);
+      const inv: any = await billing.issueInvoice(o.id, {}, c.actor);
+      const scope = { mamcosId: c.mamcos.id };
+      let list: any[] = await accounting.receivables(scope);
+      expect(list).toHaveLength(1);
+      expect(list[0]).toMatchObject({ source: 'ORDERS', invoiceNumber: inv.invoiceNumber, amount: 1000, status: 'OPEN' });
+      await billing.recordPayment(inv.id, { amount: 400, method: 'CASH', reference: `RC-${randomUUID().slice(0, 6)}` } as any, c.actor);
+      list = await accounting.receivables(scope);
+      expect(list[0].amount).toBe(600);
+      await billing.recordPayment(inv.id, { amount: 600, method: 'CASH', reference: `RC-${randomUUID().slice(0, 6)}` } as any, c.actor);
+      expect(await accounting.receivables(scope)).toHaveLength(0);
+      // The list agrees with the receivable in the books.
+      expect(await balance(c, '1100')).toBe(0);
+    });
+
     it('voiding an unpaid invoice removes revenue and receivable', async () => {
       const c = await coop();
       const o = await order(c, 2000);

@@ -62,13 +62,22 @@ function Batches({ canAdjust, canTransfer, canManageQuality, onChanged }: { canA
   const [transfer, setTransfer] = useState<any>(null);
   const [statusBatch, setStatusBatch] = useState<any>(null);
   const [costBatch, setCostBatch] = useState<any>(null);
+  const [bulkCost, setBulkCost] = useState(false);
   const { data, error, loading, reload } = useLoad<any[]>(() => opsApi.batches({ q: q || undefined, inStock: inStock ? 'true' : undefined }), [q, inStock]);
+  const uncosted = (data ?? []).filter((b: any) => b.ownerType === 'COOPERATIVE' && b.unitCost == null && b.physicalKg > 0);
   return (
     <>
       <Toolbar>
         <Field label="Search"><input className="input-field" placeholder="Batch reference" value={q} onChange={(e) => setQ(e.target.value)} /></Field>
         <label style={{ fontSize: 13, display: 'flex', gap: 6, alignItems: 'center', paddingBottom: 8 }}><input type="checkbox" checked={inStock} onChange={(e) => setInStock(e.target.checked)} />Only batches with stock</label>
       </Toolbar>
+      <ErrorNote message={error} />
+      {canAdjust && uncosted.length > 0 && (
+        <div className="alert-box" style={{ marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          <span><strong>{uncosted.length} {uncosted.length === 1 ? 'batch has' : 'batches have'} no cost yet</strong> ({kg(uncosted.reduce((t: number, b: any) => t + b.physicalKg, 0))}). Until a cost is set, this stock is missing from the accounts.</span>
+          <button type="button" className="btn-primary" onClick={() => setBulkCost(true)}>Set one cost for all</button>
+        </div>
+      )}
       <ErrorNote message={error} />
       {loading && !data ? <Loading /> : (
         <DataTable rows={data ?? []} rowKey={(b) => b.id + b.warehouseId} empty="No batches."
@@ -84,10 +93,30 @@ function Batches({ canAdjust, canTransfer, canManageQuality, onChanged }: { canA
       )}
       {adjust && <AdjustModal batch={adjust} onClose={() => setAdjust(null)} onSaved={() => { setAdjust(null); reload(); onChanged?.(); }} />}
       {transfer && <TransferModal batch={transfer} onClose={() => setTransfer(null)} onSaved={() => { setTransfer(null); reload(); onChanged?.(); }} />}
+      {bulkCost && <BulkCostModal batches={uncosted} onClose={() => setBulkCost(false)} onSaved={() => { setBulkCost(false); reload(); onChanged?.(); }} />}
       {costBatch && <CostModal batch={costBatch} onClose={() => setCostBatch(null)} onSaved={() => { setCostBatch(null); reload(); onChanged?.(); }} />}
       {statusBatch && <BatchStatusModal batch={statusBatch} onClose={() => setStatusBatch(null)} onSaved={() => { setStatusBatch(null); reload(); onChanged?.(); }} />}
     </>
   );
+}
+
+function BulkCostModal({ batches, onClose, onSaved }: { batches: any[]; onClose: () => void; onSaved: () => void }) {
+  const [cost, setCost] = useState('');
+  const [done, setDone] = useState(0);
+  const { busy, error, run } = useAction();
+  const totalKg = batches.reduce((t, b) => t + b.physicalKg, 0);
+  const submit = async () => {
+    // One batch at a time, so a failure stops cleanly and the ones already done stay done.
+    const ok = await run(async () => { for (const b of batches) { await opsApi.setOpeningValue(b.id, Number(cost)); setDone((n) => n + 1); } return true; });
+    if (ok) onSaved();
+  };
+  return <Modal title="Set one cost for all" subtitle={`${batches.length} ${batches.length === 1 ? 'batch' : 'batches'} · ${kg(totalKg)}`} onClose={onClose}
+    footer={<><button className="btn-secondary" onClick={onClose}>Close</button><button className="btn-primary" disabled={busy || !(Number(cost) > 0)} onClick={submit}>{busy ? `Saving ${done} of ${batches.length}…` : 'Save cost'}</button></>}>
+    <ErrorNote message={error} />
+    <p style={{ fontSize: 13, marginTop: 0 }}>Use this when all this stock cost about the same. Each batch is added to the books as opening stock at this cost. This can be done once per batch; later batches get their cost when they are received or milled.</p>
+    <FormGrid><Field label="Cost per kg (TZS)"><input className="input-field" type="number" min="0" value={cost} onChange={(e) => setCost(e.target.value)} /></Field></FormGrid>
+    {Number(cost) > 0 && <p className="glass-card" style={{ padding: 10, marginTop: 12, fontSize: 14 }}>Value added to the books: <strong>{tzs(Number(cost) * totalKg)}</strong></p>}
+  </Modal>;
 }
 
 function CostModal({ batch, onClose, onSaved }: { batch: any; onClose: () => void; onSaved: () => void }) {

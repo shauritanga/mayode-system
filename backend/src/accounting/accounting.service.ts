@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { computeTax, localDate, nextOpenInstant, round2 } from './tax';
+import { computeTax, localDate, nextOpenInstant, round2, bookingMoment } from './tax';
 import { AccountType, BudgetStatus, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
@@ -443,7 +443,7 @@ export class AccountingService {
       throw new BadRequestException('Choose active accounts for every journal line.');
     }
     const mamcosId = scope.mamcosId ?? null;
-    const entryDate = new Date(/^\d{4}-\d{2}-\d{2}$/.test(dto.entryDate) ? `${dto.entryDate}T09:00:00.000Z` : dto.entryDate);
+    const entryDate = /^\d{4}-\d{2}-\d{2}$/.test(dto.entryDate) ? bookingMoment(dto.entryDate) : new Date(dto.entryDate);
     const journalId = randomUUID();
     await this.prisma.$transaction(async (tx) => {
       const closed = await this.closedThrough(mamcosId, tx);
@@ -487,7 +487,7 @@ export class AccountingService {
     }
     const reason = dto.reason?.trim();
     if (!reason || reason.length < 5) throw new BadRequestException('Say why the journal is being reversed (at least a few words).');
-    const entryDate = dto.date ? new Date(`${dto.date}T09:00:00.000Z`) : new Date();
+    const entryDate = dto.date ? bookingMoment(dto.date) : new Date();
     const newId = randomUUID();
     const mamcosId = head.mamcosId;
     try {
@@ -785,11 +785,36 @@ export class AccountingService {
       where: { status: 'OPEN', dueDate: { lt: now } },
       data: { status: 'OVERDUE' },
     });
-    return this.prisma.invoice.findMany({
-      where: { ...scope, status: { in: ['OPEN', 'OVERDUE'] } },
-      include: { buyer: true, sale: true },
-      orderBy: { dueDate: 'asc' },
-    });
+    const [invoices, orderInvoices] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where: { ...scope, status: { in: ['OPEN', 'OVERDUE'] } },
+        include: { buyer: true, sale: true },
+        orderBy: { dueDate: 'asc' },
+      }),
+      // Invoices raised in Orders & Sales are receivables too; they are listed here so this report matches the receivables in the books,
+      // but they are paid and followed up in Orders & Sales (control numbers, mobile money), so they carry no actions here.
+      this.prisma.opsInvoice.findMany({
+        where: { ...scope, status: { in: ['ISSUED', 'PARTIALLY_PAID'] } },
+        orderBy: { dueDate: 'asc' },
+      }),
+    ]);
+    const fromOrders = orderInvoices
+      .map((i) => ({
+        id: `orders-${i.id}`,
+        source: 'ORDERS' as const,
+        invoiceNumber: i.invoiceNumber,
+        buyer: { name: i.customerName },
+        dueDate: i.dueDate,
+        amount: Math.round((i.total - i.amountPaid) * 100) / 100,
+        total: i.total,
+        amountPaid: i.amountPaid,
+        vatAmount: null,
+        withholdingAmount: null,
+        status: i.dueDate && i.dueDate < now ? 'OVERDUE' : 'OPEN',
+      }))
+      .filter((i) => i.amount > 0);
+    const time = (d: Date | null) => (d ? d.getTime() : Number.MAX_SAFE_INTEGER);
+    return [...invoices.map((i) => ({ ...i, source: 'ACCOUNTING' as const })), ...fromOrders].sort((a, b) => time(a.dueDate) - time(b.dueDate));
   }
   async payables(scope: LedgerScope) {
     const now = new Date(`${localDate(new Date())}T00:00:00+03:00`);
