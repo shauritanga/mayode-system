@@ -29,6 +29,8 @@ export class UpsertSupplierDto {
   @IsOptional() @IsString() @MaxLength(40) contactPhone?: string;
   @IsOptional() @IsEmail() contactEmail?: string;
   @IsOptional() @IsString() @MaxLength(40) tin?: string;
+  /** VAT registration number (company). */
+  @IsOptional() @IsString() @MaxLength(40) vrn?: string;
   /** National ID number (individual). */
   @IsOptional() @IsString() @MaxLength(40) idNumber?: string;
   /** Business registration number (company). */

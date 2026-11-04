@@ -43,10 +43,10 @@ describeDb('Suppliers (PostgreSQL)', () => {
 
   it('an individual keeps an ID number and a company keeps a registration number and a contact person, not the other way round', async () => {
     const c = await coop();
-    const person: any = await svc.create({ kind: 'INDIVIDUAL', name: uniq('Juma Hassan'), contactPhone: '0712 000 111', idNumber: '1990-123', businessRegNo: 'IGNORED', contactPerson: 'IGNORED' } as any, c.actor);
-    expect(person).toMatchObject({ kind: 'INDIVIDUAL', idNumber: '1990-123', businessRegNo: null, contactPerson: null, mamcosId: c.id });
-    const firm: any = await svc.create({ kind: 'COMPANY', name: uniq('Agro Supplies Ltd'), contactPerson: 'Neema', businessRegNo: 'BRELA-1', idNumber: 'IGNORED', itemsSupplied: [' Seeds ', 'Seeds', 'Fertiliser'] } as any, c.actor);
-    expect(firm).toMatchObject({ kind: 'COMPANY', businessRegNo: 'BRELA-1', contactPerson: 'Neema', idNumber: null });
+    const person: any = await svc.create({ kind: 'INDIVIDUAL', name: uniq('Juma Hassan'), contactPhone: '0712 000 111', idNumber: '1990-123', businessRegNo: 'IGNORED', vrn: 'IGNORED', contactPerson: 'IGNORED' } as any, c.actor);
+    expect(person).toMatchObject({ kind: 'INDIVIDUAL', idNumber: '1990-123', businessRegNo: null, vrn: null, contactPerson: null, mamcosId: c.id });
+    const firm: any = await svc.create({ kind: 'COMPANY', name: uniq('Agro Supplies Ltd'), contactPerson: 'Neema', businessRegNo: 'BRELA-1', vrn: '40-123456-A', idNumber: 'IGNORED', itemsSupplied: [' Seeds ', 'Seeds', 'Fertiliser'] } as any, c.actor);
+    expect(firm).toMatchObject({ kind: 'COMPANY', businessRegNo: 'BRELA-1', vrn: '40-123456-A', contactPerson: 'Neema', idNumber: null });
     expect(firm.itemsSupplied).toEqual(['Seeds', 'Fertiliser']);
   });
 
@@ -90,10 +90,10 @@ describeDb('Suppliers (PostgreSQL)', () => {
 
   it('switching a supplier off or on needs nothing but the switch, and a change of kind drops the other kind’s fields', async () => {
     const c = await coop();
-    const s: any = await svc.create({ kind: 'COMPANY', name: uniq('Switch'), contactPerson: 'Neema', businessRegNo: 'BR-9' } as any, c.actor);
+    const s: any = await svc.create({ kind: 'COMPANY', name: uniq('Switch'), contactPerson: 'Neema', businessRegNo: 'BR-9', vrn: 'V-1' } as any, c.actor);
     expect((await svc.update(s.id, { isActive: false }, c.actor) as any).isActive).toBe(false);
     const person: any = await svc.update(s.id, { kind: 'INDIVIDUAL', idNumber: '123' }, c.actor);
-    expect(person).toMatchObject({ kind: 'INDIVIDUAL', idNumber: '123', businessRegNo: null, contactPerson: null, isActive: false });
+    expect(person).toMatchObject({ kind: 'INDIVIDUAL', idNumber: '123', businessRegNo: null, vrn: null, contactPerson: null, isActive: false });
   });
 
   it('cannot delete a supplier that has a bill; deactivating is the way', async () => {

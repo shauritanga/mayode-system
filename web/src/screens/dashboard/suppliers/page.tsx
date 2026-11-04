@@ -19,6 +19,7 @@ interface Supplier {
   contactPhone?: string | null;
   contactEmail?: string | null;
   tin?: string | null;
+  vrn?: string | null;
   idNumber?: string | null;
   businessRegNo?: string | null;
   address?: string | null;
@@ -37,7 +38,7 @@ function SupplierModal({ supplier, onClose, onSaved }: { supplier?: Supplier; on
   const [kind, setKind] = useState<Kind>(supplier?.kind ?? 'COMPANY');
   const [f, setF] = useState({
     name: supplier?.name ?? '', contactPerson: supplier?.contactPerson ?? '', phone: supplier?.contactPhone ?? '', email: supplier?.contactEmail ?? '',
-    tin: supplier?.tin ?? '', idNumber: supplier?.idNumber ?? '', businessRegNo: supplier?.businessRegNo ?? '', address: supplier?.address ?? '', notes: supplier?.notes ?? '',
+    tin: supplier?.tin ?? '', vrn: supplier?.vrn ?? '', idNumber: supplier?.idNumber ?? '', businessRegNo: supplier?.businessRegNo ?? '', address: supplier?.address ?? '', notes: supplier?.notes ?? '',
   });
   const [items, setItems] = useState<string[]>(supplier?.itemsSupplied ?? []);
   const [itemText, setItemText] = useState('');
@@ -67,7 +68,7 @@ function SupplierModal({ supplier, onClose, onSaved }: { supplier?: Supplier; on
     const body: Record<string, unknown> = {
       kind, name: f.name.trim(), contactPhone: f.phone.trim(), contactEmail: f.email.trim() || undefined, tin: f.tin.trim() || undefined, address: f.address.trim() || undefined,
       notes: f.notes.trim() || undefined, itemsSupplied,
-      ...(person ? { idNumber: f.idNumber.trim() || undefined } : { contactPerson: f.contactPerson.trim(), businessRegNo: f.businessRegNo.trim() || undefined }),
+      ...(person ? { idNumber: f.idNumber.trim() || undefined } : { contactPerson: f.contactPerson.trim(), businessRegNo: f.businessRegNo.trim() || undefined, vrn: f.vrn.trim() || undefined }),
     };
     try {
       if (editing) await suppliersApi.update(supplier!.id, body); else await suppliersApi.create(body);
@@ -114,6 +115,7 @@ function SupplierModal({ supplier, onClose, onSaved }: { supplier?: Supplier; on
             ? <Field label="National ID number" hint="Optional"><input className="input-field" value={f.idNumber} onChange={(e) => set('idNumber', e.target.value)} /></Field>
             : <Field label="Business registration number" hint="Optional"><input className="input-field" value={f.businessRegNo} onChange={(e) => set('businessRegNo', e.target.value)} /></Field>}
           <Field label="TIN" hint="Optional"><input className="input-field" value={f.tin} onChange={(e) => set('tin', e.target.value)} /></Field>
+          {!person && <Field label="VRN (VAT registration number)" hint="Optional: only if the company is registered for VAT"><input className="input-field" value={f.vrn} onChange={(e) => set('vrn', e.target.value)} /></Field>}
           <Field label="Address or location" wide><input className="input-field" value={f.address} onChange={(e) => set('address', e.target.value)} placeholder="e.g. Madibira, near the market" /></Field>
         </div>
 
@@ -238,7 +240,7 @@ export default function SuppliersPage() {
               <div style={{ display: 'grid', gap: 14 }}>
                 <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 14px', margin: 0, fontSize: 13 }}>
                   {([
-                    ['Contact person', d.kind === 'COMPANY' ? d.contactPerson : null], ['Phone', d.contactPhone], ['Email', d.contactEmail], ['TIN', d.tin],
+                    ['Contact person', d.kind === 'COMPANY' ? d.contactPerson : null], ['Phone', d.contactPhone], ['Email', d.contactEmail], ['TIN', d.tin], ['VRN', d.kind === 'COMPANY' ? d.vrn : null],
                     [d.kind === 'INDIVIDUAL' ? 'National ID' : 'Business registration', d.kind === 'INDIVIDUAL' ? d.idNumber : d.businessRegNo], ['Address', d.address],
                   ] as [string, string | null | undefined][]).filter(([, v]) => v).map(([k, v]) => <div key={k} style={{ display: 'contents' }}><dt className="muted">{k}</dt><dd style={{ margin: 0 }}>{v}</dd></div>)}
                 </dl>

@@ -1022,6 +1022,8 @@ model Supplier {
   contactPhone  String?      @map("contact_phone")
   contactEmail  String?      @map("contact_email")
   tin           String?
+  /// VAT registration number, for a company.
+  vrn           String?
   /// National ID number, for an individual.
   idNumber      String?      @map("id_number")
   /// Business registration number, for a company.
