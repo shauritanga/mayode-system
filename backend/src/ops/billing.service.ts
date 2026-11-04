@@ -6,6 +6,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClickPesaService } from '../payments/clickpesa.service';
 import { AccountingService } from '../accounting/accounting.service';
+import { resolveCashAccount } from '../accounting/cash-resolve';
 import { hasGrant } from '../auth/role-access';
 import type { RequestUser } from '../common/ownership.service';
 import { Actor, assertVisible, nextRef, OpsNotifyService, scope, Tx } from './ops-common';
@@ -195,9 +196,16 @@ export class BillingService {
       inv.mamcosId, actorId, tx,
     );
     for (const p of inv.payments) {
+      let wallet = p.cashAccountId;
+      // A payment confirmed by the provider (mobile money) is put in the default account of its kind the first time it is booked.
+      // One booked before money accounts existed stays unassigned, so history is not rewritten.
+      if (!wallet && p.status === 'CONFIRMED' && !(await tx.ledgerEntry.count({ where: { sourceType: 'OpsPayment', sourceId: p.id } }))) {
+        wallet = await resolveCashAccount(tx, inv.mamcosId, { method: p.method });
+        if (wallet) await tx.opsPayment.update({ where: { id: p.id }, data: { cashAccountId: wallet } });
+      }
       await this.accounting.postToLedger(
         'OpsPayment', p.id, p.paidAt ?? p.createdAt, `Payment for ${inv.invoiceNumber}`,
-        p.status === 'CONFIRMED' && p.amount > 0 ? [{ code: '1000', debit: p.amount }, { code: '1100', credit: p.amount }] : [],
+        p.status === 'CONFIRMED' && p.amount > 0 ? [{ code: '1000', debit: p.amount, cashAccountId: wallet }, { code: '1100', credit: p.amount }] : [],
         inv.mamcosId, actorId, tx,
       );
     }
@@ -228,7 +236,7 @@ export class BillingService {
       try {
         await tx.opsPayment.create({
           data: {
-            mamcosId: inv.mamcosId, invoiceId, orderId: inv.orderId, amount: dto.amount, method: dto.method, provider: 'MANUAL', providerReference: reference, status: 'CONFIRMED',
+            mamcosId: inv.mamcosId, invoiceId, orderId: inv.orderId, amount: dto.amount, method: dto.method, provider: 'MANUAL', cashAccountId: await resolveCashAccount(tx, inv.mamcosId, { cashAccountId: dto.cashAccountId, method: dto.method }), providerReference: reference, status: 'CONFIRMED',
             paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(), source: 'MANUAL', payerName: dto.payerName?.trim() || null, recordedByUserId: actor.id, confirmedByUserId: actor.id,
           },
         });

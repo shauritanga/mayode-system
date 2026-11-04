@@ -51,6 +51,8 @@ export class JournalEntryLineDto {
   @IsOptional() @IsNumber() @Min(0) debit?: number;
   @IsOptional() @IsNumber() @Min(0) credit?: number;
   @IsOptional() @IsString() description?: string;
+  /** For a line on the cash account: which of the cooperative's money accounts it moved through. */
+  @IsOptional() @IsString() cashAccountId?: string;
 }
 export class CreateJournalEntryDto {
   @IsDateString() entryDate: string;

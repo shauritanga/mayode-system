@@ -33,6 +33,8 @@ export class UpdateLineDto {
 
 export class PostRunDto {
   @IsEnum(PayrollPayMethod) payMethod: PayrollPayMethod;
+  /** The money account the salaries were paid from; leave out for the default account of that kind. */
+  @IsOptional() @IsString() cashAccountId?: string;
   /** Defaults to today; cannot be in the future. */
   @IsOptional() @IsDateString() paidOn?: string;
   /** Text each person their payslip summary. */

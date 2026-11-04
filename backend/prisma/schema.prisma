@@ -320,6 +320,8 @@ model Mamcos {
   ledgerEntries         LedgerEntry[]
   charges               AmcosCharge[]
   equipmentTypes        AmcosEquipmentType[]
+  cashAccounts          CashAccount[]
+  cashTransfers         CashTransfer[]
   accountingLock        AccountingLock?
   bankStatements        BankStatement[]
   cashTransactions      CashTransaction[]
@@ -1521,14 +1523,16 @@ model LedgerEntry {
   /// Set on a reversing journal: the journal it cancels.
   reversesJournalId String?  @map("reverses_journal_id")
   postedById        String?  @map("posted_by_id")
+  /// Which of the cooperative's money accounts a cash line (ledger account 1000) moved through; null = not assigned yet.
+  cashAccountId     String?  @map("cash_account_id")
   createdAt         DateTime @default(now()) @map("created_at")
 
-  account  Account            @relation(fields: [accountId], references: [id])
-  mamcos   Mamcos?            @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
-  bankLine BankStatementLine?
+  account     Account            @relation(fields: [accountId], references: [id])
+  mamcos      Mamcos?            @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  cashAccount CashAccount?       @relation(fields: [cashAccountId], references: [id], onDelete: Restrict)
+  bankLine    BankStatementLine?
 
-  @@unique([sourceType, sourceId, accountId, revision])
-  @@unique([reversesJournalId, accountId])
+  // Uniqueness per source/reversal also includes the money account (a database index, so a transfer can post two cash lines).
   @@index([entryDate])
   @@index([mamcosId, entryDate])
   @@index([journalId])
@@ -1609,7 +1613,10 @@ model CashTransaction {
   createdById     String?               @map("created_by_id")
   createdAt       DateTime              @default(now()) @map("created_at")
 
-  mamcos Mamcos @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  mamcos        Mamcos       @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  /// The money account this moved through; null = not assigned to one.
+  cashAccountId String?      @map("cash_account_id")
+  cashAccount   CashAccount? @relation(fields: [cashAccountId], references: [id], onDelete: Restrict)
 
   @@unique([mamcosId, number])
   @@index([mamcosId, transactionDate])
@@ -1637,8 +1644,11 @@ model BankStatement {
   createdById    String?         @map("created_by_id")
   createdAt      DateTime        @default(now()) @map("created_at")
 
-  mamcos Mamcos              @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
-  lines  BankStatementLine[]
+  mamcos        Mamcos              @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  lines         BankStatementLine[]
+  /// The money account this moved through; null = not assigned to one.
+  cashAccountId String?             @map("cash_account_id")
+  cashAccount   CashAccount?        @relation(fields: [cashAccountId], references: [id], onDelete: Restrict)
 
   @@index([mamcosId, periodEnd])
   @@map("bank_statements")
@@ -1688,6 +1698,9 @@ model Invoice {
   sale              Sale?         @relation(fields: [saleId], references: [id])
   buyer             Buyer?        @relation(fields: [buyerId], references: [id])
   mamcos            Mamcos?       @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  /// The money account this moved through; null = not assigned to one.
+  cashAccountId     String?       @map("cash_account_id")
+  cashAccount       CashAccount?  @relation(fields: [cashAccountId], references: [id], onDelete: Restrict)
 
   @@unique([mamcosId, invoiceNumber])
   @@index([dueDate, status])
@@ -1716,8 +1729,11 @@ model Bill {
   description        String?
   createdAt          DateTime      @default(now()) @map("created_at")
 
-  supplierRef Supplier? @relation(fields: [supplierId], references: [id])
-  mamcos      Mamcos?   @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  supplierRef   Supplier?    @relation(fields: [supplierId], references: [id])
+  mamcos        Mamcos?      @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  /// The money account this moved through; null = not assigned to one.
+  cashAccountId String?      @map("cash_account_id")
+  cashAccount   CashAccount? @relation(fields: [cashAccountId], references: [id], onDelete: Restrict)
 
   @@unique([mamcosId, billNumber])
   @@index([dueDate, status])
@@ -4707,8 +4723,11 @@ model OpsPayment {
   rejectReason      String?          @map("reject_reason")
   createdAt         DateTime         @default(now()) @map("created_at")
 
-  invoice OpsInvoice @relation(fields: [invoiceId], references: [id])
-  order   OpsOrder   @relation(fields: [orderId], references: [id])
+  invoice       OpsInvoice   @relation(fields: [invoiceId], references: [id])
+  order         OpsOrder     @relation(fields: [orderId], references: [id])
+  /// The money account this moved through; null = not assigned to one.
+  cashAccountId String?      @map("cash_account_id")
+  cashAccount   CashAccount? @relation(fields: [cashAccountId], references: [id], onDelete: Restrict)
 
   @@unique([provider, providerReference])
   @@index([orderId])
@@ -5497,9 +5516,12 @@ model DuePayment {
   voidedById   String?          @map("voided_by_id")
   createdAt    DateTime         @default(now()) @map("created_at")
 
-  mamcos Mamcos    @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
-  due    FarmerDue @relation(fields: [dueId], references: [id], onDelete: Restrict)
-  farmer Farmer    @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+  mamcos        Mamcos       @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  due           FarmerDue    @relation(fields: [dueId], references: [id], onDelete: Restrict)
+  farmer        Farmer       @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+  /// The money account this moved through; null = not assigned to one.
+  cashAccountId String?      @map("cash_account_id")
+  cashAccount   CashAccount? @relation(fields: [cashAccountId], references: [id], onDelete: Restrict)
 
   @@unique([mamcosId, receiptNo])
   @@index([dueId])
@@ -5584,8 +5606,11 @@ model PayrollRun {
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
-  mamcos Mamcos        @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
-  lines  PayrollLine[]
+  mamcos        Mamcos        @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  lines         PayrollLine[]
+  /// The money account this moved through; null = not assigned to one.
+  cashAccountId String?       @map("cash_account_id")
+  cashAccount   CashAccount?  @relation(fields: [cashAccountId], references: [id], onDelete: Restrict)
 
   @@unique([mamcosId, period])
   @@map("payroll_runs")
@@ -5655,8 +5680,78 @@ model AmcosEquipmentType {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  mamcos    Mamcos          @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  mamcos    Mamcos           @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
   equipment AmcosEquipment[]
 
   @@map("amcos_equipment_types")
+}
+
+enum CashAccountKind {
+  CASH
+  BANK
+  MOBILE_MONEY
+}
+
+enum CashTransferStatus {
+  POSTED
+  CANCELLED
+}
+
+/// A named place the AMCOS keeps money: the cash box, a bank account, a mobile money wallet.
+model CashAccount {
+  id            String          @id @default(uuid())
+  mamcosId      String          @map("mamcos_id")
+  name          String
+  kind          CashAccountKind
+  /// The bank or mobile network, e.g. CRDB or M-Pesa.
+  provider      String?
+  accountNumber String?         @map("account_number")
+  /// The account used when money moves by this kind of payment and no account is picked.
+  isDefault     Boolean         @default(false) @map("is_default")
+  isActive      Boolean         @default(true) @map("is_active")
+  notes         String?
+  createdById   String?         @map("created_by_id")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  mamcos           Mamcos            @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  entries          LedgerEntry[]
+  transfersOut     CashTransfer[]    @relation("TransferFrom")
+  transfersIn      CashTransfer[]    @relation("TransferTo")
+  cashTransactions CashTransaction[]
+  payrollRuns      PayrollRun[]
+  duePayments      DuePayment[]
+  opsPayments      OpsPayment[]
+  invoices         Invoice[]
+  bills            Bill[]
+  statements       BankStatement[]
+
+  @@index([mamcosId, isActive])
+  @@map("cash_accounts")
+}
+
+/// Money moved from one account to another (null on either side = money not assigned to an account yet).
+model CashTransfer {
+  id            String             @id @default(uuid())
+  mamcosId      String             @map("mamcos_id")
+  number        String
+  fromAccountId String?            @map("from_account_id")
+  toAccountId   String?            @map("to_account_id")
+  amount        Decimal            @db.Decimal(14, 2)
+  transferDate  DateTime           @map("transfer_date") @db.Date
+  note          String?
+  status        CashTransferStatus @default(POSTED)
+  cancelledAt   DateTime?          @map("cancelled_at")
+  cancelledById String?            @map("cancelled_by_id")
+  cancelReason  String?            @map("cancel_reason")
+  createdById   String?            @map("created_by_id")
+  createdAt     DateTime           @default(now()) @map("created_at")
+
+  mamcos Mamcos       @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  from   CashAccount? @relation("TransferFrom", fields: [fromAccountId], references: [id], onDelete: Restrict)
+  to     CashAccount? @relation("TransferTo", fields: [toAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([mamcosId, number])
+  @@index([mamcosId, transferDate])
+  @@map("cash_transfers")
 }

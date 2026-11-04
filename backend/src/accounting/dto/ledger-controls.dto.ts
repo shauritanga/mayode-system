@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class CloseBooksDto {
   /** Last day of the month to close through (YYYY-MM-DD). */
@@ -34,7 +34,10 @@ export class StatementLineDto {
   @IsNumber() amount: number;
 }
 export class CreateStatementDto {
-  @IsString() @IsNotEmpty() accountLabel: string;
+  /** The money account the statement is for. When given, its name and kind are used. */
+  @IsOptional() @IsString() cashAccountId?: string;
+  /** Needed only when no money account is chosen. */
+  @IsOptional() @IsString() accountLabel?: string;
   @IsOptional() @IsIn(['BANK', 'MOBILE_MONEY', 'CASH']) kind?: 'BANK' | 'MOBILE_MONEY' | 'CASH';
   @IsDateString() periodStart: string;
   @IsDateString() periodEnd: string;
@@ -58,10 +61,44 @@ export class CreateCashTransactionDto {
   @IsString() @IsNotEmpty() accountCode: string;
   @IsOptional() @IsString() party?: string;
   @IsOptional() @IsIn(['CASH', 'BANK', 'MOBILE_MONEY']) method?: 'CASH' | 'BANK' | 'MOBILE_MONEY';
+  /** The money account it came from or went into. Takes precedence over the method. */
+  @IsOptional() @IsString() cashAccountId?: string;
   @IsOptional() @IsString() reference?: string;
   @IsOptional() @IsString() note?: string;
   @IsOptional() @IsBoolean() includesVat?: boolean;
 }
 export class VoidCashTransactionDto {
   @IsString() @IsNotEmpty() reason: string;
+}
+
+export class CreateCashAccountDto {
+  @IsString() @IsNotEmpty() @MaxLength(80) name: string;
+  @IsIn(['CASH', 'BANK', 'MOBILE_MONEY']) kind: 'CASH' | 'BANK' | 'MOBILE_MONEY';
+  /** The bank or mobile network, e.g. CRDB or M-Pesa. */
+  @IsOptional() @IsString() @MaxLength(80) provider?: string;
+  @IsOptional() @IsString() @MaxLength(60) accountNumber?: string;
+  @IsOptional() @IsString() @MaxLength(500) notes?: string;
+  /** Money already in the account today. Becomes the opening balance in the books. */
+  @IsOptional() @IsNumber() @Min(0) openingBalance?: number;
+  @IsOptional() @IsDateString() openingDate?: string;
+}
+export class UpdateCashAccountDto {
+  @IsOptional() @IsString() @IsNotEmpty() @MaxLength(80) name?: string;
+  @IsOptional() @IsString() @MaxLength(80) provider?: string;
+  @IsOptional() @IsString() @MaxLength(60) accountNumber?: string;
+  @IsOptional() @IsString() @MaxLength(500) notes?: string;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional() @IsBoolean() isDefault?: boolean;
+}
+export class CashTransferDto {
+  /** Leave out for money that is not in an account yet. */
+  @IsOptional() @IsString() fromAccountId?: string;
+  @IsOptional() @IsString() toAccountId?: string;
+  @IsNumber() @Min(0.01) amount: number;
+  @IsDateString() date: string;
+  @IsOptional() @IsString() @MaxLength(300) note?: string;
+}
+export class PayDto {
+  /** The money account the payment went through; leave out for the default account of that kind, or none. */
+  @IsOptional() @IsString() cashAccountId?: string;
 }

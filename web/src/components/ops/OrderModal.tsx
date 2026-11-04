@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Modal from '@/components/Modal';
+import { MoneyAccountSelect } from '@/screens/dashboard/accounting/controls';
 import { opsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { hasPermission } from '@/lib/nav';
@@ -24,7 +25,7 @@ export default function OrderModal({ id, onClose, onChanged }: { id: string; onC
   const can = (r: string, a: 'VIEW' | 'CREATE' | 'EDIT' | 'DELETE') => hasPermission(user, r, a);
   const { data: o, error: loadError, reload } = useLoad<any>(() => opsApi.order(id), [id]);
   const [panel, setPanel] = useState<Panel>(null);
-  const [f, setF] = useState({ comment: '', dueDate: '', instructions: '', amount: '', method: 'BANK_TRANSFER', reference: '', paidAt: new Date().toISOString().slice(0, 10), payer: '', phone: '', control: '', reason: '', target: '' });
+  const [f, setF] = useState({ comment: '', dueDate: '', instructions: '', amount: '', method: 'BANK_TRANSFER', cashAccountId: '', reference: '', paidAt: new Date().toISOString().slice(0, 10), payer: '', phone: '', control: '', reason: '', target: '' });
   const [edit, setEdit] = useState(false);
   const { busy, error, run, setError } = useAction();
   const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }));
@@ -65,7 +66,7 @@ export default function OrderModal({ id, onClose, onChanged }: { id: string; onC
     switch (panel) {
       case 'return': return done(() => opsApi.reviewOrder(id, 'RETURN', f.comment));
       case 'invoice': return done(() => opsApi.issueInvoice(id, { dueDate: f.dueDate ? new Date(f.dueDate).toISOString() : undefined, paymentInstructions: f.instructions || undefined }));
-      case 'pay': return done(() => opsApi.recordPayment(invoice.id, { amount: Number(f.amount), method: f.method, reference: f.reference, paidAt: new Date(f.paidAt).toISOString(), payerName: f.payer || undefined }));
+      case 'pay': return done(() => opsApi.recordPayment(invoice.id, { amount: Number(f.amount), method: f.method, cashAccountId: f.cashAccountId || undefined, reference: f.reference, paidAt: new Date(f.paidAt).toISOString(), payerName: f.payer || undefined }));
       case 'mobile': return done(() => opsApi.mobilePayment(invoice.id, { phoneNumber: f.phone, amount: Number(f.amount) || undefined }));
       case 'control': return done(() => opsApi.setControlNumber(invoice.id, f.control));
       case 'authorize': return done(() => opsApi.authorize(id, f.reason));
@@ -103,6 +104,7 @@ export default function OrderModal({ id, onClose, onChanged }: { id: string; onC
               {panel === 'pay' && <>
                 <Field label="Amount received (TZS)" hint={`Balance ${tzs(balance)}`}><input className="input-field" type="number" value={f.amount} onChange={(e) => set('amount', e.target.value)} /></Field>
                 <Field label="How it was paid"><select className="input-field" value={f.method} onChange={(e) => set('method', e.target.value)}><option value="BANK_TRANSFER">Bank transfer</option><option value="CONTROL_NUMBER">Control number</option><option value="MOBILE_MONEY">Mobile money</option><option value="CASH">Cash</option><option value="OTHER">Other</option></select></Field>
+                {['BANK_TRANSFER', 'MOBILE_MONEY', 'CASH'].includes(f.method) && <MoneyAccountSelect label="Received into" value={f.cashAccountId} onChange={(id) => set('cashAccountId', id)} defaultKind={f.method === 'BANK_TRANSFER' ? 'BANK' : (f.method as 'CASH' | 'MOBILE_MONEY')} />}
                 <Field label="Receipt or transaction reference" hint="Can only be used once."><input className="input-field" value={f.reference} onChange={(e) => set('reference', e.target.value)} /></Field>
                 <Field label="Date paid"><input className="input-field" type="date" value={f.paidAt} onChange={(e) => set('paidAt', e.target.value)} /></Field>
                 <Field label="Paid by"><input className="input-field" value={f.payer} onChange={(e) => set('payer', e.target.value)} /></Field>

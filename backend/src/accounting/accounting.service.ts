@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { resolveCashAccount } from './cash-resolve';
 import { computeTax, localDate, nextOpenInstant, round2, bookingMoment } from './tax';
 import { AccountType, BudgetStatus, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -158,7 +159,8 @@ export class AccountingService {
     sourceId: string,
     entryDate: Date,
     description: string,
-    lines: { code: string; debit?: number; credit?: number }[],
+    /** `cashAccountId` marks which of the cooperative's money accounts a cash line (code 1000) moved through; leave out for "not assigned". */
+    lines: { code: string; debit?: number; credit?: number; cashAccountId?: string | null }[],
     /** The cooperative whose books these are; null only for platform-level postings. May be a lookup still in flight. */
     mamcosIdOrLookup: string | null | Promise<string | null>,
     postedById?: string | null,
@@ -175,18 +177,25 @@ export class AccountingService {
     const accounts = new Map(
       (await this.accounts()).map((account) => [account.code, account]),
     );
+    // A line is identified by its ledger account and, for cash, the money account it moved through.
+    const keyOf = (accountId: string, cashAccountId?: string | null) => `${accountId}|${cashAccountId ?? ''}`;
     const desired = new Map<string, number>();
     for (const line of lines) {
       const account = accounts.get(line.code);
       if (!account) throw new BadRequestException(`Unknown ledger account ${line.code}`);
-      desired.set(account.id, (desired.get(account.id) ?? 0) + cents(line.debit ?? 0) - cents(line.credit ?? 0));
+      if (line.cashAccountId && line.code !== '1000') throw new BadRequestException('Only cash lines can name a money account');
+      const key = keyOf(account.id, line.cashAccountId);
+      desired.set(key, (desired.get(key) ?? 0) + cents(line.debit ?? 0) - cents(line.credit ?? 0));
     }
     const work = async (tx: Prisma.TransactionClient) => {
       // One posting per source at a time, so two requests cannot both book the same revision.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ledger:${sourceType}:${sourceId}`}))`;
-      const existing = await tx.ledgerEntry.findMany({ where: { sourceType, sourceId }, select: { accountId: true, debit: true, credit: true, revision: true } });
+      const existing = await tx.ledgerEntry.findMany({ where: { sourceType, sourceId }, select: { accountId: true, cashAccountId: true, debit: true, credit: true, revision: true } });
       const current = new Map<string, number>();
-      for (const row of existing) current.set(row.accountId, (current.get(row.accountId) ?? 0) + cents(row.debit) - cents(row.credit));
+      for (const row of existing) {
+        const key = keyOf(row.accountId, row.cashAccountId);
+        current.set(key, (current.get(key) ?? 0) + cents(row.debit) - cents(row.credit));
+      }
       const delta: [string, number][] = [];
       for (const id of new Set([...desired.keys(), ...current.keys()])) {
         const d = (desired.get(id) ?? 0) - (current.get(id) ?? 0);
@@ -205,10 +214,11 @@ export class AccountingService {
       const journalId = randomUUID();
       const text = `${revision > 1 ? 'Adjustment: ' : ''}${description}${note}`;
       const created: Prisma.LedgerEntryGetPayload<object>[] = [];
-      for (const [accountId, d] of delta) {
+      for (const [key, d] of delta) {
+        const [accountId, cashAccountId] = key.split('|');
         created.push(await tx.ledgerEntry.create({
           data: {
-            entryNumber, journalId, revision, accountId,
+            entryNumber, journalId, revision, accountId, cashAccountId: cashAccountId || null,
             debit: d > 0 ? d / 100 : 0, credit: d < 0 ? -d / 100 : 0,
             entryDate: when, sourceType, sourceId, description: text, mamcosId, postedById: postedById ?? null,
           },
@@ -372,7 +382,7 @@ export class AccountingService {
     }
     const rows = await this.prisma.ledgerEntry.findMany({
       where,
-      include: { account: true },
+      include: { account: true, cashAccount: { select: { id: true, name: true } } },
       orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }, { entryNumber: 'desc' }],
       take: Math.min(Math.max(filter.limit ?? 1000, 1), 5000) * 4, // a journal has several lines
     });
@@ -407,6 +417,7 @@ export class AccountingService {
         debit: row.debit,
         credit: row.credit,
         description: row.description,
+        cashAccount: row.cashAccount,
       });
       journal.totalDebit = round2(journal.totalDebit + row.debit);
       journal.totalCredit = round2(journal.totalCredit + row.credit);
@@ -443,6 +454,13 @@ export class AccountingService {
       throw new BadRequestException('Choose active accounts for every journal line.');
     }
     const mamcosId = scope.mamcosId ?? null;
+    const cashIds = [...new Set(dto.lines.map((l) => l.cashAccountId).filter((x): x is string => !!x))];
+    if (cashIds.length) {
+      const cashAccount = accounts.find((a) => a.code === '1000');
+      if (dto.lines.some((l) => l.cashAccountId && l.accountId !== cashAccount?.id)) throw new BadRequestException('Only a line on the cash account can name a money account.');
+      const found = mamcosId ? await this.prisma.cashAccount.count({ where: { id: { in: cashIds }, mamcosId, isActive: true } }) : 0;
+      if (found !== cashIds.length) throw new BadRequestException('Choose one of your own active money accounts.');
+    }
     const entryDate = /^\d{4}-\d{2}-\d{2}$/.test(dto.entryDate) ? bookingMoment(dto.entryDate) : new Date(dto.entryDate);
     const journalId = randomUUID();
     await this.prisma.$transaction(async (tx) => {
@@ -456,6 +474,7 @@ export class AccountingService {
           data: {
             entryNumber, journalId, revision: 1,
             accountId: line.accountId,
+            cashAccountId: line.cashAccountId || null,
             debit: line.debit ?? 0,
             credit: line.credit ?? 0,
             entryDate,
@@ -500,7 +519,7 @@ export class AccountingService {
         for (const r of rows) {
           await tx.ledgerEntry.create({
             data: {
-              entryNumber, journalId: newId, revision: 1, accountId: r.accountId,
+              entryNumber, journalId: newId, revision: 1, accountId: r.accountId, cashAccountId: r.cashAccountId,
               debit: r.credit, credit: r.debit, entryDate,
               sourceType: 'REVERSAL', sourceId: newId, reversesJournalId: journalId,
               description: `Reversal of ${head.entryNumber}: ${reason}`, mamcosId, postedById: actorId ?? null,
@@ -692,15 +711,16 @@ export class AccountingService {
     return invoice;
   }
   /** The customer pays: cash in (less any tax they withheld), receivable cleared. */
-  async payInvoice(id: string, scope: LedgerScope, actorId?: string | null) {
+  async payInvoice(id: string, scope: LedgerScope, actorId?: string | null, cashAccountId?: string | null) {
     const existing = await this.prisma.invoice.findFirst({ where: { id, ...scope } });
     if (!existing) throw new NotFoundException('Invoice not found');
     if (existing.status === 'PAID') throw new ConflictException('This invoice is already paid');
     if (existing.status === 'VOID') throw new BadRequestException('A void invoice cannot be paid');
-    const invoice = await this.prisma.invoice.update({ where: { id }, data: { status: 'PAID', paidAt: new Date() } });
+    const wallet = await resolveCashAccount(this.prisma, existing.mamcosId, { cashAccountId });
+    const invoice = await this.prisma.invoice.update({ where: { id }, data: { status: 'PAID', paidAt: new Date(), cashAccountId: wallet } });
     if (invoice.postedToLedger) {
       await this.postToLedger('InvoicePayment', invoice.id, invoice.paidAt!, `Payment of invoice ${invoice.invoiceNumber}`, [
-        { code: '1000', debit: round2(invoice.amount - invoice.withholdingAmount) },
+        { code: '1000', debit: round2(invoice.amount - invoice.withholdingAmount), cashAccountId: wallet },
         ...(invoice.withholdingAmount ? [{ code: '1410', debit: invoice.withholdingAmount }] : []),
         { code: '1100', credit: invoice.amount },
       ], invoice.mamcosId, actorId);
@@ -753,19 +773,20 @@ export class AccountingService {
     ], mamcosId, actorId);
     return bill;
   }
-  async payBill(id: string, scope: LedgerScope, actorId?: string | null) {
+  async payBill(id: string, scope: LedgerScope, actorId?: string | null, cashAccountId?: string | null) {
     const existing = await this.prisma.bill.findFirst({ where: { id, ...scope } });
     if (!existing) throw new NotFoundException('Bill not found');
     if (existing.status === 'PAID') throw new ConflictException('This bill is already paid');
     if (existing.status === 'VOID') throw new BadRequestException('A void bill cannot be paid');
+    const wallet = await resolveCashAccount(this.prisma, existing.mamcosId, { cashAccountId });
     const bill = await this.prisma.bill.update({
       where: { id },
-      data: { status: 'PAID', paidAt: new Date() },
+      data: { status: 'PAID', paidAt: new Date(), cashAccountId: wallet },
     });
     const payable = round2(bill.amount - bill.withholdingAmount);
     await this.postToLedger('BillPayment', bill.id, bill.paidAt!, `Supplier bill payment: ${bill.billNumber}`, [
       { code: '2100', debit: payable },
-      { code: '1000', credit: payable },
+      { code: '1000', credit: payable, cashAccountId: wallet },
     ], bill.mamcosId, actorId);
     return bill;
   }

@@ -6,17 +6,17 @@ import { accountingApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 
-const tzs = (n: number) => new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', maximumFractionDigits: 2 }).format(Number(n) || 0);
-const today = () => new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
-const errText = (e: any, fallback: string) => {
+export const tzs = (n: number) => new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', maximumFractionDigits: 2 }).format(Number(n) || 0);
+export const today = () => new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
+export const errText = (e: any, fallback: string) => {
   const m = e?.response?.data?.message;
   return Array.isArray(m) ? m.join(', ') : m || e?.message || fallback;
 };
 const monthEnd = (ym: string) => { const [y, m] = ym.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
 const lastMonthEnd = () => { const n = new Date(Date.now() + 3 * 3_600_000); return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), 0)).toISOString().slice(0, 10); };
-const shortDate = (v?: string | null) => { if (!v) return '—'; const m = String(v).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}-${m[2]}-${m[1]}` : String(v); };
+export const shortDate = (v?: string | null) => { if (!v) return '—'; const m = String(v).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}-${m[2]}-${m[1]}` : String(v); };
 
-function useLoad<T>(load: () => Promise<{ data: T }>, deps: unknown[]) {
+export function useLoad<T>(load: () => Promise<{ data: T }>, deps: unknown[]) {
   const [tick, setTick] = useState(0);
   const [res, setRes] = useState<{ key: string; data?: T; error?: string } | null>(null);
   const [dismissed, setDismissed] = useState('');
@@ -36,7 +36,7 @@ function useLoad<T>(load: () => Promise<{ data: T }>, deps: unknown[]) {
   };
 }
 
-function Card({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: 'good' | 'bad' }) {
+export function Card({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: 'good' | 'bad' }) {
   return <div className="glass-card" style={{ padding: 16 }}>
     <div className="muted" style={{ fontSize: 12 }}>{label}</div>
     <strong style={{ display: 'block', marginTop: 6, fontSize: 20, color: tone === 'bad' ? 'var(--red-400)' : tone === 'good' ? 'var(--green-400, #4ade80)' : undefined }}>{value}</strong>
@@ -44,18 +44,36 @@ function Card({ label, value, hint, tone }: { label: string; value: string; hint
   </div>;
 }
 /** Slim action row. The page already shows the title, so this carries only an optional one-line hint and the page's main action. */
-function Head({ text, action }: { title?: string; text?: string; action?: React.ReactNode }) {
+export function Head({ text, action }: { title?: string; text?: string; action?: React.ReactNode }) {
   if (!text && !action) return null;
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
     <span className="muted" style={{ fontSize: 13 }}>{text}</span>{action}
   </div>;
 }
-function Badge({ children, tone }: { children: React.ReactNode; tone: 'good' | 'warn' | 'bad' | 'muted' }) {
+export function Badge({ children, tone }: { children: React.ReactNode; tone: 'good' | 'warn' | 'bad' | 'muted' }) {
   const color = { good: '#4ade80', warn: '#fbbf24', bad: '#f87171', muted: 'var(--muted, #9ca3af)' }[tone];
   return <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, border: `1px solid ${color}`, color }}>{children}</span>;
 }
-function Actions({ cancel, label, form, busy, onCancel }: { cancel?: boolean; label: string; form: string; busy: boolean; onCancel: () => void }) {
+export function Actions({ cancel, label, form, busy, onCancel }: { cancel?: boolean; label: string; form: string; busy: boolean; onCancel: () => void }) {
   return <>{cancel !== false && <button type="button" className="btn-secondary" onClick={onCancel} disabled={busy}>Cancel</button>}<button type="submit" form={form} className="btn-primary" disabled={busy}>{busy ? 'Working…' : label}</button></>;
+}
+
+export const KIND_WORDS: Record<string, string> = { CASH: 'Cash box', BANK: 'Bank account', MOBILE_MONEY: 'Mobile money' };
+
+/** A "Paid from / Received into" picker used on every screen that moves money. Empty means the default account of that kind, or not assigned. */
+export function MoneyAccountSelect({ value, onChange, label = 'Money account', hint, defaultKind = 'CASH' }: { value: string; onChange: (id: string) => void; label?: string; hint?: string; defaultKind?: 'CASH' | 'BANK' | 'MOBILE_MONEY' }) {
+  const accounts = useLoad<any>(() => accountingApi.cashAccounts(), []);
+  const items: any[] = accounts.data?.items ?? [];
+  const fallback = items.find((a) => a.kind === defaultKind && a.isDefault);
+  return (
+    <label className="form-label">{label}
+      <select className="input-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{fallback ? `${fallback.name} (default)` : 'Not assigned to an account'}</option>
+        {items.filter((a) => a.id !== fallback?.id).map((a) => <option key={a.id} value={a.id}>{a.name} · {KIND_WORDS[a.kind]}</option>)}
+      </select>
+      {(hint || items.length === 0) && <span className="muted" style={{ fontSize: 11 }}>{items.length === 0 ? 'No money accounts yet. Add them in Cash & banking → Money Accounts.' : hint}</span>}
+    </label>
+  );
 }
 
 // ───────────────────────── Closing the books ─────────────────────────
@@ -141,6 +159,14 @@ export function BankReconciliationView({ canCreate, canEdit, canDelete }: { canC
       <Card label="Difference" value={s.hasStatements ? tzs(s.difference) : '—'} tone={!s.hasStatements ? undefined : s.reconciled ? 'good' : 'bad'}
         hint={s.hasStatements ? (s.reconciled ? 'Agrees' : `Not in books ${tzs(s.unmatchedLinesNet)} · not on statement ${tzs(s.unmatchedLedgerNet)}`) : undefined} />
     </div>}
+    {s?.byAccount?.length > 0 && <section className="table-panel" style={{ marginBottom: 16 }}><div className="section-toolbar"><strong>Each account against its statement</strong></div>
+      <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Account</th><th className="num">In your books</th><th className="num">On the latest statement</th><th className="num">Difference</th><th /></tr></thead><tbody>
+        {s.byAccount.map((a: any) => <tr key={a.id}><td><strong>{a.name}</strong><div className="muted" style={{ fontSize: 12 }}>{KIND_WORDS[a.kind]}</div></td>
+          <td className="num">{tzs(a.books)}</td><td className="num">{a.statement == null ? '—' : tzs(a.statement)}</td>
+          <td className="num">{a.difference == null ? '—' : tzs(a.difference)}</td>
+          <td>{a.statement == null ? <span className="muted">No statement yet</span> : Math.abs(a.difference) < 0.005 ? <Badge tone="good">Agrees</Badge> : <Badge tone="bad">Needs checking</Badge>}</td></tr>)}
+      </tbody></table></div>
+    </section>}
     <section className="table-panel"><div className="section-toolbar"><strong>Statements</strong></div>
       {list.loading ? <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div> : !list.data?.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No statements yet. Add one to start reconciling.</div> :
         <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Account</th><th>Period</th><th className="num">Opening</th><th className="num">Closing</th><th>Lines</th><th>Status</th><th /></tr></thead><tbody>
@@ -158,8 +184,27 @@ export function BankReconciliationView({ canCreate, canEdit, canDelete }: { canC
   </div>;
 }
 
+/** Picks the money account a statement is for; the free-text name and type are only for an account not set up in Money Accounts. */
+function StatementAccount({ value, label, kind, onChange }: { value: string; label: string; kind: string; onChange: (patch: { cashAccountId?: string; accountLabel?: string; kind?: string }) => void }) {
+  const accounts = useLoad<any>(() => accountingApi.cashAccounts(), []);
+  const items: any[] = (accounts.data?.items ?? []).filter((a: any) => a.kind !== 'CASH');
+  return <div style={{ display: 'grid', gap: 10 }}>
+    <label className="form-label">Which account is this statement for?
+      <select className="input-field" value={value} onChange={(e) => onChange({ cashAccountId: e.target.value })}>
+        <option value="">{items.length ? 'Another account (type its name)' : 'Type the account name'}</option>
+        {items.map((a) => <option key={a.id} value={a.id}>{a.name} · {KIND_WORDS[a.kind]}</option>)}
+      </select>
+      {items.length === 0 && <span className="muted" style={{ fontSize: 11 }}>Add your bank accounts and wallets in Money Accounts so each statement is checked against the right account.</span>}
+    </label>
+    {!value && <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
+      <label className="form-label">Account name<input className="input-field" required value={label} onChange={(e) => onChange({ accountLabel: e.target.value })} placeholder="e.g. CRDB 0150… or M-Pesa till" /></label>
+      <label className="form-label">Type<select className="input-field" value={kind} onChange={(e) => onChange({ kind: e.target.value })}><option value="BANK">Bank</option><option value="MOBILE_MONEY">Mobile money</option><option value="CASH">Cash</option></select></label>
+    </div>}
+  </div>;
+}
+
 function NewStatementModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
-  const [f, setF] = useState({ accountLabel: '', kind: 'BANK', periodStart: `${today().slice(0, 8)}01`, periodEnd: today(), openingBalance: '', closingBalance: '', text: '' });
+  const [f, setF] = useState({ cashAccountId: '', accountLabel: '', kind: 'BANK', periodStart: `${today().slice(0, 8)}01`, periodEnd: today(), openingBalance: '', closingBalance: '', text: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const parsed = useMemo(() => parseLines(f.text), [f.text]);
@@ -168,17 +213,14 @@ function NewStatementModal({ onClose, onCreated }: { onClose: () => void; onCrea
     if (bad.length) { setErr(`${bad.length} line${bad.length > 1 ? 's' : ''} could not be read. Use: date (YYYY-MM-DD), description, amount.`); return; }
     setBusy(true); setErr('');
     try {
-      const r = await accountingApi.createBankStatement({ accountLabel: f.accountLabel, kind: f.kind, periodStart: f.periodStart, periodEnd: f.periodEnd, openingBalance: Number(f.openingBalance), closingBalance: Number(f.closingBalance), lines: parsed });
+      const r = await accountingApi.createBankStatement({ cashAccountId: f.cashAccountId || undefined, accountLabel: f.cashAccountId ? undefined : f.accountLabel, kind: f.kind, periodStart: f.periodStart, periodEnd: f.periodEnd, openingBalance: Number(f.openingBalance), closingBalance: Number(f.closingBalance), lines: parsed });
       onCreated(r.data.id);
     } catch (e) { setErr(errText(e, 'Could not save the statement.')); } finally { setBusy(false); }
   };
   const readFile = (file?: File | null) => { if (file) void file.text().then((t) => setF((p) => ({ ...p, text: t }))); };
   return <Modal title="New statement" onClose={() => !busy && onClose()} width="720px" footer={<Actions label="Save and match" form="stmt-form" busy={busy} onCancel={onClose} />}>
     <form id="stmt-form" onSubmit={(e) => { e.preventDefault(); void submit(); }} style={{ display: 'grid', gap: 10 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
-        <label className="form-label">Account<input className="input-field" required value={f.accountLabel} onChange={(e) => setF({ ...f, accountLabel: e.target.value })} placeholder="e.g. CRDB 0150… or M-Pesa till" /></label>
-        <label className="form-label">Type<select className="input-field" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}><option value="BANK">Bank</option><option value="MOBILE_MONEY">Mobile money</option><option value="CASH">Cash count</option></select></label>
-      </div>
+      <StatementAccount value={f.cashAccountId} label={f.accountLabel} kind={f.kind} onChange={(patch) => setF({ ...f, ...patch })} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
         <label className="form-label">From<input className="input-field" type="date" required value={f.periodStart} onChange={(e) => setF({ ...f, periodStart: e.target.value })} /></label>
         <label className="form-label">To<input className="input-field" type="date" required value={f.periodEnd} onChange={(e) => setF({ ...f, periodEnd: e.target.value })} /></label>
@@ -351,6 +393,8 @@ export function DocumentsView({ kind, canCreate, canEdit }: { kind: 'invoice' | 
   const tax = useLoad<any>(() => accountingApi.taxSettings(), []);
   const accounts = useLoad<any[]>(() => accountingApi.accounts(), []);
   const [open, setOpen] = useState(false);
+  const [paying, setPaying] = useState<any>(null);
+  const [payAccount, setPayAccount] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const blank = { number: '', party: '', amount: '', dueDate: today(), description: '', accountCode: '', vatApplies: true, withholdingPercent: '' };
@@ -383,12 +427,16 @@ export function DocumentsView({ kind, canCreate, canEdit }: { kind: 'invoice' | 
             {showVat && <td className="num">{x.vatAmount ? tzs(x.vatAmount) : '—'}</td>}{showWht && <td className="num">{x.withholdingAmount ? tzs(x.withholdingAmount) : '—'}</td>}<td className="num">{tzs(x.amount)}</td>
             <td>{x.status === 'OVERDUE' ? <Badge tone="bad">Overdue</Badge> : <Badge tone="muted">Open</Badge>}</td>
             <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{x.source === 'ORDERS' ? <a className="btn-secondary" href="/dashboard/ops-orders">Take payment in Orders &amp; Sales</a> : canEdit && <>
-              <button type="button" className="btn-secondary" onClick={() => void run(() => (isBill ? accountingApi.payBill(x.id) : accountingApi.payInvoice(x.id)))}>{isBill ? 'Mark paid' : 'Mark received'}</button>{' '}
+              <button type="button" className="btn-secondary" onClick={() => setPaying(x)}>{isBill ? 'Mark paid' : 'Mark received'}</button>{' '}
               <details style={{ display: 'inline-block', position: 'relative' }}><summary className="btn-secondary" style={{ cursor: 'pointer', listStyle: 'none' }} aria-label="More actions">⋯</summary>
                 <div style={{ position: 'absolute', right: 0, zIndex: 5, marginTop: 4 }}><button type="button" className="btn-secondary" style={{ color: 'var(--red-400)' }} onClick={() => { if (window.confirm('Void this document? Its ledger postings are offset, not deleted.')) void run(() => (isBill ? accountingApi.voidBill(x.id) : accountingApi.voidInvoice(x.id))); }}>Void</button></div>
               </details></>}</td></tr>)}
         </tbody></table></div>}
     </section>
+    {paying && <Modal title={isBill ? `Pay ${paying.billNumber}` : `Receive payment for ${paying.invoiceNumber}`} subtitle={`${tzs(paying.amount)}${isBill ? ` to ${paying.supplier}` : ''}`} onClose={() => setPaying(null)} width="480px"
+      footer={<><button type="button" className="btn-secondary" onClick={() => setPaying(null)}>Cancel</button><button type="button" className="btn-primary" onClick={() => { const target = paying; setPaying(null); void run(() => (isBill ? accountingApi.payBill(target.id, payAccount || undefined) : accountingApi.payInvoice(target.id, payAccount || undefined))); }}>{isBill ? 'Mark as paid' : 'Mark as received'}</button></>}>
+      <MoneyAccountSelect label={isBill ? 'Paid from' : 'Received into'} value={payAccount} onChange={setPayAccount} defaultKind="BANK" />
+    </Modal>}
     {open && <Modal title={isBill ? 'Record supplier bill' : 'Record customer invoice'} onClose={() => !busy && setOpen(false)} width="600px" footer={<Actions label="Save" form="doc-form" busy={busy} onCancel={() => setOpen(false)} />}>
       <form id="doc-form" onSubmit={(e) => { e.preventDefault(); void submit(); }} style={{ display: 'grid', gap: 10 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -423,7 +471,7 @@ export function CashTransactionsView({ kind, canCreate, canEdit }: { kind: 'EXPE
   const list = useLoad<any>(() => accountingApi.cashTransactions({ kind, q: q.trim() || undefined, from: from || undefined, to: to || undefined }), [kind, q, from, to]);
   const cats = useLoad<any[]>(() => accountingApi.cashCategories(kind), [kind]);
   const tax = useLoad<any>(() => accountingApi.taxSettings(), []);
-  const blank = { date: today(), amount: '', accountCode: '', party: '', method: 'CASH', reference: '', note: '', includesVat: false };
+  const blank = { date: today(), amount: '', accountCode: '', party: '', method: 'CASH', cashAccountId: '', reference: '', note: '', includesVat: false };
   const [open, setOpen] = useState(false);
   const [f, setF] = useState(blank);
   const [voiding, setVoiding] = useState<any>(null);
@@ -436,7 +484,7 @@ export function CashTransactionsView({ kind, canCreate, canEdit }: { kind: 'EXPE
   const save = async () => {
     setBusy(true); setErr('');
     try {
-      await accountingApi.createCashTransaction({ kind, date: f.date, amount: Number(f.amount), accountCode: f.accountCode, party: f.party || undefined, method: f.method, reference: f.reference || undefined, note: f.note || undefined, includesVat: vatOn ? f.includesVat : undefined });
+      await accountingApi.createCashTransaction({ kind, date: f.date, amount: Number(f.amount), accountCode: f.accountCode, party: f.party || undefined, method: f.method, cashAccountId: f.cashAccountId || undefined, reference: f.reference || undefined, note: f.note || undefined, includesVat: vatOn ? f.includesVat : undefined });
       setOpen(false); setF(blank); list.reload();
     } catch (e) { setErr(errText(e, 'Could not save.')); } finally { setBusy(false); }
   };
@@ -458,12 +506,13 @@ export function CashTransactionsView({ kind, canCreate, canEdit }: { kind: 'EXPE
         <span className="muted" style={{ marginLeft: 'auto' }}>{d ? `${d.count} · ${tzs(d.total)}` : ''}</span>
       </div>
       {list.loading && !d ? <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div> : !items.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>{isExp ? 'No expenses recorded.' : 'No income recorded.'}</div> :
-        <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Date</th><th>No.</th><th>Category</th><th>{isExp ? 'Paid to' : 'Received from'}</th><th className="num">Amount</th><th /></tr></thead><tbody>
+        <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Date</th><th>No.</th><th>Category</th><th>{isExp ? 'Paid to' : 'Received from'}</th><th>{isExp ? 'Paid from' : 'Received into'}</th><th className="num">Amount</th><th /></tr></thead><tbody>
           {items.map((x: any) => <tr key={x.id} style={x.status === 'VOID' ? { opacity: 0.55 } : undefined}>
             <td>{shortDate(x.date)}</td>
             <td>{x.number}{x.status === 'VOID' && <div style={{ fontSize: 12, color: 'var(--red-400)' }}>Cancelled</div>}</td>
             <td>{x.category}{x.note && <div className="muted" style={{ fontSize: 12 }}>{x.note}</div>}</td>
             <td>{x.party ?? '—'}</td>
+            <td className="muted">{x.account ?? '—'}</td>
             <td className="num" style={x.status === 'VOID' ? { textDecoration: 'line-through' } : undefined}>{tzs(x.amount)}{x.vatAmount > 0 && <div className="muted" style={{ fontSize: 12 }}>incl. VAT {tzs(x.vatAmount)}</div>}</td>
             <td style={{ textAlign: 'right' }}>{canEdit && x.status === 'POSTED' && <button type="button" className="btn-secondary" onClick={() => { setErr(''); setReason(''); setVoiding(x); }}>Cancel</button>}</td>
           </tr>)}
@@ -478,7 +527,7 @@ export function CashTransactionsView({ kind, canCreate, canEdit }: { kind: 'EXPE
         <label className="form-label">Category<select className="input-field" required value={f.accountCode} onChange={(e) => setF({ ...f, accountCode: e.target.value })}><option value="">Choose…</option>{(cats.data ?? []).map((c: any) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <label className="form-label">{isExp ? 'Paid to' : 'Received from'}<input className="input-field" value={f.party} onChange={(e) => setF({ ...f, party: e.target.value })} /></label>
-          <label className="form-label">{isExp ? 'Paid by' : 'Received by'}<select className="input-field" value={f.method} onChange={(e) => setF({ ...f, method: e.target.value })}><option value="CASH">Cash</option><option value="BANK">Bank</option><option value="MOBILE_MONEY">Mobile money</option></select></label>
+          <MoneyAccountSelect label={isExp ? 'Paid from' : 'Received into'} value={f.cashAccountId} onChange={(id) => setF({ ...f, cashAccountId: id })} hint="Pick the cash box, bank account or wallet the money moved through." />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <label className="form-label">Reference<input className="input-field" value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} placeholder="Receipt no." /></label>

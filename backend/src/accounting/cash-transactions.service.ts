@@ -3,6 +3,7 @@ import { AccountType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AccountingService, LedgerScope } from './accounting.service';
 import { localDate, round2, bookingMoment } from './tax';
+import { resolveCashAccount } from './cash-resolve';
 
 export type CashKind = 'EXPENSE' | 'INCOME';
 export type CashInput = {
@@ -13,6 +14,8 @@ export type CashInput = {
   accountCode: string;
   party?: string;
   method?: 'CASH' | 'BANK' | 'MOBILE_MONEY';
+  /** The money account it went through; wins over `method`. */
+  cashAccountId?: string;
   reference?: string;
   note?: string;
   /** The amount already contains VAT (only for a VAT-registered cooperative). */
@@ -32,6 +35,7 @@ const CATEGORIES: Record<CashKind, string[]> = {
 @Injectable()
 export class CashTransactionsService {
   constructor(private readonly prisma: PrismaService, private readonly accounting: AccountingService) {}
+
 
   private mamcos(scope: LedgerScope): string {
     if (!scope.mamcosId) throw new BadRequestException('Choose a cooperative first.');
@@ -53,6 +57,7 @@ export class CashTransactionsService {
         ...(f.from || f.to ? { transactionDate: { ...(f.from ? { gte: new Date(`${f.from}T00:00:00.000Z`) } : {}), ...(f.to ? { lte: new Date(`${f.to}T00:00:00.000Z`) } : {}) } } : {}),
         ...(q ? { OR: [{ number: { contains: q, mode: 'insensitive' } }, { party: { contains: q, mode: 'insensitive' } }, { note: { contains: q, mode: 'insensitive' } }, { reference: { contains: q, mode: 'insensitive' } }] } : {}),
       },
+      include: { cashAccount: { select: { id: true, name: true } } },
       orderBy: [{ transactionDate: 'desc' }, { createdAt: 'desc' }],
       take: Math.min(Math.max(f.limit ?? 500, 1), 2000),
     });
@@ -60,7 +65,7 @@ export class CashTransactionsService {
     const items = rows.map((r) => ({
       id: r.id, kind: r.kind, number: r.number, date: r.transactionDate.toISOString().slice(0, 10), amount: Number(r.amount), vatAmount: Number(r.vatAmount),
       accountCode: r.accountCode, category: accounts.find((a) => a.code === r.accountCode)?.name ?? r.accountCode, party: r.party, method: r.method,
-      reference: r.reference, note: r.note, status: r.status, voidReason: r.voidReason,
+      reference: r.reference, note: r.note, status: r.status, voidReason: r.voidReason, account: r.cashAccount?.name ?? null,
     }));
     const live = items.filter((i) => i.status === 'POSTED');
     return { items, total: round2(live.reduce((n, i) => n + i.amount, 0)), count: live.length };
@@ -87,17 +92,19 @@ export class CashTransactionsService {
     }
     return this.prisma.$transaction(async (tx) => {
       const number = await this.accounting.nextNumber(tx, mamcosId, date, prefix, prefix);
+      const wallet = await resolveCashAccount(tx, mamcosId, { cashAccountId: dto.cashAccountId, method: dto.method });
+      const walletKind = wallet ? (await tx.cashAccount.findUnique({ where: { id: wallet }, select: { kind: true } }))?.kind : undefined;
       const row = await tx.cashTransaction.create({
         data: {
-          mamcosId, kind: dto.kind, number, transactionDate: new Date(`${dto.date}T00:00:00.000Z`), amount, vatAmount: vat, accountCode: dto.accountCode,
-          party: dto.party?.trim() || null, method: dto.method ?? 'CASH', reference: dto.reference?.trim() || null, note: dto.note?.trim() || null, createdById: actorId ?? null,
+          mamcosId, kind: dto.kind, number, transactionDate: new Date(`${dto.date}T00:00:00.000Z`), amount, vatAmount: vat, accountCode: dto.accountCode, cashAccountId: wallet,
+          party: dto.party?.trim() || null, method: walletKind ?? dto.method ?? 'CASH', reference: dto.reference?.trim() || null, note: dto.note?.trim() || null, createdById: actorId ?? null,
         },
       });
       const label = `${dto.kind === 'EXPENSE' ? 'Expense' : 'Income'} ${number}${dto.party?.trim() ? `: ${dto.party.trim()}` : ''}`;
       await this.accounting.postToLedger(dto.kind === 'EXPENSE' ? 'Expense' : 'Income', row.id, date, label,
         dto.kind === 'EXPENSE'
-          ? [{ code: dto.accountCode, debit: net }, ...(vat ? [{ code: '1400', debit: vat }] : []), { code: '1000', credit: amount }]
-          : [{ code: '1000', debit: amount }, { code: dto.accountCode, credit: net }, ...(vat ? [{ code: '2400', credit: vat }] : [])],
+          ? [{ code: dto.accountCode, debit: net }, ...(vat ? [{ code: '1400', debit: vat }] : []), { code: '1000', credit: amount, cashAccountId: wallet }]
+          : [{ code: '1000', debit: amount, cashAccountId: wallet }, { code: dto.accountCode, credit: net }, ...(vat ? [{ code: '2400', credit: vat }] : [])],
         mamcosId, actorId, tx);
       return row;
     });

@@ -5,6 +5,7 @@ import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { AccountingService } from '../accounting/accounting.service';
 import { SmsService } from '../messaging/sms.service';
 import { writeAudit } from '../irrigation/irrigation-audit';
+import { resolveCashAccount } from '../accounting/cash-resolve';
 import { CreatePayeeDto, CreateRunDto, PostRunDto, UpdateLineDto, UpdatePayeeDto } from './dto/payroll.dto';
 
 const num = (v: unknown) => (v == null ? 0 : Number(v));
@@ -233,13 +234,14 @@ export class PayrollService {
     const net = cents(gross - deductions);
     if (!run.lines.length || gross <= 0) throw new BadRequestException('There is nothing to pay in this run');
 
+    const wallet = await resolveCashAccount(this.prisma, mamcosId, { cashAccountId: dto.cashAccountId, method: dto.payMethod });
     await this.accounting.postToLedger('Payroll', run.id, paidOn, `Salaries for ${run.period}`,
-      [{ code: '5500', debit: gross }, { code: '1000', credit: net }, ...(deductions > 0 ? [{ code: '2300', credit: deductions }] : [])], mamcosId);
+      [{ code: '5500', debit: gross }, { code: '1000', credit: net, cashAccountId: wallet }, ...(deductions > 0 ? [{ code: '2300', credit: deductions }] : [])], mamcosId);
 
     const locked = await this.prisma.$transaction(async (tx) => {
       const res = await tx.payrollRun.updateMany({
         where: { id, status: 'DRAFT' },
-        data: { status: 'POSTED', payMethod: dto.payMethod, paidOn, postedAt: new Date(), postedById: actor.id, totalGross: gross, totalDeductions: deductions, totalNet: net },
+        data: { status: 'POSTED', payMethod: dto.payMethod, cashAccountId: wallet, paidOn, postedAt: new Date(), postedById: actor.id, totalGross: gross, totalDeductions: deductions, totalNet: net },
       });
       if (res.count === 1) await writeAudit(tx, actor, 'payroll', id, 'post_run', { status: 'DRAFT' }, { status: 'POSTED', period: run.period, totalGross: gross, totalNet: net, payMethod: dto.payMethod });
       return res.count === 1;

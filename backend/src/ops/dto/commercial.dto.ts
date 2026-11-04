@@ -42,6 +42,8 @@ export class IssueInvoiceDto {
 export class RecordPaymentDto {
   @IsNumber() @IsPositive() amount: number;
   @IsEnum(OpsPaymentMethod) method: OpsPaymentMethod;
+  /** The money account the payment went into; leave out for the default account of that kind. */
+  @IsOptional() @IsString() cashAccountId?: string;
   @IsString() reference: string;
   @IsOptional() @IsDateString() paidAt?: string;
   @IsOptional() @IsString() payerName?: string;

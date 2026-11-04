@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DueCategory, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveCashAccount } from '../accounting/cash-resolve';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { AccountingService } from '../accounting/accounting.service';
 import {
@@ -286,9 +287,11 @@ export class DuesService {
           if (balance <= 0) throw new BadRequestException('This due is already paid');
           if (cents(dto.amount) > balance) throw new BadRequestException(`Only ${balance.toLocaleString('en-US')} is still owed`);
           due = found;
+          // A deduction from a harvest payment is not money received, so it goes to no money account.
+          const wallet = dto.method === 'HARVEST_DEDUCTION' ? null : await resolveCashAccount(tx, mamcosId, { cashAccountId: dto.cashAccountId, method: dto.method });
           return tx.duePayment.create({
             data: {
-              mamcosId, dueId: id, farmerId: found.farmerId, receiptNo: await this.nextReceipt(tx, mamcosId), amount: cents(dto.amount), paidOn,
+              mamcosId, dueId: id, farmerId: found.farmerId, cashAccountId: wallet, receiptNo: await this.nextReceipt(tx, mamcosId), amount: cents(dto.amount), paidOn,
               method: dto.method, reference: dto.reference?.trim() || null, note: dto.note?.trim() || null, recordedById: actor.id,
             },
           });
@@ -303,7 +306,7 @@ export class DuesService {
     const debit = payment.method === 'HARVEST_DEDUCTION' ? '2200' : '1000';
     try {
       await this.accounting.postToLedger('DuePayment', payment.id, paidOn, `${payment.receiptNo} · ${due!.description}`,
-        [{ code: debit, debit: amount }, { code: CREDIT_ACCOUNT[due!.category], credit: amount }], mamcosId);
+        [{ code: debit, debit: amount, cashAccountId: debit === '1000' ? payment.cashAccountId : undefined }, { code: CREDIT_ACCOUNT[due!.category], credit: amount }], mamcosId);
     } catch (e) {
       await this.prisma.duePayment.delete({ where: { id: payment.id } }); // no receipt without its entry
       throw e;
@@ -324,7 +327,7 @@ export class DuesService {
     const debit = payment.method === 'HARVEST_DEDUCTION' ? '2200' : '1000';
     try {
       await this.accounting.postToLedger('DuePaymentVoid', paymentId, today(), `Voided ${payment.receiptNo}: ${reason.trim()}`,
-        [{ code: CREDIT_ACCOUNT[payment.due.category], debit: amount }, { code: debit, credit: amount }], mamcosId);
+        [{ code: CREDIT_ACCOUNT[payment.due.category], debit: amount }, { code: debit, credit: amount, cashAccountId: debit === '1000' ? payment.cashAccountId : undefined }], mamcosId);
     } catch (e) {
       await this.prisma.duePayment.update({ where: { id: paymentId }, data: { voidedAt: null, voidReason: null, voidedById: null } });
       throw e;

@@ -8,6 +8,7 @@ import { accountingApi, financeApi, inventoryApi, loansApi, mamcosApi, salesApi,
 import ErrorBanner from '@/components/ErrorBanner';
 import Modal from '@/components/Modal';
 import { useAuthStore } from '@/store/auth.store';
+import { CashBookView, MoneyAccountsView } from './money';
 import { BankReconciliationView, CashTransactionsView, DocumentsView, PeriodCloseView, TaxSettingsView, VatReturnView } from './controls';
 
 const MENU = [
@@ -16,7 +17,7 @@ const MENU = [
   ['Farmer Settlements', 'farmer-settlements', ['Settlement Batches', 'Payment Approvals', 'Partial Payments', 'Settlement Reconciliation']],
   ['Rice Sales & Receivables', 'rice-sales-receivables', ['Sales Invoices', 'Customer Receipts', 'Credit Sales', 'Customer Debtors']],
   ['Milling Cost Accounting', 'milling-cost-accounting', ['Production Costs', 'Milling Yield', 'By-products', 'Cost per Kilogram']],
-  ['Cash & Banking', 'cash-banking', ['Cashbooks', 'Bank Accounts', 'Mobile Money', 'Bank Reconciliation']],
+  ['Cash & Banking', 'cash-banking', ['Cashbooks', 'Money Accounts', 'Mobile Money', 'Bank Reconciliation']],
   ['Purchases & Suppliers', 'purchases-suppliers', ['Supplier Bills', 'Supplier Payments', 'Outstanding Balances']],
   ['Expenses & Income', 'expenses-income', ['Expenses', 'Other Income']],
   ['Assets & Loans', 'assets-loans', ['Equipment Register', 'Depreciation', 'Borrowings', 'Interest']],
@@ -111,7 +112,7 @@ export default function AccountingPage() {
       'milling-cost-accounting/by-products': () => inventoryApi.lots(),
       'milling-cost-accounting/cost-per-kilogram': () => financeApi.getAllCosts(),
       'cash-banking/cashbooks': () => accountingApi.cashFlow(),
-      'cash-banking/bank-accounts': () => Promise.resolve({ data: [] }),
+      'cash-banking/money-accounts': () => Promise.resolve({ data: [] }),
       'cash-banking/mobile-money': () => accountingApi.cashFlow(),
       'cash-banking/bank-reconciliation': () => Promise.resolve({ data: [] }),
       'purchases-suppliers/supplier-bills': () => Promise.resolve({ data: [] }),
@@ -331,14 +332,14 @@ export default function AccountingPage() {
 
   const columns = useMemo(() => {
     const fields = new Set<string>();
-    const hideSystemFields = submenu === 'Chart of Accounts' || submenu === 'Bank Accounts';
+    const hideSystemFields = submenu === 'Chart of Accounts';
     records.forEach((record) => Object.keys(record ?? {}).filter((key) => {
       if (typeof record[key] === 'object' && record[key] !== null) return false;
       return !hideSystemFields || !['id', 'createdat', 'created_at'].includes(key.toLowerCase());
     }).forEach((key) => fields.add(key)));
     return [...fields].slice(0, 8);
   }, [records, submenu]);
-  const emptyMessage = submenu === 'Bank Accounts'
+  const emptyMessage = submenu === 'Money Accounts'
     ? 'No bank accounts have been registered.'
     : submenu === 'Equipment Register'
       ? 'No equipment has been registered.'
@@ -375,7 +376,10 @@ export default function AccountingPage() {
     : '';
 
   const customKey = `${selectedCategory[1]}/${slug(submenu)}`;
-  const customView = customKey === 'cash-banking/bank-reconciliation' ? <BankReconciliationView canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} canDelete={!!canDeleteAccounting} />
+  const customView = customKey === 'cash-banking/cashbooks' ? <CashBookView />
+    : customKey === 'cash-banking/money-accounts' ? <MoneyAccountsView canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
+    : customKey === 'cash-banking/mobile-money' ? <CashBookView kind="MOBILE_MONEY" />
+    : customKey === 'cash-banking/bank-reconciliation' ? <BankReconciliationView canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} canDelete={!!canDeleteAccounting} />
     : customKey === 'general-ledger/period-close' ? <PeriodCloseView canClose={!!canEditAccounting} canReopen={!!canDeleteAccounting} />
     : customKey === 'expenses-income/expenses' ? <CashTransactionsView kind="EXPENSE" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
     : customKey === 'expenses-income/other-income' ? <CashTransactionsView kind="INCOME" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />

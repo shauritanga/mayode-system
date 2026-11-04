@@ -55,6 +55,8 @@ export class RecordPaymentDto {
   @Type(() => Number) @IsNumber(money) @Min(0.01) amount: number;
   @IsOptional() @IsDateString() paidOn?: string;
   @IsEnum(DuePaymentMethod) method: DuePaymentMethod;
+  /** The money account the payment went into; leave out for the default account of that kind. */
+  @IsOptional() @IsString() cashAccountId?: string;
   @IsOptional() @IsString() @MaxLength(80) reference?: string;
   @IsOptional() @IsString() @MaxLength(300) note?: string;
 }

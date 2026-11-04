@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Modal from '@/components/Modal';
+import { MoneyAccountSelect } from '@/screens/dashboard/accounting/controls';
 import { chargesApi, communicationsApi, duesApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import {
@@ -75,7 +76,7 @@ function FarmerPicker({ value, onChange, error }: { value: any; onChange: (f: an
 }
 
 function PayModal({ due, onClose, onSaved }: { due: any; onClose: () => void; onSaved: (m: string) => void }) {
-  const [form, setForm] = useState({ amount: String(due.balance), paidOn: todayISO(), method: 'CASH', reference: '', note: '' });
+  const [form, setForm] = useState({ amount: String(due.balance), paidOn: todayISO(), method: 'CASH', cashAccountId: '', reference: '', note: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -86,7 +87,7 @@ function PayModal({ due, onClose, onSaved }: { due: any; onClose: () => void; on
     if (form.paidOn > todayISO()) { setError('The payment date cannot be in the future'); return; }
     setSaving(true); setError('');
     try {
-      const p: any = (await duesApi.pay(due.id, { amount, paidOn: form.paidOn, method: form.method, reference: form.reference.trim() || undefined, note: form.note.trim() || undefined })).data;
+      const p: any = (await duesApi.pay(due.id, { amount, paidOn: form.paidOn, method: form.method, cashAccountId: form.cashAccountId || undefined, reference: form.reference.trim() || undefined, note: form.note.trim() || undefined })).data;
       onSaved(`Payment recorded. Receipt ${p.receiptNo}.`);
     } catch (e) { setError(errMsg(e)); setSaving(false); }
   };
@@ -98,6 +99,7 @@ function PayModal({ due, onClose, onSaved }: { due: any; onClose: () => void; on
           <Field label="Amount (TZS) *"><input type="number" min="1" className="input-field" value={form.amount} onChange={(e) => set('amount', e.target.value)} autoFocus /></Field>
           <Field label="Date"><input type="date" className="input-field" max={todayISO()} min={day(due.issuedOn)} value={form.paidOn} onChange={(e) => set('paidOn', e.target.value)} /></Field>
           <Field label="Paid by"><select className="input-field" value={form.method} onChange={(e) => set('method', e.target.value)}>{Object.entries(METHOD_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+          {form.method !== 'HARVEST_DEDUCTION' && <MoneyAccountSelect label="Received into" value={form.cashAccountId} onChange={(id) => set('cashAccountId', id)} defaultKind={form.method as 'CASH' | 'BANK' | 'MOBILE_MONEY'} />}
           <Field label="Reference" hint="Mobile money or bank reference"><input className="input-field" value={form.reference} onChange={(e) => set('reference', e.target.value)} /></Field>
           <Field label="Note" wide><input className="input-field" value={form.note} onChange={(e) => set('note', e.target.value)} /></Field>
         </FormGrid>

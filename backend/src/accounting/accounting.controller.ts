@@ -29,9 +29,10 @@ import {
 } from './dto/accounting.dto';
 import {
   AdjustLineDto, CloseBooksDto, CreateStatementDto, MatchLineDto, ReopenBooksDto,
-  CreateCashTransactionDto, TaxSettingsDto, VatSettlementDto, VoidCashTransactionDto, WithholdingRemittanceDto,
+  CreateCashAccountDto, CashTransferDto, PayDto, UpdateCashAccountDto, CreateCashTransactionDto, TaxSettingsDto, VatSettlementDto, VoidCashTransactionDto, WithholdingRemittanceDto,
 } from './dto/ledger-controls.dto';
 import { CashTransactionsService } from './cash-transactions.service';
+import { CashAccountsService } from './cash-accounts.service';
 import { PeriodLockService } from './period-lock.service';
 import { ReconciliationService } from './reconciliation.service';
 import { TaxService } from './tax.service';
@@ -47,6 +48,7 @@ export class AccountingController {
     private readonly reconciliation: ReconciliationService,
     private readonly tax: TaxService,
     private readonly cash: CashTransactionsService,
+    private readonly cashAccounts: CashAccountsService,
   ) {}
   // Every report and posting below is confined to one cooperative's books: the caller's own, or — for Super Admin — the
   // one named in ?mamcosId=, or everything when none is named. See AccountingService.scopeFor.
@@ -127,8 +129,8 @@ export class AccountingController {
   }
   @Post('invoices/:id/pay')
   @RequirePermission('accounting', 'EDIT')
-  payInvoice(@Param('id') id: string, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
-    return this.accounting.payInvoice(id, this.accounting.scopeFor(user, mamcosId), user.id);
+  payInvoice(@Param('id') id: string, @Body() dto: PayDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.payInvoice(id, this.accounting.scopeFor(user, mamcosId), user.id, dto?.cashAccountId);
   }
   @Post('invoices/:id/void')
   @RequirePermission('accounting', 'EDIT')
@@ -142,8 +144,8 @@ export class AccountingController {
   }
   @Post('bills/:id/pay')
   @RequirePermission('accounting', 'EDIT')
-  payBill(@Param('id') id: string, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
-    return this.accounting.payBill(id, this.accounting.scopeFor(user, mamcosId), user.id);
+  payBill(@Param('id') id: string, @Body() dto: PayDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.payBill(id, this.accounting.scopeFor(user, mamcosId), user.id, dto?.cashAccountId);
   }
   @Post('bills/:id/void')
   @RequirePermission('accounting', 'EDIT')
@@ -254,6 +256,46 @@ export class AccountingController {
   @RequirePermission('accounting', 'EDIT')
   cashVoid(@Param('id') id: string, @Body() dto: VoidCashTransactionDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
     return this.cash.voidOne(id, dto.reason, this.accounting.scopeFor(user, mamcosId), user.id);
+  }
+
+  // ───── money accounts (cash box, banks, mobile money) ─────
+  @Get('cash-accounts')
+  @RequirePermission('accounting', 'VIEW')
+  cashAccountList(@CurrentUser() user: RequestUser, @Query('includeInactive') includeInactive?: string, @Query('mamcosId') mamcosId?: string) {
+    return this.cashAccounts.list(this.accounting.scopeFor(user, mamcosId), { includeInactive: includeInactive === 'true' });
+  }
+  @Get('cash-accounts/transfers')
+  @RequirePermission('accounting', 'VIEW')
+  cashTransfers(@CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.cashAccounts.transfers(this.accounting.scopeFor(user, mamcosId));
+  }
+  @Post('cash-accounts/transfers')
+  @RequirePermission('accounting', 'CREATE')
+  cashTransfer(@Body() dto: CashTransferDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.cashAccounts.transfer(dto, this.accounting.scopeFor(user, mamcosId), user.id);
+  }
+  @Post('cash-accounts/transfers/:id/cancel')
+  @RequirePermission('accounting', 'EDIT')
+  cashTransferCancel(@Param('id') id: string, @Body() dto: VoidCashTransactionDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.cashAccounts.cancelTransfer(id, dto.reason, this.accounting.scopeFor(user, mamcosId), user.id);
+  }
+  @Post('cash-accounts')
+  @RequirePermission('accounting', 'CREATE')
+  cashAccountCreate(@Body() dto: CreateCashAccountDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.cashAccounts.create(dto, this.accounting.scopeFor(user, mamcosId), user.id);
+  }
+  @Patch('cash-accounts/:id')
+  @RequirePermission('accounting', 'EDIT')
+  cashAccountUpdate(@Param('id') id: string, @Body() dto: UpdateCashAccountDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.cashAccounts.update(id, dto, this.accounting.scopeFor(user, mamcosId));
+  }
+  @Get('cash-book')
+  @RequirePermission('accounting', 'VIEW')
+  cashBook(
+    @CurrentUser() user: RequestUser, @Query('account') account?: string, @Query('kind') kind?: 'CASH' | 'BANK' | 'MOBILE_MONEY',
+    @Query('from') from?: string, @Query('to') to?: string, @Query('mamcosId') mamcosId?: string,
+  ) {
+    return this.cashAccounts.cashBook(this.accounting.scopeFor(user, mamcosId), { account, kind, from, to });
   }
 
   // ───── VAT and withholding tax ─────

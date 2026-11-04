@@ -203,7 +203,7 @@ export const navGroups: NavGroup[] = [
               ] },
               { href: '/dashboard/accounting/cash-banking', label: 'Cash & Banking', icon: Wallet01Icon, roles: [], resource: 'accounting', children: [
                 { href: '/dashboard/accounting/cash-banking/cashbooks', label: 'Cashbooks', icon: File01Icon, roles: [] },
-                { href: '/dashboard/accounting/cash-banking/bank-accounts', label: 'Bank Accounts', icon: Building05Icon, roles: [] },
+                { href: '/dashboard/accounting/cash-banking/money-accounts', label: 'Money Accounts', icon: Building05Icon, roles: [] },
                 { href: '/dashboard/accounting/cash-banking/mobile-money', label: 'Mobile Money', icon: Wallet01Icon, roles: [] },
                 { href: '/dashboard/accounting/cash-banking/bank-reconciliation', label: 'Bank Reconciliation', icon: FileEditIcon, roles: [] },
               ] },

@@ -11,7 +11,9 @@ const cents = (n: number | string | Prisma.Decimal) => Math.round(Number(n) * 10
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 
 export type StatementInput = {
-  accountLabel: string;
+  /** The money account this statement is for; its name and kind are used. Leave out for a statement of an account not set up here. */
+  cashAccountId?: string;
+  accountLabel?: string;
   kind?: 'BANK' | 'MOBILE_MONEY' | 'CASH';
   periodStart: string;
   periodEnd: string;
@@ -42,9 +44,9 @@ export class ReconciliationService {
     if (st.status === 'RECONCILED') throw new ConflictException('This statement is reconciled. Reopen it to make changes.');
   }
   /** Cash-book entries (signed: money in positive) in a window, with whether a statement line already claims them. */
-  private async cashEntries(mamcosId: string, from: Date, to: Date, onlyUnmatched: boolean) {
+  private async cashEntries(mamcosId: string, from: Date, to: Date, onlyUnmatched: boolean, cashAccountId?: string | null) {
     const rows = await this.prisma.ledgerEntry.findMany({
-      where: { mamcosId, account: { code: CASH }, entryDate: { gte: from, lte: to }, ...(onlyUnmatched ? { bankLine: null } : {}) },
+      where: { mamcosId, account: { code: CASH }, entryDate: { gte: from, lte: to }, ...(onlyUnmatched ? { bankLine: null } : {}), ...(cashAccountId ? { cashAccountId } : {}) },
       orderBy: [{ entryDate: 'asc' }, { createdAt: 'asc' }],
       select: { id: true, entryNumber: true, entryDate: true, description: true, debit: true, credit: true, sourceType: true },
     });
@@ -57,7 +59,7 @@ export class ReconciliationService {
     return rows.map((s) => {
       const sum = s.lines.reduce((n, l) => n + cents(l.amount), 0);
       return {
-        id: s.id, accountLabel: s.accountLabel, kind: s.kind, periodStart: ymd(s.periodStart), periodEnd: ymd(s.periodEnd),
+        id: s.id, accountLabel: s.accountLabel, kind: s.kind, cashAccountId: s.cashAccountId, periodStart: ymd(s.periodStart), periodEnd: ymd(s.periodEnd),
         openingBalance: Number(s.openingBalance), closingBalance: Number(s.closingBalance), status: s.status, reconciledAt: s.reconciledAt,
         lineCount: s.lines.length, unmatched: s.lines.filter((l) => !l.ledgerEntryId).length,
         arithmeticDifference: (cents(s.closingBalance) - cents(s.openingBalance) - sum) / 100,
@@ -67,6 +69,9 @@ export class ReconciliationService {
 
   async create(dto: StatementInput, scope: LedgerScope, actorId?: string | null) {
     const mamcosId = this.mamcos(scope);
+    const account = dto.cashAccountId ? await this.prisma.cashAccount.findFirst({ where: { id: dto.cashAccountId, mamcosId } }) : null;
+    if (dto.cashAccountId && !account) throw new BadRequestException('Choose one of your own money accounts.');
+    if (account) { dto.accountLabel = account.name; dto.kind = account.kind; }
     if (!dto.accountLabel?.trim()) throw new BadRequestException('Name the account this statement is for.');
     if (dto.periodEnd < dto.periodStart) throw new BadRequestException('The statement ends before it starts.');
     if (!dto.lines?.length) throw new BadRequestException('Add at least one statement line.');
@@ -76,7 +81,7 @@ export class ReconciliationService {
     }
     const created = await this.prisma.bankStatement.create({
       data: {
-        mamcosId, accountLabel: dto.accountLabel.trim(), kind: dto.kind ?? 'BANK',
+        mamcosId, accountLabel: dto.accountLabel!.trim(), kind: dto.kind ?? 'BANK', cashAccountId: account?.id ?? null,
         periodStart: new Date(`${dto.periodStart}T00:00:00.000Z`), periodEnd: new Date(`${dto.periodEnd}T00:00:00.000Z`),
         openingBalance: dto.openingBalance, closingBalance: dto.closingBalance, createdById: actorId ?? null,
         lines: { create: dto.lines.map((l) => ({ lineDate: new Date(`${l.date}T00:00:00.000Z`), description: l.description.trim() || 'Statement line', reference: l.reference?.trim() || null, amount: l.amount })) },
@@ -92,7 +97,7 @@ export class ReconciliationService {
     const from = new Date(st.periodStart.getTime() - WINDOW_DAYS * DAY_MS);
     const to = new Date(st.periodEnd.getTime() + (WINDOW_DAYS + 1) * DAY_MS);
     const [candidates, entries] = await Promise.all([
-      this.cashEntries(mamcosId, from, to, true),
+      this.cashEntries(mamcosId, from, to, true, st.cashAccountId),
       this.prisma.ledgerEntry.findMany({ where: { id: { in: st.lines.map((l) => l.ledgerEntryId).filter((x): x is string => !!x) } }, select: { id: true, entryNumber: true, entryDate: true, description: true } }),
     ]);
     const sum = st.lines.reduce((n, l) => n + cents(l.amount), 0);
@@ -118,7 +123,7 @@ export class ReconciliationService {
     this.assertDraft(st);
     const from = new Date(st.periodStart.getTime() - WINDOW_DAYS * DAY_MS);
     const to = new Date(st.periodEnd.getTime() + (WINDOW_DAYS + 1) * DAY_MS);
-    const pool = (await this.cashEntries(mamcosId, from, to, true)).map((e) => ({ ...e, cents: cents(e.amount), t: new Date(`${e.date}T00:00:00.000Z`).getTime(), taken: false }));
+    const pool = (await this.cashEntries(mamcosId, from, to, true, st.cashAccountId)).map((e) => ({ ...e, cents: cents(e.amount), t: new Date(`${e.date}T00:00:00.000Z`).getTime(), taken: false }));
     const pairs: { lineId: string; entryId: string }[] = [];
     for (const line of st.lines.filter((l) => !l.ledgerEntryId)) {
       const t = line.lineDate.getTime();
@@ -142,6 +147,7 @@ export class ReconciliationService {
     const entry = await this.prisma.ledgerEntry.findFirst({ where: { id: ledgerEntryId, mamcosId, account: { code: CASH } }, include: { bankLine: true } });
     if (!entry) throw new NotFoundException('That is not a cash-book entry of this cooperative.');
     if (entry.bankLine) throw new ConflictException('That cash-book entry is already matched to another statement line.');
+    if (line.statement.cashAccountId && entry.cashAccountId !== line.statement.cashAccountId) throw new BadRequestException('That entry went through a different money account.');
     if (cents(entry.debit - entry.credit) !== cents(line.amount)) throw new BadRequestException('The amounts differ, so these cannot be the same transaction.');
     await this.prisma.bankStatementLine.update({ where: { id: lineId }, data: { ledgerEntryId, matchedAt: new Date(), matchedById: actorId ?? null } });
     return this.detail(line.statementId, scope);
@@ -171,8 +177,8 @@ export class ReconciliationService {
     const journal = await this.accounting.createJournalEntry({
       entryDate: ymd(line.lineDate), description: text,
       lines: moneyIn
-        ? [{ accountId: cash.id, debit: amount }, { accountId: dto.accountId, credit: amount }]
-        : [{ accountId: dto.accountId, debit: amount }, { accountId: cash.id, credit: amount }],
+        ? [{ accountId: cash.id, debit: amount, cashAccountId: line.statement.cashAccountId ?? undefined }, { accountId: dto.accountId, credit: amount }]
+        : [{ accountId: dto.accountId, debit: amount }, { accountId: cash.id, credit: amount, cashAccountId: line.statement.cashAccountId ?? undefined }],
     }, { mamcosId }, actorId);
     const cashRow = await this.prisma.ledgerEntry.findFirst({ where: { journalId: journal!.id, accountId: cash.id } });
     await this.prisma.bankStatementLine.update({ where: { id: lineId }, data: { ledgerEntryId: cashRow!.id, matchedAt: new Date(), matchedById: actorId ?? null } });
@@ -221,7 +227,21 @@ export class ReconciliationService {
     const unmatchedLedgerNet = round2(unmatchedLedger.reduce((n, e) => n + e.amount, 0));
     const unmatchedLinesNet = round2(statements.flatMap((s) => s.lines).filter((l) => !l.ledgerEntryId).reduce((n, l) => n + Number(l.amount), 0));
     const difference = round2(ledgerBalance - unmatchedLedgerNet + unmatchedLinesNet - statementsTotal);
+    // Each money account against its own latest statement.
+    const accounts = await this.prisma.cashAccount.findMany({ where: { mamcosId, isActive: true }, orderBy: [{ kind: 'asc' }, { name: 'asc' }] });
+    const byAccount = await Promise.all(accounts.map(async (a) => {
+      const sums = await this.prisma.ledgerEntry.aggregate({ where: { mamcosId, cashAccountId: a.id, entryDate: { lte: end } }, _sum: { debit: true, credit: true } });
+      const books = round2((sums._sum.debit ?? 0) - (sums._sum.credit ?? 0));
+      const mine = statements.filter((s) => s.cashAccountId === a.id);
+      const last = mine[mine.length - 1];
+      if (!last) return { id: a.id, name: a.name, kind: a.kind, books, statement: null as number | null, status: null as string | null, periodEnd: null as string | null, difference: null as number | null };
+      const since = new Date(Math.min(...mine.map((s) => s.periodStart.getTime())));
+      const open = (await this.cashEntries(mamcosId, since, end, true, a.id)).reduce((n, e) => n + e.amount, 0);
+      const unmatchedLines = mine.flatMap((s) => s.lines).filter((l) => !l.ledgerEntryId).reduce((n, l) => n + Number(l.amount), 0);
+      return { id: a.id, name: a.name, kind: a.kind, books, statement: Number(last.closingBalance), status: last.status as string, periodEnd: ymd(last.periodEnd), difference: round2(books - open + unmatchedLines - Number(last.closingBalance)) };
+    }));
     return {
+      byAccount,
       asOf: day, ledgerBalance, statementsTotal, unmatchedLedgerNet, unmatchedLinesNet, difference,
       reconciled: statements.length > 0 && Math.abs(difference) < 0.005,
       hasStatements: statements.length > 0,

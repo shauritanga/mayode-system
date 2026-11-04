@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import Modal from '@/components/Modal';
+import { MoneyAccountSelect } from '@/screens/dashboard/accounting/controls';
 import { payrollApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import {
@@ -160,6 +161,7 @@ function EditLineModal({ runId, line, onClose, onSaved }: { runId: string; line:
 
 function PostModal({ run, onClose, onPosted }: { run: any; onClose: () => void; onPosted: (m: string) => void }) {
   const [method, setMethod] = useState('MOBILE_MONEY');
+  const [cashAccountId, setCashAccountId] = useState('');
   const [paidOn, setPaidOn] = useState(todayISO());
   const [notify, setNotify] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -167,7 +169,7 @@ function PostModal({ run, onClose, onPosted }: { run: any; onClose: () => void; 
   const post = async () => {
     setSaving(true); setError('');
     try {
-      const res = await payrollApi.post(run.id, { payMethod: method, paidOn, notify });
+      const res = await payrollApi.post(run.id, { payMethod: method, cashAccountId: cashAccountId || undefined, paidOn, notify });
       const n = res.data.notified;
       onPosted(`Pay run for ${monthLabel(run.period)} posted.${n ? ` ${n.sent} text message(s) sent${n.failed ? `, ${n.failed} failed` : ''}.` : ''}`);
     } catch (e) { setError(errMsg(e)); setSaving(false); }
@@ -178,7 +180,8 @@ function PostModal({ run, onClose, onPosted }: { run: any; onClose: () => void; 
       <div style={{ display: 'grid', gap: 12, fontSize: 14 }}>
         <div>This records that <strong>{tzs(run.totalNet)}</strong> was paid to {run.lines.length} {run.lines.length === 1 ? 'person' : 'people'} and adds <strong>{tzs(run.totalGross)}</strong> of salaries to your accounts{run.totalDeductions > 0 ? `, with ${tzs(run.totalDeductions)} of deductions held until you pay them on` : ''}. <strong>It cannot be changed afterwards.</strong></div>
         <FormGrid>
-          <Field label="Paid by"><select className="input-field" value={method} onChange={(e) => setMethod(e.target.value)}>{METHODS.map((m) => <option key={m} value={m}>{titleCase(m)}</option>)}</select></Field>
+          <Field label="Paid by"><select className="input-field" value={method} onChange={(e) => { setMethod(e.target.value); setCashAccountId(''); }}>{METHODS.map((m) => <option key={m} value={m}>{titleCase(m)}</option>)}</select></Field>
+          <div style={{ gridColumn: '1 / -1' }}><MoneyAccountSelect label="Paid from" value={cashAccountId} onChange={setCashAccountId} defaultKind={method as 'CASH' | 'BANK' | 'MOBILE_MONEY'} hint="Choose the account the salaries were paid out of." /></div>
           <Field label="Date paid"><input className="input-field" type="date" max={todayISO()} value={paidOn} onChange={(e) => setPaidOn(e.target.value)} /></Field>
         </FormGrid>
         <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} /> Text each person that their salary was paid</label>
