@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useState } from 'react';
+import Link from 'next/link';
 import Modal from '@/components/Modal';
 import { irrigationApi, machineryApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
@@ -142,7 +143,7 @@ function EquipmentModal({ item, rates, onClose, onSaved }: { item?: any; rates: 
               <option value="">Choose…</option>
               {(types.data ?? []).filter((t: any) => t.isActive || t.id === item?.typeId).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
-            {types.data && types.data.length === 0 && <a href="/dashboard/amcos-settings" style={{ fontSize: 12 }}>Add machine types in Settings →</a>}
+            {types.data && types.data.length === 0 && <Link href="/dashboard/amcos-settings" style={{ fontSize: 12 }}>Add machine types in Settings →</Link>}
           </Field>
           <Field label="Registration / serial no."><input className="input-field" value={form.registrationNo} onChange={(e) => set('registrationNo', e.target.value)} /></Field>
           <Field label="Owned by" hint={editing ? 'Cannot be changed after the machine has been used' : undefined}>
@@ -306,7 +307,7 @@ function Equipment({ canWrite }: { canWrite: boolean }) {
       <section className="table-panel" style={{ marginBottom: 16 }}>
         <div className="section-toolbar">
           <strong>Standard rates</strong>
-          <a className="btn-secondary" href="/dashboard/amcos-settings">Change in Settings</a>
+          <Link className="btn-secondary" href="/dashboard/amcos-settings">Change in Settings</Link>
         </div>
         <div className="metric-grid" style={{ padding: 16 }}>
           <StatCard label="Registration fee (tools owned by others)" value={rates.data?.toolRegistrationFee ? tzs(rates.data.toolRegistrationFee) : 'Not set'} hint="Paid once when the tool is registered" />
