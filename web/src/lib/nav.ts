@@ -2,6 +2,7 @@ import { APP_MODE } from './app-mode';
 import { PORTAL_SECTIONS } from './portal-routes';
 import {
   Home01Icon,
+  Settings01Icon,
   UserGroupIcon,
   Plant01Icon,
   ClipboardIcon,
@@ -139,7 +140,7 @@ export const navGroups: NavGroup[] = [
   {
     label: 'Settings',
     items: [
-      { href: '/dashboard/amcos-settings', label: 'Settings', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'amcos_settings' },
+      { href: '/dashboard/amcos-settings', label: 'Settings', icon: Settings01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'amcos_settings' },
     ],
   },
   {
