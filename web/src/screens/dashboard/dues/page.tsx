@@ -476,7 +476,7 @@ function Statement({ farmerId, onClose }: { farmerId: string; onClose: () => voi
   );
 }
 
-function Arrears({ can }: { can: (r: string, a: string) => boolean }) {
+function Debts({ can }: { can: (r: string, a: string) => boolean }) {
   const [category, setCategory] = useState('');
   const { data, loading, error, reload } = useApi<any>(() => duesApi.arrears({ category: category || undefined }), [category]);
   const [statement, setStatement] = useState<string | null>(null);
@@ -491,22 +491,22 @@ function Arrears({ can }: { can: (r: string, a: string) => boolean }) {
       {message && <Notice tone="success" onDismiss={() => setMessage('')}>{message}</Notice>}
       <LoadError message={error} onRetry={reload} />
       <div className="metric-grid" style={{ marginBottom: 12 }}>
-        <StatCard label="Farmers who owe" value={data ? String(data.farmers) : '—'} />
-        <StatCard label="Total owed" value={data ? tzs(data.outstanding) : '—'} />
-        <StatCard label="Of which overdue" value={data ? tzs(data.overdue) : '—'} tone={data?.overdue ? 'warn' : undefined} />
+        <StatCard label="Farmers with debts" value={data ? String(data.farmers) : '—'} />
+        <StatCard label="Total debts" value={data ? tzs(data.outstanding) : '—'} />
+        <StatCard label="Overdue debts" value={data ? tzs(data.overdue) : '—'} tone={data?.overdue ? 'warn' : undefined} />
       </div>
       <section className="table-panel">
         <div className="section-toolbar">
-          <strong>Farmers who still owe</strong>
+          <strong>Farmers with debts</strong>
           <span style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <select className="input-field" style={{ width: 'auto' }} value={category} onChange={(e) => { setCategory(e.target.value); setSelected(new Set()); }} aria-label="Kind"><option value="">All kinds</option>{Object.entries(CATEGORY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
             {can('communication', 'CREATE') && <button type="button" className="btn-primary" style={{ whiteSpace: 'nowrap' }} disabled={!selected.size} onClick={() => setReminding(true)}>{selected.size ? `Remind ${selected.size} by SMS` : 'Remind by SMS'}</button>}
           </span>
         </div>
-        {loading && !data ? <TableSkeleton cols={6} /> : !items.length ? <Empty title="Nobody owes anything" hint="Farmers with an unpaid balance are listed here, most overdue first." /> : (
+        {loading && !data ? <TableSkeleton cols={6} /> : !items.length ? <Empty title="No debts" hint="Farmers with an unpaid debt are listed here, the most overdue first." /> : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
-              <thead><tr>{can('communication', 'CREATE') && <th><input type="checkbox" checked={allOn} onChange={() => setSelected(allOn ? new Set() : new Set(items.map((i) => i.farmer.id)))} aria-label="Select all" /></th>}<th>Farmer</th><th>Phone</th><th className="num">Charges</th><th className="num">Owes</th><th className="num">Overdue</th><th /></tr></thead>
+              <thead><tr>{can('communication', 'CREATE') && <th><input type="checkbox" checked={allOn} onChange={() => setSelected(allOn ? new Set() : new Set(items.map((i) => i.farmer.id)))} aria-label="Select all" /></th>}<th>Farmer</th><th>Phone</th><th className="num">Charges</th><th className="num">Debt</th><th className="num">Overdue</th><th /></tr></thead>
               <tbody>
                 {items.map((i) => (
                   <tr key={i.farmer.id}>
@@ -539,17 +539,17 @@ function Arrears({ can }: { can: (r: string, a: string) => boolean }) {
 export default function DuesPage() {
   const user = useAuthStore((s) => s.user);
   const can = useCan();
-  const [tab, setTab] = useState<'dues' | 'charges' | 'arrears'>('dues');
+  const [tab, setTab] = useState<'dues' | 'charges' | 'debts'>('dues');
   if (!user?.mamcosId) {
     return <><PageHeader title="AMCOS Charges" /><Empty title="AMCOS charges belong to an AMCOS" hint="Sign in with an AMCOS account to see what its farmers owe." /></>;
   }
   return (
     <div>
       <PageHeader title="AMCOS Charges" subtitle="Levies, membership and canal cleaning fees, and fertiliser repayments: what each farmer owes, what they have paid, and who is behind." />
-      <Tabs tabs={[{ id: 'dues', label: 'Dues & payments' }, { id: 'charges', label: 'Charges' }, { id: 'arrears', label: 'Arrears' }]} active={tab} onChange={setTab} />
+      <Tabs tabs={[{ id: 'dues', label: 'Dues & payments' }, { id: 'charges', label: 'Charges' }, { id: 'debts', label: 'Debts' }]} active={tab} onChange={setTab} />
       {tab === 'dues' && <Dues can={can} />}
       {tab === 'charges' && <Charges can={can} />}
-      {tab === 'arrears' && <Arrears can={can} />}
+      {tab === 'debts' && <Debts can={can} />}
     </div>
   );
 }
