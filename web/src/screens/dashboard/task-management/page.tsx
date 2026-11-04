@@ -137,7 +137,7 @@ function EquipmentModal({ item, rates, onClose, onSaved }: { item?: any; rates: 
       <form id="equipment-form" onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
         <FormGrid>
           <Field label="Name *" error={errors.name}><input className="input-field" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Tractor MF-385" /></Field>
-          <Field label="Type *" error={errors.typeId} hint={types.data && types.data.length === 0 ? 'Add the kinds of machine your AMCOS has in Charges & Settings first.' : undefined}>
+          <Field label="Type *" error={errors.typeId} hint={types.data && types.data.length === 0 ? 'Add the kinds of machine your AMCOS has in Settings first.' : undefined}>
             <select className="input-field" value={form.typeId} onChange={(e) => set('typeId', e.target.value)}>
               <option value="">Choose…</option>
               {(types.data ?? []).filter((t: any) => t.isActive || t.id === item?.typeId).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}

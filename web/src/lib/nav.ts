@@ -137,9 +137,9 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Charges & Settings',
+    label: 'Settings',
     items: [
-      { href: '/dashboard/amcos-settings', label: 'Charges & Settings', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'amcos_settings' },
+      { href: '/dashboard/amcos-settings', label: 'Settings', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'amcos_settings' },
     ],
   },
   {

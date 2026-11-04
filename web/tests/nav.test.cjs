@@ -317,11 +317,12 @@ test('Payroll follows its own grant and exists only in the AMCOS portal', () => 
   assert.equal(loadNavigation('admin').isPathAllowed('/dashboard/payroll', { role: 'SUPER_ADMIN' }), false);
 });
 
-test('Charges & Settings follows its own grant and exists only in the AMCOS portal', () => {
+test('AMCOS Settings follows its own grant and exists only in the AMCOS portal', () => {
   const user = { role: 'CUSTOM', roleId: 'r', mamcosId: 'm1', permissions: [{ resource: 'amcos_settings', action: 'VIEW' }] };
   const coop = loadNavigation('cooperatives');
   assert.ok(coop.getVisibleGroups(user).flatMap((g) => g.items.map((i) => i.href)).includes('/dashboard/amcos-settings'));
   assert.equal(coop.isPathAllowed('/dashboard/amcos-settings', user), true);
   assert.equal(coop.isPathAllowed('/dashboard/amcos-settings', { ...user, permissions: [{ resource: 'payroll', action: 'VIEW' }] }), false);
+  assert.equal(coop.isPathAllowed('/dashboard/amcos-settings/membership-levies', user), true);
   assert.equal(loadNavigation('admin').isPathAllowed('/dashboard/amcos-settings', { role: 'SUPER_ADMIN' }), false);
 });

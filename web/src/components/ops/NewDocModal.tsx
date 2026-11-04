@@ -134,7 +134,7 @@ export default function NewDocModal({ kind, existing, fromQuotation, onClose, on
           <button type="button" className="btn-secondary" onClick={() => setLines((ls) => [...ls, emptyLine()])}>+ Add product</button>
           <div style={{ textAlign: 'right', fontSize: 13 }}>
             <div>Subtotal {tzs(totals.sub)} · Discount − {tzs(totals.disc)} · Tax {tzs(totals.tax)}</div>
-            {totals.fee > 0 && <div className="muted" style={{ fontSize: 12 }}>Includes a delivery fee of {tzs(totals.fee)} (set in Charges &amp; Settings)</div>}
+            {totals.fee > 0 && <div className="muted" style={{ fontSize: 12 }}>Includes a delivery fee of {tzs(totals.fee)} (set in Settings)</div>}
             <div style={{ fontSize: 16, fontWeight: 700 }}>Total {tzs(totals.total)}</div>
           </div>
         </div>
