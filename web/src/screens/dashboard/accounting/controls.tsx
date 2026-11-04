@@ -368,6 +368,7 @@ export function DocumentsView({ kind, canCreate, canEdit }: { kind: 'invoice' | 
   const supplierChoices = (suppliers.data ?? []).filter((x: any) => x.isActive);
   const [open, setOpen] = useState(false);
   const [paying, setPaying] = useState<any>(null);
+  const [voiding, setVoiding] = useState<any>(null);
   const [payAccount, setPayAccount] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -403,11 +404,13 @@ export function DocumentsView({ kind, canCreate, canEdit }: { kind: 'invoice' | 
             <td>{x.status === 'OVERDUE' ? <Badge tone="bad">Overdue</Badge> : <Badge tone="muted">Open</Badge>}</td>
             <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{x.source === 'ORDERS' ? <a className="btn-secondary" href="/dashboard/ops-orders">Take payment in Orders &amp; Sales</a> : canEdit && <>
               <button type="button" className="btn-secondary" onClick={() => setPaying(x)}>{isBill ? 'Mark paid' : 'Mark received'}</button>{' '}
-              <details style={{ display: 'inline-block', position: 'relative' }}><summary className="btn-secondary" style={{ cursor: 'pointer', listStyle: 'none' }} aria-label="More actions">⋯</summary>
-                <div style={{ position: 'absolute', right: 0, zIndex: 5, marginTop: 4 }}><button type="button" className="btn-secondary" style={{ color: 'var(--red-400)' }} onClick={() => { if (window.confirm('Void this document? Its ledger postings are offset, not deleted.')) void run(() => (isBill ? accountingApi.voidBill(x.id) : accountingApi.voidInvoice(x.id))); }}>Void</button></div>
-              </details></>}</td></tr>)}
+              <button type="button" className="btn-secondary" style={{ color: 'var(--red-400)' }} onClick={() => setVoiding(x)}>Void</button></>}</td></tr>)}
         </tbody></table></div>}
     </section>
+    {voiding && <Modal title={`Void ${isBill ? voiding.billNumber : voiding.invoiceNumber}?`} subtitle={`${tzs(voiding.amount)}${isBill ? ` · ${voiding.supplier}` : ''}`} onClose={() => setVoiding(null)} width="460px"
+      footer={<><button type="button" className="btn-secondary" onClick={() => setVoiding(null)}>Keep it</button><button type="button" className="btn-primary" style={{ background: 'var(--red-500, #dc2626)' }} onClick={() => { const target = voiding; setVoiding(null); void run(() => (isBill ? accountingApi.voidBill(target.id) : accountingApi.voidInvoice(target.id))); }}>Void {isBill ? 'bill' : 'invoice'}</button></>}>
+      <p style={{ margin: 0, fontSize: 14 }}>The {isBill ? 'bill' : 'invoice'} is cancelled and no longer counts as {isBill ? 'owed to the supplier' : 'owed to you'}. Its entries in the books are offset by opposite entries, not deleted, so the history stays.</p>
+    </Modal>}
     {paying && <Modal title={isBill ? `Pay ${paying.billNumber}` : `Receive payment for ${paying.invoiceNumber}`} subtitle={`${tzs(paying.amount)}${isBill ? ` to ${paying.supplier}` : ''}`} onClose={() => setPaying(null)} width="480px"
       footer={<><button type="button" className="btn-secondary" onClick={() => setPaying(null)}>Cancel</button><button type="button" className="btn-primary" onClick={() => { const target = paying; setPaying(null); void run(() => (isBill ? accountingApi.payBill(target.id, payAccount || undefined) : accountingApi.payInvoice(target.id, payAccount || undefined))); }}>{isBill ? 'Mark as paid' : 'Mark as received'}</button></>}>
       <MoneyAccountSelect label={isBill ? 'Paid from' : 'Received into'} value={payAccount} onChange={setPayAccount} defaultKind="BANK" />
