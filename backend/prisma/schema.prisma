@@ -319,6 +319,7 @@ model Mamcos {
   communications        Communication[]
   ledgerEntries         LedgerEntry[]
   charges               AmcosCharge[]
+  equipmentTypes        AmcosEquipmentType[]
   accountingLock        AccountingLock?
   bankStatements        BankStatement[]
   cashTransactions      CashTransaction[]
@@ -5076,7 +5077,9 @@ model AmcosEquipment {
   id                    String             @id @default(uuid())
   mamcosId              String             @map("mamcos_id")
   name                  String
+  /// Legacy fixed kind, kept so older records and reports still read; the AMCOS's own list (typeRef) is what screens show.
   type                  EquipmentType
+  typeId                String?            @map("type_id")
   registrationNo        String?            @map("registration_no")
   ownership             EquipmentOwnership @default(AMCOS)
   ownerName             String?            @map("owner_name")
@@ -5094,6 +5097,7 @@ model AmcosEquipment {
   updatedAt             DateTime           @updatedAt @map("updated_at")
 
   mamcos     Mamcos              @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  typeRef    AmcosEquipmentType? @relation(fields: [typeId], references: [id], onDelete: Restrict)
   activities MachineryActivity[]
   asset      Asset?
 
@@ -5639,4 +5643,20 @@ model AmcosCharge {
 
   @@unique([mamcosId, code])
   @@map("amcos_charges")
+}
+
+/// A kind of machine or tool the AMCOS has (tractor, thresher, water pump…), kept in its Settings.
+model AmcosEquipmentType {
+  id          String   @id @default(uuid())
+  mamcosId    String   @map("mamcos_id")
+  name        String
+  isActive    Boolean  @default(true) @map("is_active")
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  mamcos    Mamcos          @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  equipment AmcosEquipment[]
+
+  @@map("amcos_equipment_types")
 }

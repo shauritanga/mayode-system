@@ -57,6 +57,60 @@ function Card({ title, subtitle, children, action }: { title: string; subtitle: 
   );
 }
 
+
+const COMMON_MACHINES = ['Tractor', 'Power tiller', 'Combine harvester', 'Thresher', 'Transplanter', 'Sprayer', 'Truck', 'Water pump'];
+
+/** The kinds of machine this AMCOS has. Tools & Equipment offers exactly this list when a machine is registered. */
+function MachineTypes({ types, canEdit, onChanged }: { types: any[]; canEdit: boolean; onChanged: (message: string) => void }) {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  const run = async (fn: () => Promise<unknown>, message: string) => {
+    setBusy(true); setError('');
+    try { await fn(); setName(''); setRenaming(null); onChanged(message); } catch (e) { setError(errMsg(e, 'Could not save.')); } finally { setBusy(false); }
+  };
+  const have = new Set(types.filter((t) => t.isActive).map((t) => t.name.toLowerCase()));
+  const suggestions = COMMON_MACHINES.filter((m) => !have.has(m.toLowerCase()));
+  return (
+    <Card title="Machines & tools" subtitle="The kinds of machine your AMCOS has. When someone registers a machine in Tools & Equipment, they choose from this list.">
+      {error && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 13, padding: '8px 16px' }}>{error}</div>}
+      {types.length === 0
+        ? <div className="muted" style={{ padding: 20 }}>No machine types yet. Add the machines your AMCOS has, for example a tractor or a thresher.</div>
+        : types.map((t) => {
+          const editing = renaming?.id === t.id ? renaming : null;
+          return (
+          <div key={t.id} style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderTop: '1px solid var(--neutral-100)', opacity: t.isActive ? 1 : 0.55 }}>
+            {editing
+              ? <input className="input-field" style={{ maxWidth: 260 }} autoFocus value={editing.name} onChange={(e) => setRenaming({ id: t.id, name: e.target.value })} aria-label="Machine type name" />
+              : <div><strong>{t.name}</strong> <span className="muted" style={{ fontSize: 12 }}>· {t.machines} {t.machines === 1 ? 'machine' : 'machines'}{t.isActive ? '' : ' · switched off'}</span></div>}
+            {canEdit && <span style={{ display: 'flex', gap: 8 }}>
+              {editing
+                ? <><button type="button" className="btn-secondary" onClick={() => setRenaming(null)}>Cancel</button><button type="button" className="btn-primary" disabled={busy || editing.name.trim().length < 2} onClick={() => void run(() => machineryApi.updateType(t.id, { name: editing.name }), 'Name saved.')}>Save</button></>
+                : <><button type="button" className="btn-secondary" onClick={() => setRenaming({ id: t.id, name: t.name })}>Rename</button>
+                  <button type="button" className="btn-secondary" disabled={busy} onClick={() => void run(() => machineryApi.updateType(t.id, { isActive: !t.isActive }), t.isActive ? `${t.name} switched off. Existing machines keep it.` : `${t.name} switched on.`)}>{t.isActive ? 'Switch off' : 'Switch on'}</button></>}
+            </span>}
+          </div>
+          );
+        })}
+      {canEdit && (
+        <div style={{ padding: 16, borderTop: '1px solid var(--neutral-100)', display: 'grid', gap: 10 }}>
+          <form style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} onSubmit={(e) => { e.preventDefault(); if (name.trim().length >= 2) void run(() => machineryApi.createType(name), `${name.trim()} added.`); }}>
+            <input className="input-field" style={{ maxWidth: 280 }} placeholder="Add a type, e.g. Water pump" value={name} onChange={(e) => setName(e.target.value)} aria-label="New machine type" />
+            <button type="submit" className="btn-primary" disabled={busy || name.trim().length < 2}>Add</button>
+          </form>
+          {suggestions.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="muted" style={{ fontSize: 12 }}>Common machines:</span>
+              {suggestions.map((m) => <button key={m} type="button" className="btn-secondary" style={{ padding: '2px 10px', fontSize: 12 }} disabled={busy} onClick={() => void run(() => machineryApi.createType(m), `${m} added.`)}>+ {m}</button>)}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function NewLevyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (m: string) => void }) {
   const [f, setF] = useState({ name: '', category: 'LEVY', basis: 'FLAT', rate: '', season: '' });
   const [busy, setBusy] = useState(false);
@@ -87,6 +141,7 @@ export default function AmcosSettingsPage() {
   const [adding, setAdding] = useState(false);
   const types = useApi<any[]>(() => duesApi.types({ includeInactive: 'true' }), []);
   const rates = useApi<any>(() => machineryApi.rates(), []);
+  const machineTypes = useApi<any[]>(() => machineryApi.types({ includeInactive: 'true' }), []);
   const charges = useApi<any[]>(() => chargesApi.list(), []);
   const tax = useApi<any>(() => accountingApi.taxSettings(), []);
   const canCharges = can('amcos_settings', 'EDIT');
@@ -96,7 +151,7 @@ export default function AmcosSettingsPage() {
   const byCode = (code: string) => (charges.data ?? []).find((c) => c.code === code);
   const done = (m: string) => setMessage(m);
   const loading = types.loading || rates.loading || charges.loading || tax.loading;
-  const error = types.error || rates.error || charges.error || tax.error;
+  const error = types.error || rates.error || charges.error || tax.error || machineTypes.error;
 
   const saveCharge = (code: string, label: string, extra: object = {}) => async (v: { amount: number | null; active: boolean }) => {
     await chargesApi.update(code, { amount: v.amount ?? 0, isActive: v.active, ...extra });
@@ -110,7 +165,7 @@ export default function AmcosSettingsPage() {
     <>
       <PageHeader title="Charges & Settings" subtitle="Set every charge your AMCOS makes, once. Dues, tools, orders and the warehouse all take their amounts from here." />
       {message && <Notice tone="success" onDismiss={() => setMessage('')}>{message}</Notice>}
-      <LoadError message={error} onRetry={() => { types.reload(); rates.reload(); charges.reload(); tax.reload(); }} />
+      <LoadError message={error} onRetry={() => { types.reload(); rates.reload(); charges.reload(); tax.reload(); machineTypes.reload(); }} />
       {!canCharges && <p className="muted" style={{ marginTop: 0 }}>You can see these amounts but not change them.</p>}
 
       <Card title="Membership & levies" subtitle="Charged to your farmers from the Dues page. A new amount applies to farmers charged from now on; what was already charged does not change."
@@ -123,6 +178,8 @@ export default function AmcosSettingsPage() {
               onSave={async (v) => { await duesApi.updateType(t.id, { rate: v.amount ?? undefined, isActive: v.active }); done(`${t.name} saved. It applies to farmers charged from now on.`); types.reload(); }} />
           ))}
       </Card>
+
+      <MachineTypes types={machineTypes.data ?? []} canEdit={canTools} onChanged={(m) => { done(m); machineTypes.reload(); }} />
 
       <Card title="Tool fees" subtitle="For machines and tools registered with your AMCOS. A tool can still have its own rate; this is the standard.">
         <ChargeRow key={`reg-${rates.data?.toolRegistrationFee}`} name="Registration fee" how="Paid once by the owner of a tool that is not the AMCOS's" usedIn="Tools & Equipment → registering a tool" unit="TZS once"

@@ -984,6 +984,9 @@ export const machineryApi = {
   updateActivity: (id: string, data: object) => api.patch(`/machinery/activities/${id}`, data),
   feePaid: (id: string, paidOn?: string) => api.post(`/machinery/activities/${id}/fee-paid`, { paidOn }),
   registrationFeePaid: (id: string, paidOn?: string) => api.post(`/machinery/equipment/${id}/registration-fee-paid`, { paidOn }),
+  types: (params?: object) => api.get('/machinery/equipment-types', { params }),
+  createType: (name: string) => api.post('/machinery/equipment-types', { name }),
+  updateType: (id: string, data: object) => api.patch(`/machinery/equipment-types/${id}`, data),
   rates: () => api.get('/machinery/rates'),
   updateRates: (data: object) => api.patch('/machinery/rates', data),
 };

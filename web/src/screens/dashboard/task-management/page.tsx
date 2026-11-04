@@ -11,7 +11,6 @@ import {
 } from '@/screens/dashboard/irrigation/ui';
 
 const ACTIVITY_TYPES = ['PLOUGHING', 'HARROWING', 'LEVELLING', 'TRANSPLANTING', 'SPRAYING', 'HARVESTING', 'THRESHING', 'TRANSPORT', 'OTHER'];
-const EQUIPMENT_TYPES = ['TRACTOR', 'POWER_TILLER', 'COMBINE_HARVESTER', 'THRESHER', 'TRANSPLANTER', 'SPRAYER', 'TRUCK', 'OTHER'];
 const STATUSES = ['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 const FEE_LABEL: Record<string, string> = { NOT_APPLICABLE: 'No fee', PENDING: 'Due', PAID: 'Paid' };
@@ -92,8 +91,9 @@ function ActivityModal({ activity, equipment, blocks, onClose, onSaved }: { acti
 
 function EquipmentModal({ item, rates, onClose, onSaved }: { item?: any; rates: any; onClose: () => void; onSaved: (m: string) => void }) {
   const editing = !!item;
+  const types = useApi<any[]>(() => machineryApi.types({ includeInactive: 'true' }), []);
   const [form, setForm] = useState({
-    name: item?.name ?? '', type: item?.type ?? 'TRACTOR', registrationNo: item?.registrationNo ?? '', ownership: item?.ownership ?? 'AMCOS',
+    name: item?.name ?? '', typeId: item?.typeId ?? '', registrationNo: item?.registrationNo ?? '', ownership: item?.ownership ?? 'AMCOS',
     ownerName: item?.ownerName ?? '', ownerPhone: item?.ownerPhone ?? '', feePerHectare: item?.feePerHectare == null ? '' : String(item.feePerHectare), registrationFee: '',
     isActive: item?.isActive ?? true, notes: item?.notes ?? '',
   });
@@ -106,6 +106,7 @@ function EquipmentModal({ item, rates, onClose, onSaved }: { item?: any; rates: 
   const save = async () => {
     const found: Record<string, string> = {};
     if (!form.name.trim()) found.name = 'Give the machine a name';
+    if (!form.typeId) found.typeId = 'Choose the type of machine';
     if (external && !form.ownerName.trim()) found.ownerName = 'Who owns this machine?';
     if (form.feePerHectare !== '' && !(Number(form.feePerHectare) >= 0)) found.feePerHectare = 'Enter zero or more';
     if (form.registrationFee !== '' && !(Number(form.registrationFee) >= 0)) found.registrationFee = 'Enter zero or more';
@@ -115,13 +116,13 @@ function EquipmentModal({ item, rates, onClose, onSaved }: { item?: any; rates: 
     try {
       if (editing) {
         await machineryApi.updateEquipment(item.id, {
-          name: form.name.trim(), type: form.type, registrationNo: form.registrationNo.trim(), isActive: form.isActive, notes: form.notes.trim(),
+          name: form.name.trim(), typeId: form.typeId, registrationNo: form.registrationNo.trim(), isActive: form.isActive, notes: form.notes.trim(),
           ...(external ? { ownerName: form.ownerName.trim(), ownerPhone: form.ownerPhone.trim() } : {}),
           ...(form.feePerHectare !== '' ? { feePerHectare: Number(form.feePerHectare) } : {}),
         });
       } else {
         await machineryApi.createEquipment({
-          name: form.name.trim(), type: form.type, ownership: form.ownership, registrationNo: form.registrationNo.trim() || undefined, notes: form.notes.trim() || undefined,
+          name: form.name.trim(), typeId: form.typeId, ownership: form.ownership, registrationNo: form.registrationNo.trim() || undefined, notes: form.notes.trim() || undefined,
           feePerHectare: form.feePerHectare === '' ? undefined : Number(form.feePerHectare),
           ...(external ? { ownerName: form.ownerName.trim(), ownerPhone: form.ownerPhone.trim() || undefined, registrationFee: form.registrationFee === '' ? undefined : Number(form.registrationFee) } : {}),
         });
@@ -136,7 +137,13 @@ function EquipmentModal({ item, rates, onClose, onSaved }: { item?: any; rates: 
       <form id="equipment-form" onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
         <FormGrid>
           <Field label="Name *" error={errors.name}><input className="input-field" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Tractor MF-385" /></Field>
-          <Field label="Type"><select className="input-field" value={form.type} onChange={(e) => set('type', e.target.value)}>{EQUIPMENT_TYPES.map((t) => <option key={t} value={t}>{titleCase(t)}</option>)}</select></Field>
+          <Field label="Type *" error={errors.typeId} hint={types.data && types.data.length === 0 ? 'Add the kinds of machine your AMCOS has in Charges & Settings first.' : undefined}>
+            <select className="input-field" value={form.typeId} onChange={(e) => set('typeId', e.target.value)}>
+              <option value="">Choose…</option>
+              {(types.data ?? []).filter((t: any) => t.isActive || t.id === item?.typeId).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            {types.data && types.data.length === 0 && <a href="/dashboard/amcos-settings" style={{ fontSize: 12 }}>Add machine types in Settings →</a>}
+          </Field>
           <Field label="Registration / serial no."><input className="input-field" value={form.registrationNo} onChange={(e) => set('registrationNo', e.target.value)} /></Field>
           <Field label="Owned by" hint={editing ? 'Cannot be changed after the machine has been used' : undefined}>
             <select className="input-field" value={form.ownership} onChange={(e) => set('ownership', e.target.value)} disabled={editing}>
@@ -326,7 +333,7 @@ function Equipment({ canWrite }: { canWrite: boolean }) {
                 {data.map((e) => (
                   <tr key={e.id}>
                     <td><div style={{ fontWeight: 600 }}>{e.name}</div>{e.registrationNo && <div className="muted" style={{ fontSize: 11 }}>{e.registrationNo}</div>}</td>
-                    <td>{titleCase(e.type)}</td>
+                    <td>{e.typeName ?? titleCase(e.type)}</td>
                     <td>{e.ownership === 'AMCOS' ? 'AMCOS' : <>{e.ownerName}<div className="muted" style={{ fontSize: 11 }}>{e.ownerPhone ?? 'External'}</div></>}</td>
                     <td>
                       {e.registrationFeeStatus === 'NOT_APPLICABLE' ? <span className="muted">—</span> : (

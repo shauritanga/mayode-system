@@ -239,7 +239,7 @@ describeDb('Machinery and task management (PostgreSQL)', () => {
   it('declares an explicit permission on every machinery route', () => {
     const proto = MachineryController.prototype as any;
     const handlers = Object.getOwnPropertyNames(proto).filter((n) => n !== 'constructor' && typeof proto[n] === 'function');
-    expect(handlers.length).toBe(10);
+    expect(handlers.length).toBe(13);
     for (const name of handlers) {
       const required = Reflect.getMetadata(PERMISSION_KEY, proto[name]);
       expect({ name, resource: required?.resource }).toEqual({ name, resource: 'machinery' });

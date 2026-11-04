@@ -1059,4 +1059,9 @@ export const SW_MESSAGES: Record<string, string> = {
   "Nothing is late beyond the grace days": "Hakuna kilichochelewa zaidi ya siku za msamaha",
   "Storage for this month has already been charged": "Ada ya kuhifadhi ya mwezi huu tayari imetozwa",
   "No farmer has stock stored with the cooperative": "Hakuna mkulima mwenye mazao yaliyohifadhiwa kwa ushirika",
+  "Give the type a name of at least two letters": "Pa aina hiyo jina lenye angalau herufi mbili",
+  "Machine type not found": "Aina ya mashine haijapatikana",
+  "Choose the type of machine": "Chagua aina ya mashine",
+  "\"{0}\" is already in your list": "\"{0}\" tayari iko kwenye orodha yako",
+  "\"{0}\" is switched off in Settings": "\"{0}\" imezimwa katika Mipangilio",
 };

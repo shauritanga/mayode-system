@@ -9,6 +9,7 @@ import type { RequestUser } from '../common/ownership.service';
 import { MachineryService } from './machinery.service';
 import {
   CreateActivityDto, CreateEquipmentDto, ListQueryDto, MarkFeePaidDto, UpdateActivityDto, UpdateEquipmentDto, UpdateRatesDto,
+  CreateEquipmentTypeDto, UpdateEquipmentTypeDto,
 } from './dto/machinery.dto';
 
 @ApiTags('machinery')
@@ -27,6 +28,12 @@ export class MachineryController {
 
   @Post('equipment/:id/registration-fee-paid') @RequirePermission('machinery', 'EDIT')
   registrationFeePaid(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: MarkFeePaidDto, @Query('mamcosId') m?: string) { return this.machinery.markRegistrationFeePaid(u, id, dto.paidOn, m); }
+  @Get('equipment-types') @RequirePermission('machinery', 'VIEW')
+  types(@CurrentUser() u: RequestUser, @Query() q: { mamcosId?: string; includeInactive?: string }) { return this.machinery.listTypes(u, q); }
+  @Post('equipment-types') @RequirePermission('machinery', 'CREATE')
+  createType(@CurrentUser() u: RequestUser, @Body() dto: CreateEquipmentTypeDto, @Query('mamcosId') m?: string) { return this.machinery.createType(u, dto, m); }
+  @Patch('equipment-types/:id') @RequirePermission('machinery', 'EDIT')
+  updateType(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: UpdateEquipmentTypeDto, @Query('mamcosId') m?: string) { return this.machinery.updateType(u, id, dto, m); }
   @Get('rates') @RequirePermission('machinery', 'VIEW')
   rates(@CurrentUser() u: RequestUser, @Query('mamcosId') m?: string) { return this.machinery.rates(u, m); }
   @Patch('rates') @RequirePermission('machinery', 'EDIT')

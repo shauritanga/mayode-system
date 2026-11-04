@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { EquipmentType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { AccountingService } from '../accounting/accounting.service';
@@ -36,6 +36,7 @@ export class MachineryService {
     const [items, totals] = await Promise.all([
       this.prisma.amcosEquipment.findMany({
         where: { mamcosId, ...(q.includeInactive === 'true' ? {} : { isActive: true }) },
+        include: { typeRef: { select: { id: true, name: true } } },
         orderBy: [{ ownership: 'asc' }, { name: 'asc' }],
       }),
       this.prisma.machineryActivity.groupBy({
@@ -45,11 +46,69 @@ export class MachineryService {
     ]);
     const used = new Map(totals.map((t) => [t.equipmentId, t]));
     const { toolFeePerHectare } = await this.rates(actor, q.mamcosId);
-    return items.map((e) => ({
-      ...e, feePerHectare: e.feePerHectare == null ? null : num(e.feePerHectare), registrationFee: num(e.registrationFee),
+    return items.map(({ typeRef, ...e }) => ({
+      ...e, typeName: typeRef?.name ?? e.type.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase()), feePerHectare: e.feePerHectare == null ? null : num(e.feePerHectare), registrationFee: num(e.registrationFee),
       effectiveFeePerHectare: e.feePerHectare == null ? toolFeePerHectare : num(e.feePerHectare),
       jobs: used.get(e.id)?._count._all ?? 0, hectaresWorked: num(used.get(e.id)?._sum.hectares), feesEarned: num(used.get(e.id)?._sum.feeAmount),
     }));
+  }
+
+
+  // ───────────────────────── machine types (kept in the AMCOS's Settings) ─────────────────────────
+
+  private static readonly STANDARD: Record<string, EquipmentType> = {
+    tractor: 'TRACTOR', 'power tiller': 'POWER_TILLER', 'combine harvester': 'COMBINE_HARVESTER', thresher: 'THRESHER',
+    transplanter: 'TRANSPLANTER', sprayer: 'SPRAYER', truck: 'TRUCK',
+  };
+  private static cleanName = (name: string) => name.trim().replace(/\s+/g, ' ');
+
+  async listTypes(actor: RequestUser, q: { mamcosId?: string; includeInactive?: string } = {}) {
+    const mamcosId = this.tenant(actor, q.mamcosId);
+    const types = await this.prisma.amcosEquipmentType.findMany({
+      where: { mamcosId, ...(q.includeInactive === 'true' ? {} : { isActive: true }) },
+      include: { _count: { select: { equipment: true } } }, orderBy: { name: 'asc' },
+    });
+    return types.map(({ _count, ...t }) => ({ ...t, machines: _count.equipment }));
+  }
+
+  async createType(actor: RequestUser, dto: { name: string }, mamcosIdParam?: string) {
+    const mamcosId = this.tenant(actor, mamcosIdParam);
+    const name = MachineryService.cleanName(dto.name);
+    if (name.length < 2) throw new BadRequestException('Give the type a name of at least two letters');
+    const existing = await this.prisma.amcosEquipmentType.findFirst({ where: { mamcosId, name: { equals: name, mode: 'insensitive' } } });
+    if (existing) {
+      if (existing.isActive) throw new ConflictException(`"${existing.name}" is already in your list`);
+      return this.prisma.amcosEquipmentType.update({ where: { id: existing.id }, data: { isActive: true } });
+    }
+    return this.prisma.amcosEquipmentType.create({ data: { mamcosId, name, createdById: actor.id } });
+  }
+
+  async updateType(actor: RequestUser, id: string, dto: { name?: string; isActive?: boolean }, mamcosIdParam?: string) {
+    const mamcosId = this.tenant(actor, mamcosIdParam);
+    const current = await this.prisma.amcosEquipmentType.findFirst({ where: { id, mamcosId } });
+    if (!current) throw new NotFoundException('Machine type not found');
+    const name = dto.name === undefined ? undefined : MachineryService.cleanName(dto.name);
+    if (name !== undefined) {
+      if (name.length < 2) throw new BadRequestException('Give the type a name of at least two letters');
+      const clash = await this.prisma.amcosEquipmentType.findFirst({ where: { mamcosId, id: { not: id }, name: { equals: name, mode: 'insensitive' } } });
+      if (clash) throw new ConflictException(`"${clash.name}" is already in your list`);
+    }
+    return this.prisma.amcosEquipmentType.update({ where: { id }, data: { ...(name !== undefined ? { name } : {}), ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}) } });
+  }
+
+  /** The type a machine is saved under: one from the AMCOS's list, or (for older callers) a standard kind that is added to the list. */
+  private async resolveType(mamcosId: string, typeId?: string, kind?: EquipmentType): Promise<{ id: string; type: EquipmentType }> {
+    if (typeId) {
+      const t = await this.prisma.amcosEquipmentType.findFirst({ where: { id: typeId, mamcosId } });
+      if (!t) throw new NotFoundException('Machine type not found');
+      if (!t.isActive) throw new BadRequestException(`"${t.name}" is switched off in Settings`);
+      return { id: t.id, type: MachineryService.STANDARD[t.name.toLowerCase()] ?? 'OTHER' };
+    }
+    if (!kind) throw new BadRequestException('Choose the type of machine');
+    const name = kind.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+    const found = await this.prisma.amcosEquipmentType.findFirst({ where: { mamcosId, name: { equals: name, mode: 'insensitive' } } });
+    const t = found ?? (await this.prisma.amcosEquipmentType.create({ data: { mamcosId, name } }));
+    return { id: t.id, type: kind };
   }
 
   private checkOwnership(dto: { ownership?: string; ownerName?: string | null; registrationFee?: number | null }) {
@@ -85,12 +144,13 @@ export class MachineryService {
   async createEquipment(actor: RequestUser, dto: CreateEquipmentDto, mamcosIdParam?: string) {
     const mamcosId = this.tenant(actor, mamcosIdParam);
     this.checkOwnership(dto);
+    const kind = await this.resolveType(mamcosId, dto.typeId, dto.type);
     // Tools owned by someone else pay the AMCOS's registration fee once (or the amount agreed for this tool); the AMCOS's own tools do not.
     const registrationFee = dto.ownership === 'EXTERNAL' ? dto.registrationFee ?? (await this.rates(actor, mamcosIdParam)).toolRegistrationFee ?? 0 : 0;
     try {
       return await this.prisma.amcosEquipment.create({
         data: {
-          mamcosId, name: dto.name.trim(), type: dto.type, registrationNo: dto.registrationNo?.trim() || null, ownership: dto.ownership,
+          mamcosId, name: dto.name.trim(), type: kind.type, typeId: kind.id, registrationNo: dto.registrationNo?.trim() || null, ownership: dto.ownership,
           ownerName: dto.ownerName?.trim() || null, ownerPhone: dto.ownerPhone?.trim() || null,
           feePerHectare: dto.feePerHectare ?? null, notes: dto.notes?.trim() || null, createdById: actor.id,
           registrationFee, registrationFeeStatus: registrationFee > 0 ? 'PENDING' : 'NOT_APPLICABLE',
@@ -107,11 +167,12 @@ export class MachineryService {
     const current = await this.prisma.amcosEquipment.findFirst({ where: { id, mamcosId } });
     if (!current) throw new NotFoundException('Equipment not found');
     this.checkOwnership({ ownership: current.ownership, ownerName: dto.ownerName ?? current.ownerName });
+    const kind = dto.typeId !== undefined || dto.type !== undefined ? await this.resolveType(mamcosId, dto.typeId, dto.type) : null;
     try {
       return await this.prisma.amcosEquipment.update({
         where: { id },
         data: {
-          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}), ...(dto.type !== undefined ? { type: dto.type } : {}),
+          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}), ...(kind ? { type: kind.type, typeId: kind.id } : {}),
           ...(dto.registrationNo !== undefined ? { registrationNo: dto.registrationNo.trim() || null } : {}),
           ...(dto.ownerName !== undefined ? { ownerName: dto.ownerName.trim() || null } : {}),
           ...(dto.ownerPhone !== undefined ? { ownerPhone: dto.ownerPhone.trim() || null } : {}),

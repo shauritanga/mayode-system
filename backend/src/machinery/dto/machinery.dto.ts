@@ -6,7 +6,10 @@ import { ActivityFeeStatus, EquipmentOwnership, EquipmentType, MachineryActivity
 
 export class CreateEquipmentDto {
   @IsString() @IsNotEmpty() @MaxLength(120) name: string;
-  @IsEnum(EquipmentType) type: EquipmentType;
+  /** The machine type chosen from the AMCOS's own list in Settings. */
+  @IsOptional() @IsUUID() typeId?: string;
+  /** Older clients may send one of the standard kinds instead; it is matched to (or added to) the AMCOS's list. */
+  @IsOptional() @IsEnum(EquipmentType) type?: EquipmentType;
   @IsOptional() @IsString() @MaxLength(60) registrationNo?: string;
   @IsEnum(EquipmentOwnership) ownership: EquipmentOwnership;
   /** Required when the machine belongs to someone else. */
@@ -29,6 +32,7 @@ export class UpdateRatesDto {
 export class UpdateEquipmentDto {
   @IsOptional() @IsString() @IsNotEmpty() @MaxLength(120) name?: string;
   @IsOptional() @IsEnum(EquipmentType) type?: EquipmentType;
+  @IsOptional() @IsUUID() typeId?: string;
   @IsOptional() @IsString() @MaxLength(60) registrationNo?: string;
   @IsOptional() @IsString() @MaxLength(120) ownerName?: string;
   @IsOptional() @IsString() @MaxLength(30) ownerPhone?: string;
@@ -81,4 +85,13 @@ export class ListQueryDto {
   @IsOptional() @IsUUID() mamcosId?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) pageSize?: number;
+}
+
+export class CreateEquipmentTypeDto {
+  @IsString() @IsNotEmpty() @MaxLength(60) name: string;
+}
+
+export class UpdateEquipmentTypeDto {
+  @IsOptional() @IsString() @IsNotEmpty() @MaxLength(60) name?: string;
+  @IsOptional() @IsBoolean() isActive?: boolean;
 }
