@@ -102,3 +102,16 @@ export class PayDto {
   /** The money account the payment went through; leave out for the default account of that kind, or none. */
   @IsOptional() @IsString() cashAccountId?: string;
 }
+
+export class FarmerPayoutDto {
+  @IsOptional() @IsString() farmerId?: string;
+  /** For a seller who is not a registered farmer. */
+  @IsOptional() @IsString() @MaxLength(120) sellerName?: string;
+  @IsNumber() @Min(0.01) amount: number;
+  @IsDateString() paidOn: string;
+  @IsOptional() @IsIn(['CASH', 'BANK', 'MOBILE_MONEY']) method?: 'CASH' | 'BANK' | 'MOBILE_MONEY';
+  /** The money account it was paid from; wins over the method. */
+  @IsOptional() @IsString() cashAccountId?: string;
+  @IsOptional() @IsString() @MaxLength(80) reference?: string;
+  @IsOptional() @IsString() @MaxLength(300) note?: string;
+}

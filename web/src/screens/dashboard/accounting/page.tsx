@@ -9,12 +9,11 @@ import ErrorBanner from '@/components/ErrorBanner';
 import Modal from '@/components/Modal';
 import { useAuthStore } from '@/store/auth.store';
 import { CashBookView, MoneyAccountsView } from './money';
+import { FarmerAccountsView, PayoutsView } from './farmers';
 import { BankReconciliationView, CashTransactionsView, DocumentsView, PeriodCloseView, TaxSettingsView, VatReturnView } from './controls';
 
 const MENU = [
-  ['Farmer Financial Accounts', 'farmer-financial-accounts', ['Farmer Ledger', 'Farmer Balances', 'Advances', 'Deductions', 'Farmer Statements']],
-  ['Paddy Procurement', 'paddy-procurement', ['Paddy Purchases', 'Paddy Deliveries', 'Procurement Payables', 'Quality Adjustments']],
-  ['Farmer Settlements', 'farmer-settlements', ['Settlement Batches', 'Payment Approvals', 'Partial Payments', 'Settlement Reconciliation']],
+  ['Farmers', 'farmer-accounts', ['Owed to Farmers', 'Payouts', 'Farmer Statements']],
   ['Rice Sales & Receivables', 'rice-sales-receivables', ['Sales Invoices', 'Customer Receipts', 'Credit Sales', 'Customer Debtors']],
   ['Milling Cost Accounting', 'milling-cost-accounting', ['Production Costs', 'Milling Yield', 'By-products', 'Cost per Kilogram']],
   ['Cash & Banking', 'cash-banking', ['Cashbooks', 'Money Accounts', 'Mobile Money', 'Bank Reconciliation']],
@@ -32,7 +31,7 @@ const MENU = [
 const DISPLAY_GROUPS = [
   { label: 'Sales & customers', icon: ShoppingCart, sections: ['rice-sales-receivables'] },
   { label: 'Purchases & expenses', icon: ReceiptText, sections: ['purchases-suppliers', 'expenses-income'] },
-  { label: 'Farmers', icon: UsersRound, sections: ['farmer-financial-accounts', 'paddy-procurement', 'farmer-settlements'] },
+  { label: 'Farmers', icon: UsersRound, sections: ['farmer-accounts'] },
   { label: 'Cash & banking', icon: Landmark, sections: ['cash-banking'] },
   { label: 'Production, assets & funds', icon: Factory, sections: ['milling-cost-accounting', 'assets-loans', 'budgets-cooperative-funds'] },
   { label: 'Books & reports', icon: BookOpen, sections: ['general-ledger', 'financial-reports', 'tax-compliance'] },
@@ -90,19 +89,9 @@ export default function AccountingPage() {
   const request = useMemo(() => {
     const key = `${path[0] ?? selectedCategory[1]}/${path[1] ?? slug(submenu)}`;
     const calls: Record<string, () => Promise<any>> = {
-      'farmer-financial-accounts/farmer-ledger': () => inventoryApi.getAll(),
-      'farmer-financial-accounts/farmer-balances': () => inventoryApi.getAll(),
-      'farmer-financial-accounts/advances': () => loansApi.getAll(),
-      'farmer-financial-accounts/deductions': () => loansApi.getAll(),
-      'farmer-financial-accounts/farmer-statements': () => accountingApi.statements(),
-      'paddy-procurement/paddy-purchases': () => inventoryApi.getAll(),
-      'paddy-procurement/paddy-deliveries': () => inventoryApi.getAll(),
-      'paddy-procurement/procurement-payables': () => accountingApi.payables(),
-      'paddy-procurement/quality-adjustments': () => inventoryApi.getAll(),
-      'farmer-settlements/settlement-batches': () => salesApi.list(),
-      'farmer-settlements/payment-approvals': () => salesApi.list(),
-      'farmer-settlements/partial-payments': () => salesApi.list(),
-      'farmer-settlements/settlement-reconciliation': () => salesApi.list(),
+      'farmer-accounts/owed-to-farmers': () => Promise.resolve({ data: [] }),
+      'farmer-accounts/payouts': () => Promise.resolve({ data: [] }),
+      'farmer-accounts/farmer-statements': () => Promise.resolve({ data: [] }),
       'rice-sales-receivables/sales-invoices': () => salesApi.list(),
       'rice-sales-receivables/customer-receipts': () => accountingApi.receivables(),
       'rice-sales-receivables/credit-sales': () => accountingApi.receivables(),
@@ -376,7 +365,10 @@ export default function AccountingPage() {
     : '';
 
   const customKey = `${selectedCategory[1]}/${slug(submenu)}`;
-  const customView = customKey === 'cash-banking/cashbooks' ? <CashBookView />
+  const customView = customKey === 'farmer-accounts/owed-to-farmers' ? <FarmerAccountsView mode="owed" canCreate={!!canCreateAccounting} />
+    : customKey === 'farmer-accounts/payouts' ? <PayoutsView canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
+    : customKey === 'farmer-accounts/farmer-statements' ? <FarmerAccountsView mode="statements" canCreate={false} />
+    : customKey === 'cash-banking/cashbooks' ? <CashBookView />
     : customKey === 'cash-banking/money-accounts' ? <MoneyAccountsView canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
     : customKey === 'cash-banking/mobile-money' ? <CashBookView kind="MOBILE_MONEY" />
     : customKey === 'cash-banking/bank-reconciliation' ? <BankReconciliationView canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} canDelete={!!canDeleteAccounting} />

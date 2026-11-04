@@ -29,10 +29,11 @@ import {
 } from './dto/accounting.dto';
 import {
   AdjustLineDto, CloseBooksDto, CreateStatementDto, MatchLineDto, ReopenBooksDto,
-  CreateCashAccountDto, CashTransferDto, PayDto, UpdateCashAccountDto, CreateCashTransactionDto, TaxSettingsDto, VatSettlementDto, VoidCashTransactionDto, WithholdingRemittanceDto,
+  CreateCashAccountDto, CashTransferDto, FarmerPayoutDto, PayDto, UpdateCashAccountDto, CreateCashTransactionDto, TaxSettingsDto, VatSettlementDto, VoidCashTransactionDto, WithholdingRemittanceDto,
 } from './dto/ledger-controls.dto';
 import { CashTransactionsService } from './cash-transactions.service';
 import { CashAccountsService } from './cash-accounts.service';
+import { FarmerAccountsService } from './farmer-accounts.service';
 import { PeriodLockService } from './period-lock.service';
 import { ReconciliationService } from './reconciliation.service';
 import { TaxService } from './tax.service';
@@ -49,6 +50,7 @@ export class AccountingController {
     private readonly tax: TaxService,
     private readonly cash: CashTransactionsService,
     private readonly cashAccounts: CashAccountsService,
+    private readonly farmerAccounts: FarmerAccountsService,
   ) {}
   // Every report and posting below is confined to one cooperative's books: the caller's own, or — for Super Admin — the
   // one named in ?mamcosId=, or everything when none is named. See AccountingService.scopeFor.
@@ -256,6 +258,33 @@ export class AccountingController {
   @RequirePermission('accounting', 'EDIT')
   cashVoid(@Param('id') id: string, @Body() dto: VoidCashTransactionDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
     return this.cash.voidOne(id, dto.reason, this.accounting.scopeFor(user, mamcosId), user.id);
+  }
+
+  // ───── farmers: what is owed to them, payouts, statements ─────
+  @Get('farmer-accounts')
+  @RequirePermission('accounting', 'VIEW')
+  farmerOwed(@CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.farmerAccounts.owed(this.accounting.scopeFor(user, mamcosId));
+  }
+  @Get('farmer-accounts/statement')
+  @RequirePermission('accounting', 'VIEW')
+  farmerStatement(@CurrentUser() user: RequestUser, @Query('farmerId') farmerId?: string, @Query('seller') seller?: string, @Query('mamcosId') mamcosId?: string) {
+    return this.farmerAccounts.statement(this.accounting.scopeFor(user, mamcosId), { farmerId, seller });
+  }
+  @Get('farmer-payouts')
+  @RequirePermission('accounting', 'VIEW')
+  farmerPayouts(@CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.farmerAccounts.payouts(this.accounting.scopeFor(user, mamcosId));
+  }
+  @Post('farmer-payouts')
+  @RequirePermission('accounting', 'CREATE')
+  farmerPay(@Body() dto: FarmerPayoutDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.farmerAccounts.pay(dto, this.accounting.scopeFor(user, mamcosId), user.id);
+  }
+  @Post('farmer-payouts/:id/void')
+  @RequirePermission('accounting', 'EDIT')
+  farmerPayoutVoid(@Param('id') id: string, @Body() dto: VoidCashTransactionDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.farmerAccounts.void(id, dto.reason, this.accounting.scopeFor(user, mamcosId), user.id);
   }
 
   // ───── money accounts (cash box, banks, mobile money) ─────

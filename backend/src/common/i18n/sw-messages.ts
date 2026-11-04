@@ -1082,4 +1082,11 @@ export const SW_MESSAGES: Record<string, string> = {
   "This transfer is already cancelled.": "Uhamisho huu tayari umefutwa.",
   "Transfer not found.": "Uhamisho haujapatikana.",
   "\"{0}\" is switched off.": "\"{0}\" imezimwa.",
+  "Choose a farmer.": "Chagua mkulima.",
+  "Farmer not found.": "Mkulima hajapatikana.",
+  "Choose who is being paid.": "Chagua anayelipwa.",
+  "Nothing is owed to this person.": "Hakuna deni la kumlipa mtu huyu.",
+  "Only {0} is owed to this person.": "Anayedai ni {0} pekee.",
+  "Payout not found.": "Malipo hayajapatikana.",
+  "This payout is already cancelled.": "Malipo haya tayari yamefutwa.",
 };

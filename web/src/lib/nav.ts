@@ -171,24 +171,10 @@ export const navGroups: NavGroup[] = [
             href: '/dashboard/accounting', label: 'Accounting & Finance', icon: Wallet01Icon,
             roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY', 'AUDITOR'], resource: 'accounting',
             children: [
-              { href: '/dashboard/accounting/farmer-financial-accounts', label: 'Farmer Financial Accounts', icon: UserGroupIcon, roles: [], resource: 'accounting', children: [
-                { href: '/dashboard/accounting/farmer-financial-accounts/farmer-ledger', label: 'Farmer Ledger', icon: File01Icon, roles: [] },
-                { href: '/dashboard/accounting/farmer-financial-accounts/farmer-balances', label: 'Farmer Balances', icon: Wallet01Icon, roles: [] },
-                { href: '/dashboard/accounting/farmer-financial-accounts/advances', label: 'Advances', icon: Wallet01Icon, roles: [] },
-                { href: '/dashboard/accounting/farmer-financial-accounts/deductions', label: 'Deductions', icon: Wallet01Icon, roles: [] },
-                { href: '/dashboard/accounting/farmer-financial-accounts/farmer-statements', label: 'Farmer Statements', icon: File01Icon, roles: [] },
-              ] },
-              { href: '/dashboard/accounting/paddy-procurement', label: 'Paddy Procurement', icon: WheatIcon, roles: [], resource: 'accounting', children: [
-                { href: '/dashboard/accounting/paddy-procurement/paddy-purchases', label: 'Paddy Purchases', icon: ShoppingCart02Icon, roles: [] },
-                { href: '/dashboard/accounting/paddy-procurement/paddy-deliveries', label: 'Paddy Deliveries', icon: Package01Icon, roles: [] },
-                { href: '/dashboard/accounting/paddy-procurement/procurement-payables', label: 'Procurement Payables', icon: Wallet01Icon, roles: [] },
-                { href: '/dashboard/accounting/paddy-procurement/quality-adjustments', label: 'Quality Adjustments', icon: FileEditIcon, roles: [] },
-              ] },
-              { href: '/dashboard/accounting/farmer-settlements', label: 'Farmer Settlements', icon: Wallet01Icon, roles: [], resource: 'accounting', children: [
-                { href: '/dashboard/accounting/farmer-settlements/settlement-batches', label: 'Settlement Batches', icon: File01Icon, roles: [] },
-                { href: '/dashboard/accounting/farmer-settlements/payment-approvals', label: 'Payment Approvals', icon: Shield01Icon, roles: [] },
-                { href: '/dashboard/accounting/farmer-settlements/partial-payments', label: 'Partial Payments', icon: Wallet01Icon, roles: [] },
-                { href: '/dashboard/accounting/farmer-settlements/settlement-reconciliation', label: 'Settlement Reconciliation', icon: FileEditIcon, roles: [] },
+              { href: '/dashboard/accounting/farmer-accounts', label: 'Farmers', icon: UserGroupIcon, roles: [], resource: 'accounting', children: [
+                { href: '/dashboard/accounting/farmer-accounts/owed-to-farmers', label: 'Owed to Farmers', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/farmer-accounts/payouts', label: 'Payouts', icon: Wallet01Icon, roles: [] },
+                { href: '/dashboard/accounting/farmer-accounts/farmer-statements', label: 'Farmer Statements', icon: File01Icon, roles: [] },
               ] },
               { href: '/dashboard/accounting/rice-sales-receivables', label: 'Rice Sales & Receivables', icon: Store01Icon, roles: [], resource: 'accounting', children: [
                 { href: '/dashboard/accounting/rice-sales-receivables/sales-invoices', label: 'Sales Invoices', icon: File01Icon, roles: [] },

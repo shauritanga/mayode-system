@@ -222,6 +222,8 @@ model Farmer {
   joinRequests              AmcosJoinRequest[]
   communicationReceipts     CommunicationRecipient[]
 
+  farmerPayouts FarmerPayout[]
+
   @@map("farmers")
 }
 
@@ -322,6 +324,7 @@ model Mamcos {
   equipmentTypes        AmcosEquipmentType[]
   cashAccounts          CashAccount[]
   cashTransfers         CashTransfer[]
+  farmerPayouts         FarmerPayout[]
   accountingLock        AccountingLock?
   bankStatements        BankStatement[]
   cashTransactions      CashTransaction[]
@@ -5725,6 +5728,7 @@ model CashAccount {
   invoices         Invoice[]
   bills            Bill[]
   statements       BankStatement[]
+  farmerPayouts    FarmerPayout[]
 
   @@index([mamcosId, isActive])
   @@map("cash_accounts")
@@ -5754,4 +5758,35 @@ model CashTransfer {
   @@unique([mamcosId, number])
   @@index([mamcosId, transferDate])
   @@map("cash_transfers")
+}
+
+/// Money paid to a farmer (or a walk-in seller) for paddy the cooperative bought. Clears what the cooperative owes them.
+model FarmerPayout {
+  id            String    @id @default(uuid())
+  mamcosId      String    @map("mamcos_id")
+  /// PAY-2026-000001, running per cooperative and year.
+  number        String
+  farmerId      String?   @map("farmer_id")
+  /// For a seller who is not a registered farmer; exactly one of farmerId and sellerName is set.
+  sellerName    String?   @map("seller_name")
+  amount        Decimal   @db.Decimal(14, 2)
+  paidOn        DateTime  @map("paid_on") @db.Date
+  /// How it was paid; informational, the money account is what moves the cash.
+  method        String    @default("CASH")
+  reference     String?
+  note          String?
+  cashAccountId String?   @map("cash_account_id")
+  voidedAt      DateTime? @map("voided_at")
+  voidedById    String?   @map("voided_by_id")
+  voidReason    String?   @map("void_reason")
+  createdById   String?   @map("created_by_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  mamcos      Mamcos       @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  farmer      Farmer?      @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+  cashAccount CashAccount? @relation(fields: [cashAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([mamcosId, number])
+  @@index([mamcosId, farmerId])
+  @@map("farmer_payouts")
 }
