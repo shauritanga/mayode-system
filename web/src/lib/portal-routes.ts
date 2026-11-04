@@ -35,6 +35,7 @@ export const PORTAL_SECTIONS = {
     "task-management",
     "assets",
     "payroll",
+    "amcos-settings",
     "dues",
     "communication",
     "governance",

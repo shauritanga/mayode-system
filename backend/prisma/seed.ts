@@ -153,6 +153,7 @@ async function seedRolesAndPermissions() {
     { key: 'machinery', label: 'Machinery & Task Management' },
     { key: 'assets', label: 'Asset Management' },
     { key: 'payroll', label: 'Payroll (salaries & pay runs)' },
+    { key: 'amcos_settings', label: 'AMCOS Charges & Settings' },
     { key: 'dues', label: 'Farmer Dues & Payments' },
     { key: 'communication', label: 'Communication with Farmers' },
     { key: 'loans', label: 'Loans' },

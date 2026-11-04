@@ -265,31 +265,6 @@ function Activities({ equipment, blocks, canWrite }: { equipment: any[]; blocks:
   );
 }
 
-function RatesModal({ rates, onClose, onSaved }: { rates: any; onClose: () => void; onSaved: (m: string) => void }) {
-  const [registration, setRegistration] = useState(rates?.toolRegistrationFee == null ? '' : String(rates.toolRegistrationFee));
-  const [perHectare, setPerHectare] = useState(rates?.toolFeePerHectare == null ? '' : String(rates.toolFeePerHectare));
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const save = async () => {
-    if ((registration !== '' && !(Number(registration) >= 0)) || (perHectare !== '' && !(Number(perHectare) >= 0))) { setError('Enter amounts of zero or more'); return; }
-    setSaving(true); setError('');
-    try {
-      await machineryApi.updateRates({ toolRegistrationFee: registration === '' ? null : Number(registration), toolFeePerHectare: perHectare === '' ? null : Number(perHectare) });
-      onSaved('Standard rates saved. They apply to tools and jobs recorded from now on.');
-    } catch (e) { setError(errMsg(e)); setSaving(false); }
-  };
-  return (
-    <Modal title="Standard rates" onClose={() => !saving && onClose()} width="480px"
-      footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><button type="button" className="btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save rates'}</button></>}>
-      <div style={{ display: 'grid', gap: 12 }}>
-        <Field label="Registration fee (TZS)" hint="Paid once by every tool owned by someone else when it is registered. The AMCOS's own tools do not pay it."><input type="number" min="0" className="input-field" value={registration} onChange={(e) => setRegistration(e.target.value)} autoFocus /></Field>
-        <Field label="Contribution per hectare (TZS)" hint="Every tool, the AMCOS's own or not, contributes this for each hectare it works. A tool can have its own rate."><input type="number" min="0" className="input-field" value={perHectare} onChange={(e) => setPerHectare(e.target.value)} /></Field>
-        {error && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 13 }}>{error}</div>}
-      </div>
-    </Modal>
-  );
-}
-
 function RegistrationPaidModal({ item, onClose, onSaved }: { item: any; onClose: () => void; onSaved: (m: string) => void }) {
   const [date, setDate] = useState(todayISO());
   const [saving, setSaving] = useState(false);
@@ -313,7 +288,6 @@ function Equipment({ canWrite }: { canWrite: boolean }) {
   const { data, loading, error, reload } = useApi<any[]>(() => machineryApi.equipment({ includeInactive: showAll ? 'true' : undefined }), [showAll]);
   const rates = useApi<any>(() => machineryApi.rates(), []);
   const [form, setForm] = useState<{ item?: any } | null>(null);
-  const [editRates, setEditRates] = useState(false);
   const [payReg, setPayReg] = useState<any>(null);
   const [message, setMessage] = useState('');
   const regDue = (data ?? []).filter((e) => e.registrationFeeStatus === 'PENDING');
@@ -325,7 +299,7 @@ function Equipment({ canWrite }: { canWrite: boolean }) {
       <section className="table-panel" style={{ marginBottom: 16 }}>
         <div className="section-toolbar">
           <strong>Standard rates</strong>
-          {canWrite && <button type="button" className="btn-secondary" onClick={() => setEditRates(true)}>Set rates</button>}
+          <a className="btn-secondary" href="/dashboard/amcos-settings">Change in Settings</a>
         </div>
         <div className="metric-grid" style={{ padding: 16 }}>
           <StatCard label="Registration fee (tools owned by others)" value={rates.data?.toolRegistrationFee ? tzs(rates.data.toolRegistrationFee) : 'Not set'} hint="Paid once when the tool is registered" />
@@ -373,7 +347,6 @@ function Equipment({ canWrite }: { canWrite: boolean }) {
         )}
       </section>
       {form && <EquipmentModal item={form.item} rates={rates.data} onClose={() => setForm(null)} onSaved={(m) => { setForm(null); done(m); }} />}
-      {editRates && <RatesModal rates={rates.data} onClose={() => setEditRates(false)} onSaved={(m) => { setEditRates(false); done(m); }} />}
       {payReg && <RegistrationPaidModal item={payReg} onClose={() => setPayReg(null)} onSaved={(m) => { setPayReg(null); done(m); }} />}
     </>
   );

@@ -2,6 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { PaymentsModule } from '../payments/payments.module';
 import { SettingsModule } from '../settings/settings.module';
 import { AccountingModule } from '../accounting/accounting.module';
+import { ChargesModule } from '../charges/charges.module';
 import { OpsNotifyService } from './ops-common';
 import { CatalogService } from './catalog.service';
 import { StockService } from './stock.service';
@@ -24,7 +25,7 @@ import {
 } from './ops.controllers';
 
 @Module({
-  imports: [forwardRef(() => PaymentsModule), SettingsModule, AccountingModule],
+  imports: [forwardRef(() => PaymentsModule), SettingsModule, AccountingModule, ChargesModule],
   controllers: [OpsCatalogController, OpsWarehouseController, OpsSalesController, OpsBillingController, OpsPublicController, OpsDispatchController, OpsFarmController, OpsReportsController, OpsSetupController],
   providers: [
     OpsNotifyService, CatalogService, StockService, StockAccountingService, ReceivingService, ProcessingService, TraceabilityService, SalesOpsService, BillingService, DispatchService, DocumentsService,

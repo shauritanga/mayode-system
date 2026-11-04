@@ -82,7 +82,7 @@ export class BillingService {
           customerDetails: { reference: c.reference, type: c.type, phone: c.phone, email: c.email, address: c.billingAddress ?? c.address, tin: c.tin, vrn: c.vrn, contactPerson: c.contactPerson, businessRegNo: c.businessRegNo, idNumber: c.idNumber },
           subtotal: o.subtotal, discountTotal: o.discountTotal, taxTotal: o.taxTotal, total: o.total,
           dueDate: dto.dueDate ? new Date(dto.dueDate) : new Date(Date.now() + 7 * 86_400_000), paymentInstructions: dto.paymentInstructions?.trim() || null, issuedByUserId: actor.id,
-          lines: { create: o.lines.map((l) => ({ description: l.product.name, brand: l.product.brand, quantity: l.quantity, unit: l.product.unit, unitPrice: l.unitPrice, discountPercent: l.discountPercent, taxRatePercent: l.taxRatePercent, lineTotal: l.lineTotal })) },
+          lines: { create: [...o.lines.map((l) => ({ description: l.product.name, brand: l.product.brand, quantity: l.quantity, unit: l.product.unit, unitPrice: l.unitPrice, discountPercent: l.discountPercent, taxRatePercent: l.taxRatePercent, lineTotal: l.lineTotal })), ...(o.deliveryFee > 0 ? [{ description: 'Delivery', brand: null, quantity: 1, unit: 'trip', unitPrice: o.deliveryFee, discountPercent: 0, taxRatePercent: 0, lineTotal: o.deliveryFee }] : [])] },
         },
       });
       await tx.opsOrder.update({ where: { id: orderId }, data: { status: 'INVOICED' } });

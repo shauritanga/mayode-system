@@ -545,6 +545,7 @@ export const opsApi = {
   customer: (id: string) => api.get(`/ops/customers/${id}`),
   saveCustomer: (data: object, id?: string) => (id ? api.patch(`/ops/customers/${id}`, data) : api.post('/ops/customers', data)),
   // sales
+  deliveryFee: () => api.get('/ops/sales/delivery-fee'),
   availability: (productIds: string[]) => api.get('/ops/sales/availability', { params: { productIds: productIds.join(',') } }),
   quotations: (params?: object) => api.get('/ops/sales/quotations', { params }),
   quotation: (id: string) => api.get(`/ops/sales/quotations/${id}`),
@@ -1034,6 +1035,15 @@ export const duesApi = {
   voidPayment: (paymentId: string, reason: string) => api.post(`/dues/payments/${paymentId}/void`, { reason }),
   waive: (id: string, data: object) => api.post(`/dues/${id}/waive`, data),
   cancel: (id: string, reason: string) => api.post(`/dues/${id}/cancel`, { reason }),
+};
+
+export const chargesApi = {
+  list: () => api.get('/charges'),
+  update: (code: string, data: object) => api.patch(`/charges/${code}`, data),
+  previewPenalties: () => api.get('/charges/penalties/preview'),
+  applyPenalties: () => api.post('/charges/penalties/apply'),
+  previewStorage: (month: string) => api.get('/charges/storage/preview', { params: { month } }),
+  applyStorage: (month: string) => api.post('/charges/storage/apply', { month }),
 };
 
 export const communicationsApi = {

@@ -11,6 +11,7 @@ import { Pool } from 'pg';
 import { OwnershipService } from '../common/ownership.service';
 import { AccountingService } from '../accounting/accounting.service';
 import { StockAccountingService } from './stock-accounting.service';
+import { ChargesService } from '../charges/charges.service';
 import { ReceivingService } from './receiving.service';
 import { ProcessingService } from './processing.service';
 import { StockService } from './stock.service';
@@ -68,7 +69,7 @@ describeDb('Stock record and accounts (PostgreSQL)', () => {
     accounting = new AccountingService(prisma as any, new OwnershipService(prisma as any));
     books = new StockAccountingService(prisma as any, accounting);
     receiving = new ReceivingService(prisma as any, notify, books);
-    processing = new ProcessingService(prisma as any, notify, books);
+    processing = new ProcessingService(prisma as any, notify, books, new ChargesService(prisma as any, new OwnershipService(prisma as any)));
     stock = new StockService(prisma as any, notify, books);
     warehouses = new WarehousesService(prisma as any, receiving, books);
     billing = new BillingService(prisma as any, {} as any, {} as any, notify, accounting);

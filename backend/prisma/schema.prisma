@@ -318,6 +318,7 @@ model Mamcos {
   equipment             AmcosEquipment[]
   communications        Communication[]
   ledgerEntries         LedgerEntry[]
+  charges               AmcosCharge[]
   accountingLock        AccountingLock?
   bankStatements        BankStatement[]
   cashTransactions      CashTransaction[]
@@ -4499,6 +4500,8 @@ model Quotation {
   discountTotal   Float           @default(0) @map("discount_total")
   taxTotal        Float           @default(0) @map("tax_total")
   total           Float           @default(0)
+  /// Delivery charge from the AMCOS's Settings when the quotation is for delivery; already inside subtotal and total.
+  deliveryFee     Float           @default(0) @map("delivery_fee")
   createdByUserId String          @map("created_by_user_id")
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
@@ -4554,6 +4557,8 @@ model OpsOrder {
   /// Set when accounts released goods before full payment.
   authorizationOverride String?        @map("authorization_override")
   shortageNote          String?        @map("shortage_note")
+  /// Delivery charge taken from the AMCOS's Settings when the order is for delivery; already inside subtotal and total.
+  deliveryFee           Float          @default(0) @map("delivery_fee")
   createdAt             DateTime       @default(now()) @map("created_at")
   updatedAt             DateTime       @updatedAt @map("updated_at")
 
@@ -5599,4 +5604,39 @@ model PayrollLine {
 
   @@unique([runId, payeeId])
   @@map("payroll_lines")
+}
+
+enum ChargeBasis {
+  FLAT
+  PER_HECTARE
+  PER_KG
+  PERCENT
+}
+
+enum ChargeCategory {
+  WAREHOUSE
+  PENALTY
+}
+
+/// A fee the AMCOS sets once on its Settings page and every screen then takes from here: milling, storage, delivery, late penalty.
+/// (Membership fee, levies and canal cleaning are FarmerDueType rows; tool fees and VAT are Mamcos columns; Settings edits those too.)
+model AmcosCharge {
+  id          String         @id @default(uuid())
+  mamcosId    String         @map("mamcos_id")
+  code        String
+  name        String
+  category    ChargeCategory
+  basis       ChargeBasis
+  amount      Decimal        @default(0) @db.Decimal(14, 2)
+  /// Days after which a late-payment penalty starts (penalty only).
+  graceDays   Int            @default(0) @map("grace_days")
+  isActive    Boolean        @default(false) @map("is_active")
+  updatedById String?        @map("updated_by_id")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  mamcos Mamcos @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+
+  @@unique([mamcosId, code])
+  @@map("amcos_charges")
 }

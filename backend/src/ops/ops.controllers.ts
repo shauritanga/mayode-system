@@ -174,6 +174,8 @@ export class OpsSalesController {
     const map = await this.sales.availability(u, ids.split(',').filter(Boolean));
     return Object.fromEntries(map);
   }
+  @Get('delivery-fee') @RequirePermission('ops_orders', 'VIEW')
+  async deliveryFee(@CurrentUser() u: U) { return { amount: await this.sales.deliveryFeeFor(u, 'DELIVERY') }; }
   @Get('quotations') @RequirePermission('ops_orders', 'VIEW')
   quotations(@CurrentUser() u: U, @Query() q: Record<string, string>) { return this.sales.quotations(u, q); }
   @Post('quotations') @RequirePermission('ops_orders', 'CREATE')

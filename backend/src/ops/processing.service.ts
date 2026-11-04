@@ -5,6 +5,7 @@ import { Actor, assertVisible, batchBalances, lockBatches, nextRef, owner, OpsNo
 import { outputsExceedInput, r3, runBalance } from './ops-rules';
 import { CreateRunDto } from './dto/warehouse.dto';
 import { StockAccountingService } from './stock-accounting.service';
+import { ChargesService } from '../charges/charges.service';
 
 type User = Actor & { id: string };
 /** Runs losing more than this share of what went in are flagged for management. */
@@ -18,6 +19,7 @@ export class ProcessingService {
     private readonly prisma: PrismaService,
     private readonly notify: OpsNotifyService,
     private readonly stockBooks: StockAccountingService,
+    private readonly charges: ChargesService,
   ) {}
 
   /** Records a run and moves the stock in one transaction: inputs leave, outputs arrive, the difference is the recorded loss. */
@@ -94,7 +96,16 @@ export class ProcessingService {
         await tx.processingOutput.create({ data: { runId: run.id, batchId, productId: o.productId ?? null, kind: o.kind, quantityKg: o.quantityKg, destinationLocation: o.destinationLocation?.trim() || null, note: o.note?.trim() || null } });
       }
       await this.stockBooks.postRun(tx, run, batches.map((b) => ({ batch: b, quantityKg: merged.get(b.id)! })), costed, actor.id);
-      return { run, balance };
+      // Milling someone's rice earns the fee set in Settings; the AMCOS's own rice earns nothing.
+      let millingFee = 0;
+      if (dto.kind === 'MILLING' && ownerType === 'FARMER' && ownerFarmerId && run.mamcosId) {
+        const rate = await this.charges.rate(run.mamcosId, 'MILLING_FEE', tx);
+        if (rate) {
+          millingFee = Math.round(rate.amount * inputKg * 100) / 100;
+          await this.charges.chargeFarmer(tx, { mamcosId: run.mamcosId, farmerId: ownerFarmerId, description: `Milling · ${run.reference}`, amount: millingFee, createdById: actor.id });
+        }
+      }
+      return { run, balance, millingFee };
     });
 
     const flagged = run.balance.lossPct > LOSS_ALERT_PCT || (dto.kind === 'MILLING' && run.balance.milledYieldPct < LOW_YIELD_PCT);
@@ -104,7 +115,7 @@ export class ProcessingService {
         body: `${run.run.reference}: ${run.balance.lossPct}% unaccounted${dto.kind === 'MILLING' ? `, ${run.balance.milledYieldPct}% milled rice yield` : ''}.`, data: { runId: run.run.id },
       });
     }
-    return this.detail(run.run.id, actor);
+    return { ...(await this.detail(run.run.id, actor)), millingFee: run.millingFee };
   }
 
   async detail(id: string, actor: Actor) {
@@ -173,6 +184,8 @@ export class ProcessingService {
         if (other) throw new ConflictException('This run’s output has already been processed again');
       }
       await this.stockBooks.voidRun(tx, run, actor.id);
+      const due = await tx.farmerDue.findFirst({ where: { mamcosId: run.mamcosId ?? undefined, description: `Milling · ${run.reference}`, status: 'ACTIVE' }, include: { payments: { where: { voidedAt: null }, select: { id: true } } } });
+      if (due && due.payments.length === 0) await tx.farmerDue.update({ where: { id: due.id }, data: { status: 'CANCELLED', cancelReason: `Run ${run.reference} reversed: ${reason.trim()}` } });
       for (const p of produced) {
         await tx.stockLedgerEntry.create({ data: { batchId: p.batchId, warehouseId: run.warehouseId, type: 'PROCESS_OUT', quantityKg: -p.quantityKg, reason: `Run ${run.reference} reversed: ${reason.trim()}`, refType: 'processing-reversal', refId: id, reversalOfId: p.id, createdByUserId: actor.id } });
       }

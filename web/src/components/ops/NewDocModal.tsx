@@ -40,6 +40,8 @@ export default function NewDocModal({ kind, existing, fromQuotation, onClose, on
   const { busy, error, run } = useAction();
 
   useEffect(() => { opsApi.products({ active: 'true' }).then((r) => setProducts((r.data as Product[]).filter((p) => p.category !== 'BYPRODUCT'))); }, []);
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  useEffect(() => { opsApi.deliveryFee().then((r) => setDeliveryFee(Number(r.data?.amount) || 0)).catch(() => setDeliveryFee(0)); }, []);
   useEffect(() => { opsApi.customers({ q: search || undefined }).then((r) => setCustomers(r.data)); }, [search]);
   useEffect(() => {
     const ids = [...new Set(lines.map((l) => l.productId).filter(Boolean))];
@@ -61,9 +63,10 @@ export default function NewDocModal({ kind, existing, fromQuotation, onClose, on
       const c = calc({ quantity: Number(l.quantity), unitPrice: Number(l.unitPrice), discountPercent: Number(l.discountPercent) || 0 }, p.taxRatePercent);
       sub += c.gross; disc += c.disc; tax += c.tax; total += c.total;
     }
-    return { sub, disc, tax, total };
+    const fee = mode === 'DELIVERY' ? deliveryFee : 0;
+    return { sub: sub + fee, disc, tax, total: total + fee, fee };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lines, products]);
+  }, [lines, products, mode, deliveryFee]);
   const valid = customerId && lines.length > 0 && lines.every((l) => l.productId && Number(l.quantity) > 0 && l.unitPrice !== '');
 
   const save = async () => {
@@ -131,6 +134,7 @@ export default function NewDocModal({ kind, existing, fromQuotation, onClose, on
           <button type="button" className="btn-secondary" onClick={() => setLines((ls) => [...ls, emptyLine()])}>+ Add product</button>
           <div style={{ textAlign: 'right', fontSize: 13 }}>
             <div>Subtotal {tzs(totals.sub)} · Discount − {tzs(totals.disc)} · Tax {tzs(totals.tax)}</div>
+            {totals.fee > 0 && <div className="muted" style={{ fontSize: 12 }}>Includes a delivery fee of {tzs(totals.fee)} (set in Charges &amp; Settings)</div>}
             <div style={{ fontSize: 16, fontWeight: 700 }}>Total {tzs(totals.total)}</div>
           </div>
         </div>

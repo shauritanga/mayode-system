@@ -283,7 +283,7 @@ export function TaxSettingsView({ canEdit }: { canEdit: boolean }) {
           <label className="form-label">VRN (VAT registration number)<input className="input-field" disabled={!canEdit} value={f.vrn} onChange={(e) => setF({ ...f, vrn: e.target.value })} /></label>
         </div>
         <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" disabled={!canEdit} checked={f.vatRegistered} onChange={(e) => setF({ ...f, vatRegistered: e.target.checked })} /> This cooperative is registered for VAT</label>
-        <label className="form-label">VAT rate (%)<input className="input-field" type="number" min="0" max="100" step="0.01" disabled={!canEdit || !f.vatRegistered} value={f.vatRate} onChange={(e) => setF({ ...f, vatRate: e.target.value })} /></label>
+        <label className="form-label">VAT rate (%)<input className="input-field" type="number" disabled value={f.vatRate} readOnly /><span className="muted" style={{ fontSize: 11 }}>Set in <a href="/dashboard/amcos-settings">Charges &amp; Settings</a></span></label>
         {canEdit && <div><button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>{saved && <span className="muted" style={{ marginLeft: 12 }}>Saved</span>}</div>}
       </form>
     </section>

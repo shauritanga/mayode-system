@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Modal from '@/components/Modal';
-import { communicationsApi, duesApi } from '@/lib/api';
+import { chargesApi, communicationsApi, duesApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import {
   ConfirmDialog, Empty, Field, Filters, FormGrid, LoadError, Notice, PageHeader, Pager, StatCard, TableSkeleton, Tabs,
@@ -337,46 +337,6 @@ function PayButton({ due, onSaved }: { due: any; onSaved: (m: string) => void })
   );
 }
 
-function TypeModal({ item, onClose, onSaved }: { item?: any; onClose: () => void; onSaved: (m: string) => void }) {
-  const editing = !!item;
-  const [form, setForm] = useState({ name: item?.name ?? '', category: item?.category ?? 'LEVY', basis: item?.basis ?? 'PER_HECTARE', rate: item ? String(item.rate) : '', season: item?.season ?? '', dueDate: day(item?.dueDate), notes: item?.notes ?? '', isActive: item?.isActive ?? true });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const set = (k: string, v: any) => { setForm((f) => ({ ...f, [k]: v })); setErrors((e) => ({ ...e, [k]: '' })); };
-  const save = async () => {
-    const found: Record<string, string> = {};
-    if (!form.name.trim()) found.name = 'Give the charge a name';
-    if (!(Number(form.rate) > 0)) found.rate = 'Enter the amount';
-    setErrors(found);
-    if (Object.keys(found).length) return;
-    setSaving(true); setError('');
-    try {
-      if (editing) await duesApi.updateType(item.id, { name: form.name.trim(), rate: Number(form.rate), season: form.season.trim(), dueDate: form.dueDate || undefined, notes: form.notes.trim(), isActive: form.isActive });
-      else await duesApi.createType({ name: form.name.trim(), category: form.category, basis: form.basis, rate: Number(form.rate), season: form.season.trim() || undefined, dueDate: form.dueDate || undefined, notes: form.notes.trim() || undefined });
-      onSaved(editing ? 'Charge updated.' : 'Charge created.');
-    } catch (e) { setError(errMsg(e)); setSaving(false); }
-  };
-  return (
-    <Modal title={editing ? `Edit ${item.name}` : 'New charge'} subtitle="Set it once, then apply it to all your farmers." onClose={() => !saving && onClose()} width="560px"
-      footer={<Footer onClose={onClose} saving={saving} form="type-form" label={editing ? 'Save' : 'Create charge'} />}>
-      <form id="type-form" onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
-        <FormGrid>
-          <Field label="Name *" error={errors.name}><input className="input-field" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Levy 2026" /></Field>
-          <Field label="Kind"><select className="input-field" value={form.category} onChange={(e) => set('category', e.target.value)} disabled={editing}>{CHARGE_CATEGORIES.map((c) => <option key={c} value={c}>{cat(c)}</option>)}</select></Field>
-          <Field label="Charged" hint={editing ? 'Cannot change after the charge is created' : undefined}><select className="input-field" value={form.basis} onChange={(e) => set('basis', e.target.value)} disabled={editing}><option value="PER_HECTARE">Per hectare held</option><option value="FLAT">Same amount for every farmer</option></select></Field>
-          <Field label={form.basis === 'PER_HECTARE' ? 'Amount per hectare (TZS) *' : 'Amount per farmer (TZS) *'} error={errors.rate} hint={editing ? 'Applies only to farmers charged after this change' : undefined}><input type="number" min="1" className="input-field" value={form.rate} onChange={(e) => set('rate', e.target.value)} /></Field>
-          <Field label="Season"><input className="input-field" value={form.season} onChange={(e) => set('season', e.target.value)} placeholder="e.g. 2026 main season" /></Field>
-          <Field label="Pay by"><input type="date" className="input-field" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></Field>
-          <Field label="Notes" wide><input className="input-field" value={form.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
-        </FormGrid>
-        {editing && <label className="form-label" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}><input type="checkbox" checked={form.isActive} onChange={(e) => set('isActive', e.target.checked)} />Active (can be charged to farmers)</label>}
-        {errBox(error)}
-      </form>
-    </Modal>
-  );
-}
-
 function ChargeEveryone({ type, onClose, onDone }: { type: any; onClose: () => void; onDone: (m: string) => void }) {
   const { data: p, loading, error } = useApi<any>(() => duesApi.previewCharge(type.id), [type.id]);
   return (
@@ -393,13 +353,58 @@ function ChargeEveryone({ type, onClose, onDone }: { type: any; onClose: () => v
   );
 }
 
+/** Charges a fee set in Settings to the farmers it applies to: shows who and how much first, then charges on confirmation. */
+function FeeRunModal({ kind, onClose, onDone }: { kind: 'penalties' | 'storage'; onClose: () => void; onDone: (m: string) => void }) {
+  const isPenalty = kind === 'penalties';
+  const [month, setMonth] = useState(todayISO().slice(0, 7));
+  const plan = useApi<any>(() => (isPenalty ? chargesApi.previewPenalties() : chargesApi.previewStorage(month)), [kind, month]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const rows: any[] = plan.data?.rows ?? [];
+  const run = async () => {
+    setBusy(true); setError('');
+    try {
+      const r: any = (await (isPenalty ? chargesApi.applyPenalties() : chargesApi.applyStorage(month))).data;
+      onDone(`${r.charged} ${r.charged === 1 ? 'farmer was' : 'farmers were'} charged TZS ${Math.round(r.total).toLocaleString('en-US')}.`);
+    } catch (e) { setError(errMsg(e, 'Could not charge.')); } finally { setBusy(false); }
+  };
+  return (
+    <Modal title={isPenalty ? 'Apply late payment penalties' : 'Charge storage for a month'}
+      subtitle={isPenalty ? 'A percentage of what farmers still owe after the grace days. Check the list, then charge.' : 'For rice the cooperative keeps for farmers. Check the list, then charge.'} onClose={() => !busy && onClose()} width="640px"
+      footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={busy}>Close</button><button type="button" className="btn-primary" disabled={busy || !rows.length} onClick={() => void run()}>{busy ? 'Charging…' : rows.length ? `Charge ${rows.length} ${rows.length === 1 ? 'farmer' : 'farmers'}` : 'Nothing to charge'}</button></>}>
+      {!isPenalty && <Field label="Month"><input className="input-field" type="month" max={todayISO().slice(0, 7)} value={month} onChange={(e) => setMonth(e.target.value)} /></Field>}
+      {(error || plan.error) && <div role="alert" className="alert-box alert-danger" style={{ margin: '12px 0' }}>{error || plan.error}{(error || plan.error).includes('Settings') && <> <a href="/dashboard/amcos-settings">Open Settings</a></>}</div>}
+      {plan.data && (
+        <>
+          <p style={{ fontSize: 13 }}>
+            {isPenalty ? `${plan.data.percent}% a month after ${plan.data.graceDays} grace days · ${plan.data.month}` : `TZS ${plan.data.perKg.toLocaleString('en-US')} per kg for ${plan.data.month}`}
+            {plan.data.alreadyCharged > 0 && <> · {plan.data.alreadyCharged} already charged</>}
+          </p>
+          {rows.length === 0 ? <div className="muted" style={{ padding: 16 }}>{isPenalty ? 'No farmer is late beyond the grace days, or this month has already been charged.' : 'Nobody to charge for this month.'}</div> : (
+            <div style={{ maxHeight: 300, overflow: 'auto' }}>
+              <table className="data-table"><thead><tr><th>Farmer</th><th>{isPenalty ? 'Owes' : 'Kg stored'}</th><th className="num">Charge</th></tr></thead>
+                <tbody>{rows.map((r) => <tr key={r.dueId ?? r.farmerId}><td>{r.farmer}{isPenalty && <div className="muted" style={{ fontSize: 11 }}>{r.description}</div>}</td><td>{isPenalty ? `TZS ${Math.round(r.balance).toLocaleString('en-US')}` : `${r.kg.toLocaleString('en-US')} kg`}</td><td className="num">TZS {Math.round(r.amount).toLocaleString('en-US')}</td></tr>)}</tbody></table>
+            </div>
+          )}
+          {rows.length > 0 && <p style={{ fontWeight: 600 }}>Total TZS {Math.round(plan.data.total).toLocaleString('en-US')}</p>}
+        </>
+      )}
+    </Modal>
+  );
+}
+
 function Charges({ can }: { can: (r: string, a: string) => boolean }) {
   const [showAll, setShowAll] = useState(false);
   const { data, loading, error, reload } = useApi<any[]>(() => duesApi.types({ includeInactive: showAll ? 'true' : undefined }), [showAll]);
-  const [form, setForm] = useState<{ item?: any } | null>(null);
   const [charging, setCharging] = useState<any>(null);
   const [message, setMessage] = useState('');
-  const add = can('dues', 'CREATE') ? <button type="button" className="btn-primary" onClick={() => setForm({})}>New charge</button> : undefined;
+  // Amounts are set in one place, the Settings page; this page applies them to farmers.
+  const [feeRun, setFeeRun] = useState<'penalties' | 'storage' | null>(null);
+  const add = <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+    {can('dues', 'CREATE') && <button type="button" className="btn-secondary" onClick={() => setFeeRun('storage')}>Charge storage…</button>}
+    {can('dues', 'CREATE') && <button type="button" className="btn-secondary" onClick={() => setFeeRun('penalties')}>Apply late penalties…</button>}
+    <a className="btn-secondary" href="/dashboard/amcos-settings">Change amounts in Settings</a>
+  </span>;
   return (
     <>
       {message && <Notice tone="success" onDismiss={() => setMessage('')}>{message}</Notice>}
@@ -427,7 +432,6 @@ function Charges({ can }: { can: (r: string, a: string) => boolean }) {
                     <td className="num">{c.farmersCharged}</td><td className="num">{tzs(c.charged)}</td><td className="num">{tzs(c.collected)}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {can('dues', 'CREATE') && c.isActive && <button type="button" className="btn-primary" onClick={() => setCharging(c)}>Charge farmers</button>}{' '}
-                      {can('dues', 'EDIT') && <button type="button" className="btn-secondary" onClick={() => setForm({ item: c })}>Edit</button>}
                     </td>
                   </tr>
                 ))}
@@ -436,7 +440,7 @@ function Charges({ can }: { can: (r: string, a: string) => boolean }) {
           </div>
         )}
       </section>
-      {form && <TypeModal item={form.item} onClose={() => setForm(null)} onSaved={(m) => { setForm(null); setMessage(m); reload(); }} />}
+      {feeRun && <FeeRunModal kind={feeRun} onClose={() => setFeeRun(null)} onDone={(m) => { setFeeRun(null); setMessage(m); reload(); }} />}
       {charging && <ChargeEveryone type={charging} onClose={() => setCharging(null)} onDone={(m) => { setMessage(m); reload(); }} />}
     </>
   );

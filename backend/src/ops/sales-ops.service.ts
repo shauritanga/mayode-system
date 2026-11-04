@@ -1,8 +1,9 @@
+import { ChargesService } from '../charges/charges.service';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { Actor, assertVisible, batchBalances, nextRef, owner, OpsNotifyService, scope, Tx } from './ops-common';
-import { canMoveOrder, documentTotals, lineTotals, r3 } from './ops-rules';
+import { canMoveOrder, documentTotals, lineTotals, r2, r3 } from './ops-rules';
 import { CatalogService } from './catalog.service';
 import { CreateOrderDto, CreateQuotationDto, DocLineDto, ReviewOrderDto, UpdateOrderDto } from './dto/commercial.dto';
 
@@ -17,6 +18,7 @@ export class SalesOpsService {
     private readonly prisma: PrismaService,
     private readonly catalog: CatalogService,
     private readonly notify: OpsNotifyService,
+    private readonly charges: ChargesService,
   ) {}
 
   // ---------- stock a salesperson may promise ----------
@@ -46,6 +48,17 @@ export class SalesOpsService {
       return { productId: p.id, quantity: l.quantity, unitPrice, discountPercent: l.discountPercent ?? 0, taxRatePercent: p.taxRatePercent, lineTotal: t.total };
     });
     return { built, totals: documentTotals(built) };
+  }
+
+  /** The delivery fee set in Settings, when the order is for delivery; nothing for collection or when the fee is off. */
+  async deliveryFeeFor(actor: Actor, mode?: string | null): Promise<number> {
+    if (mode !== 'DELIVERY') return 0;
+    return (await this.charges.rate(owner(actor), 'DELIVERY_FEE'))?.amount ?? 0;
+  }
+
+  /** The fee goes inside the subtotal and total, so every report, invoice and payment sees one number. */
+  private withFee<T extends { subtotal: number; total: number }>(totals: T, fee: number) {
+    return { ...totals, subtotal: r2(totals.subtotal + fee), total: r2(totals.total + fee), deliveryFee: fee };
   }
 
   private docInclude = {
@@ -78,7 +91,8 @@ export class SalesOpsService {
 
   async createQuotation(dto: CreateQuotationDto, actor: User) {
     await this.catalog.requireCustomer(dto.customerId, actor);
-    const { built, totals } = await this.buildLines(dto.lines, actor);
+    const { built, totals: lineSums } = await this.buildLines(dto.lines, actor);
+    const totals = this.withFee(lineSums, await this.deliveryFeeFor(actor, dto.deliveryMode));
     const q = await this.prisma.$transaction(async (tx) =>
       tx.quotation.create({
         data: {
@@ -95,7 +109,8 @@ export class SalesOpsService {
     const q = await this.prisma.quotation.findUnique({ where: { id } });
     assertVisible(actor, q, 'Quotation');
     if (!['DRAFT', 'SENT'].includes(q.status)) throw new ConflictException('This quotation can no longer be changed');
-    const { built, totals } = await this.buildLines(dto.lines, actor);
+    const { built, totals: lineSums } = await this.buildLines(dto.lines, actor);
+    const totals = this.withFee(lineSums, await this.deliveryFeeFor(actor, dto.deliveryMode));
     await this.prisma.$transaction(async (tx) => {
       await tx.quotationLine.deleteMany({ where: { quotationId: id } });
       await tx.quotation.update({ where: { id }, data: { validUntil: dto.validUntil ? new Date(dto.validUntil) : null, deliveryMode: dto.deliveryMode, deliveryNote: dto.deliveryNote, notes: dto.notes, ...totals, lines: { create: built } } });
@@ -128,7 +143,8 @@ export class SalesOpsService {
       if (['CONVERTED', 'CANCELLED'].includes(q.status)) throw new ConflictException('That quotation is closed');
       quotationId = q.id;
     }
-    const { built, totals } = await this.buildLines(dto.lines, actor);
+    const { built, totals: lineSums } = await this.buildLines(dto.lines, actor);
+    const totals = this.withFee(lineSums, await this.deliveryFeeFor(actor, dto.deliveryMode));
     const order = await this.prisma.$transaction(async (tx) => {
       const o = await tx.opsOrder.create({
         data: {
@@ -195,11 +211,15 @@ export class SalesOpsService {
     assertVisible(actor, o, 'Order');
     if (o.status !== 'RETURNED_TO_SALES') throw new ConflictException('An order can only be corrected after accounts return it');
     const patch: Prisma.OpsOrderUpdateInput = { deliveryMode: dto.deliveryMode, deliveryNote: dto.deliveryNote, notes: dto.notes };
+    // Changing between collection and delivery changes the delivery fee, and so the total.
+    const fee = dto.deliveryMode !== undefined ? await this.deliveryFeeFor(actor, dto.deliveryMode) : o.deliveryFee;
     await this.prisma.$transaction(async (tx) => {
       if (dto.lines) {
         const { built, totals } = await this.buildLines(dto.lines, actor);
         await tx.opsOrderLine.deleteMany({ where: { orderId: id } });
-        Object.assign(patch, totals, { lines: { create: built } });
+        Object.assign(patch, this.withFee(totals, fee), { lines: { create: built } });
+      } else if (fee !== o.deliveryFee) {
+        Object.assign(patch, { subtotal: r2(o.subtotal - o.deliveryFee + fee), total: r2(o.total - o.deliveryFee + fee), deliveryFee: fee });
       }
       await tx.opsOrder.update({ where: { id }, data: patch });
     });
