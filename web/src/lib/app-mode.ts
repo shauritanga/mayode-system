@@ -70,7 +70,7 @@ export const APP_MODE_LOGIN_COPY: Record<
     subtitle: 'Sign in to your Cooperative Portal.',
     tagline: 'The integrated platform for AMCOS and Cooperatives in Tanzania.',
     description:
-      'Traceability, farmer records, crop cycles, insurance, credit and the M-LAX Marketplace all in one place.',
+      'Traceability, farmer records, crop cycles, insurance, credit, carbon credits and the M-LAX Marketplace all in one place.',
   },
   admin: {
     subtitle: 'Sign in to the MAYODE GROUP Admin Portal.',

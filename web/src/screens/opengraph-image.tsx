@@ -38,7 +38,7 @@ export default function OpengraphImage() {
           The integrated platform for AMCOS and Cooperatives in Tanzania.
         </div>
         <div style={{ fontSize: 26, color: '#4E5A53', marginTop: 22, lineHeight: 1.5, maxWidth: 1000 }}>
-          Traceability, Farmer records, crop cycles, Insurance, Credit and the M-LAX Marketplace — all in one place.
+          Traceability, Farmer records, crop cycles, Insurance, Credit, Carbon credits and the M-LAX Marketplace — all in one place.
         </div>
       </div>
     ),
