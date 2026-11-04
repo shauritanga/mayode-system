@@ -2,7 +2,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the rest of the accounting screens */
 
 import { useEffect, useMemo, useState } from 'react';
-import { accountingApi } from '@/lib/api';
+import Link from 'next/link';
+import { accountingApi, suppliersApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 import MoneyInput from '@/components/MoneyInput';
@@ -363,12 +364,14 @@ export function DocumentsView({ kind, canCreate, canEdit }: { kind: 'invoice' | 
   const list = useLoad<any[]>(() => (isBill ? accountingApi.payables() : accountingApi.receivables()), [kind]);
   const tax = useLoad<any>(() => accountingApi.taxSettings(), []);
   const accounts = useLoad<any[]>(() => accountingApi.accounts(), []);
+  const suppliers = useLoad<any[]>(() => (isBill ? suppliersApi.getAll() : Promise.resolve({ data: [] })), [kind]);
+  const supplierChoices = (suppliers.data ?? []).filter((x: any) => x.isActive);
   const [open, setOpen] = useState(false);
   const [paying, setPaying] = useState<any>(null);
   const [payAccount, setPayAccount] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const blank = { number: '', party: '', amount: '', dueDate: today(), description: '', accountCode: '', vatApplies: true, withholdingPercent: '' };
+  const blank = { number: '', party: '', supplierId: '', amount: '', dueDate: today(), description: '', accountCode: '', vatApplies: true, withholdingPercent: '' };
   const [f, setF] = useState(blank);
   const vat = tax.data?.vatRegistered ? tax.data.vatRate : 0;
   const net = Number(f.amount) || 0;
@@ -376,11 +379,12 @@ export function DocumentsView({ kind, canCreate, canEdit }: { kind: 'invoice' | 
   const wht = Math.round(net * (Number(f.withholdingPercent) || 0)) / 100;
   const choices = (accounts.data ?? []).filter((a: any) => (isBill ? ['EXPENSE', 'ASSET'] : ['INCOME']).includes(a.type));
   const run = async (fn: () => Promise<any>) => { setErr(''); try { await fn(); list.reload(); } catch (e) { setErr(errText(e, 'That did not work.')); } };
+  const chosenSupplier = supplierChoices.find((x: any) => x.id === f.supplierId);
   const submit = async () => {
     setBusy(true); setErr('');
     try {
       const common = { amount: net, dueDate: f.dueDate, description: f.description || undefined, vatApplies: vat ? f.vatApplies : undefined, withholdingPercent: f.withholdingPercent ? Number(f.withholdingPercent) : undefined };
-      if (isBill) await accountingApi.createBill({ ...common, billNumber: f.number || undefined, supplier: f.party, expenseAccountCode: f.accountCode || undefined });
+      if (isBill) await accountingApi.createBill({ ...common, billNumber: f.number || undefined, supplier: chosenSupplier?.name ?? f.party.trim(), supplierId: chosenSupplier?.id, expenseAccountCode: f.accountCode || undefined });
       else await accountingApi.createInvoice({ ...common, invoiceNumber: f.number || undefined, revenueAccountCode: f.accountCode || undefined });
       setOpen(false); setF(blank); list.reload();
     } catch (e) { setErr(errText(e, 'Could not save.')); } finally { setBusy(false); }
@@ -411,9 +415,19 @@ export function DocumentsView({ kind, canCreate, canEdit }: { kind: 'invoice' | 
     {open && <Modal title={isBill ? 'Record supplier bill' : 'Record customer invoice'} onClose={() => !busy && setOpen(false)} width="600px" footer={<Actions label="Save" form="doc-form" busy={busy} onCancel={() => setOpen(false)} />}>
       <form id="doc-form" onSubmit={(e) => { e.preventDefault(); void submit(); }} style={{ display: 'grid', gap: 10 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <label className="form-label">{isBill ? 'Supplier' : 'Number'}{isBill
-            ? <input className="input-field" required value={f.party} onChange={(e) => setF({ ...f, party: e.target.value })} />
-            : <input className="input-field" value={f.number} onChange={(e) => setF({ ...f, number: e.target.value })} placeholder="Auto-number" />}</label>
+          {isBill
+            ? <div style={{ display: 'grid', gap: 6 }}>
+              <label className="form-label">Supplier
+                <select className="input-field" required value={f.supplierId} onChange={(e) => setF({ ...f, supplierId: e.target.value, party: e.target.value === 'other' ? f.party : '' })}>
+                  <option value="" disabled>Choose a supplier…</option>
+                  {supplierChoices.map((x: any) => <option key={x.id} value={x.id}>{x.name} · {x.kind === 'INDIVIDUAL' ? 'Individual' : 'Company'}</option>)}
+                  <option value="other">Someone else (type a name)</option>
+                </select>
+              </label>
+              {f.supplierId === 'other' && <input className="input-field" required autoFocus placeholder="Supplier name" aria-label="Supplier name" value={f.party} onChange={(e) => setF({ ...f, party: e.target.value })} />}
+              {!supplierChoices.length && !suppliers.loading && <span className="muted" style={{ fontSize: 11 }}>No suppliers yet. <Link href="/dashboard/suppliers">Add your suppliers</Link> to pick them here.</span>}
+            </div>
+            : <label className="form-label">Number<input className="input-field" value={f.number} onChange={(e) => setF({ ...f, number: e.target.value })} placeholder="Auto-number" /></label>}
           <label className="form-label">{isBill ? 'Bill number' : 'Due date'}{isBill
             ? <input className="input-field" value={f.number} onChange={(e) => setF({ ...f, number: e.target.value })} placeholder="Auto-number" />
             : <input className="input-field" type="date" required value={f.dueDate} onChange={(e) => setF({ ...f, dueDate: e.target.value })} />}</label>
