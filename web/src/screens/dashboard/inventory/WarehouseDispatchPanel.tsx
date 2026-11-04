@@ -2,6 +2,7 @@
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { salesApi } from '@/lib/api';
+import MoneyInput from '@/components/MoneyInput';
 
 interface DispatchLookupResult {
   invoiceNumber: string;
@@ -186,9 +187,9 @@ export default function WarehouseDispatchPanel() {
                 {feeRequired && (
                   <label>
                     <div style={{ fontSize: 12, marginBottom: 4 }}>Transport fee paid</div>
-                    <input
+                    <MoneyInput
                       className="input-field"
-                      type="number"
+                     
                       min={0}
                       value={form.transportFee}
                       onChange={(e) => setForm({ ...form, transportFee: e.target.value })}

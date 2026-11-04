@@ -4,6 +4,7 @@ import Modal from '@/components/Modal';
 import { opsApi } from '@/lib/api';
 import { dateTime, day, kg, label, tzs } from '@/lib/ops';
 import { DataTable, ErrorNote, Facts, Field, FormGrid, Loading, Status, Toolbar, useAction, useLoad } from './ui';
+import MoneyInput from '@/components/MoneyInput';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function ReceivingPanel({ canCreate, canConfirm, canCancel, initialStatus = '' }: { canCreate: boolean; canConfirm: boolean; canCancel: boolean; initialStatus?: string }) {
@@ -163,7 +164,7 @@ function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean
       <h4 style={{ margin: '16px 0 8px', fontSize: 13 }}>Quantity, price and quality</h4>
       <FormGrid>
         <Field label="Weight delivered (kg)"><input className="input-field" type="number" value={f.grossKg} onChange={(e) => set('grossKg', e.target.value)} /></Field>
-        <Field label="Price we pay (TZS per kg)" hint="Fill in only if we are buying this paddy. Leave empty if we are just storing it for the farmer."><input className="input-field" type="number" min="0" placeholder="Not buying" value={f.pricePerKg} onChange={(e) => set('pricePerKg', e.target.value)} /></Field>
+        <Field label="Price we pay (TZS per kg)" hint="Fill in only if we are buying this paddy. Leave empty if we are just storing it for the farmer."><MoneyInput className="input-field" min="0" placeholder="Not buying" value={f.pricePerKg} onChange={(e) => set('pricePerKg', e.target.value)} /></Field>
         <Field label="Bags"><input className="input-field" type="number" value={f.bags} onChange={(e) => set('bags', e.target.value)} /></Field>
         <Field label="Weight per bag (kg)"><input className="input-field" type="number" value={f.bagWeightKg} onChange={(e) => set('bagWeightKg', e.target.value)} /></Field>
         <Field label="Moisture (%)"><input className="input-field" type="number" value={f.moisturePct} onChange={(e) => set('moisturePct', e.target.value)} /></Field>

@@ -7,6 +7,7 @@ import { hasPermission } from '@/lib/nav';
 import { ChartCard, TrendAreaChart } from '@/components/role-dashboards/Charts';
 import Modal from '@/components/Modal';
 import { day, tzs } from './format';
+import MoneyInput from '@/components/MoneyInput';
 
 interface Trend { commodity: string; latest: number; previous: number | null; changePct: number | null; readings: number; series: { date: string; price: number }[] }
 interface Price { id: string; commodity: string; price: number; market: string | null; source: string | null; recordedAt: string; scope: string }
@@ -105,7 +106,7 @@ export default function PricesPanel() {
           <div style={{ display: 'grid', gap: 10 }}>
             <label className="form-label">Commodity<input className="input-field" list="commodity-list" placeholder="e.g. Paddy, Rice (milled)" value={form.commodity} onChange={(e) => setForm({ ...form, commodity: e.target.value })} />
               <datalist id="commodity-list">{[...new Set(data.rows.map((r) => r.commodity))].map((c) => <option key={c} value={c} />)}</datalist></label>
-            <label className="form-label">Price (TZS)<input className="input-field" type="number" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></label>
+            <label className="form-label">Price (TZS)<MoneyInput className="input-field" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></label>
             <label className="form-label">Market<input className="input-field" placeholder="e.g. Rujewa market" value={form.market} onChange={(e) => setForm({ ...form, market: e.target.value })} /></label>
             <label className="form-label">Source (optional)<input className="input-field" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} /></label>
             <label className="form-label">Date<input className="input-field" type="date" value={form.recordedAt} onChange={(e) => setForm({ ...form, recordedAt: e.target.value })} /></label>

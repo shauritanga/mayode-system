@@ -4,6 +4,7 @@ import { creditApi, farmersApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-error';
 import Modal from '@/components/Modal';
 import { PURPOSES, tzs } from '@/lib/credit';
+import MoneyInput from '@/components/MoneyInput';
 
 interface Lender { id: string; name: string; interestRatePercent: number | null }
 interface FarmerOption { id: string; firstName: string; lastName: string; controlNumber: string }
@@ -65,7 +66,7 @@ export default function NewApplicationModal({ forStaff, onClose, onCreated }: { 
           {lenders.length === 0 && <span style={{ fontSize: 12, color: 'var(--neutral-500)' }}>No lenders are set up yet.</span>}
         </label>
         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
-          <label className="form-label">Amount needed (TZS)<input className="input-field" type="number" min={1} value={form.amountRequested} onChange={(e) => setForm({ ...form, amountRequested: e.target.value })} /></label>
+          <label className="form-label">Amount needed (TZS)<MoneyInput className="input-field" min={1} value={form.amountRequested} onChange={(e) => setForm({ ...form, amountRequested: e.target.value })} /></label>
           <label className="form-label">Repay over (months)<input className="input-field" type="number" min={1} max={60} value={form.termMonths} onChange={(e) => setForm({ ...form, termMonths: e.target.value })} /></label>
         </div>
         <label className="form-label">What the money is for

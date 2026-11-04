@@ -6,6 +6,7 @@ import { accountingApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 import { Actions, Badge, Card, Head, errText, shortDate, today, tzs, useLoad, KIND_WORDS } from './controls';
+import MoneyInput from '@/components/MoneyInput';
 
 // ───────────────────────── Money accounts ─────────────────────────
 export function MoneyAccountsView({ canCreate, canEdit }: { canCreate: boolean; canEdit: boolean }) {
@@ -110,7 +111,7 @@ function AccountModal({ account, onClose, onSaved }: { account?: any; onClose: (
         <label className="form-label">{f.kind === 'BANK' ? 'Account number' : 'Phone number'} (optional)<input className="input-field" value={f.accountNumber} onChange={(e) => setF({ ...f, accountNumber: e.target.value })} /></label>
       </div>}
       {!editing && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <label className="form-label">Money in it today (TZS)<input className="input-field" type="number" min="0" step="0.01" value={f.openingBalance} placeholder="0" onChange={(e) => setF({ ...f, openingBalance: e.target.value })} /></label>
+        <label className="form-label">Money in it today (TZS)<MoneyInput className="input-field" min="0" step="0.01" value={f.openingBalance} placeholder="0" onChange={(e) => setF({ ...f, openingBalance: e.target.value })} /></label>
         <label className="form-label">As at<input className="input-field" type="date" max={today()} value={f.openingDate} onChange={(e) => setF({ ...f, openingDate: e.target.value })} /></label>
       </div>}
       {!editing && <span className="muted" style={{ fontSize: 12 }}>The money already in the account is added to your books as the cooperative’s own funds. Leave it empty if the account is new.</span>}
@@ -140,7 +141,7 @@ function TransferModal({ accounts, unassigned, start, onClose, onSaved }: { acco
       <label className="form-label">Take it from<select className="input-field" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value, to: e.target.value === f.to ? '' : f.to })}>{options('')}</select></label>
       <label className="form-label">Put it into<select className="input-field" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })}><option value="" disabled>Choose…</option>{options(f.from, f.from === 'none')}</select></label>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <label className="form-label">Amount (TZS)<input className="input-field" type="number" min="0.01" step="0.01" required value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>
+        <label className="form-label">Amount (TZS)<MoneyInput className="input-field" min="0.01" step="0.01" required value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>
         <label className="form-label">Date<input className="input-field" type="date" max={today()} required value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></label>
       </div>
       <label className="form-label">Note (optional)<input className="input-field" value={f.note} placeholder="e.g. Banked the week’s takings" onChange={(e) => setF({ ...f, note: e.target.value })} /></label>

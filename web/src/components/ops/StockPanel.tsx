@@ -4,6 +4,7 @@ import Modal from '@/components/Modal';
 import { opsApi } from '@/lib/api';
 import { dateTime, day, kg, label, tzs } from '@/lib/ops';
 import { DataTable, ErrorNote, Field, FormGrid, Loading, Status, Tabs, Toolbar, useAction, useLoad } from './ui';
+import MoneyInput from '@/components/MoneyInput';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Sub = 'position' | 'batches' | 'ledger' | 'transfers';
@@ -114,7 +115,7 @@ function BulkCostModal({ batches, onClose, onSaved }: { batches: any[]; onClose:
     footer={<><button className="btn-secondary" onClick={onClose}>Close</button><button className="btn-primary" disabled={busy || !(Number(cost) > 0)} onClick={submit}>{busy ? `Saving ${done} of ${batches.length}…` : 'Save cost'}</button></>}>
     <ErrorNote message={error} />
     <p style={{ fontSize: 13, marginTop: 0 }}>Use this when all this stock cost about the same. Each batch is added to the books as opening stock at this cost. This can be done once per batch; later batches get their cost when they are received or milled.</p>
-    <FormGrid><Field label="Cost per kg (TZS)"><input className="input-field" type="number" min="0" value={cost} onChange={(e) => setCost(e.target.value)} /></Field></FormGrid>
+    <FormGrid><Field label="Cost per kg (TZS)"><MoneyInput className="input-field" min="0" value={cost} onChange={(e) => setCost(e.target.value)} /></Field></FormGrid>
     {Number(cost) > 0 && <p className="glass-card" style={{ padding: 10, marginTop: 12, fontSize: 14 }}>Value added to the books: <strong>{tzs(Number(cost) * totalKg)}</strong></p>}
   </Modal>;
 }
@@ -128,7 +129,7 @@ function CostModal({ batch, onClose, onSaved }: { batch: any; onClose: () => voi
     footer={<><button className="btn-secondary" onClick={onClose}>Close</button><button className="btn-primary" disabled={busy || !(Number(cost) > 0)} onClick={submit}>{busy ? 'Saving…' : 'Save cost'}</button></>}>
     <ErrorNote message={error} />
     <p style={{ fontSize: 13, marginTop: 0 }}>This stock has no cost yet, so it is missing from the accounts. Enter what one kilogram cost and the stock is added to the books as opening stock. This can be done once.</p>
-    <FormGrid><Field label="Cost per kg (TZS)"><input className="input-field" type="number" min="0" value={cost} onChange={(e) => setCost(e.target.value)} /></Field></FormGrid>
+    <FormGrid><Field label="Cost per kg (TZS)"><MoneyInput className="input-field" min="0" value={cost} onChange={(e) => setCost(e.target.value)} /></Field></FormGrid>
     {value > 0 && <p className="glass-card" style={{ padding: 10, marginTop: 12, fontSize: 14 }}>Value added to the books: <strong>{tzs(value)}</strong></p>}
   </Modal>;
 }

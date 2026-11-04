@@ -5,6 +5,7 @@ import { apiErrorMessage } from '@/lib/api-error';
 import Modal from '@/components/Modal';
 import { INSTALMENT, STATUS, day, purposeLabel, tzs, type Application } from '@/lib/credit';
 import CreditProfileView from './CreditProfileView';
+import MoneyInput from '@/components/MoneyInput';
 
 type Mode = 'lender' | 'applicant';
 
@@ -81,7 +82,7 @@ export default function ApplicationModal({ id, mode, onClose, onChanged }: { id:
         <div style={{ display: 'grid', gap: 10 }}>
           {action === 'approve' && <>
             <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-              <label className="form-label">Amount approved (TZS)<input className="input-field" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+              <label className="form-label">Amount approved (TZS)<MoneyInput className="input-field" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
               <label className="form-label">Term (months)<input className="input-field" type="number" min={1} max={60} value={form.term} onChange={(e) => setForm({ ...form, term: e.target.value })} /></label>
               <label className="form-label">Interest (% per year)<input className="input-field" type="number" min={0} step="0.1" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} /></label>
               <label className="form-label">Deduct from sale payouts (%)<input className="input-field" type="number" min={0} max={100} value={form.deduct} onChange={(e) => setForm({ ...form, deduct: e.target.value })} /></label>
@@ -90,7 +91,7 @@ export default function ApplicationModal({ id, mode, onClose, onChanged }: { id:
           </>}
           {action === 'reject' && <p style={{ fontSize: 13, margin: 0 }}>The farmer is told by SMS. Give a short reason they can act on.</p>}
           {action === 'disburse' && <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-            <label className="form-label">Amount released (TZS)<input className="input-field" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+            <label className="form-label">Amount released (TZS)<MoneyInput className="input-field" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
             <label className="form-label">Date<input className="input-field" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
             <label className="form-label">Payment reference<input className="input-field" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} /></label>
           </div>}

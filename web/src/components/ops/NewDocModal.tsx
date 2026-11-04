@@ -5,6 +5,7 @@ import { opsApi } from '@/lib/api';
 import { tzs } from '@/lib/ops';
 import { Field, FormGrid, ErrorNote, useAction } from './ui';
 import CustomerModal, { type Customer } from './CustomerModal';
+import MoneyInput from '@/components/MoneyInput';
 
 interface Product { id: string; code: string; name: string; brand: string | null; unit: string; unitPrice: number | null; taxRatePercent: number; packSizeKg: number | null; category: string }
 interface Line { productId: string; quantity: string; unitPrice: string; discountPercent: string }
@@ -119,7 +120,7 @@ export default function NewDocModal({ kind, existing, fromQuotation, onClose, on
                       {p && have != null && <div style={{ fontSize: 11, color: needKg > have ? 'var(--red-500)' : 'var(--neutral-500)' }}>{have.toLocaleString()} kg available{needKg > have ? ` — short by ${(needKg - have).toLocaleString()} kg` : ''}</div>}
                     </td>
                     <td><input className="input-field" style={{ width: 90, textAlign: 'right' }} type="number" min="0" step="any" value={l.quantity} onChange={(e) => set(i, 'quantity', e.target.value)} /><div style={{ fontSize: 11, color: 'var(--neutral-500)', textAlign: 'right' }}>{p?.unit ?? ''}</div></td>
-                    <td><input className="input-field" style={{ width: 110, textAlign: 'right' }} type="number" min="0" value={l.unitPrice} onChange={(e) => set(i, 'unitPrice', e.target.value)} /></td>
+                    <td><MoneyInput className="input-field" style={{ width: 110, textAlign: 'right' }} min="0" value={l.unitPrice} onChange={(e) => set(i, 'unitPrice', e.target.value)} /></td>
                     <td><input className="input-field" style={{ width: 70, textAlign: 'right' }} type="number" min="0" max="100" value={l.discountPercent} onChange={(e) => set(i, 'discountPercent', e.target.value)} /></td>
                     <td style={{ textAlign: 'right' }}>{p?.taxRatePercent ?? '—'}</td>
                     <td style={{ textAlign: 'right', fontWeight: 600 }}>{c ? tzs(c.total) : '—'}</td>

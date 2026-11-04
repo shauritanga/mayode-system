@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { insuranceApi, uploadsApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-error';
 import Modal from '@/components/Modal';
+import MoneyInput from '@/components/MoneyInput';
 
 /** The field inspection of a claim: what was seen, photos, the loss measured, and a recommendation to the insurer. */
 export default function ClaimInspectModal({ claim, onClose, onSaved }: { claim: { id: string; claimedAmount: number; inspectionNotes?: string | null; assessedLossAmount?: number | null; recommendation?: string | null; inspectionPhotoUrls?: string[] }; onClose: () => void; onSaved: () => void }) {
@@ -42,7 +43,7 @@ export default function ClaimInspectModal({ claim, onClose, onSaved }: { claim: 
       {error && <div className="alert-box alert-danger" style={{ marginBottom: 10 }}>{error}</div>}
       <div style={{ display: 'grid', gap: 12 }}>
         <label className="form-label">What you found in the field<textarea className="input-field" rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
-        <label className="form-label">Loss you measured (TZS)<input className="input-field" type="number" min={0} value={loss} onChange={(e) => setLoss(e.target.value)} /></label>
+        <label className="form-label">Loss you measured (TZS)<MoneyInput className="input-field" min={0} value={loss} onChange={(e) => setLoss(e.target.value)} /></label>
         <label className="form-label">Your recommendation
           <select className="input-field" value={rec} onChange={(e) => setRec(e.target.value)}>
             <option value="">No recommendation</option><option value="APPROVE">Approve the claim</option><option value="REJECT">Reject the claim</option><option value="REINSPECT">Needs another visit</option>

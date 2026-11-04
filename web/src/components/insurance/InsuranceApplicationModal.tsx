@@ -6,6 +6,7 @@ import Modal from '@/components/Modal';
 import { day, tzs } from '@/lib/credit';
 import { APP_STATUS, productLabel, type InsApplication } from '@/lib/insurance';
 import RiskPanel from './RiskPanel';
+import MoneyInput from '@/components/MoneyInput';
 
 type Mode = 'insurer' | 'staff' | 'farmer';
 
@@ -70,8 +71,8 @@ export default function InsuranceApplicationModal({ id, mode, onClose, onChanged
 
       {action === 'approve' && (
         <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', marginBottom: 12 }}>
-          <label className="form-label">Sum insured (TZS)<input className="input-field" type="number" value={f.sum} onChange={(e) => setF({ ...f, sum: e.target.value })} /></label>
-          <label className="form-label">Premium (TZS)<input className="input-field" type="number" value={f.premium} onChange={(e) => setF({ ...f, premium: e.target.value })} />{rate != null && <span style={{ fontSize: 11 }}>{rate}% of the cover</span>}</label>
+          <label className="form-label">Sum insured (TZS)<MoneyInput className="input-field" value={f.sum} onChange={(e) => setF({ ...f, sum: e.target.value })} /></label>
+          <label className="form-label">Premium (TZS)<MoneyInput className="input-field" value={f.premium} onChange={(e) => setF({ ...f, premium: e.target.value })} />{rate != null && <span style={{ fontSize: 11 }}>{rate}% of the cover</span>}</label>
           <label className="form-label">Cover starts<input className="input-field" type="date" value={f.start} onChange={(e) => setF({ ...f, start: e.target.value })} /></label>
           <label className="form-label">Cover ends<input className="input-field" type="date" value={f.end} onChange={(e) => setF({ ...f, end: e.target.value })} /></label>
           <label className="form-label" style={{ gridColumn: '1 / -1' }}>Note to the farmer (optional)<input className="input-field" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></label>
@@ -80,7 +81,7 @@ export default function InsuranceApplicationModal({ id, mode, onClose, onChanged
       {action === 'reject' && <label className="form-label" style={{ marginBottom: 12 }}>Reason<input className="input-field" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></label>}
       {action === 'premium' && (
         <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', marginBottom: 12 }}>
-          <label className="form-label">Amount collected (TZS)<input className="input-field" type="number" value={f.paid} onChange={(e) => setF({ ...f, paid: e.target.value })} /><span style={{ fontSize: 11 }}>Premium due {tzs(a.premiumAmount)}</span></label>
+          <label className="form-label">Amount collected (TZS)<MoneyInput className="input-field" value={f.paid} onChange={(e) => setF({ ...f, paid: e.target.value })} /><span style={{ fontSize: 11 }}>Premium due {tzs(a.premiumAmount)}</span></label>
           <label className="form-label">Date<input className="input-field" type="date" value={f.paidAt} onChange={(e) => setF({ ...f, paidAt: e.target.value })} /></label>
           <label className="form-label">Receipt / reference<input className="input-field" value={f.ref} onChange={(e) => setF({ ...f, ref: e.target.value })} /></label>
         </div>

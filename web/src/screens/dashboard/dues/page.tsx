@@ -11,6 +11,7 @@ import {
   ConfirmDialog, Empty, Field, Filters, FormGrid, LoadError, Notice, PageHeader, Pager, StatCard, TableSkeleton, Tabs,
   errMsg, fmtDate, titleCase, todayISO, useApi, useCan, useDebounced,
 } from '@/screens/dashboard/irrigation/ui';
+import MoneyInput from '@/components/MoneyInput';
 
 const CATEGORY_LABEL: Record<string, string> = { LEVY: 'Levy', MEMBERSHIP_FEE: 'Membership fee', CANAL_CLEANING: 'Canal cleaning', FERTILISER: 'Fertiliser', OTHER: 'Other' };
 const CHARGE_CATEGORIES = ['LEVY', 'MEMBERSHIP_FEE', 'CANAL_CLEANING', 'OTHER'];
@@ -97,7 +98,7 @@ function PayModal({ due, onClose, onSaved }: { due: any; onClose: () => void; on
       footer={<Footer onClose={onClose} saving={saving} form="pay-form" label="Record payment" />}>
       <form id="pay-form" onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
         <FormGrid>
-          <Field label="Amount (TZS) *"><input type="number" min="1" className="input-field" value={form.amount} onChange={(e) => set('amount', e.target.value)} autoFocus /></Field>
+          <Field label="Amount (TZS) *"><MoneyInput min="1" className="input-field" value={form.amount} onChange={(e) => set('amount', e.target.value)} autoFocus /></Field>
           <Field label="Date"><input type="date" className="input-field" max={todayISO()} min={day(due.issuedOn)} value={form.paidOn} onChange={(e) => set('paidOn', e.target.value)} /></Field>
           <Field label="Paid by"><select className="input-field" value={form.method} onChange={(e) => set('method', e.target.value)}>{Object.entries(METHOD_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
           {form.method !== 'HARVEST_DEDUCTION' && <MoneyAccountSelect label="Received into" value={form.cashAccountId} onChange={(id) => set('cashAccountId', id)} defaultKind={form.method as 'CASH' | 'BANK' | 'MOBILE_MONEY'} />}
@@ -136,7 +137,7 @@ function ChargeFarmerModal({ onClose, onSaved }: { onClose: () => void; onSaved:
           <FarmerPicker value={farmer} onChange={setFarmer} error={errors.farmer} />
           <FormGrid>
             <Field label="Kind"><select className="input-field" value={form.category} onChange={(e) => set('category', e.target.value)}>{CHARGE_CATEGORIES.map((c) => <option key={c} value={c}>{cat(c)}</option>)}</select></Field>
-            <Field label="Amount (TZS) *" error={errors.amount}><input type="number" min="1" className="input-field" value={form.amount} onChange={(e) => set('amount', e.target.value)} /></Field>
+            <Field label="Amount (TZS) *" error={errors.amount}><MoneyInput min="1" className="input-field" value={form.amount} onChange={(e) => set('amount', e.target.value)} /></Field>
             <Field label="What for *" error={errors.description} wide><input className="input-field" value={form.description} onChange={(e) => set('description', e.target.value)} /></Field>
             <Field label="Pay by" error={errors.dueDate}><input type="date" className="input-field" min={todayISO()} value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></Field>
           </FormGrid>
@@ -182,7 +183,7 @@ function FertiliserModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
             <Field label="Date issued"><input type="date" className="input-field" max={todayISO()} value={form.issuedOn} onChange={(e) => set('issuedOn', e.target.value)} /></Field>
             <Field label="Quantity *" error={errors.quantity}><input type="number" min="0.01" step="0.01" className="input-field" value={form.quantity} onChange={(e) => set('quantity', e.target.value)} /></Field>
             <Field label="Unit"><input className="input-field" value={form.unit} onChange={(e) => set('unit', e.target.value)} /></Field>
-            <Field label="Price per unit (TZS) *" error={errors.unitPrice}><input type="number" min="1" className="input-field" value={form.unitPrice} onChange={(e) => set('unitPrice', e.target.value)} /></Field>
+            <Field label="Price per unit (TZS) *" error={errors.unitPrice}><MoneyInput min="1" className="input-field" value={form.unitPrice} onChange={(e) => set('unitPrice', e.target.value)} /></Field>
             <Field label="Repay by" error={errors.dueDate}><input type="date" className="input-field" min={form.issuedOn} value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></Field>
           </FormGrid>
           <div style={{ fontSize: 14 }}>Total owed: <strong>{tzs(total)}</strong></div>

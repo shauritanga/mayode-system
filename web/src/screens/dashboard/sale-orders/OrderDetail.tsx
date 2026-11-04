@@ -6,6 +6,7 @@ import { apiErrorMessage } from '@/lib/api-error';
 import { useAuthStore } from '@/store/auth.store';
 import { hasPermission } from '@/lib/nav';
 import ErrorBanner from '@/components/ErrorBanner';
+import MoneyInput from '@/components/MoneyInput';
 
 export interface OrderEvent {
   id: string;
@@ -297,7 +298,7 @@ export default function OrderDetail({ orderId, onChanged }: { orderId: string; o
             </div>
             {f.mode === 'HIRED' && <div className="ua-field"><label className="ua-label" htmlFor="so-tr">Transporter</label><input id="so-tr" className="input-field" required value={f.transporter ?? ''} onChange={(e) => set('transporter', e.target.value)} /></div>}
             <div className="ua-row">
-              <div className="ua-field"><label className="ua-label" htmlFor="so-fee">Transport fee (TZS)<span className="ua-opt">optional</span></label><input id="so-fee" className="input-field" type="number" min={0} value={f.fee ?? ''} onChange={(e) => set('fee', e.target.value)} /></div>
+              <div className="ua-field"><label className="ua-label" htmlFor="so-fee">Transport fee (TZS)<span className="ua-opt">optional</span></label><MoneyInput id="so-fee" className="input-field" min={0} value={f.fee ?? ''} onChange={(e) => set('fee', e.target.value)} /></div>
               <div className="ua-field"><label className="ua-label" htmlFor="so-dest">Destination<span className="ua-opt">optional</span></label><input id="so-dest" className="input-field" value={f.dest ?? ''} onChange={(e) => set('dest', e.target.value)} /></div>
             </div>
           </>)}

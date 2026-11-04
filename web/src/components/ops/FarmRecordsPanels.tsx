@@ -4,6 +4,7 @@ import Modal from '@/components/Modal';
 import { opsApi } from '@/lib/api';
 import { dateTime, day, kg, label, tzs } from '@/lib/ops';
 import { DataTable, ErrorNote, Field, FormGrid, Loading, Tabs, Toolbar, useAction, useLoad } from './ui';
+import MoneyInput from '@/components/MoneyInput';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function AttendancePanel() {
@@ -84,7 +85,7 @@ function InputModal({ item, onClose, onSaved }: { item: any; onClose: () => void
         <Field label="Name"><input className="input-field" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
         <Field label="Kind"><select className="input-field" value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}>{['SEED', 'FERTILIZER', 'PESTICIDE', 'HERBICIDE', 'FUEL', 'OTHER'].map((t) => <option key={t} value={t}>{label(t)}</option>)}</select></Field>
         <Field label="Unit"><input className="input-field" value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} /></Field>
-        <Field label="Cost per unit (TZS)"><input className="input-field" type="number" value={f.unitCost} onChange={(e) => setF({ ...f, unitCost: e.target.value })} /></Field>
+        <Field label="Cost per unit (TZS)"><MoneyInput className="input-field" value={f.unitCost} onChange={(e) => setF({ ...f, unitCost: e.target.value })} /></Field>
         <Field label="Warn when stock falls to"><input className="input-field" type="number" value={f.reorderLevel} onChange={(e) => setF({ ...f, reorderLevel: e.target.value })} /></Field>
       </FormGrid>
     </Modal>

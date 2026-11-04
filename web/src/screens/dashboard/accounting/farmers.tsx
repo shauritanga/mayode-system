@@ -6,6 +6,7 @@ import { accountingApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 import { Actions, Badge, Card, Head, MoneyAccountSelect, errText, shortDate, today, tzs, useLoad } from './controls';
+import MoneyInput from '@/components/MoneyInput';
 
 const payee = (i: { farmerId?: string | null; sellerName?: string | null }) => (i.farmerId ? { farmerId: i.farmerId } : { sellerName: i.sellerName });
 
@@ -101,7 +102,7 @@ function PayModal({ payee: p, onClose, onSaved }: { payee: any; onClose: () => v
     <form id="payout-form" onSubmit={(e) => { e.preventDefault(); void submit(); }} style={{ display: 'grid', gap: 10 }}>
       {p.debts > 0 && <div className="alert-box" role="note">This farmer also owes the cooperative <strong>{tzs(p.debts)}</strong> in dues. You may want to collect it, or agree with the farmer to take it off this payment.</div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <label className="form-label">Amount (TZS)<input className="input-field" type="number" min="0.01" max={p.owed} step="0.01" required autoFocus value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
+        <label className="form-label">Amount (TZS)<MoneyInput className="input-field" min="0.01" max={p.owed} step="0.01" required autoFocus value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
           <span className="muted" style={{ fontSize: 11 }}>{left > 0.004 ? `${tzs(left)} will still be owed` : 'This clears what is owed'}</span></label>
         <label className="form-label">Date<input className="input-field" type="date" max={today()} required value={f.paidOn} onChange={(e) => setF({ ...f, paidOn: e.target.value })} /></label>
       </div>

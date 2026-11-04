@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { marketplaceApi } from '@/lib/api';
 import { apiError } from '@/lib/download';
 import { InsightPanel, money } from '@/components/role-dashboards/DashboardPrimitives';
+import MoneyInput from '@/components/MoneyInput';
 
 export default function FarmerLandListingForm({ farms, farmerId, onSubmit }: { farms: any[]; farmerId: string; onSubmit: (data: object) => Promise<void> }) {
   const [farmId, setFarmId] = useState(''); const [asking, setAsking] = useState(''); const [months, setMonths] = useState('12'); const [deal, setDeal] = useState('STANDARD');
@@ -18,12 +19,12 @@ export default function FarmerLandListingForm({ farms, farmerId, onSubmit }: { f
     catch (err) { setError(apiError(err)); } finally { setBusy(false); }
   }}>
     <label className="form-label">Farm<select className="input-field" required value={farmId} onChange={(e) => setFarmId(e.target.value)}><option value="">Choose a farm you own</option>{farms.filter((f) => f.farmerId === farmerId).map((f) => <option key={f.id} value={f.id}>{f.farmCode} · {f.socialHectares} ha</option>)}</select></label>
-    <label className="form-label">Asking price / first year (TZS)<input className="input-field" required type="number" min="1" step="1" value={asking} onChange={(e) => setAsking(e.target.value)} /></label>
+    <label className="form-label">Asking price / first year (TZS)<MoneyInput className="input-field" required min="1" step="1" value={asking} onChange={(e) => setAsking(e.target.value)} /></label>
     <label className="form-label">Lease duration (months)<input className="input-field" required type="number" min="1" max="60" step="1" value={months} onChange={(e) => setMonths(e.target.value)} /></label>
     <label className="form-label">Deal<select className="input-field" value={deal} onChange={(e) => setDeal(e.target.value)}><option value="STANDARD">Standard</option><option value="FLASH_DEAL">Flash deal</option><option value="RELATIONSHIP">Relationship (private, by code)</option></select></label>
     {deal === 'RELATIONSHIP' && <p className="form-grid-wide" style={{ gridColumn: '1 / -1', fontSize: 13, color: 'var(--text-secondary)' }}>A Relationship listing is private. When you create it, the system gives you a secret code. Give the code only to the person you choose: they enter it to unlock the listing, and nobody else can take it, even if they find it. The code works for one person and is valid for 14 days. You can generate a new one at any time before a deposit.</p>}
     {Number(months) > 12 && <><label className="form-label">Pricing model<select className="input-field" value={pricing} onChange={(e) => setPricing(e.target.value)}><option value="fixed">Fixed annual rent</option><option value="step_up">Annual step-up</option><option value="rice_linked">Rice-linked rent</option></select></label><label className="form-label">Payment plan<select className="input-field" value={plan} onChange={(e) => setPlan(e.target.value)}><option value="PREPAID">Full term upfront</option><option value="ANNUAL">Annual installments</option></select></label></>}
-    <label className="form-label">Optional automatic price drop (TZS)<input className="input-field" type="number" min="1" max={Number(asking) || undefined} value={drop} onChange={(e) => setDrop(e.target.value)} /></label>
+    <label className="form-label">Optional automatic price drop (TZS)<MoneyInput className="input-field" min="1" max={Number(asking) || undefined} value={drop} onChange={(e) => setDrop(e.target.value)} /></label>
     {drop && <label className="form-label">Drop after days<input className="input-field" required type="number" min="1" step="1" value={days} onChange={(e) => setDays(e.target.value)} /></label>}
     {gauge && <p className="form-grid-wide">Suggested rent: <strong>{money(gauge.suggestedPrice)}</strong> · Asking price is {gauge.marketGauge} relative to comparable farms · Grade {gauge.grade}. The suggestion is advisory; you set the price.</p>}
     {error && <p role="alert" className="form-grid-wide">{error}</p>}<button className="btn-primary" disabled={busy || !farmerId}>{busy ? 'Saving…' : 'Create listing'}</button>

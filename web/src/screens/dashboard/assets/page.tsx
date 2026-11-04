@@ -9,6 +9,7 @@ import {
   ConfirmDialog, Empty, Field, Filters, FormGrid, LoadError, Notice, PageHeader, Pager, StatCard, TableSkeleton, Tabs,
   errMsg, fmtDate, fmtNum, titleCase, todayISO, useApi, useCan,
 } from '@/screens/dashboard/irrigation/ui';
+import MoneyInput from '@/components/MoneyInput';
 
 const CATEGORIES = ['MACHINERY_VEHICLE', 'BUILDING_WAREHOUSE', 'MILL_PROCESSING', 'IRRIGATION_STRUCTURE', 'SOLAR_POWER', 'MEASURING_EQUIPMENT', 'TOOLS', 'OFFICE_IT', 'FURNITURE', 'OTHER'];
 const LIFE_YEARS: Record<string, number> = { MACHINERY_VEHICLE: 8, BUILDING_WAREHOUSE: 40, MILL_PROCESSING: 12, IRRIGATION_STRUCTURE: 25, SOLAR_POWER: 15, MEASURING_EQUIPMENT: 5, TOOLS: 4, OFFICE_IT: 4, FURNITURE: 8, OTHER: 5 };
@@ -80,7 +81,7 @@ function AssetModal({ canLinkMachines, onClose, onSaved }: { canLinkMachines: bo
           <Field label="Name *" error={errors.name}><input className="input-field" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Tractor MF-385" /></Field>
           <Field label="Category *"><select className="input-field" value={form.category} onChange={(e) => set('category', e.target.value)}>{CATEGORIES.map((c) => <option key={c} value={c}>{cat(c)}</option>)}</select></Field>
           <Field label="Purchase date *" error={errors.purchaseDate}><input type="date" className="input-field" max={todayISO()} value={form.purchaseDate} onChange={(e) => set('purchaseDate', e.target.value)} /></Field>
-          <Field label="Cost (TZS) *" error={errors.cost}><input type="number" min="0" className="input-field" value={form.cost} onChange={(e) => set('cost', e.target.value)} /></Field>
+          <Field label="Cost (TZS) *" error={errors.cost}><MoneyInput min="0" className="input-field" value={form.cost} onChange={(e) => set('cost', e.target.value)} /></Field>
           <Field label="Held by"><input className="input-field" value={form.custodianName} onChange={(e) => set('custodianName', e.target.value)} placeholder="Person responsible" /></Field>
           <Field label="Where it is kept"><input className="input-field" value={form.location} onChange={(e) => set('location', e.target.value)} /></Field>
         </FormGrid>
@@ -92,7 +93,7 @@ function AssetModal({ canLinkMachines, onClose, onSaved }: { canLinkMachines: bo
           <Field label="Paid for by"><select className="input-field" value={form.fundingSource} onChange={(e) => set('fundingSource', e.target.value)}>{FUNDING.map((c) => <option key={c} value={c}>{titleCase(c)}</option>)}</select></Field>
           <Field label="Supplier"><input className="input-field" value={form.supplier} onChange={(e) => set('supplier', e.target.value)} /></Field>
           <Field label="Useful life (years)" error={errors.usefulLifeYears} hint={`Leave empty for the usual ${LIFE_YEARS[form.category]} years`}><input type="number" min="1" className="input-field" value={form.usefulLifeYears} onChange={(e) => set('usefulLifeYears', e.target.value)} /></Field>
-          <Field label="Value left at the end (TZS)" error={errors.salvageValue} hint="Salvage value; empty means fully written off"><input type="number" min="0" className="input-field" value={form.salvageValue} onChange={(e) => set('salvageValue', e.target.value)} /></Field>
+          <Field label="Value left at the end (TZS)" error={errors.salvageValue} hint="Salvage value; empty means fully written off"><MoneyInput min="0" className="input-field" value={form.salvageValue} onChange={(e) => set('salvageValue', e.target.value)} /></Field>
           <Field label="Condition"><select className="input-field" value={form.condition} onChange={(e) => set('condition', e.target.value)}>{CONDITIONS.map((c) => <option key={c} value={c}>{titleCase(c)}</option>)}</select></Field>
           <Field label="Service every (days)"><input type="number" min="1" className="input-field" value={form.serviceIntervalDays} onChange={(e) => set('serviceIntervalDays', e.target.value)} /></Field>
           <Field label="Warranty ends"><input type="date" className="input-field" value={form.warrantyExpiresOn} onChange={(e) => set('warrantyExpiresOn', e.target.value)} /></Field>
@@ -177,7 +178,7 @@ function MaintenanceModal({ asset, onClose, onSaved }: { asset: { id: string; na
         <FormGrid>
           <Field label="Kind of work"><select className="input-field" value={form.kind} onChange={(e) => set('kind', e.target.value)}>{WORK_KINDS.map((k) => <option key={k} value={k}>{titleCase(k)}</option>)}</select></Field>
           <Field label="Date done *"><input type="date" className="input-field" max={todayISO()} value={form.doneOn} onChange={(e) => set('doneOn', e.target.value)} /></Field>
-          <Field label="Cost (TZS)"><input type="number" min="0" className="input-field" value={form.cost} onChange={(e) => set('cost', e.target.value)} /></Field>
+          <Field label="Cost (TZS)"><MoneyInput min="0" className="input-field" value={form.cost} onChange={(e) => set('cost', e.target.value)} /></Field>
           <Field label="Done by"><input className="input-field" value={form.performedBy} onChange={(e) => set('performedBy', e.target.value)} placeholder="Workshop or person" /></Field>
           <Field label="Next due" hint="Empty keeps the usual service interval"><input type="date" className="input-field" value={form.nextDueOn} onChange={(e) => set('nextDueOn', e.target.value)} /></Field>
           <Field label="Notes" wide><textarea className="input-field" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
@@ -241,7 +242,7 @@ function DisposeModal({ asset, onClose, onSaved }: { asset: any; onClose: () => 
         <FormGrid>
           <Field label="What happened"><select className="input-field" value={form.method} onChange={(e) => set('method', e.target.value)}>{DISPOSAL_METHODS.map((m) => <option key={m} value={m}>{titleCase(m)}</option>)}</select></Field>
           <Field label="Date"><input type="date" className="input-field" max={todayISO()} value={form.disposedOn} onChange={(e) => set('disposedOn', e.target.value)} /></Field>
-          {form.method === 'SOLD' && <Field label="Sale proceeds (TZS)"><input type="number" min="0" className="input-field" value={form.proceeds} onChange={(e) => set('proceeds', e.target.value)} /></Field>}
+          {form.method === 'SOLD' && <Field label="Sale proceeds (TZS)"><MoneyInput min="0" className="input-field" value={form.proceeds} onChange={(e) => set('proceeds', e.target.value)} /></Field>}
           <Field label="Reason" wide><textarea className="input-field" rows={2} value={form.reason} onChange={(e) => set('reason', e.target.value)} /></Field>
         </FormGrid>
         <p style={{ fontSize: 13, margin: '12px 0 0' }}>{gainLoss >= 0 ? 'Gain' : 'Loss'} on disposal: <strong style={{ color: gainLoss >= 0 ? 'var(--green-500)' : 'var(--red-400)' }}>{tzs(Math.abs(gainLoss))}</strong></p>

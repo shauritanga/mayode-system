@@ -7,6 +7,7 @@ import { tzs } from '@/lib/credit';
 import type { RiskInfo } from '@/lib/insurance';
 import ProductGuide from './ProductGuide';
 import RiskPanel from './RiskPanel';
+import MoneyInput from '@/components/MoneyInput';
 
 interface FarmerOption { id: string; firstName: string; lastName: string; controlNumber: string }
 
@@ -91,7 +92,7 @@ export default function NewInsuranceApplicationModal({ forStaff, onClose, onCrea
           <label className="form-label">Area to insure (hectares)<input className="input-field" type="number" min={0.01} step="0.1" value={form.insuredAreaHectares} onChange={(e) => setForm({ ...form, insuredAreaHectares: e.target.value })} /></label>
           <label className="form-label">Rice variety<input className="input-field" value={form.riceVariety} onChange={(e) => setForm({ ...form, riceVariety: e.target.value })} /></label>
           <label className="form-label">Cover you would like (TZS)
-            <input className="input-field" type="number" min={0} value={form.requestedSumInsured} onChange={(e) => setForm({ ...form, requestedSumInsured: e.target.value })} />
+            <MoneyInput className="input-field" min={0} value={form.requestedSumInsured} onChange={(e) => setForm({ ...form, requestedSumInsured: e.target.value })} />
             {hint?.suggestedSumInsured != null && (
               <button type="button" className="btn-secondary" style={{ fontSize: 11, padding: '3px 8px', marginTop: 4 }} onClick={() => setForm({ ...form, requestedSumInsured: String(hint.suggestedSumInsured) })}>
                 Suggested {tzs(hint.suggestedSumInsured)} — use

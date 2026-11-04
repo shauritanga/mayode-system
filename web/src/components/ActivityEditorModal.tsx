@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import Modal from '@/components/Modal';
 import { cropCyclesApi, mamcosApi, plotsApi, uploadsApi } from '@/lib/api';
 import { ACTIVITY_TYPES, INPUT_UNITS } from '@/lib/activity-types';
+import MoneyInput from '@/components/MoneyInput';
 
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: 'var(--neutral-400)', marginBottom: '5px', fontWeight: 600 };
 const s = (v: unknown) => (v == null ? '' : String(v));
@@ -165,7 +166,7 @@ export default function ActivityEditorModal({
           </div>
         </Field>
         <Field label="Cost (TZS)">
-          <input className="input-field" type="number" min="0" step="any" value={v.cost} onChange={(e) => set('cost', e.target.value)} />
+          <MoneyInput className="input-field" min="0" step="any" value={v.cost} onChange={(e) => set('cost', e.target.value)} />
         </Field>
         <Field label="What was done" wide>
           <input className="input-field" value={v.description} onChange={(e) => set('description', e.target.value)} placeholder="Short description of the work" />

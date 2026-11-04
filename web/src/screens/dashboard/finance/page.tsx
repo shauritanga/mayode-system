@@ -5,6 +5,7 @@ import { apiErrorMessage } from '@/lib/api-error';
 import { useEffect, useState } from 'react';
 import { accountingApi, financeApi, farmersApi, suppliersApi, loansApi } from '@/lib/api';
 import Modal from '@/components/Modal';
+import MoneyInput from '@/components/MoneyInput';
 
 interface FinanceSummary {
   totalRevenue: number;
@@ -431,7 +432,7 @@ function ReceivablesTab() {
         >
           <form onSubmit={submit} style={{ display: 'grid', gap: 9 }}>
             <input className="input-field" placeholder="Invoice number" required value={form.invoiceNumber} onChange={(e) => setForm({ ...form, invoiceNumber: e.target.value })} />
-            <input className="input-field" type="number" min="0.01" step="0.01" placeholder="Amount (TZS)" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            <MoneyInput className="input-field" min="0.01" step="0.01" placeholder="Amount (TZS)" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
             <input className="input-field" type="date" required value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
             <input className="input-field" placeholder="Buyer ID (optional)" value={form.buyerId} onChange={(e) => setForm({ ...form, buyerId: e.target.value })} />
             {error && <div style={{ color: 'var(--red-400)', fontSize: 13 }}>{error}</div>}
@@ -554,7 +555,7 @@ function PayablesTab() {
             {!form.supplierId && (
               <input className="input-field" placeholder="Or type supplier name" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} />
             )}
-            <input className="input-field" type="number" min="0.01" step="0.01" placeholder="Amount (TZS)" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            <MoneyInput className="input-field" min="0.01" step="0.01" placeholder="Amount (TZS)" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
             <input className="input-field" type="date" required value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
             <input className="input-field" placeholder="Description (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             {error && <div style={{ color: 'var(--red-400)', fontSize: 13 }}>{error}</div>}
@@ -687,7 +688,7 @@ function BudgetsTab() {
                   <option value="">Select account…</option>
                   {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                 </select>
-                <input className="input-field" type="number" placeholder="Amount" value={line.amount} onChange={(e) => updateLine(i, 'amount', e.target.value)} />
+                <MoneyInput className="input-field" placeholder="Amount" value={line.amount} onChange={(e) => updateLine(i, 'amount', e.target.value)} />
               </div>
             ))}
             <button type="button" className="btn-secondary" style={{ fontSize: 12, justifySelf: 'start' }} onClick={() => setLines([...lines, { accountId: '', amount: '' }])}>+ Add line</button>

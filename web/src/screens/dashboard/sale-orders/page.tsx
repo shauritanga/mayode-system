@@ -8,6 +8,7 @@ import { hasPermission } from '@/lib/nav';
 import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 import OrderDetail, { StatusChip, STATUS_LABEL } from './OrderDetail';
+import MoneyInput from '@/components/MoneyInput';
 
 interface Row {
   id: string; reference: string; status: string; quantityKg: number; grade?: string | null; pricePerKg: number;
@@ -238,7 +239,7 @@ export function SaleOrdersView({ embedded = false }: { embedded?: boolean }) {
               </div>
               <div className="ua-field">
                 <label className="ua-label" htmlFor="so-price">Price per kg (TZS)</label>
-                <input id="so-price" className="input-field" type="number" min={0} step="any" required value={form.pricePerKg} onChange={(e) => set('pricePerKg', e.target.value)} />
+                <MoneyInput id="so-price" className="input-field" min={0} step="any" required value={form.pricePerKg} onChange={(e) => set('pricePerKg', e.target.value)} />
               </div>
             </div>
             {form.quantityKg && form.pricePerKg && <div className="ua-role-note">Order value: TZS {Math.round(Number(form.quantityKg) * Number(form.pricePerKg)).toLocaleString()}</div>}

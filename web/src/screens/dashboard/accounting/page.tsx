@@ -11,6 +11,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { CashBookView, MoneyAccountsView } from './money';
 import { FarmerAccountsView, PayoutsView } from './farmers';
 import { BankReconciliationView, CashTransactionsView, DocumentsView, PeriodCloseView, VatReturnView } from './controls';
+import MoneyInput from '@/components/MoneyInput';
 
 const MENU = [
   ['Farmers', 'farmer-accounts', ['Owed to Farmers', 'Payouts', 'Farmer Statements']],
@@ -439,7 +440,7 @@ export default function AccountingPage() {
         {reserveFormOpen && <Modal title="Allocate retained earnings to reserve" onClose={() => !reserveSaving && setReserveFormOpen(false)} width="520px" footer={<><button type="button" className="btn-secondary" onClick={() => setReserveFormOpen(false)} disabled={reserveSaving}>Cancel</button><button type="submit" form="reserve-allocation-form" className="btn-primary" disabled={reserveSaving}>{reserveSaving ? 'Saving…' : 'Record allocation'}</button></>}>
           <form id="reserve-allocation-form" onSubmit={(event) => { event.preventDefault(); void saveReserveAllocation(); }} style={{ display: 'grid', gap: 10 }}>
             {(!currentUser?.mamcosId || currentUser.role === 'SUPER_ADMIN') && <label className="form-label">Cooperative<select className="input-field" required value={reserveForm.mamcosId} onChange={(event) => setReserveForm({ ...reserveForm, mamcosId: event.target.value })}><option value="">Select cooperative</option>{reserveCooperatives.map((cooperative) => <option key={cooperative.id} value={cooperative.id}>{cooperative.name}</option>)}</select></label>}
-            <label className="form-label">Amount (TZS)<input className="input-field" type="number" min="0.01" step="1" required value={reserveForm.amount} onChange={(event) => setReserveForm({ ...reserveForm, amount: event.target.value })} /></label>
+            <label className="form-label">Amount (TZS)<MoneyInput className="input-field" min="0.01" step="1" required value={reserveForm.amount} onChange={(event) => setReserveForm({ ...reserveForm, amount: event.target.value })} /></label>
             <label className="form-label">Allocation date<input className="input-field" type="date" required value={reserveForm.allocationDate} onChange={(event) => setReserveForm({ ...reserveForm, allocationDate: event.target.value })} /></label>
             <label className="form-label">Description<input className="input-field" value={reserveForm.description} onChange={(event) => setReserveForm({ ...reserveForm, description: event.target.value })} placeholder="e.g. Annual general reserve allocation" /></label>
             {reserveError && <div style={{ color: 'var(--red-400)', fontSize: 13 }}>{reserveError}</div>}
@@ -461,7 +462,7 @@ export default function AccountingPage() {
           <form id="member-contribution-form" onSubmit={(event) => { event.preventDefault(); void saveContribution(); }} style={{ display: 'grid', gap: 10 }}>
             <label className="form-label">Member<select className="input-field" required value={contributionForm.farmerId} onChange={(event) => setContributionForm({ ...contributionForm, farmerId: event.target.value })}><option value="">Select member</option>{(memberContributionReport.members ?? []).map((member: any) => <option key={member.id} value={member.id}>{member.firstName} {member.lastName} · {member.controlNumber}</option>)}</select></label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <label className="form-label">Amount (TZS)<input className="input-field" type="number" min="0.01" step="1" required value={contributionForm.amount} onChange={(event) => setContributionForm({ ...contributionForm, amount: event.target.value })} /></label>
+              <label className="form-label">Amount (TZS)<MoneyInput className="input-field" min="0.01" step="1" required value={contributionForm.amount} onChange={(event) => setContributionForm({ ...contributionForm, amount: event.target.value })} /></label>
               <label className="form-label">Contribution date<input className="input-field" type="date" required value={contributionForm.contributionDate} onChange={(event) => setContributionForm({ ...contributionForm, contributionDate: event.target.value })} /></label>
             </div>
             <label className="form-label">Payment method<select className="input-field" value={contributionForm.paymentMethod} onChange={(event) => setContributionForm({ ...contributionForm, paymentMethod: event.target.value })}><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank transfer</option><option value="MOBILE_MONEY">Mobile money</option><option value="OTHER">Other</option></select></label>
@@ -501,7 +502,7 @@ export default function AccountingPage() {
             <div style={{ fontWeight: 700, marginTop: 6 }}>Account allocations</div>
             {budgetLines.map((line, index) => <div key={index} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 150px auto', gap: 8 }}>
               <select className="input-field" required value={line.accountId} onChange={(event) => setBudgetLines((current) => current.map((item, i) => i === index ? { ...item, accountId: event.target.value } : item))}><option value="">Choose account</option>{budgetAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select>
-              <input className="input-field" type="number" min="0" step="1" required placeholder="Amount (TZS)" value={line.amount} onChange={(event) => setBudgetLines((current) => current.map((item, i) => i === index ? { ...item, amount: event.target.value } : item))} />
+              <MoneyInput className="input-field" min="0" step="1" required placeholder="Amount (TZS)" value={line.amount} onChange={(event) => setBudgetLines((current) => current.map((item, i) => i === index ? { ...item, amount: event.target.value } : item))} />
               {budgetLines.length > 1 && <button type="button" className="btn-secondary" aria-label="Remove account allocation" onClick={() => setBudgetLines((current) => current.filter((_, i) => i !== index))}>×</button>}
             </div>)}
             <button type="button" className="btn-secondary" style={{ justifySelf: 'start' }} onClick={() => setBudgetLines((current) => [...current, { accountId: '', amount: '' }])}>Add account line</button>
@@ -650,7 +651,7 @@ export default function AccountingPage() {
               {journalLines.map((line, index) => <div key={index} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 100px 160px 32px', gap: 8, alignItems: 'center' }}>
                 <select className="input-field" required value={line.accountId} onChange={(event) => setJournalLines((current) => current.map((item, i) => i === index ? { ...item, accountId: event.target.value } : item))}><option value="">Choose account</option>{budgetAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select>
                 <select className="input-field" value={line.side} onChange={(event) => setJournalLines((current) => current.map((item, i) => i === index ? { ...item, side: event.target.value } : item))}><option value="debit">Debit</option><option value="credit">Credit</option></select>
-                <input className="input-field" type="number" min="0.01" step="0.01" required placeholder="0.00" value={line.amount} onChange={(event) => setJournalLines((current) => current.map((item, i) => i === index ? { ...item, amount: event.target.value } : item))} />
+                <MoneyInput className="input-field" min="0.01" step="0.01" required placeholder="0.00" value={line.amount} onChange={(event) => setJournalLines((current) => current.map((item, i) => i === index ? { ...item, amount: event.target.value } : item))} />
                 {journalLines.length > 2 ? <button type="button" className="btn-secondary" aria-label="Remove line" onClick={() => setJournalLines((current) => current.filter((_, i) => i !== index))}>×</button> : <span />}
               </div>)}
               <div><button type="button" className="btn-secondary" onClick={() => setJournalLines((current) => [...current, { accountId: '', side: 'debit', amount: '' }])}>Add line</button></div>

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import { Clock, LayoutList, Percent, Tractor, Users, Warehouse } from 'lucide-react';
 import Modal from '@/components/Modal';
+import MoneyInput from '@/components/MoneyInput';
 import { accountingApi, chargesApi, duesApi, machineryApi } from '@/lib/api';
 import { Field, LoadError, Notice, TableSkeleton, errMsg, titleCase, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 
@@ -46,7 +47,7 @@ function EditAmountModal({ title, subtitle, unit, amount, active, graceDays, not
       footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button><button type="submit" form="amount-form" className="btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button></>}>
       <form id="amount-form" onSubmit={(e) => { e.preventDefault(); void save(); }} style={{ display: 'grid', gap: 14 }}>
         {error && <div role="alert" className="alert-box alert-danger">{error}</div>}
-        <Field label={`Amount (${unit})`}><input className="input-field" type="number" min="0" step="any" autoFocus value={value} placeholder="Not set" onChange={(e) => setValue(e.target.value)} /></Field>
+        <Field label={`Amount (${unit})`}>{unit.startsWith('TZS') ? <MoneyInput className="input-field" min="0" autoFocus value={value} placeholder="Not set" onChange={(e) => setValue(e.target.value)} /> : <input className="input-field" type="number" min="0" step="any" autoFocus value={value} placeholder="Not set" onChange={(e) => setValue(e.target.value)} />}</Field>
         {graceDays != null && <Field label="Grace period (days)" hint="A late payment is charged only after this many days past the due date."><input className="input-field" type="number" min="0" max="365" value={grace} onChange={(e) => setGrace(e.target.value)} /></Field>}
         {active != null && (
           <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 14 }}>
@@ -77,7 +78,7 @@ function NewLevyModal({ onClose, onSaved }: { onClose: () => void; onSaved: (m: 
         <Field label="Name" wide><input className="input-field" autoFocus value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Annual levy" /></Field>
         <Field label="Kind"><select className="input-field" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>{['LEVY', 'MEMBERSHIP_FEE', 'CANAL_CLEANING', 'OTHER'].map((k) => <option key={k} value={k}>{KIND_WORDS[k]}</option>)}</select></Field>
         <Field label="How it is charged"><select className="input-field" value={f.basis} onChange={(e) => setF({ ...f, basis: e.target.value })}><option value="FLAT">Same amount for every farmer</option><option value="PER_HECTARE">Per hectare the farmer holds</option></select></Field>
-        <Field label={f.basis === 'PER_HECTARE' ? 'Amount per hectare (TZS)' : 'Amount (TZS)'}><input className="input-field" type="number" min="1" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} /></Field>
+        <Field label={f.basis === 'PER_HECTARE' ? 'Amount per hectare (TZS)' : 'Amount (TZS)'}><MoneyInput className="input-field" min="1" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} /></Field>
         <Field label="Season (optional)"><input className="input-field" value={f.season} onChange={(e) => setF({ ...f, season: e.target.value })} placeholder="e.g. 2026/27" /></Field>
       </div>
     </Modal>

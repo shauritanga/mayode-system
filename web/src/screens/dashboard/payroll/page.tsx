@@ -10,6 +10,7 @@ import {
   ConfirmDialog, Empty, Field, FormGrid, LoadError, Notice, PageHeader, StatCard, StatusBadge, TableSkeleton, Tabs,
   errMsg, fmtDate, titleCase, todayISO, useApi, useCan,
 } from '@/screens/dashboard/irrigation/ui';
+import MoneyInput from '@/components/MoneyInput';
 
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 const METHODS = ['CASH', 'MOBILE_MONEY', 'BANK'];
@@ -54,7 +55,7 @@ function PayeeModal({ payee, onClose, onSaved }: { payee?: any; onClose: () => v
         )}
         <FormGrid>
           <Field label="Paid as"><input className="input-field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Cashier, Canal leader C01…" /></Field>
-          <Field label="Monthly salary (TZS)"><input className="input-field" type="number" min={0} step="1000" value={salary} onChange={(e) => setSalary(e.target.value)} /></Field>
+          <Field label="Monthly salary (TZS)"><MoneyInput className="input-field" min={0} step="1000" value={salary} onChange={(e) => setSalary(e.target.value)} /></Field>
         </FormGrid>
         {error && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 13 }}>{error}</div>}
       </form>
@@ -148,8 +149,8 @@ function EditLineModal({ runId, line, onClose, onSaved }: { runId: string; line:
       footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><Submit form="line-form" saving={saving} label="Save" /></>}>
       <form id="line-form" onSubmit={(e) => { e.preventDefault(); void save(); }} style={{ display: 'grid', gap: 12 }}>
         <FormGrid>
-          <Field label="Pay for the month (TZS)" hint="Change for a part month or a bonus."><input className="input-field" type="number" min={0} value={gross} onChange={(e) => setGross(e.target.value)} autoFocus /></Field>
-          <Field label="Deductions (TZS)"><input className="input-field" type="number" min={0} value={deductions} onChange={(e) => setDeductions(e.target.value)} /></Field>
+          <Field label="Pay for the month (TZS)" hint="Change for a part month or a bonus."><MoneyInput className="input-field" min={0} value={gross} onChange={(e) => setGross(e.target.value)} autoFocus /></Field>
+          <Field label="Deductions (TZS)"><MoneyInput className="input-field" min={0} value={deductions} onChange={(e) => setDeductions(e.target.value)} /></Field>
         </FormGrid>
         <Field label="Deduction note"><input className="input-field" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Pension, advance, tax…" /></Field>
         <div>Paid to them: <strong>{tzs(net)}</strong></div>

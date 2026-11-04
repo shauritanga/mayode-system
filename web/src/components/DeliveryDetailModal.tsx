@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Modal from '@/components/Modal';
 import { inventoryApi } from '@/lib/api';
 import { PAYMENT_BADGE, PAYMENT_LABELS, deliveryBuyers, deliveryVariety, kgs, tzs, type DeliveryRow } from '@/lib/aggregation';
+import MoneyInput from '@/components/MoneyInput';
 
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: 'var(--neutral-400)', marginBottom: '5px', fontWeight: 600 };
 const h4: React.CSSProperties = { fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-3)', margin: '16px 0 8px' };
@@ -117,7 +118,7 @@ export default function DeliveryDetailModal({
             <>
               <h4 style={h4}>Update</h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div><label style={labelStyle}>Price per kg (TZS)</label><input className="input-field" type="number" min="0" step="any" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
+                <div><label style={labelStyle}>Price per kg (TZS)</label><MoneyInput className="input-field" min="0" step="any" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
                 <div><label style={labelStyle}>Rice variety</label><input className="input-field" value={variety} onChange={(e) => setVariety(e.target.value)} /></div>
                 <div><label style={labelStyle}>Bags</label><input className="input-field" type="number" min="0" value={bags} onChange={(e) => setBags(e.target.value)} /></div>
                 <div><label style={labelStyle}>Storage batch number</label><input className="input-field" value={batch} onChange={(e) => setBatch(e.target.value)} /></div>
@@ -135,7 +136,7 @@ export default function DeliveryDetailModal({
                 <div style={{ marginTop: 16 }}>
                   <label style={labelStyle}>Record a payment to the farmer (TZS)</label>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <input className="input-field" type="number" min="1" step="any" placeholder={`up to ${Math.round(owed).toLocaleString()}`} value={pay} onChange={(e) => setPay(e.target.value)} />
+                    <MoneyInput className="input-field" min="1" step="any" placeholder={`up to ${Math.round(owed).toLocaleString()}`} value={pay} onChange={(e) => setPay(e.target.value)} />
                     <button className="btn-primary" style={{ fontSize: 12, whiteSpace: 'nowrap' }} disabled={busy || !(Number(pay) > 0)} onClick={savePayment}>Record payment</button>
                     <button className="btn-secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }} disabled={busy} onClick={() => setPay(String(owed))}>Pay all</button>
                   </div>

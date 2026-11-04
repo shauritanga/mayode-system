@@ -5,6 +5,7 @@ import { apiErrorMessage } from '@/lib/api-error';
 import Modal from '@/components/Modal';
 import { day, tzs } from '@/lib/credit';
 import { CLAIM_PAY, productLabel } from '@/lib/insurance';
+import MoneyInput from '@/components/MoneyInput';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const CLAIM_BADGE: Record<string, string> = { SUBMITTED: 'badge-blue', INSPECTING: 'badge-gold', APPROVED: 'badge-green', REJECTED: 'badge-red', PAID: 'badge-green' };
@@ -93,7 +94,7 @@ export default function InsurerClaimsPanel() {
           )}>
           {formError && <div className="alert-box alert-danger" style={{ marginBottom: 10 }}>{formError}</div>}
           <div style={{ display: 'grid', gap: 12 }}>
-            <label className="form-label">{active.kind === 'decide' ? 'Amount to approve (TZS)' : 'Amount paid (TZS)'}<input className="input-field" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+            <label className="form-label">{active.kind === 'decide' ? 'Amount to approve (TZS)' : 'Amount paid (TZS)'}<MoneyInput className="input-field" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
             {active.kind === 'decide' ? (
               <label className="form-label">Note (needed to reject)<input className="input-field" value={note} onChange={(e) => setNote(e.target.value)} /></label>
             ) : (

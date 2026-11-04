@@ -10,6 +10,7 @@ import {
   ConfirmDialog, Empty, Field, Filters, FormGrid, LoadError, Notice, PageHeader, Pager, StatCard, StatusBadge, TableSkeleton, Tabs,
   errMsg, fmtDate, fmtNum, titleCase, todayISO, useApi, useCan,
 } from '@/screens/dashboard/irrigation/ui';
+import MoneyInput from '@/components/MoneyInput';
 
 const ACTIVITY_TYPES = ['PLOUGHING', 'HARROWING', 'LEVELLING', 'TRANSPLANTING', 'SPRAYING', 'HARVESTING', 'THRESHING', 'TRANSPORT', 'OTHER'];
 const STATUSES = ['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
@@ -78,7 +79,7 @@ function ActivityModal({ activity, equipment, blocks, onClose, onSaved }: { acti
           <Field label="Status"><select className="input-field" value={form.status} onChange={(e) => set('status', e.target.value)}>{STATUSES.map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}</select></Field>
           {machine && !paid && (
             <Field label="Contribution to the AMCOS (TZS)" error={errors.feeAmount} hint={suggested ? `Standard: ${tzs(suggested)} (${form.hectares} ha × ${tzs(rate)})` : rate ? 'Leave empty to use hectares × the rate' : 'No rate is set yet. Set the standard rate on the Machines tab.'}>
-              <input type="number" min="0" className="input-field" value={form.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} placeholder={suggested ? String(suggested) : ''} />
+              <MoneyInput min="0" className="input-field" value={form.feeAmount} onChange={(e) => set('feeAmount', e.target.value)} placeholder={suggested ? String(suggested) : ''} />
             </Field>
           )}
           <Field label="Notes" wide><textarea className="input-field" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
@@ -154,9 +155,9 @@ function EquipmentModal({ item, rates, onClose, onSaved }: { item?: any; rates: 
           {external && <>
             <Field label="Owner *" error={errors.ownerName}><input className="input-field" value={form.ownerName} onChange={(e) => set('ownerName', e.target.value)} /></Field>
             <Field label="Owner phone"><input className="input-field" inputMode="tel" value={form.ownerPhone} onChange={(e) => set('ownerPhone', e.target.value)} /></Field>
-            {!editing && <Field label="Registration fee (TZS)" error={errors.registrationFee} hint={rates?.toolRegistrationFee ? `Leave empty for the standard ${tzs(rates.toolRegistrationFee)}` : 'Paid once to the AMCOS. No standard fee is set.'}><input type="number" min="0" className="input-field" value={form.registrationFee} onChange={(e) => set('registrationFee', e.target.value)} placeholder={rates?.toolRegistrationFee ? String(rates.toolRegistrationFee) : ''} /></Field>}
+            {!editing && <Field label="Registration fee (TZS)" error={errors.registrationFee} hint={rates?.toolRegistrationFee ? `Leave empty for the standard ${tzs(rates.toolRegistrationFee)}` : 'Paid once to the AMCOS. No standard fee is set.'}><MoneyInput min="0" className="input-field" value={form.registrationFee} onChange={(e) => set('registrationFee', e.target.value)} placeholder={rates?.toolRegistrationFee ? String(rates.toolRegistrationFee) : ''} /></Field>}
           </>}
-          <Field label="Contribution per hectare (TZS)" error={errors.feePerHectare} hint={rates?.toolFeePerHectare ? `Leave empty for the standard ${tzs(rates.toolFeePerHectare)}` : 'Every tool contributes this for each hectare it works. No standard rate is set.'}><input type="number" min="0" className="input-field" value={form.feePerHectare} onChange={(e) => set('feePerHectare', e.target.value)} placeholder={rates?.toolFeePerHectare ? String(rates.toolFeePerHectare) : ''} /></Field>
+          <Field label="Contribution per hectare (TZS)" error={errors.feePerHectare} hint={rates?.toolFeePerHectare ? `Leave empty for the standard ${tzs(rates.toolFeePerHectare)}` : 'Every tool contributes this for each hectare it works. No standard rate is set.'}><MoneyInput min="0" className="input-field" value={form.feePerHectare} onChange={(e) => set('feePerHectare', e.target.value)} placeholder={rates?.toolFeePerHectare ? String(rates.toolFeePerHectare) : ''} /></Field>
           {editing && <label className="form-label" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={form.isActive} onChange={(e) => set('isActive', e.target.checked)} />In service (can be used for new jobs)</label>}
           <Field label="Notes" wide><textarea className="input-field" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
         </FormGrid>

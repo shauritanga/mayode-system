@@ -8,6 +8,7 @@ import { hasPermission } from '@/lib/nav';
 import { dateTime, day, kg, label, openBlob, tzs } from '@/lib/ops';
 import { Facts, Field, FormGrid, ErrorNote, Loading, Status, useAction, useLoad } from './ui';
 import NewDocModal from './NewDocModal';
+import MoneyInput from '@/components/MoneyInput';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Panel = null | 'return' | 'invoice' | 'pay' | 'mobile' | 'control' | 'authorize' | 'cancel' | 'void' | 'revoke' | 'reject';
@@ -102,7 +103,7 @@ export default function OrderModal({ id, onClose, onChanged }: { id: string; onC
                 <Field label="Payment instructions" wide><input className="input-field" placeholder="Bank, account, control number…" value={f.instructions} onChange={(e) => set('instructions', e.target.value)} /></Field>
               </>}
               {panel === 'pay' && <>
-                <Field label="Amount received (TZS)" hint={`Balance ${tzs(balance)}`}><input className="input-field" type="number" value={f.amount} onChange={(e) => set('amount', e.target.value)} /></Field>
+                <Field label="Amount received (TZS)" hint={`Balance ${tzs(balance)}`}><MoneyInput className="input-field" value={f.amount} onChange={(e) => set('amount', e.target.value)} /></Field>
                 <Field label="How it was paid"><select className="input-field" value={f.method} onChange={(e) => set('method', e.target.value)}><option value="BANK_TRANSFER">Bank transfer</option><option value="CONTROL_NUMBER">Control number</option><option value="MOBILE_MONEY">Mobile money</option><option value="CASH">Cash</option><option value="OTHER">Other</option></select></Field>
                 {['BANK_TRANSFER', 'MOBILE_MONEY', 'CASH'].includes(f.method) && <MoneyAccountSelect label="Received into" value={f.cashAccountId} onChange={(id) => set('cashAccountId', id)} defaultKind={f.method === 'BANK_TRANSFER' ? 'BANK' : (f.method as 'CASH' | 'MOBILE_MONEY')} />}
                 <Field label="Receipt or transaction reference" hint="Can only be used once."><input className="input-field" value={f.reference} onChange={(e) => set('reference', e.target.value)} /></Field>
@@ -111,7 +112,7 @@ export default function OrderModal({ id, onClose, onChanged }: { id: string; onC
               </>}
               {panel === 'mobile' && <>
                 <Field label="Customer’s mobile number"><input className="input-field" value={f.phone} onChange={(e) => set('phone', e.target.value)} /></Field>
-                <Field label="Amount (TZS)" hint="The order is marked paid only when the provider confirms it."><input className="input-field" type="number" value={f.amount} onChange={(e) => set('amount', e.target.value)} /></Field>
+                <Field label="Amount (TZS)" hint="The order is marked paid only when the provider confirms it."><MoneyInput className="input-field" value={f.amount} onChange={(e) => set('amount', e.target.value)} /></Field>
               </>}
               {panel === 'control' && <Field label="Control number received from the bank or GePG" wide><input className="input-field" value={f.control} onChange={(e) => set('control', e.target.value)} /></Field>}
               {needsReason && panel !== 'return' && <Field label={panel === 'authorize' ? 'Why release before full payment? (needs management approval)' : 'Reason'} wide><input className="input-field" value={f.reason} onChange={(e) => set('reason', e.target.value)} /></Field>}

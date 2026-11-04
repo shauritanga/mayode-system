@@ -8,6 +8,7 @@ import {
 } from '@/components/role-dashboards/DashboardPrimitives';
 import { suppliersApi } from '@/lib/api';
 import { today, toIso, splitUrls } from './FarmerDataContext';
+import MoneyInput from '@/components/MoneyInput';
 
 export function SelectFarm({ farms, value, onChange }: { farms: any[]; value: string; onChange: (value: string) => void }) {
   return <label className="form-label">Farm<select className="input-field" value={value} onChange={(e) => onChange(e.target.value)}><option value="">Select farm</option>{farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.farmCode} · {farm.name}</option>)}</select></label>;
@@ -112,7 +113,7 @@ export function CostForm({ cycles, onSubmit }: { cycles: any[]; onSubmit: (paylo
       <SelectCycle cycles={cycles} value={cropCycleId} onChange={setCropCycleId} />
       <label className="form-label">Category<select className="input-field" value={category} onChange={(e) => setCategory(e.target.value)}><option>SEEDS</option><option>FERTILIZER</option><option>PESTICIDE</option><option>LABOR</option><option>EQUIPMENT</option><option>IRRIGATION</option><option>TRANSPORT</option><option>OTHER</option></select></label>
       <label className="form-label">Item<input className="input-field" required value={itemName} onChange={(e) => setItemName(e.target.value)} /></label>
-      <label className="form-label">Total TZS<input className="input-field" required type="number" min="0" value={totalCost} onChange={(e) => setTotalCost(e.target.value)} /></label>
+      <label className="form-label">Total TZS<MoneyInput className="input-field" required min="0" value={totalCost} onChange={(e) => setTotalCost(e.target.value)} /></label>
       <label className="form-label">Supplier<select className="input-field" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}><option value="">Not specified</option>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
       <label className="form-label">Payment status<select className="input-field" value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}><option value="PENDING">Pending</option><option value="PARTIAL">Partial</option><option value="PAID">Paid</option></select></label>
       <label className="form-label form-grid-wide">Receipt URL<input className="input-field" value={receiptUrl} onChange={(e) => setReceiptUrl(e.target.value)} /></label>
@@ -130,7 +131,7 @@ export function RevenueForm({ cycles, onSubmit }: { cycles: any[]; onSubmit: (pa
     <form className="form-grid" onSubmit={(event) => { event.preventDefault(); onSubmit({ cropCycleId, revenueType: 'LOCAL_SALE', quantityKg: Number(quantityKg), pricePerKg: Number(pricePerKg), totalRevenue: total, saleDate: new Date().toISOString() }); }}>
       <SelectCycle cycles={cycles} value={cropCycleId} onChange={setCropCycleId} />
       <label className="form-label">Quantity kg<input className="input-field" required type="number" min="0" value={quantityKg} onChange={(e) => setQuantityKg(e.target.value)} /></label>
-      <label className="form-label">Price/kg<input className="input-field" required type="number" min="0" value={pricePerKg} onChange={(e) => setPricePerKg(e.target.value)} /></label>
+      <label className="form-label">Price/kg<MoneyInput className="input-field" required min="0" value={pricePerKg} onChange={(e) => setPricePerKg(e.target.value)} /></label>
       <MetricTile label="Calculated total" value={money(total)} hint="Quantity × price/kg" />
       <button className="btn-primary" type="submit" disabled={!cropCycleId}>Save revenue</button>
     </form>
@@ -167,7 +168,7 @@ export function ConsentForm({ onSubmit }: { onSubmit: (payload: any) => void }) 
 export function MakeOfferButton({ farmerId, listingId, onOffer }: { farmerId: string; listingId: string; onOffer: (amount: number) => void }) {
   const [amount, setAmount] = useState('');
   return <form style={{ display: 'flex', gap: 8 }} onSubmit={(event) => { event.preventDefault(); onOffer(Number(amount)); }}>
-    <input className="input-field" style={{ width: 120 }} type="number" min="0" placeholder="Offer" value={amount} onChange={(e) => setAmount(e.target.value)} />
+    <MoneyInput className="input-field" style={{ width: 120 }} min="0" placeholder="Offer" value={amount} onChange={(e) => setAmount(e.target.value)} />
     <button className="btn-secondary" type="submit" disabled={!farmerId || !listingId || !amount}>Offer</button>
   </form>;
 }

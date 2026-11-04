@@ -10,6 +10,7 @@ import { ChartCard, DonutBreakdown, HorizontalBarChart } from '@/components/role
 import DeliveryDetailModal from '@/components/DeliveryDetailModal';
 import { PAYMENT_BADGE, PAYMENT_LABELS, deliveryBuyers, deliveryVariety, kgs, tzs, type DeliveryRow } from '@/lib/aggregation';
 import { MetricTile, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
+import MoneyInput from '@/components/MoneyInput';
 
 interface Slice { name: string; weightKg: number; count: number; value: number }
 interface DashboardSummary {
@@ -547,9 +548,9 @@ export default function InventoryPage() {
             </label>
             <label className="form-label">
               Purchase price per kg (TZS)<span style={{ fontWeight: 400, color: 'var(--neutral-500)' }}> (optional)</span>
-              <input
+              <MoneyInput
                 className="input-field"
-                type="number"
+               
                 min="0"
                 step="any"
                 value={form.pricePerKg}

@@ -4,6 +4,7 @@ import Modal from '@/components/Modal';
 import { opsApi } from '@/lib/api';
 import { kg, label, tzs } from '@/lib/ops';
 import { DataTable, ErrorNote, Field, FormGrid, Loading, Toolbar, useAction, useLoad } from './ui';
+import MoneyInput from '@/components/MoneyInput';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function ProductsPanel({ canCreate, canEdit }: { canCreate: boolean; canEdit: boolean }) {
@@ -50,7 +51,7 @@ function ProductModal({ product, onClose, onSaved }: { product: any; onClose: ()
         <Field label="Grade"><input className="input-field" value={f.grade} onChange={(e) => set('grade', e.target.value)} /></Field>
         <Field label="Pack size (kg)" hint="For bagged rice, e.g. 5, 10, 25, 50"><input className="input-field" type="number" value={f.packSizeKg} onChange={(e) => set('packSizeKg', e.target.value)} /></Field>
         <Field label="Sold by"><select className="input-field" value={f.unit} onChange={(e) => set('unit', e.target.value)}><option value="kg">Kilogram</option><option value="bag">Bag</option></select></Field>
-        <Field label="Standard price (TZS)"><input className="input-field" type="number" value={f.unitPrice} onChange={(e) => set('unitPrice', e.target.value)} /></Field>
+        <Field label="Standard price (TZS)"><MoneyInput className="input-field" value={f.unitPrice} onChange={(e) => set('unitPrice', e.target.value)} /></Field>
         <Field label="Tax rate (%)"><input className="input-field" type="number" value={f.taxRatePercent} onChange={(e) => set('taxRatePercent', e.target.value)} /></Field>
         <Field label="Low-stock level (kg)"><input className="input-field" type="number" value={f.reorderLevelKg} onChange={(e) => set('reorderLevelKg', e.target.value)} /></Field>
         <label style={{ fontSize: 13, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={f.isActive} onChange={(e) => set('isActive', e.target.checked)} />Active</label>

@@ -10,6 +10,7 @@ import InsuranceApplicationsPanel from '@/components/insurance/InsuranceApplicat
 import ProductGuide from '@/components/insurance/ProductGuide';
 import ClaimInspectModal from '@/components/insurance/ClaimInspectModal';
 import { MetricTile, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
+import MoneyInput from '@/components/MoneyInput';
 
 interface Provider { id: string; name: string; contactPerson?: string; phone?: string; email?: string; _count?: { policies: number } }
 interface Policy {
@@ -434,8 +435,8 @@ function PoliciesAndClaims() {
             </select>
             <input className="input-field" placeholder="Rice variety" value={policyForm.riceVariety} onChange={(e) => setPolicyForm({ ...policyForm, riceVariety: e.target.value })} />
             <input className="input-field" type="number" step="0.1" placeholder="Insured area (hectares)" required value={policyForm.insuredAreaHectares} onChange={(e) => setPolicyForm({ ...policyForm, insuredAreaHectares: e.target.value })} />
-            <input className="input-field" type="number" placeholder="Sum insured (TZS)" required value={policyForm.sumInsured} onChange={(e) => setPolicyForm({ ...policyForm, sumInsured: e.target.value })} />
-            <input className="input-field" type="number" placeholder="Premium amount (TZS)" required value={policyForm.premiumAmount} onChange={(e) => setPolicyForm({ ...policyForm, premiumAmount: e.target.value })} />
+            <MoneyInput className="input-field" placeholder="Sum insured (TZS)" required value={policyForm.sumInsured} onChange={(e) => setPolicyForm({ ...policyForm, sumInsured: e.target.value })} />
+            <MoneyInput className="input-field" placeholder="Premium amount (TZS)" required value={policyForm.premiumAmount} onChange={(e) => setPolicyForm({ ...policyForm, premiumAmount: e.target.value })} />
             <input className="input-field" type="date" placeholder="Start date" value={policyForm.startDate || ''} onChange={(e) => setPolicyForm({ ...policyForm, startDate: e.target.value })} />
             <input className="input-field" type="date" placeholder="End date" value={policyForm.endDate || ''} onChange={(e) => setPolicyForm({ ...policyForm, endDate: e.target.value })} />
           </form>
@@ -462,7 +463,7 @@ function PoliciesAndClaims() {
             <input className="input-field" type="date" required value={claimForm.incidentDate} onChange={(e) => setClaimForm({ ...claimForm, incidentDate: e.target.value })} />
             <input className="input-field" placeholder="Incident type (flood, drought, pest…)" required value={claimForm.incidentType} onChange={(e) => setClaimForm({ ...claimForm, incidentType: e.target.value })} />
             <textarea className="input-field" placeholder="Description" value={claimForm.description} onChange={(e) => setClaimForm({ ...claimForm, description: e.target.value })} />
-            <input className="input-field" type="number" placeholder="Claimed amount (TZS)" required value={claimForm.claimedAmount} onChange={(e) => setClaimForm({ ...claimForm, claimedAmount: e.target.value })} />
+            <MoneyInput className="input-field" placeholder="Claimed amount (TZS)" required value={claimForm.claimedAmount} onChange={(e) => setClaimForm({ ...claimForm, claimedAmount: e.target.value })} />
           </form>
         </Modal>
       )}
@@ -488,7 +489,7 @@ function PolicyPremiumModal({ policy, onClose, onSaved }: { policy: Policy; onCl
       footer={<><button className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button><button className="btn-primary" onClick={save} disabled={busy || !Number(amount)}>{busy ? 'Saving…' : 'Record'}</button></>}>
       {error && <div className="alert-box alert-danger" style={{ marginBottom: 10 }}>{error}</div>}
       <div style={{ display: 'grid', gap: 12 }}>
-        <label className="form-label">Amount collected (TZS)<input className="input-field" type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+        <label className="form-label">Amount collected (TZS)<MoneyInput className="input-field" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
         <label className="form-label">Receipt / reference<input className="input-field" value={reference} onChange={(e) => setReference(e.target.value)} /></label>
       </div>
     </Modal>

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { accountingApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
+import MoneyInput from '@/components/MoneyInput';
 
 export const tzs = (n: number) => new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', maximumFractionDigits: 2 }).format(Number(n) || 0);
 export const today = () => new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
@@ -224,8 +225,8 @@ function NewStatementModal({ onClose, onCreated }: { onClose: () => void; onCrea
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
         <label className="form-label">From<input className="input-field" type="date" required value={f.periodStart} onChange={(e) => setF({ ...f, periodStart: e.target.value })} /></label>
         <label className="form-label">To<input className="input-field" type="date" required value={f.periodEnd} onChange={(e) => setF({ ...f, periodEnd: e.target.value })} /></label>
-        <label className="form-label">Opening balance<input className="input-field" type="number" step="0.01" required value={f.openingBalance} onChange={(e) => setF({ ...f, openingBalance: e.target.value })} /></label>
-        <label className="form-label">Closing balance<input className="input-field" type="number" step="0.01" required value={f.closingBalance} onChange={(e) => setF({ ...f, closingBalance: e.target.value })} /></label>
+        <label className="form-label">Opening balance<MoneyInput className="input-field" step="0.01" required value={f.openingBalance} onChange={(e) => setF({ ...f, openingBalance: e.target.value })} /></label>
+        <label className="form-label">Closing balance<MoneyInput className="input-field" step="0.01" required value={f.closingBalance} onChange={(e) => setF({ ...f, closingBalance: e.target.value })} /></label>
       </div>
       <label className="form-label">Statement lines — one per row: date, description, amount (money out is negative)
         <textarea className="input-field" rows={8} required value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })} placeholder={'2026-10-03, Deposit from rice sale, 1500000\n2026-10-05, Bank charges, -5000'} style={{ fontFamily: 'monospace' }} />
@@ -347,7 +348,7 @@ export function VatReturnView({ canCreate }: { canCreate: boolean }) {
         {dlg === 'vat'
           ? <><p className="muted" style={{ margin: 0, fontSize: 13 }}>Clears output and input VAT up to this date.</p>
               <label className="form-label">Settle VAT up to<input className="input-field" type="date" required value={f.through} onChange={(e) => setF({ ...f, through: e.target.value })} /></label></>
-          : <label className="form-label">Amount paid (TZS)<input className="input-field" type="number" min="0.01" step="0.01" required value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>}
+          : <label className="form-label">Amount paid (TZS)<MoneyInput className="input-field" min="0.01" step="0.01" required value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>}
         <label className="form-label">Paid on<input className="input-field" type="date" required value={f.paidOn} onChange={(e) => setF({ ...f, paidOn: e.target.value })} /></label>
         <label className="form-label">Reference (optional)<input className="input-field" value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} placeholder="Payment slip or receipt number" /></label>
         {err && <div style={{ color: 'var(--red-400)', fontSize: 13 }}>{err}</div>}
@@ -418,7 +419,7 @@ export function DocumentsView({ kind, canCreate, canEdit }: { kind: 'invoice' | 
             : <input className="input-field" type="date" required value={f.dueDate} onChange={(e) => setF({ ...f, dueDate: e.target.value })} />}</label>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <label className="form-label">Amount before VAT (TZS)<input className="input-field" type="number" min="0.01" step="0.01" required value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>
+          <label className="form-label">Amount before VAT (TZS)<MoneyInput className="input-field" min="0.01" step="0.01" required value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>
           {isBill ? <label className="form-label">Due date<input className="input-field" type="date" required value={f.dueDate} onChange={(e) => setF({ ...f, dueDate: e.target.value })} /></label> : <label className="form-label">Customer withholds (%)<input className="input-field" type="number" min="0" max="100" step="0.01" value={f.withholdingPercent} onChange={(e) => setF({ ...f, withholdingPercent: e.target.value })} placeholder="0" /></label>}
         </div>
         {isBill && <label className="form-label">We withhold (%)<input className="input-field" type="number" min="0" max="100" step="0.01" value={f.withholdingPercent} onChange={(e) => setF({ ...f, withholdingPercent: e.target.value })} placeholder="0" /></label>}
@@ -492,7 +493,7 @@ export function CashTransactionsView({ kind, canCreate, canEdit }: { kind: 'EXPE
       <form id="cash-form" onSubmit={(e) => { e.preventDefault(); void save(); }} style={{ display: 'grid', gap: 10 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <label className="form-label">Date<input className="input-field" type="date" required max={today()} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></label>
-          <label className="form-label">Amount (TZS)<input className="input-field" type="number" min="0.01" step="0.01" required value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>
+          <label className="form-label">Amount (TZS)<MoneyInput className="input-field" min="0.01" step="0.01" required value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>
         </div>
         <label className="form-label">Category<select className="input-field" required value={f.accountCode} onChange={(e) => setF({ ...f, accountCode: e.target.value })}><option value="">Choose…</option>{(cats.data ?? []).map((c: any) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
