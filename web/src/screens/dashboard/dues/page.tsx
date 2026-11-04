@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import Modal from '@/components/Modal';
 import { MoneyAccountSelect } from '@/screens/dashboard/accounting/controls';
 import { chargesApi, communicationsApi, duesApi } from '@/lib/api';
@@ -375,7 +376,7 @@ function FeeRunModal({ kind, onClose, onDone }: { kind: 'penalties' | 'storage';
       subtitle={isPenalty ? 'A percentage of what farmers still owe after the grace days. Check the list, then charge.' : 'For rice the cooperative keeps for farmers. Check the list, then charge.'} onClose={() => !busy && onClose()} width="640px"
       footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={busy}>Close</button><button type="button" className="btn-primary" disabled={busy || !rows.length} onClick={() => void run()}>{busy ? 'Charging…' : rows.length ? `Charge ${rows.length} ${rows.length === 1 ? 'farmer' : 'farmers'}` : 'Nothing to charge'}</button></>}>
       {!isPenalty && <Field label="Month"><input className="input-field" type="month" max={todayISO().slice(0, 7)} value={month} onChange={(e) => setMonth(e.target.value)} /></Field>}
-      {(error || plan.error) && <div role="alert" className="alert-box alert-danger" style={{ margin: '12px 0' }}>{error || plan.error}{(error || plan.error).includes('Settings') && <> <a href="/dashboard/amcos-settings">Open Settings</a></>}</div>}
+      {(error || plan.error) && <div role="alert" className="alert-box alert-danger" style={{ margin: '12px 0' }}>{error || plan.error}{(error || plan.error).includes('Settings') && <> <Link href="/dashboard/amcos-settings">Open Settings</Link></>}</div>}
       {plan.data && (
         <>
           <p style={{ fontSize: 13 }}>
@@ -405,7 +406,7 @@ function Charges({ can }: { can: (r: string, a: string) => boolean }) {
   const add = <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
     {can('dues', 'CREATE') && <button type="button" className="btn-secondary" onClick={() => setFeeRun('storage')}>Charge storage…</button>}
     {can('dues', 'CREATE') && <button type="button" className="btn-secondary" onClick={() => setFeeRun('penalties')}>Apply late penalties…</button>}
-    <a className="btn-secondary" href="/dashboard/amcos-settings">Change amounts in Settings</a>
+    <Link className="btn-secondary" href="/dashboard/amcos-settings">Change amounts in Settings</Link>
   </span>;
   return (
     <>
