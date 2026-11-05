@@ -81,6 +81,8 @@ export class FarmersService {
 
     // An AMCOS farmer is registered on the hectare they already hold, and that hectare's code is their ID.
     const hectare = dto.hectareId ? await this.hectareForRegistration(dto.hectareId, tenantId) : null;
+    if (dto.guardianId && !hectare) throw new BadRequestException('Choose a hectare before naming a guardian');
+    const guardian = dto.guardianId ? await this.guardianForRegistration(dto.guardianId, tenantId) : null;
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const controlNumber = hectare ? hectare.code : await this.generateControlNumber();
     // A farmer registered by a field officer is credited to, and assigned to, that officer.
@@ -140,12 +142,28 @@ export class FarmersService {
           data: { hectareId: hectare.id, farmerId: created.id, status: 'ACTIVE', allocatedOn: new Date(), requestedById: actor.id, approvedById: actor.id, approvedAt: new Date(), notes: 'Registered on this hectare' },
         });
         await writeAudit(tx, actor, 'irrigation_hectare', hectare.id, 'allocate', null, { ...allocation, registeredWithFarmer: true } as any);
+        // The hectare is registered in the new farmer's name, but really belongs to the guardian (a relative or other member).
+        if (guardian) {
+          await tx.irrigationHectareGuardian.create({
+            data: { allocationId: allocation.id, guardianId: guardian.id, startedOn: allocation.allocatedOn, note: 'Named when the farmer was registered', createdById: actor.id },
+          });
+          await writeAudit(tx, actor, 'irrigation_hectare', hectare.id, 'set-guardian', { guardianId: null }, { guardianId: guardian.id, allocationId: allocation.id, registeredWithFarmer: true } as any);
+        }
       }
       return created;
     }).catch((error) => {
       if (hectare && error?.code === 'P2002') throw new ConflictException('This hectare was just taken or its ID is already in use');
       throw error;
     });
+  }
+
+  /** The guardian named at registration must be an existing member of the same AMCOS who is not blacklisted. */
+  private async guardianForRegistration(guardianId: string, tenantId: string | null) {
+    const guardian = await this.prisma.farmer.findUnique({ where: { id: guardianId }, select: { id: true, firstName: true, lastName: true, mamcosId: true, isBlacklisted: true } });
+    if (!guardian) throw new NotFoundException('Guardian not found');
+    if (tenantId && guardian.mamcosId !== tenantId) throw new BadRequestException(`${guardian.firstName} ${guardian.lastName} is not a member of your AMCOS`);
+    if (guardian.isBlacklisted) throw new BadRequestException(`${guardian.firstName} ${guardian.lastName} is blacklisted and cannot be a guardian`);
+    return guardian;
   }
 
   /** The free hectare of the caller's AMCOS that a new farmer is being registered on. */

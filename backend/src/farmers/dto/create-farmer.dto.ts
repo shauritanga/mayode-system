@@ -25,6 +25,11 @@ export class CreateFarmerDto {
   @IsUUID()
   hectareId?: string;
 
+  @ApiPropertyOptional({ description: 'Optional, with a hectare: an existing member of the same AMCOS who is the real owner of the hectare, which is registered in this farmer\'s name. They become its guardian.' })
+  @IsOptional()
+  @IsUUID()
+  guardianId?: string;
+
   @ApiProperty({
     example: '+255700000001',
     description: 'Login phone number (unique)',

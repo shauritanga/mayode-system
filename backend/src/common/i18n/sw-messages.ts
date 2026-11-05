@@ -1095,4 +1095,7 @@ export const SW_MESSAGES: Record<string, string> = {
   "A supplier called \"{0}\" already exists": "Msambazaji anayeitwa \"{0}\" tayari yupo",
   "Give the supplier a name of at least two letters": "Mpe msambazaji jina lenye angalau herufi mbili",
   "A supplier with recorded costs or bills cannot be deleted; deactivate it instead to preserve traceability.": "Msambazaji mwenye gharama au ankara zilizorekodiwa hawezi kufutwa; mzime badala yake ili kuhifadhi ufuatiliaji.",
+  "Choose a hectare before naming a guardian": "Chagua hekta kabla ya kumtaja mlezi",
+  "{0} {1} is not a member of your AMCOS": "{0} {1} si mwanachama wa AMCOS yako",
+  "{0} {1} is blacklisted and cannot be a guardian": "{0} {1} yuko kwenye orodha nyeusi na hawezi kuwa mlezi",
 };

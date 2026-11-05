@@ -6,15 +6,18 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { Copy01Icon, Tick02Icon } from '@hugeicons/core-free-icons';
 import Modal from '@/components/Modal';
 import HectarePicker from './HectarePicker';
+import { useSchemeScope } from '@/screens/dashboard/irrigation/useSchemeScope';
 import { farmersApi, joinRequestsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import {
-  ConfirmDialog, Empty, Field, LoadError, Notice, TableSkeleton, errMsg, fmtDate, useApi, useCan,
+  ConfirmDialog, Empty, Field, LoadError, MemberPicker, Notice, TableSkeleton, errMsg, fmtDate, useApi, useCan, type MemberLite,
 } from '@/screens/dashboard/irrigation/ui';
 
 function AddFarmerModal({ onClose, onCreated }: { onClose: () => void; onCreated: (message: string, password?: string) => void }) {
   const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', village: '' });
   const [hectare, setHectare] = useState<{ id: string; code: string } | null>(null);
+  const [guardian, setGuardian] = useState<MemberLite | null>(null);
+  const { schemeId } = useSchemeScope();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -33,7 +36,7 @@ function AddFarmerModal({ onClose, onCreated }: { onClose: () => void; onCreated
     try {
       const res = await farmersApi.create({
         firstName: form.firstName.trim(), lastName: form.lastName.trim(), phone: form.phone.trim(),
-        email: form.email.trim() || undefined, village: form.village.trim() || undefined, hectareId: hectare!.id,
+        email: form.email.trim() || undefined, village: form.village.trim() || undefined, hectareId: hectare!.id, guardianId: guardian?.id,
       });
       const name = form.firstName.trim();
       onCreated(res.data.credentialsSms === 'sent' ? `${name} was registered on hectare ${hectare!.code}. Sign-in details were sent by SMS.` : `${name} was registered on hectare ${hectare!.code}, but the SMS could not be sent.`, res.data.temporaryPassword);
@@ -51,6 +54,12 @@ function AddFarmerModal({ onClose, onCreated }: { onClose: () => void; onCreated
           <Field label="Email" error={errors.email}><input className="input-field" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="Optional" autoComplete="off" /></Field>
           <Field label="Village"><input className="input-field" value={form.village} onChange={(e) => set('village', e.target.value)} placeholder="Optional" autoComplete="off" /></Field>
           <HectarePicker up value={hectare} onChange={(h) => { setHectare(h); setErrors((e) => ({ ...e, hectare: '' })); }} error={errors.hectare} />
+          <div style={{ gridColumn: '1 / -1' }}>
+            {hectare
+              ? <MemberPicker schemeId={schemeId} value={guardian} onChange={setGuardian} label="Guardian (optional)" />
+              : <Field label="Guardian (optional)" hint="Choose the hectare first."><input className="input-field" disabled placeholder="Search members" /></Field>}
+            <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>Use a guardian when this hectare is registered in {form.firstName.trim() || 'this farmer'}&apos;s name but really belongs to another member, such as a relative. It then shows on the guardian&apos;s page under &ldquo;Farms guided by this farmer&rdquo;.</p>
+          </div>
         </div>
         {error && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 13, marginTop: 12 }}>{error}</div>}
       </form>
