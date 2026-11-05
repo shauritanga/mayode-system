@@ -125,8 +125,10 @@ describeDb('Communication with farmers (PostgreSQL)', () => {
       await hold('Chausiku', b3.id, 1);              // Canal 2
       await hold('Dotto', b1.id, 2, 'ENDED');       // no longer holds anything
       await prisma.irrigationHectareGuardian.create({ data: { allocationId: baraka.id, guardianId: farmers.Asha, startedOn: new Date('2026-02-01') } }); // …guarded by Asha
-      await prisma.irrigationLeadership.create({ data: { position: 'CANAL_LEADER', canalId: c1.id, farmerId: farmers.Chausiku, appointedOn: new Date('2026-01-01'), termStart: new Date('2026-01-01'), status: 'ACTIVE' } });
-      await prisma.irrigationLeadership.create({ data: { position: 'BLOCK_LEADER', canalId: c1.id, blockId: b1.id, farmerId: farmers.Dotto, appointedOn: new Date('2025-01-01'), termStart: new Date('2025-01-01'), status: 'ENDED', endedOn: new Date('2025-12-01') } });
+      // The board: Chausiku sits on it; Dotto's seat has ended; Ester sits on the other AMCOS's board.
+      await prisma.boardMember.create({ data: { mamcosId: mamcosA, farmerId: farmers.Chausiku, position: 'CHAIRPERSON', termStart: new Date('2026-01-01') } });
+      await prisma.boardMember.create({ data: { mamcosId: mamcosA, farmerId: farmers.Dotto, position: 'MEMBER', termStart: new Date('2025-01-01'), status: 'ENDED', endedOn: new Date('2025-12-01'), endReason: 'Resigned' } });
+      await prisma.boardMember.create({ data: { mamcosId: mamcosB, farmerId: farmers.Ester, position: 'MEMBER', termStart: new Date('2026-01-01') } });
       // A canal of the other AMCOS.
       const schemeB = await prisma.irrigationScheme.create({ data: { mamcosId: mamcosB, code: `U-${tag}`, name: `Scheme B ${tag}`, region: 'Mbeya', district: 'Mbarali', waterSource: 'River' } as any });
       canalB = (await prisma.irrigationCanal.create({ data: { schemeId: schemeB.id, canalNumber: 1, code: 'C1', name: 'Canal 1' } as any })).id;
@@ -162,9 +164,9 @@ describeDb('Communication with farmers (PostgreSQL)', () => {
       await expect(svc.preview(adminA, { audience: 'BLOCK', blockId: block1, canalId: canal2, channel: 'SMS' })).rejects.toThrow(/does not belong to your AMCOS/);
     });
 
-    it('board members are the farmers who currently hold a leadership post', async () => {
+    it('board members are the registered farmers currently seated on the board', async () => {
       const sent: any = await svc.send(adminA, { audience: 'BOARD', channel: 'SMS', body: 'Mkutano wa bodi, {name}' }, undefined, { inline: true });
-      expect(smsSent.map((m) => m.text)).toEqual(['Mkutano wa bodi, Chausiku']); // Dotto's post ended
+      expect(smsSent.map((m) => m.text)).toEqual(['Mkutano wa bodi, Chausiku']); // Dotto's seat ended; Ester sits on another AMCOS's board
       const detail: any = await svc.get(adminA, sent.id, {});
       expect(detail.recipients[0]).toMatchObject({ kind: 'BOARD' });
     });

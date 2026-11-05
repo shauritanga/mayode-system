@@ -144,6 +144,12 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'Board',
+    items: [
+      { href: '/dashboard/board', label: 'Board Members', icon: Shield01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'board_members' },
+    ],
+  },
+  {
     label: 'Communication',
     items: [
       { href: '/dashboard/communication', label: 'Communication', icon: Mail01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'communication' },
@@ -439,7 +445,7 @@ const COOPERATIVE_PORTAL_HIDDEN_HREFS = new Set([
  */
 const COOPERATIVE_MENU_ORDER = [
   '/dashboard', '/dashboard/farmers', '/dashboard/irrigation', '/dashboard/scheme-structure', '/dashboard/plot-allocation', '/dashboard/dues', '/dashboard/ops-orders', '/dashboard/task-management',
-  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/payroll', '/dashboard/ops-warehouse', '/dashboard/staff', '/dashboard/leadership', '/dashboard/suppliers', '/dashboard/sales',
+  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/payroll', '/dashboard/ops-warehouse', '/dashboard/staff', '/dashboard/board', '/dashboard/leadership', '/dashboard/suppliers', '/dashboard/sales',
   '/dashboard/reports', '/dashboard/credit', '/dashboard/traceability', '/dashboard/disputes', '/dashboard/governance', '/dashboard/ai',
   '/dashboard/audit-log', '/dashboard/roles', '/dashboard/amcos-settings', '/dashboard/settings',
 ];

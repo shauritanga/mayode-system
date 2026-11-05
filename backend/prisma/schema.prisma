@@ -219,6 +219,7 @@ model Farmer {
   irrigationTransfersFrom   IrrigationAllocationTransfer[] @relation("TransferFromFarmer")
   irrigationTransfersTo     IrrigationAllocationTransfer[] @relation("TransferToFarmer")
   irrigationLeaderships     IrrigationLeadership[]
+  boardSeats                BoardMember[]
   joinRequests              AmcosJoinRequest[]
   communicationReceipts     CommunicationRecipient[]
 
@@ -319,6 +320,7 @@ model Mamcos {
   joinRequests          AmcosJoinRequest[]
   equipment             AmcosEquipment[]
   communications        Communication[]
+  boardMembers          BoardMember[]
   ledgerEntries         LedgerEntry[]
   charges               AmcosCharge[]
   equipmentTypes        AmcosEquipmentType[]
@@ -5824,4 +5826,47 @@ model FarmerPayout {
   @@unique([mamcosId, number])
   @@index([mamcosId, farmerId])
   @@map("farmer_payouts")
+}
+
+// ============================================================
+// AMCOS BOARD
+// ============================================================
+
+enum BoardPosition {
+  CHAIRPERSON
+  VICE_CHAIRPERSON
+  SECRETARY
+  TREASURER
+  MEMBER
+}
+
+enum BoardMemberStatus {
+  ACTIVE
+  ENDED
+}
+
+/// A registered farmer sitting on the AMCOS board. Partial unique indexes (raw SQL in the migration): one ACTIVE seat per farmer,
+/// and one ACTIVE holder for each officer post (everything except MEMBER).
+model BoardMember {
+  id          String            @id @default(uuid())
+  mamcosId    String            @map("mamcos_id")
+  farmerId    String            @map("farmer_id")
+  position    BoardPosition     @default(MEMBER)
+  termStart   DateTime          @map("term_start") @db.Date
+  termEnd     DateTime?         @map("term_end") @db.Date
+  status      BoardMemberStatus @default(ACTIVE)
+  notes       String?
+  endedOn     DateTime?         @map("ended_on") @db.Date
+  endReason   String?           @map("end_reason")
+  createdById String?           @map("created_by_id")
+  endedById   String?           @map("ended_by_id")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  mamcos Mamcos @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  farmer Farmer @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+
+  @@index([mamcosId, status])
+  @@index([farmerId])
+  @@map("board_members")
 }

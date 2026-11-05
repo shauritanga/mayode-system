@@ -137,7 +137,7 @@ export class CommunicationsService implements OnModuleInit {
       }
       case 'BOARD': {
         const rows = await this.prisma.farmer.findMany({
-          where: { mamcosId, irrigationLeaderships: { some: { status: 'ACTIVE', canal: { scheme: { mamcosId } } } } },
+          where: { mamcosId, boardSeats: { some: { status: 'ACTIVE', mamcosId } } },
           select, orderBy: { firstName: 'asc' },
         });
         return { people: rows.map((f) => this.farmerPerson(f, 'BOARD')), label: 'AMCOS board members' };

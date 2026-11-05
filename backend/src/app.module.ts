@@ -63,6 +63,7 @@ import { AssetsModule } from './assets/assets.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { DuesModule } from './dues/dues.module';
 import { ChargesModule } from './charges/charges.module';
+import { BoardModule } from './board/board.module';
 import { CommunicationsModule } from './communications/communications.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { GovernanceModule } from './governance/governance.module';
@@ -147,6 +148,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     PayrollModule,
     DuesModule,
     ChargesModule,
+    BoardModule,
     CommunicationsModule,
     GovernanceModule,
     BuyerPortalModule,

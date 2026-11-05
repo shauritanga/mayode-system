@@ -1070,3 +1070,11 @@ export const communicationsApi = {
   list: (params?: object) => api.get('/communications', { params }),
   get: (id: string, params?: object) => api.get(`/communications/${id}`, { params }),
 };
+
+export const boardApi = {
+  list: (params?: object) => api.get('/board-members', { params }),
+  candidates: (params?: object) => api.get('/board-members/candidates', { params }),
+  add: (data: object) => api.post('/board-members', data),
+  update: (id: string, data: object) => api.patch(`/board-members/${id}`, data),
+  end: (id: string, data: object) => api.post(`/board-members/${id}/end`, data),
+};
