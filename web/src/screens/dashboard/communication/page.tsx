@@ -15,6 +15,14 @@ const CHANNEL_LABEL: Record<string, string> = { SMS: 'SMS', EMAIL: 'Email', BOTH
 const STATUS_TONE: Record<string, string> = { SENDING: 'badge-gold', COMPLETED: 'badge-green', INTERRUPTED: 'badge-red' };
 const DELIVERY_TONE: Record<string, string> = { SENT: 'badge-green', SIMULATED: 'badge-gold', FAILED: 'badge-red', SKIPPED: 'badge-gray', PENDING: 'badge-blue' };
 type Mode = 'ALL' | 'CANAL' | 'BLOCK' | 'SELECTED' | 'BOARD' | 'STAFF';
+const AUDIENCES: { id: Mode; label: string; hint: (farmers: number, t: any) => string }[] = [
+  { id: 'ALL', label: 'All farmers', hint: (n) => (n ? `Every registered farmer (${fmtNum(n)})` : 'Every registered farmer') },
+  { id: 'CANAL', label: 'Farmers by canal', hint: () => 'Everyone farming in one canal' },
+  { id: 'BLOCK', label: 'Farmers by block', hint: () => 'Everyone farming in one block of a canal' },
+  { id: 'SELECTED', label: 'Selected farmers', hint: () => 'Pick one or several farmers by name' },
+  { id: 'BOARD', label: 'AMCOS board members', hint: (_n, t) => (t ? `${fmtNum(t.board)} on the board` : 'The members listed under Board Members') },
+  { id: 'STAFF', label: 'Staff members', hint: (_n, t) => (t ? `${fmtNum(t.staff)} staff` : 'Everyone on your staff list') },
+];
 const KIND_LABEL: Record<string, string> = { FARMER: 'Farmer', BOARD: 'Board member', STAFF: 'Staff' };
 const DELIVERY_LABEL: Record<string, string> = { SENT: 'Sent', SIMULATED: 'Not delivered (not connected)', FAILED: 'Failed', SKIPPED: 'Skipped', PENDING: 'Waiting' };
 
@@ -96,21 +104,11 @@ function Compose({ onSent }: { onSent: (message: string) => void }) {
       <section className="table-panel" style={{ marginBottom: 14 }}>
         <div className="section-toolbar"><strong>1 · Who should receive it?</strong></div>
         <div style={{ padding: 16, display: 'grid', gap: 12 }}>
-          <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))' }}>
-            {([
-              ['ALL', 'All farmers', allCount ? `${fmtNum(allCount)} registered` : 'Every registered farmer'],
-              ['CANAL', 'Farmers by canal', 'Everyone farming in one canal'],
-              ['BLOCK', 'Farmers by block', 'One block of a canal'],
-              ['SELECTED', 'Selected farmers', 'Pick one or several by name'],
-              ['BOARD', 'Board members', targets.data ? `${fmtNum(targets.data.board)} on the board` : 'Canal and block leaders'],
-              ['STAFF', 'Staff members', targets.data ? `${fmtNum(targets.data.staff)} staff` : 'Everyone on your staff list'],
-            ] as [Mode, string, string][]).map(([id, label, hint]) => (
-              <label key={id} className="glass-card" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', cursor: 'pointer', outline: mode === id ? '2px solid var(--green-400, #4ade80)' : 'none' }}>
-                <input type="radio" name="audience" checked={mode === id} onChange={() => { setMode(id); setBlockId(''); }} style={{ marginTop: 3 }} />
-                <span><strong>{label}</strong><span className="muted" style={{ display: 'block', fontSize: 12 }}>{hint}</span></span>
-              </label>
-            ))}
-          </div>
+          <Field label="Send to *" hint={AUDIENCES.find((a) => a.id === mode)?.hint(allCount, targets.data)}>
+            <select className="input-field" value={mode} onChange={(e) => { setMode(e.target.value as Mode); setBlockId(''); }}>
+              {AUDIENCES.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+            </select>
+          </Field>
           {errors.audience && <span style={{ color: 'var(--red-400)', fontSize: 12 }}>{errors.audience}</span>}
           {(mode === 'CANAL' || mode === 'BLOCK') && (
             targets.loading && !targets.data ? <TableSkeleton rows={1} cols={2} /> : !canals.length ? <Empty title="No canals set up yet" hint="Add canals and blocks under Irrigation first." /> : (
