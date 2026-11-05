@@ -6,6 +6,10 @@ export class AudienceDto {
   @IsEnum(CommunicationAudience) audience: CommunicationAudience;
   /** Required when audience is SELECTED. One id is an individual message. */
   @IsOptional() @IsArray() @ArrayMaxSize(5000) @IsUUID('all', { each: true }) farmerIds?: string[];
+  /** Required for CANAL; optional for BLOCK (checked against the block's canal when given). */
+  @IsOptional() @IsUUID() canalId?: string;
+  /** Required for BLOCK. */
+  @IsOptional() @IsUUID() blockId?: string;
   @IsEnum(CommunicationChannel) channel: CommunicationChannel;
 }
 

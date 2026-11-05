@@ -1064,6 +1064,7 @@ export const chargesApi = {
 export const communicationsApi = {
   channels: () => api.get('/communications/channels'),
   farmers: (params?: object) => api.get('/communications/farmers', { params }),
+  targets: () => api.get('/communications/targets'),
   preview: (data: object) => api.post('/communications/preview', data),
   send: (data: object) => api.post('/communications', data),
   list: (params?: object) => api.get('/communications', { params }),

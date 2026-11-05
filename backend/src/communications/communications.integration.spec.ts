@@ -102,6 +102,103 @@ describeDb('Communication with farmers (PostgreSQL)', () => {
     });
   });
 
+  describe('targeting: canal, block, board and staff', () => {
+    let canal1: string; let canal2: string; let block1: string; let block2: string; let canalB: string;
+    const names = (rows: any[]) => rows.map((r) => r.farmer.name.split(' ')[0]).sort();
+
+    beforeAll(async () => {
+      const tag = randomUUID().slice(0, 5);
+      const scheme = await prisma.irrigationScheme.create({ data: { mamcosId: mamcosA, code: `T-${tag}`, name: `Scheme ${tag}`, region: 'Mbeya', district: 'Mbarali', waterSource: 'River' } as any });
+      const c1 = await prisma.irrigationCanal.create({ data: { schemeId: scheme.id, canalNumber: 1, code: 'C1', name: 'Canal 1' } as any });
+      const c2 = await prisma.irrigationCanal.create({ data: { schemeId: scheme.id, canalNumber: 2, code: 'C2', name: 'Canal 2' } as any });
+      const b1 = await prisma.irrigationBlock.create({ data: { canalId: c1.id, blockNumber: 1, side: 'RIGHT', code: `${tag}.1`, areaHectares: 30, hectareCount: 30 } as any });
+      const b2 = await prisma.irrigationBlock.create({ data: { canalId: c1.id, blockNumber: 2, side: 'LEFT', code: `${tag}.2`, areaHectares: 30, hectareCount: 30 } as any });
+      const b3 = await prisma.irrigationBlock.create({ data: { canalId: c2.id, blockNumber: 1, side: 'RIGHT', code: `${tag}.3`, areaHectares: 30, hectareCount: 30 } as any });
+      canal1 = c1.id; canal2 = c2.id; block1 = b1.id; block2 = b2.id;
+      const hect = (blockId: string, n: number) => prisma.irrigationHectare.create({ data: { blockId, hectareNumber: n, code: `${tag}-${blockId.slice(0, 4)}-${n}`, areaHectares: 1 } });
+      const hold = async (farmerKey: string, blockId: string, n: number, status: 'ACTIVE' | 'ENDED' = 'ACTIVE') => {
+        const h = await hect(blockId, n);
+        return prisma.irrigationHectareAllocation.create({ data: { hectareId: h.id, farmerId: farmers[farmerKey], status, allocatedOn: new Date('2026-01-01'), ...(status === 'ENDED' ? { endedOn: new Date('2026-06-01') } : {}) } });
+      };
+      await hold('Asha', b1.id, 1);                 // Canal 1 · Block 1
+      const baraka = await hold('Baraka', b2.id, 1); // Canal 1 · Block 2, registered to Baraka…
+      await hold('Chausiku', b3.id, 1);              // Canal 2
+      await hold('Dotto', b1.id, 2, 'ENDED');       // no longer holds anything
+      await prisma.irrigationHectareGuardian.create({ data: { allocationId: baraka.id, guardianId: farmers.Asha, startedOn: new Date('2026-02-01') } }); // …guarded by Asha
+      await prisma.irrigationLeadership.create({ data: { position: 'CANAL_LEADER', canalId: c1.id, farmerId: farmers.Chausiku, appointedOn: new Date('2026-01-01'), termStart: new Date('2026-01-01'), status: 'ACTIVE' } });
+      await prisma.irrigationLeadership.create({ data: { position: 'BLOCK_LEADER', canalId: c1.id, blockId: b1.id, farmerId: farmers.Dotto, appointedOn: new Date('2025-01-01'), termStart: new Date('2025-01-01'), status: 'ENDED', endedOn: new Date('2025-12-01') } });
+      // A canal of the other AMCOS.
+      const schemeB = await prisma.irrigationScheme.create({ data: { mamcosId: mamcosB, code: `U-${tag}`, name: `Scheme B ${tag}`, region: 'Mbeya', district: 'Mbarali', waterSource: 'River' } as any });
+      canalB = (await prisma.irrigationCanal.create({ data: { schemeId: schemeB.id, canalNumber: 1, code: 'C1', name: 'Canal 1' } as any })).id;
+      // Staff: one active officer, one switched off, one of the other AMCOS.
+      await prisma.user.create({ data: { phone: `+2557${Math.floor(Math.random() * 1e8).toString().padStart(8, '0')}`, passwordHash: 'x', firstName: 'Neema', lastName: 'Officer', role: UserRole.CUSTOM, mamcosId: mamcosA, email: `neema-${tag}@example.com` } });
+      await prisma.user.create({ data: { phone: `+2557${Math.floor(Math.random() * 1e8).toString().padStart(8, '0')}`, passwordHash: 'x', firstName: 'Old', lastName: 'Clerk', role: UserRole.CUSTOM, mamcosId: mamcosA, isActive: false } });
+      await prisma.user.create({ data: { phone: `+2557${Math.floor(Math.random() * 1e8).toString().padStart(8, '0')}`, passwordHash: 'x', firstName: 'Other', lastName: 'Staff', role: UserRole.CUSTOM, mamcosId: mamcosB } });
+    });
+
+    it('a canal reaches the farmers who hold or guard its land, and nobody else', async () => {
+      const p: any = await svc.preview(adminA, { audience: 'CANAL', canalId: canal1, channel: 'SMS' });
+      expect(p).toMatchObject({ people: 2, sms: 2, label: 'Farmers of Canal 1' }); // Asha (holder + guardian) and Baraka
+      const sent: any = await svc.send(adminA, { audience: 'CANAL', canalId: canal2, channel: 'SMS', body: 'Habari {name}' }, undefined, { inline: true });
+      expect(smsSent.map((m) => m.text)).toEqual(['Habari Chausiku']);
+      expect(sent).toMatchObject({ audience: 'CANAL', canalId: canal2, audienceLabel: 'Farmers of Canal 2' });
+    });
+
+    it('a block narrows it further, counting guardians and ignoring ended allocations', async () => {
+      const b1: any = await svc.send(adminA, { audience: 'BLOCK', blockId: block1, channel: 'SMS', body: 'Hi' }, undefined, { inline: true });
+      expect(smsSent).toHaveLength(1); // Asha only; Dotto's allocation ended
+      expect(b1.audienceLabel).toMatch(/^Farmers of Canal 1 · /);
+      const detail: any = await svc.get(adminA, b1.id, {});
+      expect(names(detail.recipients)).toEqual(['Asha']);
+      smsSent.length = 0;
+      await svc.send(adminA, { audience: 'BLOCK', blockId: block2, channel: 'SMS', body: 'Hi' }, undefined, { inline: true });
+      expect(smsSent).toHaveLength(2); // Baraka (holder) and Asha (guardian)
+    });
+
+    it('refuses a canal or block that is not the sender’s, or missing', async () => {
+      await expect(svc.preview(adminA, { audience: 'CANAL', canalId: canalB, channel: 'SMS' })).rejects.toThrow(/does not belong to your AMCOS/);
+      await expect(svc.preview(adminA, { audience: 'CANAL', channel: 'SMS' })).rejects.toThrow(/Choose a canal/);
+      await expect(svc.preview(adminA, { audience: 'BLOCK', channel: 'SMS' })).rejects.toThrow(/Choose a block/);
+      await expect(svc.preview(adminA, { audience: 'BLOCK', blockId: block1, canalId: canal2, channel: 'SMS' })).rejects.toThrow(/does not belong to your AMCOS/);
+    });
+
+    it('board members are the farmers who currently hold a leadership post', async () => {
+      const sent: any = await svc.send(adminA, { audience: 'BOARD', channel: 'SMS', body: 'Mkutano wa bodi, {name}' }, undefined, { inline: true });
+      expect(smsSent.map((m) => m.text)).toEqual(['Mkutano wa bodi, Chausiku']); // Dotto's post ended
+      const detail: any = await svc.get(adminA, sent.id, {});
+      expect(detail.recipients[0]).toMatchObject({ kind: 'BOARD' });
+    });
+
+    it('staff are the active non-farmer users of the AMCOS, personalised by name', async () => {
+      const p: any = await svc.preview(adminA, { audience: 'STAFF', channel: 'SMS' });
+      expect(p.people).toBe(2); // Neema and the switched-off clerk; the other AMCOS's staff are not listed
+      expect(p.sms).toBe(1);
+      const sent: any = await svc.send(adminA, { audience: 'STAFF', channel: 'BOTH', subject: 'Notice', body: 'Hi {name}' }, undefined, { inline: true });
+      expect(smsSent.map((m) => m.text)).toContain('Hi Neema');
+      expect(emailSent.map((m) => m.to)).toEqual([expect.stringMatching(/^neema-.*@example\.com$/)]);
+      const detail: any = await svc.get(adminA, sent.id, {});
+      expect(detail.recipients.every((r: any) => r.kind === 'STAFF')).toBe(true);
+      expect(detail.recipients.map((r: any) => r.farmer.name)).toContain('Neema Officer');
+      const row = await prisma.communicationRecipient.findFirstOrThrow({ where: { communicationId: sent.id, recipientName: 'Neema Officer', channel: 'SMS' } });
+      expect(row).toMatchObject({ farmerId: null, recipientKind: 'STAFF' });
+      expect(row.userId).toBeTruthy();
+    });
+
+    it('lists canals, blocks, and head counts for the picker, per AMCOS', async () => {
+      const t: any = await svc.targets(adminA);
+      const c1 = t.canals.find((c: any) => c.id === canal1);
+      expect(c1.farmers).toBe(2);
+      expect(c1.blocks.map((b: any) => b.farmers)).toEqual([1, 2]);
+      expect(t.canals.some((c: any) => c.id === canalB)).toBe(false);
+      expect(t).toMatchObject({ board: 1, staff: 2 });
+    });
+
+    it('is protected by the communication permission', () => {
+      const perm = Reflect.getMetadata(PERMISSION_KEY, CommunicationsController.prototype.targets);
+      expect(perm).toMatchObject({ resource: 'communication', action: 'VIEW' });
+    });
+  });
+
   describe('sending', () => {
     it('texts every reachable farmer in the AMCOS, personalised, and records each outcome', async () => {
       const sent: any = await svc.send(adminA, { audience: 'ALL', channel: 'SMS', body: 'Habari {name}, mkutano kesho saa 4.' }, undefined, { inline: true });
@@ -150,7 +247,7 @@ describeDb('Communication with farmers (PostgreSQL)', () => {
       await expect(svc.send(adminA, { audience: 'ALL', channel: 'SMS', body: '   ' }, undefined, { inline: true })).rejects.toThrow(/Write the message/);
       await expect(svc.send(adminA, { audience: 'ALL', channel: 'SMS', body: 'x'.repeat(481) }, undefined, { inline: true })).rejects.toThrow(/at most 480/);
       await expect(svc.send(adminA, { audience: 'ALL', channel: 'EMAIL', body: 'Ujumbe' }, undefined, { inline: true })).rejects.toThrow(/needs a subject/);
-      await expect(svc.send(adminA, { audience: 'SELECTED', farmerIds: [farmers.Chausiku], channel: 'EMAIL', subject: 'S', body: 'B' }, undefined, { inline: true })).rejects.toThrow(/None of the chosen farmers can be reached/);
+      await expect(svc.send(adminA, { audience: 'SELECTED', farmerIds: [farmers.Chausiku], channel: 'EMAIL', subject: 'S', body: 'B' }, undefined, { inline: true })).rejects.toThrow(/None of the chosen recipients can be reached/);
       expect(await prisma.communication.count({ where: { mamcosId: mamcosA, body: '   ' } })).toBe(0);
     });
 
@@ -190,7 +287,7 @@ describeDb('Communication with farmers (PostgreSQL)', () => {
   it('declares an explicit permission on every route, and sending needs CREATE', () => {
     const proto = CommunicationsController.prototype as any;
     const handlers = Object.getOwnPropertyNames(proto).filter((n) => n !== 'constructor' && typeof proto[n] === 'function');
-    expect(handlers.length).toBe(6);
+    expect(handlers.length).toBe(7);
     for (const name of handlers) expect(Reflect.getMetadata(PERMISSION_KEY, proto[name])?.resource).toBe('communication');
     expect(Reflect.getMetadata(PERMISSION_KEY, proto.send).action).toBe('CREATE');
   });

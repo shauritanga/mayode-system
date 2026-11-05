@@ -22,6 +22,9 @@ export class CommunicationsController {
   @Get('farmers') @RequirePermission('communication', 'VIEW')
   farmers(@CurrentUser() u: RequestUser, @Query() q: PageQueryDto) { return this.communications.farmers(u, q); }
 
+  @Get('targets') @RequirePermission('communication', 'VIEW')
+  targets(@CurrentUser() u: RequestUser, @Query('mamcosId') mamcosId?: string) { return this.communications.targets(u, mamcosId); }
+
   @Post('preview') @RequirePermission('communication', 'VIEW')
   preview(@CurrentUser() u: RequestUser, @Body() dto: AudienceDto, @Query('mamcosId') mamcosId?: string) { return this.communications.preview(u, dto, mamcosId); }
 

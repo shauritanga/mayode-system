@@ -5190,6 +5190,10 @@ enum CommunicationChannel {
 enum CommunicationAudience {
   ALL
   SELECTED
+  CANAL
+  BLOCK
+  BOARD
+  STAFF
 }
 
 enum CommunicationStatus {
@@ -5217,6 +5221,11 @@ model Communication {
   mamcosId        String                @map("mamcos_id")
   channel         CommunicationChannel
   audience        CommunicationAudience
+  /// Set for CANAL and BLOCK audiences.
+  canalId         String?               @map("canal_id")
+  blockId         String?               @map("block_id")
+  /// Plain-words snapshot of who it went to, e.g. "Canal 1 · Block 3".
+  audienceLabel   String?               @map("audience_label")
   subject         String?
   body            String
   status          CommunicationStatus   @default(SENDING)
@@ -5240,7 +5249,12 @@ model Communication {
 model CommunicationRecipient {
   id              String                @id @default(uuid())
   communicationId String                @map("communication_id")
-  farmerId        String                @map("farmer_id")
+  /// Farmers and board members. Staff recipients have userId instead (a CHECK in the migration needs one of the two).
+  farmerId        String?               @map("farmer_id")
+  userId          String?               @map("user_id")
+  recipientName   String?               @map("recipient_name")
+  /// FARMER, BOARD or STAFF.
+  recipientKind   String                @default("FARMER") @map("recipient_kind")
   channel         MessageChannel
   address         String?
   status          MessageDeliveryStatus @default(PENDING)
@@ -5248,7 +5262,7 @@ model CommunicationRecipient {
   sentAt          DateTime?             @map("sent_at")
 
   communication Communication @relation(fields: [communicationId], references: [id], onDelete: Cascade)
-  farmer        Farmer        @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+  farmer        Farmer?       @relation(fields: [farmerId], references: [id], onDelete: Restrict)
 
   @@unique([communicationId, farmerId, channel], map: "communication_recipients_unique_per_channel")
   @@index([communicationId, status])
