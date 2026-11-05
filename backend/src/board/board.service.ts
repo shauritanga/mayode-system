@@ -55,14 +55,13 @@ export class BoardService {
   async candidates(actor: RequestUser, q: BoardQueryDto) {
     const mamcosId = this.tenant(actor, q.mamcosId);
     const text = q.q?.trim();
-    if (!text || text.length < 2) return { data: [] };
     const rows = await this.prisma.farmer.findMany({
       where: {
         mamcosId, boardSeats: { none: { status: 'ACTIVE' } },
-        OR: [{ firstName: { contains: text, mode: 'insensitive' } }, { lastName: { contains: text, mode: 'insensitive' } }, { controlNumber: { contains: text, mode: 'insensitive' } }, { user: { phone: { contains: text } } }],
+        ...(text ? { OR: [{ firstName: { contains: text, mode: 'insensitive' } }, { lastName: { contains: text, mode: 'insensitive' } }, { controlNumber: { contains: text, mode: 'insensitive' } }, { user: { phone: { contains: text } } }] } : {}),
       },
       select: { id: true, firstName: true, lastName: true, controlNumber: true, village: true, user: { select: { phone: true } } },
-      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }], take: Math.min(q.pageSize ?? 10, 50),
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }], take: Math.min(q.pageSize ?? 20, 50),
     });
     return { data: rows.map((f) => ({ id: f.id, name: `${f.firstName} ${f.lastName}`.trim(), memberNumber: f.controlNumber, village: f.village, phone: f.user?.phone ?? null })) };
   }

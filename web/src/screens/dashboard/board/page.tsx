@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import Modal from '@/components/Modal';
 import { boardApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
-import { Empty, Field, LoadError, Notice, PageHeader, StatCard, TableSkeleton, Tabs, errMsg, fmtDate, useApi, useCan, useDebounced } from '@/screens/dashboard/irrigation/ui';
+import { Empty, Field, LoadError, Notice, PageHeader, TableSkeleton, Tabs, errMsg, fmtDate, useApi, useCan, useDebounced } from '@/screens/dashboard/irrigation/ui';
 
 const POSITIONS: [string, string][] = [
   ['CHAIRPERSON', 'Chairperson'], ['VICE_CHAIRPERSON', 'Vice chairperson'], ['SECRETARY', 'Secretary'], ['TREASURER', 'Treasurer'], ['MEMBER', 'Board member'],
@@ -23,7 +23,8 @@ function AddDialog({ onClose, onDone }: { onClose: () => void; onDone: (text: st
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const found = useApi<any>(!picked && q.length >= 2 ? () => boardApi.candidates({ q }) : null, [q, picked]);
+  const [open, setOpen] = useState(false);
+  const found = useApi<any>(open ? () => boardApi.candidates({ q: q || undefined }) : null, [q, open]);
 
   const save = async () => {
     if (!picked) { setError('Choose a farmer from the list'); return; }
@@ -40,22 +41,20 @@ function AddDialog({ onClose, onDone }: { onClose: () => void; onDone: (text: st
       footer={<><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button type="button" className="btn-primary" disabled={busy} onClick={save}>{busy ? 'Adding…' : 'Add to board'}</button></>}>
       <div style={{ display: 'grid', gap: 12 }}>
         {error && <Notice tone="error">{error}</Notice>}
-        {picked ? (
-          <Field label="Farmer">
-            <div className="input-field" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <span><strong>{picked.name}</strong> <span className="muted">· {picked.memberNumber}</span></span>
-              <button type="button" className="btn-secondary" onClick={() => { setPicked(null); setText(''); }}>Change</button>
-            </div>
-          </Field>
-        ) : (
-          <Field label="Farmer *" hint="Type at least 2 letters of the name, member number or phone">
-            <input className="input-field" value={text} onChange={(e) => setText(e.target.value)} placeholder="Search registered farmers" autoComplete="off" autoFocus />
-            {q.length >= 2 && (
-              <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, maxHeight: 220, overflow: 'auto', marginTop: 4 }}>
-                {found.loading && !found.data ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>Searching…</div>
+        <Field label="Farmer *" hint="Click to see your registered farmers, or type to search by name, member number or phone">
+          <div style={{ position: 'relative' }}>
+            <input className="input-field" role="combobox" aria-controls="board-farmer-list" aria-expanded={open} aria-autocomplete="list" autoComplete="off" placeholder="Choose a farmer"
+              value={picked && !open ? `${picked.name} · ${picked.memberNumber}` : text}
+              onFocus={() => { setOpen(true); setText(''); }}
+              onBlur={() => setOpen(false)}
+              onChange={(e) => { setText(e.target.value); setPicked(null); setOpen(true); }} />
+            {open && (
+              <div id="board-farmer-list" role="listbox" style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: '100%', marginTop: 4, background: 'var(--surface-1, #fff)', border: '1px solid var(--border-subtle)', borderRadius: 8, maxHeight: 240, overflow: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.25)' }}>
+                {found.loading && !found.data ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>Loading…</div>
                   : !found.data?.data.length ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>No matching farmers. People already on the board are not listed.</div>
                   : found.data.data.map((m: any) => (
-                    <button key={m.id} type="button" onClick={() => setPicked(m)}
+                    <button key={m.id} type="button" role="option" aria-selected={picked?.id === m.id}
+                      onMouseDown={(e) => { e.preventDefault(); setPicked(m); setText(''); setOpen(false); }}
                       style={{ display: 'flex', width: '100%', justifyContent: 'space-between', gap: 8, padding: '8px 10px', background: 'none', border: 'none', borderBottom: '1px solid var(--border-subtle)', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: 'inherit' }}>
                       <span><strong>{m.name}</strong> <span className="muted">· {m.memberNumber}{m.village ? ` · ${m.village}` : ''}</span></span>
                       <span className="muted">{m.phone ?? 'no phone'}</span>
@@ -63,8 +62,8 @@ function AddDialog({ onClose, onDone }: { onClose: () => void; onDone: (text: st
                   ))}
               </div>
             )}
-          </Field>
-        )}
+          </div>
+        </Field>
         <Field label="Post" hint="Chairperson, vice chairperson, secretary and treasurer can each have one holder.">
           <select className="input-field" value={position} onChange={(e) => setPosition(e.target.value)}>{POSITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         </Field>
@@ -153,12 +152,6 @@ export default function BoardPage() {
         actions={can('board_members', 'CREATE') ? <button type="button" className="btn-primary" onClick={() => setDialog({ kind: 'add' })}>Add board member</button> : undefined} />
       {notice && <Notice tone="success" onDismiss={() => setNotice('')}>{notice}</Notice>}
       <LoadError message={list.error} onRetry={list.reload} />
-      {tab === 'current' && list.data && (
-        <div className="metric-grid" style={{ marginBottom: 14 }}>
-          <StatCard label="On the board" value={String(list.data.totals.active)} />
-          <StatCard label="Posts without a holder" value={String(vacant.length)} tone={vacant.length ? 'warn' : undefined} />
-        </div>
-      )}
       {tab === 'current' && vacant.length > 0 && <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>Not filled yet: {vacant.join(', ')}.</div>}
       <Tabs tabs={[{ id: 'current' as const, label: 'Current board' }, { id: 'past' as const, label: 'Past members' }]} active={tab} onChange={setTab} />
       <section className="table-panel">

@@ -54,8 +54,9 @@ describeDb('AMCOS board (PostgreSQL)', () => {
   });
 
   it('finds only farmers of this AMCOS who are not already seated', async () => {
-    const c: any = await svc.candidates(adminA, { q: 'a' });
-    expect(c.data).toEqual([]); // too short to search
+    const all: any = await svc.candidates(adminA, {}); // no search text: the dropdown opens with the first farmers
+    expect(all.data.length).toBeGreaterThan(0);
+    expect(all.data.every((x: any) => !['Amani', 'Bahati'].includes(x.name.split(' ')[0]))).toBe(true);
     const found: any = await svc.candidates(adminA, { q: 'Mwakyusa' });
     expect(found.data.map((x: any) => x.name.split(' ')[0]).sort()).toEqual(['Cosmas', 'Doreen']);
   });
