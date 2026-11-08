@@ -14,7 +14,7 @@ interface Notification {
   type: string;
   title: string;
   body: string;
-  data?: { leaseId?: string; farmId?: string; membershipId?: string; alertId?: string; winnerId?: string; campaignId?: string; registryId?: string } | null;
+  data?: { leaseId?: string; farmId?: string; membershipId?: string; alertId?: string; winnerId?: string; campaignId?: string; registryId?: string; transferId?: string } | null;
   isRead: boolean;
   createdAt: string;
 }
@@ -48,6 +48,7 @@ export default function NotificationCenter() {
     if (item.data?.alertId) router.push({ pathname: '/alert/[id]', params: { id: item.data.alertId } });
     else if (item.data?.registryId) router.push('/claim-farms');
     else if (item.data?.winnerId || item.data?.campaignId) router.push('/rewards');
+    else if (item.data?.transferId) router.push('/plot-transfer-requests');
     else if (item.data?.leaseId) router.push('/leases');
     else if (item.data?.membershipId) router.push('/membership');
     else if (item.data?.farmId) router.push({ pathname: '/farm/[id]', params: { id: item.data.farmId } });

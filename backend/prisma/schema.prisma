@@ -124,20 +124,24 @@ model PartnerApiRequest {
 // ============================================================
 
 model Farmer {
-  id            String    @id @default(uuid())
-  userId        String    @unique @map("user_id")
-  controlNumber String    @unique @map("control_number") // Auto-generated: MYD-00001
-  firstName     String    @map("first_name")
-  lastName      String    @map("last_name")
-  dateOfBirth   DateTime? @map("date_of_birth")
+  id            String        @id @default(uuid())
+  userId        String        @unique @map("user_id")
+  controlNumber String        @unique @map("control_number") // Auto-generated: MYD-00001
+  firstName     String        @map("first_name")
+  lastName      String        @map("last_name")
+  dateOfBirth   DateTime?     @map("date_of_birth")
   gender        Gender?
-  nationalId    String?   @unique @map("national_id")
-  photoUrl      String?   @map("photo_url")
+  /// The NIDA number, when the farmer has one (kept for national referencing); see idType/idNumber for the primary ID.
+  nationalId    String?       @unique @map("national_id")
+  /// The primary ID the farmer registered with. NIDA is optional; a voter ID or driver's license is accepted instead.
+  idType        FarmerIdType? @map("id_type")
+  idNumber      String?       @map("id_number")
+  photoUrl      String?       @map("photo_url")
   village       String?
   ward          String?
-  district      String?   @default("Mbarali")
-  region        String?   @default("Mbeya")
-  familySize    Int?      @map("family_size")
+  district      String?       @default("Mbarali")
+  region        String?       @default("Mbeya")
+  familySize    Int?          @map("family_size")
 
   // Extended profile (rice-production platform)
   email                  String?
@@ -172,6 +176,8 @@ model Farmer {
 
   // Relations
   user                      User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  localVerifications        FarmerLocalVerification[]      @relation("LocalVerificationFarmer")
+  guaranteedVerifications   FarmerLocalVerification[]      @relation("LocalVerificationGuarantor")
   mamcosId                  String?                        @map("mamcos_id")
   farmerDues                FarmerDue[]
   guardianships             IrrigationHectareGuardian[]    @relation("FarmerGuardianships")
@@ -220,6 +226,7 @@ model Farmer {
   irrigationTransfersTo     IrrigationAllocationTransfer[] @relation("TransferToFarmer")
   irrigationLeaderships     IrrigationLeadership[]
   boardSeats                BoardMember[]
+  farmDefaultCases          FarmDefaultCase[]
   joinRequests              AmcosJoinRequest[]
   communicationReceipts     CommunicationRecipient[]
 
@@ -321,6 +328,7 @@ model Mamcos {
   equipment             AmcosEquipment[]
   communications        Communication[]
   boardMembers          BoardMember[]
+  farmDefaultCases      FarmDefaultCase[]
   ledgerEntries         LedgerEntry[]
   charges               AmcosCharge[]
   equipmentTypes        AmcosEquipmentType[]
@@ -363,25 +371,27 @@ model IrrigationScheme {
   createdAt        DateTime @default(now()) @map("created_at")
 
   // Irrigation Scheme Management (canals → blocks → hectare units)
-  code                      String?          @unique
-  region                    String?
-  district                  String?
-  ward                      String?
-  village                   String?
-  description               String?
-  establishedOn             DateTime?        @map("established_on") @db.Date
-  status                    IrrigationStatus @default(ACTIVE)
+  code                       String?          @unique
+  region                     String?
+  district                   String?
+  ward                       String?
+  village                    String?
+  description                String?
+  establishedOn              DateTime?        @map("established_on") @db.Date
+  status                     IrrigationStatus @default(ACTIVE)
   /// Planning targets used for setup alerts; they never block data entry except maxBlocksPerCanal / hectaresPerBlock.
-  plannedCanalCount         Int              @default(6) @map("planned_canal_count")
-  minBlocksPerCanal         Int              @default(15) @map("min_blocks_per_canal")
-  maxBlocksPerCanal         Int              @default(16) @map("max_blocks_per_canal")
-  hectaresPerBlock          Decimal          @default(30) @map("hectares_per_block") @db.Decimal(8, 2)
+  plannedCanalCount          Int              @default(6) @map("planned_canal_count")
+  minBlocksPerCanal          Int              @default(15) @map("min_blocks_per_canal")
+  maxBlocksPerCanal          Int              @default(16) @map("max_blocks_per_canal")
+  hectaresPerBlock           Decimal          @default(30) @map("hectares_per_block") @db.Decimal(8, 2)
   /// Allocation policy: null = a member may hold any number of hectares.
-  maxHectaresPerFarmer      Int?             @map("max_hectares_per_farmer")
-  requireAllocationApproval Boolean          @default(false) @map("require_allocation_approval")
-  createdById               String?          @map("created_by_id")
-  updatedById               String?          @map("updated_by_id")
-  updatedAt                 DateTime         @default(now()) @updatedAt @map("updated_at")
+  maxHectaresPerFarmer       Int?             @map("max_hectares_per_farmer")
+  requireAllocationApproval  Boolean          @default(false) @map("require_allocation_approval")
+  /// Transfers wait for the receiving member to accept (SMS + app) before any approval or execution.
+  requireRecipientAcceptance Boolean          @default(false) @map("require_recipient_acceptance")
+  createdById                String?          @map("created_by_id")
+  updatedById                String?          @map("updated_by_id")
+  updatedAt                  DateTime         @default(now()) @updatedAt @map("updated_at")
 
   mamcos    Mamcos?              @relation(fields: [mamcosId], references: [id])
   canals    IrrigationCanal[]
@@ -522,6 +532,7 @@ model IrrigationHectareAllocation {
 }
 
 enum IrrigationTransferStatus {
+  AWAITING_RECIPIENT
   PENDING_APPROVAL
   COMPLETED
   REJECTED
@@ -529,24 +540,26 @@ enum IrrigationTransferStatus {
 }
 
 model IrrigationAllocationTransfer {
-  id               String                   @id @default(uuid())
-  hectareId        String                   @map("hectare_id")
-  fromAllocationId String                   @map("from_allocation_id")
-  toAllocationId   String?                  @map("to_allocation_id")
-  fromFarmerId     String                   @map("from_farmer_id")
-  toFarmerId       String                   @map("to_farmer_id")
-  transferDate     DateTime                 @map("transfer_date") @db.Date
-  effectiveDate    DateTime                 @map("effective_date") @db.Date
-  reason           String
-  status           IrrigationTransferStatus
-  requestedById    String?                  @map("requested_by_id")
-  approvedById     String?                  @map("approved_by_id")
-  approvedAt       DateTime?                @map("approved_at")
-  processedById    String?                  @map("processed_by_id")
-  processedAt      DateTime?                @map("processed_at")
-  rejectedReason   String?                  @map("rejected_reason")
-  createdAt        DateTime                 @default(now()) @map("created_at")
-  updatedAt        DateTime                 @updatedAt @map("updated_at")
+  id                   String                   @id @default(uuid())
+  hectareId            String                   @map("hectare_id")
+  fromAllocationId     String                   @map("from_allocation_id")
+  toAllocationId       String?                  @map("to_allocation_id")
+  fromFarmerId         String                   @map("from_farmer_id")
+  toFarmerId           String                   @map("to_farmer_id")
+  transferDate         DateTime                 @map("transfer_date") @db.Date
+  effectiveDate        DateTime                 @map("effective_date") @db.Date
+  reason               String
+  status               IrrigationTransferStatus
+  requestedById        String?                  @map("requested_by_id")
+  approvedById         String?                  @map("approved_by_id")
+  approvedAt           DateTime?                @map("approved_at")
+  processedById        String?                  @map("processed_by_id")
+  processedAt          DateTime?                @map("processed_at")
+  rejectedReason       String?                  @map("rejected_reason")
+  /// When the receiving member accepted or declined (null while AWAITING_RECIPIENT or if acceptance was not required).
+  recipientRespondedAt DateTime?                @map("recipient_responded_at")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
 
   hectare        IrrigationHectare            @relation(fields: [hectareId], references: [id], onDelete: Restrict)
   fromAllocation IrrigationHectareAllocation  @relation("TransferFromAllocation", fields: [fromAllocationId], references: [id], onDelete: Restrict)
@@ -694,26 +707,29 @@ model Farm {
   photoUrls             String[]  @map("photo_urls")
 
   // Extended farm characteristics
-  ownershipType      OwnershipType? @map("ownership_type")
-  ownerName          String?        @map("owner_name")
-  ownerPhone         String?        @map("owner_phone")
-  landTenure         String?        @map("land_tenure")
-  soilType           String?        @map("soil_type")
-  soilFertility      String?        @map("soil_fertility")
-  waterSource        String?        @map("water_source")
-  irrigationMethod   String?        @map("irrigation_method")
+  ownershipType      OwnershipType?  @map("ownership_type")
+  ownerName          String?         @map("owner_name")
+  ownerPhone         String?         @map("owner_phone")
+  landTenure         String?         @map("land_tenure")
+  soilType           String?         @map("soil_type")
+  soilFertility      String?         @map("soil_fertility")
+  waterSource        String?         @map("water_source")
+  irrigationMethod   String?         @map("irrigation_method")
   accessibility      String?
-  previousCrops      String[]       @map("previous_crops")
+  previousCrops      String[]        @map("previous_crops")
   /// Mayode Farms operations: the person who runs this farm, whether it is one of Mayode's own, and whether it is in use.
-  managerUserId      String?        @map("manager_user_id")
-  isMayodeFarm       Boolean        @default(false) @map("is_mayode_farm")
-  isActive           Boolean        @default(true) @map("is_active")
-  isVerified         Boolean        @default(false) @map("is_verified")
-  isAvailableForRent Boolean        @default(false) @map("is_available_for_rent")
-  isLeased           Boolean        @default(false) @map("is_leased")
-  leaseLockedUntil   DateTime?      @map("lease_locked_until")
-  createdAt          DateTime       @default(now()) @map("created_at")
-  updatedAt          DateTime       @updatedAt @map("updated_at")
+  managerUserId      String?         @map("manager_user_id")
+  isMayodeFarm       Boolean         @default(false) @map("is_mayode_farm")
+  isActive           Boolean         @default(true) @map("is_active")
+  isVerified         Boolean         @default(false) @map("is_verified")
+  isAvailableForRent Boolean         @default(false) @map("is_available_for_rent")
+  isLeased           Boolean         @default(false) @map("is_leased")
+  leaseLockedUntil   DateTime?       @map("lease_locked_until")
+  /// Overdue-debt handling: NORMAL unless the owner's debt is past the grace period (see FarmDefaultCase).
+  adminStatus        FarmAdminStatus @default(NORMAL) @map("admin_status")
+  adminCaseId        String?         @map("admin_case_id")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
 
   // GPS Boundary (stored as GeoJSON polygon via PostGIS)
   // We store coordinates as JSON since Prisma doesn't natively support PostGIS geometry
@@ -1908,6 +1924,9 @@ model LandListing {
   lastInstallmentYear  Int         @default(0) @map("last_installment_year")
   // Reward for Honesty: every M-LAX in-app deal is MAYODE-protected once escrow is secured
   mayodeProtected      Boolean     @default(false) @map("mayode_protected")
+  /// Listed because the owner's debt went unpaid (FarmDefaultCase). The price may not go below minimumPrice.
+  defaultCaseId        String?     @map("default_case_id")
+  minimumPrice         Float?      @map("minimum_price")
   // Private ("Relationship") deals: only a keyed hash of the code is stored, never the code. The
   // first renter to redeem it is recorded in claimedByFarmerId and is the only one who can take the listing.
   accessCodeHash       String?     @map("access_code_hash")
@@ -3525,10 +3544,18 @@ enum EducationLevel {
   TERTIARY
 }
 
+enum FarmerIdType {
+  NIDA
+  VOTER_ID
+  DRIVER_LICENSE
+}
+
 enum DocumentType {
   NATIONAL_ID
   NIDA_ID
   VOTER_ID
+  DRIVER_LICENSE
+  VILLAGE_LETTER
   TITLE_DEED
   LEASE_AGREEMENT
   PHOTO
@@ -5869,4 +5896,108 @@ model BoardMember {
   @@index([mamcosId, status])
   @@index([farmerId])
   @@map("board_members")
+}
+
+// ============================================================
+// FARMER LOCAL VERIFICATION (Tier 3: farmers without NIDA, voter ID or driver's license)
+// ============================================================
+
+enum LocalVerificationMethod {
+  VILLAGE_LETTER
+  LOCAL_VOTER_ID
+  GUARANTOR
+}
+
+/// How a farmer with no national ID was vouched for locally: a village/street government letter (Barua ya Utambulisho),
+/// a local voter ID, or the sign-off of a current Block or Canal Chairman. A record stays until it is revoked.
+model FarmerLocalVerification {
+  id                    String                        @id @default(uuid())
+  farmerId              String                        @map("farmer_id")
+  method                LocalVerificationMethod
+  /// Letter reference number, or the local voter ID number.
+  reference             String?
+  letterDocumentUrl     String?                       @map("letter_document_url")
+  guarantorFarmerId     String?                       @map("guarantor_farmer_id")
+  /// The chairman's post when they signed (a leadership can end later; this keeps what was true then).
+  guarantorPosition     IrrigationLeadershipPosition? @map("guarantor_position")
+  guarantorLeadershipId String?                       @map("guarantor_leadership_id")
+  notes                 String?
+  recordedById          String?                       @map("recorded_by_id")
+  createdAt             DateTime                      @default(now()) @map("created_at")
+  revokedAt             DateTime?                     @map("revoked_at")
+  revokedById           String?                       @map("revoked_by_id")
+  revokedReason         String?                       @map("revoked_reason")
+
+  farmer    Farmer  @relation("LocalVerificationFarmer", fields: [farmerId], references: [id], onDelete: Cascade)
+  guarantor Farmer? @relation("LocalVerificationGuarantor", fields: [guarantorFarmerId], references: [id], onDelete: Restrict)
+
+  @@index([farmerId, revokedAt])
+  @@map("farmer_local_verifications")
+}
+
+// ============================================================
+// OVERDUE-DEBT FARMS (block, AMCOS administration, M-LAX)
+// ============================================================
+
+enum FarmAdminStatus {
+  NORMAL
+  UNDER_AMCOS
+  MLAX_NOTICE
+  AT_MLAX
+}
+
+/// UNDER_AMCOS, MLAX_NOTICE and AT_MLAX are the open stages; the rest are how a case ended.
+enum FarmDefaultCaseStatus {
+  UNDER_AMCOS
+  MLAX_NOTICE
+  AT_MLAX
+  RECLAIMED
+  TAKEN_OVER
+  LEASED_ON_MLAX
+  CLOSED
+}
+
+/// A farmer whose debt stayed unpaid past the grace period: their farms are blocked and run by the AMCOS. A partial unique
+/// index (raw SQL in the migration) allows one open case per farmer.
+model FarmDefaultCase {
+  id              String                @id @default(uuid())
+  mamcosId        String                @map("mamcos_id")
+  farmerId        String                @map("farmer_id")
+  status          FarmDefaultCaseStatus @default(UNDER_AMCOS)
+  openedOn        DateTime              @map("opened_on") @db.Date
+  graceDays       Int                   @map("grace_days")
+  debtAtOpen      Decimal               @map("debt_at_open") @db.Decimal(14, 2)
+  penaltyDueId    String?               @map("penalty_due_id")
+  noticeSentAt    DateTime?             @map("notice_sent_at")
+  noticeDeadline  DateTime?             @map("notice_deadline")
+  atMlaxAt        DateTime?             @map("at_mlax_at")
+  resolvedOn      DateTime?             @map("resolved_on")
+  resolvedNote    String?               @map("resolved_note")
+  takenByFarmerId String?               @map("taken_by_farmer_id")
+  takenFarmIds    String[]              @map("taken_farm_ids")
+  createdById     String?               @map("created_by_id")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  mamcos Mamcos             @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  farmer Farmer             @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+  events FarmDefaultEvent[]
+
+  @@index([mamcosId, status])
+  @@index([farmerId])
+  @@map("farm_default_cases")
+}
+
+model FarmDefaultEvent {
+  id        String   @id @default(uuid())
+  caseId    String   @map("case_id")
+  kind      String
+  note      String?
+  actorId   String?  @map("actor_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  case FarmDefaultCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt])
+  @@map("farm_default_events")
 }

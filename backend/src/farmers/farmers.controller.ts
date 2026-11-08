@@ -29,6 +29,8 @@ import {
   UpsertHouseholdDto,
   LinkDocumentDto,
   SubmitIdentityDto,
+  RecordLocalVerificationDto,
+  RevokeLocalVerificationDto,
 } from './dto/farmer-actions.dto';
 import {
   CaptureConsentDto,
@@ -514,6 +516,34 @@ export class FarmersController {
     @CurrentUser() user: RequestUser,
   ) {
     return this.farmersService.submitIdentity(id, dto, user);
+  }
+
+  @Post(':id/local-verifications')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('farmers', 'EDIT')
+  @ApiOperation({
+    summary:
+      'Tier 3: vouch for a farmer with no national ID (village letter, local voter ID, or a Block/Canal Chairman guarantor)',
+  })
+  recordLocalVerification(
+    @Param('id') id: string,
+    @Body() dto: RecordLocalVerificationDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.farmersService.recordLocalVerification(id, dto, user);
+  }
+
+  @Post(':id/local-verifications/:verificationId/revoke')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FIELD_OFFICER, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('farmers', 'EDIT')
+  @ApiOperation({ summary: 'Revoke a local verification, with a reason' })
+  revokeLocalVerification(
+    @Param('id') id: string,
+    @Param('verificationId') verificationId: string,
+    @Body() dto: RevokeLocalVerificationDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.farmersService.revokeLocalVerification(id, verificationId, dto, user);
   }
 
   @Delete('documents/:documentId')

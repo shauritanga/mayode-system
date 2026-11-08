@@ -82,6 +82,7 @@ export class SchemesService {
           hectaresPerBlock: dto.hectaresPerBlock ?? 30,
           maxHectaresPerFarmer: dto.maxHectaresPerFarmer ?? null,
           requireAllocationApproval: dto.requireAllocationApproval ?? false,
+          requireRecipientAcceptance: dto.requireRecipientAcceptance ?? false,
           createdById: actor.id,
           updatedById: actor.id,
         },
@@ -127,6 +128,7 @@ export class SchemesService {
       ...(dto.hectaresPerBlock !== undefined ? { hectaresPerBlock: dto.hectaresPerBlock } : {}),
       ...(dto.maxHectaresPerFarmer !== undefined ? { maxHectaresPerFarmer: dto.maxHectaresPerFarmer } : {}),
       ...(dto.requireAllocationApproval !== undefined ? { requireAllocationApproval: dto.requireAllocationApproval } : {}),
+      ...(dto.requireRecipientAcceptance !== undefined ? { requireRecipientAcceptance: dto.requireRecipientAcceptance } : {}),
       updatedById: actor.id,
     };
     return this.prisma.$transaction(async (tx) => {

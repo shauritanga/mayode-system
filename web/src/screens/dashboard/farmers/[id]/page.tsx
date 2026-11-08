@@ -6,9 +6,15 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { hasPermission, isPathAllowed } from '@/lib/nav';
 import { useAuthStore } from '@/store/auth.store';
-import { API_BASE_URL, farmersApi, irrigationApi } from '@/lib/api';
-import { EditFarmerModal, RemoveFarmerModal } from './FarmerActions';
-import { BASE, CardsSkeleton, Empty, LoadError, Panel, StatCard, StatusBadge, fmtDate, fmtHa, titleCase, useApi } from '../../irrigation/ui';
+import { API_BASE_URL, api, farmDefaultsApi, farmersApi, irrigationApi } from '@/lib/api';
+import { EditFarmerModal, LocalVerificationModal, RemoveFarmerModal } from './FarmerActions';
+import { BASE, CardsSkeleton, ConfirmDialog, Empty, LoadError, Panel, StatCard, StatusBadge, fmtDate, fmtHa, titleCase, useApi } from '../../irrigation/ui';
+
+const TIER_LABEL: Record<string, string> = { STANDARD: 'Tier 1 · Standard member', FAMILY: 'Tier 2 · Family / beneficiary', ALTERNATIVE_ID: 'Tier 3 · Alternative ID' };
+const IDENTIFIER_LABEL: Record<string, string> = {
+  NIDA: 'NIDA', VOTER_ID: 'Voter ID', DRIVER_LICENSE: "Driver's license", LOCAL_VERIFICATION: 'Local verification', GUARDIAN: 'Guardian (beneficial owner)', PHONE_ONLY: 'Phone number only',
+};
+const METHOD_LABEL: Record<string, string> = { VILLAGE_LETTER: 'Village / street letter', LOCAL_VOTER_ID: 'Local voter ID', GUARANTOR: 'Chairman guarantor' };
 
 const photoSrc = (url?: string | null) => (!url ? null : /^https?:/.test(url) ? url : `${API_BASE_URL.replace(/\/api\/v\d+\/?$/, '')}${url}`);
 
@@ -19,12 +25,14 @@ export default function FarmerProfilePage() {
   // In the AMCOS portal the farmer list is a tab of Farmers & Plot Allocation.
   const listHref = user && isPathAllowed('/dashboard/plot-allocation', user) ? '/dashboard/plot-allocation' : '/dashboard/farmers';
   const router = useRouter();
-  const [dialog, setDialog] = useState<'edit' | 'remove' | null>(null);
+  const [dialog, setDialog] = useState<'edit' | 'remove' | 'verify' | null>(null);
+  const [revoking, setRevoking] = useState<any>(null);
   const canEdit = hasPermission(user, 'farmers', 'EDIT');
   const canRemove = hasPermission(user, 'farmers', 'DELETE');
   const person = useApi<any>(() => farmersApi.getOne(id), [id]);
   // Hectare records come from the irrigation scheme; a farmer outside it, or a user without that grant, simply has none to show.
   const land = useApi<any>(() => irrigationApi.farmer(id), [id]);
+  const overdue = useApi<any>(hasPermission(user, 'farmers', 'VIEW') ? () => farmDefaultsApi.forFarmer(id) : null, [id]);
   const f = person.data;
   const name = f ? `${f.firstName} ${f.lastName}` : 'Farmer';
   const photo = photoSrc(f?.photoUrl);
@@ -32,6 +40,8 @@ export default function FarmerProfilePage() {
     ['Farmer ID', f.controlNumber ?? '—'], ['Phone', f.user?.phone ?? '—'], ['Email', f.user?.email ?? '—'], ['Gender', titleCase(f.gender) || '—'], ['Date of birth', fmtDate(f.dateOfBirth)],
     ['Village', f.village ?? '—'], ['Ward', f.ward ?? '—'], ['District', f.district ?? '—'], ['AMCOS', f.mamcos?.name ?? '—'],
     ['Registered', fmtDate(f.createdAt)],
+    ['Registration tier', TIER_LABEL[f.registrationTier] ?? '—'], ['Identified by', IDENTIFIER_LABEL[f.identifierUsed] ?? '—'],
+    ...(f.idNumber ? [['ID number', f.idNumber] as [string, any]] : []),
   ] : [];
   const d = land.data;
   const guided = d ? [...d.guided.current, ...d.guided.history] : [];
@@ -41,6 +51,18 @@ export default function FarmerProfilePage() {
         <Link href={listHref} style={{ color: 'inherit', textDecoration: 'underline' }}>Farmers</Link><span>/</span><span>{name}</span>
       </nav>
       <LoadError message={person.error} onRetry={person.reload} />
+      {overdue.data?.case && (
+        <div role="alert" className="glass-card" style={{ padding: '12px 16px', marginBottom: 14, borderLeft: '4px solid var(--red-400)' }}>
+          <strong style={{ color: 'var(--red-400)' }}>Farms blocked: debt overdue</strong>
+          <div style={{ fontSize: 13, marginTop: 4 }}>
+            Owes <strong>TZS {Math.round(overdue.data.case.debt).toLocaleString('en-US')}</strong>{overdue.data.case.daysOverdue != null ? `, ${overdue.data.case.daysOverdue} days overdue` : ''}.{' '}
+            {overdue.data.case.status === 'UNDER_AMCOS' && `The farms cannot be leased and are run by the AMCOS until ${fmtDate(overdue.data.case.graceEndsAt)}. Paying the debt gives them back; another farmer may pay it and farm them this season.`}
+            {overdue.data.case.status === 'MLAX_NOTICE' && `Last warning sent. The farms go to M-LAX on ${fmtDate(overdue.data.case.graceEndsAt)} unless the debt is paid.`}
+            {overdue.data.case.status === 'AT_MLAX' && 'The farms are on M-LAX for leasing. The owner receives nothing from the lease and can only get them back by leasing them through M-LAX.'}
+            {' '}{hasPermission(user, 'farm_administration', 'VIEW') && <Link href="/dashboard/farm-administration" style={{ textDecoration: 'underline' }}>Open farms under administration</Link>}
+          </div>
+        </div>
+      )}
       {person.loading ? <CardsSkeleton count={3} /> : !f ? null : (
         <>
           <Panel>
@@ -94,6 +116,29 @@ export default function FarmerProfilePage() {
               )}
           </Panel>
 
+          <Panel title="Local verification" pad={false}
+            actions={canEdit && f.identifierUsed === 'PHONE_ONLY' || (canEdit && f.registrationTier === 'ALTERNATIVE_ID') ? <button type="button" className="btn-primary" onClick={() => setDialog('verify')}>Add verification</button> : undefined}>
+            {!f.localVerifications?.length
+              ? <Empty title="No local verification" hint={f.identifierUsed === 'PHONE_ONLY' ? 'This farmer has no ID on file. Add a village letter, local voter ID or a chairman guarantor.' : 'Only needed for farmers with no NIDA, voter ID or driver\'s license.'} />
+              : (
+                <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Method</th><th>Details</th><th>Recorded</th><th>Status</th><th /></tr></thead><tbody>
+                  {f.localVerifications.map((v: any) => (
+                    <tr key={v.id} style={v.revokedAt ? { opacity: 0.6 } : undefined}>
+                      <td>{METHOD_LABEL[v.method] ?? v.method}</td>
+                      <td>
+                        {v.reference ?? ''}
+                        {v.letterDocumentUrl && <> <a href={photoSrc(v.letterDocumentUrl) ?? '#'} target="_blank" rel="noreferrer">View letter</a></>}
+                        {v.guarantor && <>{`${v.guarantor.firstName} ${v.guarantor.lastName}`} <span className="muted">· {titleCase(v.guarantorPosition)}</span></>}
+                      </td>
+                      <td>{fmtDate(v.createdAt)}</td>
+                      <td>{v.revokedAt ? <span className="muted">Revoked {fmtDate(v.revokedAt)}</span> : <StatusBadge value="ACTIVE" />}</td>
+                      <td>{canEdit && !v.revokedAt && <button type="button" className="btn-secondary" onClick={() => setRevoking(v)}>Revoke</button>}</td>
+                    </tr>
+                  ))}
+                </tbody></table></div>
+              )}
+          </Panel>
+
           <Panel title="Farms guided by this farmer" pad={false}>
             {land.loading ? <div style={{ padding: 16 }}><CardsSkeleton count={1} /></div>
               : !guided.length ? <Empty title="No guided farms" hint="Farms registered in a relative's name but owned by this farmer show here." />
@@ -115,6 +160,10 @@ export default function FarmerProfilePage() {
           </Panel>
         </>
       )}
+      {dialog === 'verify' && f && <LocalVerificationModal farmer={f} onClose={() => setDialog(null)} onSaved={person.reload} />}
+      {revoking && f && <ConfirmDialog title="Revoke verification" body="The farmer will no longer count as locally verified." confirmLabel="Revoke" danger askReason
+        onClose={() => setRevoking(null)}
+        onConfirm={async (reason?: string) => { await api.post(`/farmers/${f.id}/local-verifications/${revoking.id}/revoke`, { reason }); setRevoking(null); person.reload(); }} />}
       {dialog === 'edit' && f && <EditFarmerModal farmer={f} onClose={() => setDialog(null)} onSaved={person.reload} />}
       {dialog === 'remove' && f && <RemoveFarmerModal farmer={f} onClose={() => setDialog(null)} onRemoved={() => router.push(listHref)} />}
     </>

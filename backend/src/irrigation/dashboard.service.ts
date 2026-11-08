@@ -102,7 +102,7 @@ export class DashboardService {
       scheme: {
         id: scheme.id, code: scheme.code, name: scheme.name, status: scheme.status, mamcos: scheme.mamcos,
         region: scheme.region, district: scheme.district, ward: scheme.ward, village: scheme.village, waterSource: scheme.waterSource,
-        plannedCanalCount: scheme.plannedCanalCount, requireAllocationApproval: scheme.requireAllocationApproval,
+        plannedCanalCount: scheme.plannedCanalCount, requireAllocationApproval: scheme.requireAllocationApproval, requireRecipientAcceptance: scheme.requireRecipientAcceptance,
       },
       totals: {
         canals: canals.length, blocks: blocks.length, hectareUnits: units, registeredHectares: area, allocatedHectares: allocatedArea,

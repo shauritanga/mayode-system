@@ -1,3 +1,4 @@
+import { assertFarmNotBlocked } from '../farm-defaults/farm-block';
 import {
   BadRequestException,
   ConflictException,
@@ -82,9 +83,11 @@ export class FarmLeasesService {
         farmerId: true,
         mamcosId: true,
         isVerified: true,
+        adminStatus: true,
       },
     });
     if (!farm) throw new NotFoundException(`Farm ${dto.farmId} not found`);
+    assertFarmNotBlocked(farm);
     if (!farm.farmerId)
       throw new ConflictException(
         'Owner-operated assignments are not available for AMCOS-owned farms; assign a renter instead',
@@ -610,9 +613,10 @@ export class FarmLeasesService {
     const ownFarmer = await this.farmerForUser(user.id);
     const farm = await this.prisma.farm.findUnique({
       where: { id: dto.farmId },
-      select: { farmerId: true },
+      select: { farmerId: true, farmCode: true, adminStatus: true },
     });
     if (!farm) throw new NotFoundException(`Farm ${dto.farmId} not found`);
+    assertFarmNotBlocked(farm);
     if (!farm.farmerId)
       throw new ConflictException(
         'Owner-operated assignments are not available for AMCOS-owned farms; assign a renter instead',

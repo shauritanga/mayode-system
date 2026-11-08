@@ -6,6 +6,8 @@ import type { PrismaService } from '../prisma/prisma.service';
 export const IRRIGATION_RESOURCE = 'irrigation';
 export const ALLOCATION_RESOURCE = 'irrigation_allocations';
 export const LEADERSHIP_RESOURCE = 'irrigation_leadership';
+/** Final sign-off on plot transfers; held by the AMCOS Manager and Accountant roles. */
+export const TRANSFER_APPROVAL_RESOURCE = 'irrigation_transfer_approval';
 
 export type Db = Prisma.TransactionClient | PrismaService;
 

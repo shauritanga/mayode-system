@@ -108,16 +108,16 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     description: 'Keeps the books: ledger, charges, assets and the monthly payroll. Cannot manage users or roles.',
     grants: {
       workspace: V, farmers: V, accounting: VCE, finance: VCE, dues: VCE, payroll: VCE, assets: VE,
-      loans: V, suppliers: V, reports: V, audit_logs: V,
+      loans: V, suppliers: V, reports: V, audit_logs: V, irrigation_transfer_approval: ['EDIT'],
     },
   },
   {
     name: 'Manager',
-    description: 'Oversees the whole AMCOS with read access to operations, finance and payroll; changes nothing.',
+    description: 'Oversees the whole AMCOS with read access to operations, finance and payroll. Gives the final sign-off on plot transfers; changes nothing else.',
     grants: {
       workspace: V, farmers: V, accounting: V, finance: V, dues: V, payroll: V, assets: V, machinery: V,
       irrigation: V, irrigation_allocations: V, irrigation_leadership: V, communication: V, governance: V,
-      suppliers: V, inventory: V, warehouses: V, reports: V, audit_logs: V,
+      suppliers: V, inventory: V, warehouses: V, reports: V, audit_logs: V, irrigation_transfer_approval: ['EDIT'],
     },
   },
   {

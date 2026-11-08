@@ -164,7 +164,7 @@ export class FarmOpsService {
     return this.prisma.farmer.findMany({
       where: {
         ...scope(actor),
-        ...(term ? { OR: [{ firstName: { contains: term, mode: 'insensitive' } }, { lastName: { contains: term, mode: 'insensitive' } }, { controlNumber: { contains: term, mode: 'insensitive' } }, { nationalId: { contains: term } }] } : {}),
+        ...(term ? { OR: [{ firstName: { contains: term, mode: 'insensitive' } }, { lastName: { contains: term, mode: 'insensitive' } }, { controlNumber: { contains: term, mode: 'insensitive' } }, { nationalId: { contains: term } }, { idNumber: { contains: term, mode: 'insensitive' } }] } : {}),
       },
       select: { id: true, controlNumber: true, firstName: true, lastName: true, village: true, district: true },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],

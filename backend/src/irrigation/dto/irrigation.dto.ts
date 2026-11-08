@@ -34,6 +34,7 @@ export class CreateSchemeDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(500) hectaresPerBlock?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) maxHectaresPerFarmer?: number | null;
   @IsOptional() @IsBoolean() requireAllocationApproval?: boolean;
+  @IsOptional() @IsBoolean() requireRecipientAcceptance?: boolean;
 }
 
 export class UpdateSchemeDto {
@@ -54,6 +55,7 @@ export class UpdateSchemeDto {
   /** null clears the per-member limit. */
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) maxHectaresPerFarmer?: number | null;
   @IsOptional() @IsBoolean() requireAllocationApproval?: boolean;
+  @IsOptional() @IsBoolean() requireRecipientAcceptance?: boolean;
 }
 
 export class CreateCanalDto {
@@ -164,4 +166,8 @@ export class CreateDocumentDto {
   @IsString() @IsNotEmpty() fileName: string;
   @IsOptional() @IsString() mimeType?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) sizeBytes?: number;
+}
+
+export class DeclineTransferDto {
+  @IsString() @IsNotEmpty() @MaxLength(500) reason: string;
 }

@@ -1078,3 +1078,13 @@ export const boardApi = {
   update: (id: string, data: object) => api.patch(`/board-members/${id}`, data),
   end: (id: string, data: object) => api.post(`/board-members/${id}/end`, data),
 };
+
+export const farmDefaultsApi = {
+  list: (params?: object) => api.get('/farm-defaults', { params }),
+  check: () => api.post('/farm-defaults/check'),
+  payers: (params?: object) => api.get('/farm-defaults/payers', { params }),
+  forFarmer: (farmerId: string) => api.get(`/farm-defaults/farmer/${farmerId}`),
+  me: () => api.get('/farm-defaults/me'),
+  takeOver: (id: string, data: object) => api.post(`/farm-defaults/${id}/take-over`, data),
+  release: (id: string, data: object) => api.post(`/farm-defaults/${id}/release`, data),
+};

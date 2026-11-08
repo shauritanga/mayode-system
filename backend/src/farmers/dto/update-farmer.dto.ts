@@ -10,7 +10,7 @@ import {
   Min,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Gender, EducationLevel } from '@prisma/client';
+import { Gender, EducationLevel, FarmerIdType } from '@prisma/client';
 
 export class UpdateFarmerDto {
   @ApiPropertyOptional({
@@ -45,6 +45,20 @@ export class UpdateFarmerDto {
   @IsString()
   @IsOptional()
   nationalId?: string;
+
+  @ApiPropertyOptional({
+    enum: FarmerIdType,
+    example: FarmerIdType.VOTER_ID,
+    description: 'Primary ID the farmer registers with. NIDA is optional: a voter ID or driver\'s license is accepted instead. Send with idNumber.',
+  })
+  @IsEnum(FarmerIdType)
+  @IsOptional()
+  idType?: FarmerIdType;
+
+  @ApiPropertyOptional({ example: 'T-1234-5678-9012-3', description: 'The number for idType' })
+  @IsString()
+  @IsOptional()
+  idNumber?: string;
 
   @ApiPropertyOptional({ example: 'john@example.com' })
   @IsEmail()

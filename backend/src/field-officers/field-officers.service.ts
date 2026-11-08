@@ -209,6 +209,7 @@ export class FieldOfficersService {
             assignedOfficerId: true,
             verificationStatus: true,
             nationalId: true,
+            idNumber: true,
             village: true,
             ward: true,
             gender: true,
@@ -274,7 +275,11 @@ export class FieldOfficersService {
         bump(
           farmerFilled,
           f.registeredByOfficerId,
-          FARMER_COMPLETENESS_FIELDS.filter((k) => f[k] != null && f[k] !== '')
+          FARMER_COMPLETENESS_FIELDS.filter((k) => {
+            // NIDA is optional: any registered ID counts as the farmer's identity
+            const v = k === 'nationalId' ? (f.nationalId ?? f.idNumber) : f[k];
+            return v != null && v !== '';
+          })
             .length,
         );
     }

@@ -27,6 +27,8 @@ interface LandListing {
   dealType: string;
   /** Has a private-deal code; set by the server. */
   isPrivate?: boolean;
+  /** Leased because the owner's debt to the AMCOS went unpaid; the price cannot go below the debt. */
+  fromOverdueDebt?: boolean;
   leaseStatus: string;
   leaseDurationMonths: number;
   commissionRate: number;
@@ -901,6 +903,7 @@ export default function MarketplacePage() {
                               <span className={`badge ${l.isFlashDeal ? 'badge-red' : l.dealType === 'RELATIONSHIP' ? 'badge-blue' : 'badge-gold'}`}>
                                 {l.isFlashDeal ? '⚡ Flash' : `${l.isPrivate ? '🔒 ' : ''}${l.dealType}`}
                               </span>
+                              {l.fromOverdueDebt && <span className="badge badge-red" title="The owner's debt to the AMCOS is unpaid. The price cannot be set below the debt and penalty." style={{ marginLeft: 6 }}>Overdue debt</span>}
                             </td>
                             <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{l.leaseDurationMonths} months</td>
                             <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{(l.commissionRate * 100).toFixed(0)}%</td>

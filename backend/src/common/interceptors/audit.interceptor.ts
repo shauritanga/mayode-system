@@ -95,6 +95,7 @@ export class AuditInterceptor implements NestInterceptor {
       'signature',
       'thumbprint',
       'nationalId',
+      'idNumber',
     ];
     const clone: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(

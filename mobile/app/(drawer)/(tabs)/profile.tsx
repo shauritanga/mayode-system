@@ -260,6 +260,13 @@ export default function ProfileTab() {
               </View>
               <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#9CA3AF" />
             </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/plot-transfer-requests')}>
+              <View style={styles.menuItemLeft}>
+                <HugeiconsIcon icon={Agreement01Icon} size={22} color="#10B981" />
+                <Text style={styles.menuItemText}>{t('plotTransferRequests')}</Text>
+              </View>
+              <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#9CA3AF" />
+            </TouchableOpacity>
             <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 0 }]} onPress={() => router.push('/rewards')}>
               <View style={styles.menuItemLeft}>
                 <HugeiconsIcon icon={GiftIcon} size={22} color="#F59E0B" />

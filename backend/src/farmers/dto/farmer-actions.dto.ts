@@ -5,11 +5,13 @@ import {
   IsNumber,
   IsInt,
   IsEnum,
+  IsIn,
+  IsUUID,
   IsNotEmpty,
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DocumentType } from '@prisma/client';
+import { DocumentType, LocalVerificationMethod } from '@prisma/client';
 
 /** Field-officer approves a farmer after on-site review. */
 export class VerifyFarmerDto {
@@ -165,11 +167,11 @@ export class LinkDocumentDto {
 /** Farmer submits final-stage identity verification (owner comment §2.1). */
 export class SubmitIdentityDto {
   @ApiProperty({
-    enum: [DocumentType.NIDA_ID, DocumentType.VOTER_ID],
+    enum: [DocumentType.NIDA_ID, DocumentType.VOTER_ID, DocumentType.DRIVER_LICENSE],
     example: DocumentType.NIDA_ID,
     description: 'Type of identity document',
   })
-  @IsEnum(DocumentType)
+  @IsIn([DocumentType.NIDA_ID, DocumentType.VOTER_ID, DocumentType.DRIVER_LICENSE])
   idType: DocumentType;
 
   @ApiProperty({
@@ -203,4 +205,38 @@ export class SubmitIdentityDto {
   @IsString()
   @IsOptional()
   profilePhotoUrl?: string;
+}
+
+/** Tier 3: vouch for a farmer who has no NIDA, voter ID or driver's license. */
+export class RecordLocalVerificationDto {
+  @ApiProperty({ enum: LocalVerificationMethod, example: LocalVerificationMethod.VILLAGE_LETTER })
+  @IsEnum(LocalVerificationMethod)
+  method: LocalVerificationMethod;
+
+  @ApiPropertyOptional({ example: 'KJ/MD/2026/118', description: 'Letter reference number, or the local voter ID number (required for LOCAL_VOTER_ID)' })
+  @IsString()
+  @IsOptional()
+  reference?: string;
+
+  @ApiPropertyOptional({ example: '/uploads/barua.jpg', description: 'Photo of the village/street government letter (required for VILLAGE_LETTER)' })
+  @IsString()
+  @IsOptional()
+  letterDocumentUrl?: string;
+
+  @ApiPropertyOptional({ description: 'The Block or Canal Chairman (a farmer) who vouches for them (required for GUARANTOR)' })
+  @IsUUID()
+  @IsOptional()
+  guarantorFarmerId?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}
+
+export class RevokeLocalVerificationDto {
+  @ApiProperty({ example: 'Letter found to be forged' })
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
 }

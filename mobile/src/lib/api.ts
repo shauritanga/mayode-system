@@ -607,6 +607,13 @@ export const ownershipApi = {
   forFarm: (farmId: string) => api.get(`/farm-ownerships/farm/${farmId}`),
 };
 
+// ── Irrigation plot transfers: the receiving member's side ──
+export const plotTransfersApi = {
+  incoming: () => api.get('/irrigation/my-transfers'),
+  accept: (id: string) => api.post(`/irrigation/my-transfers/${id}/accept`),
+  decline: (id: string, reason: string) => api.post(`/irrigation/my-transfers/${id}/decline`, { reason }),
+};
+
 // ── Farm-action alerts (free preview vs premium recommendation) ──
 export const alertsApi = {
   list: () => api.get('/farm-alerts'),

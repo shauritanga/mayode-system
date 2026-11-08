@@ -11,7 +11,8 @@ import { farmersApi, uploadsApi } from '../src/lib/data';
 import { useAuthStore } from '../src/store/auth.store';
 import { useI18n, TranslationKey } from '../src/i18n';
 
-type IdType = 'NIDA_ID' | 'VOTER_ID';
+type IdType = 'NIDA_ID' | 'VOTER_ID' | 'DRIVER_LICENSE';
+const ID_LABEL: Record<IdType, 'nidaId' | 'voterId' | 'driverLicense'> = { NIDA_ID: 'nidaId', VOTER_ID: 'voterId', DRIVER_LICENSE: 'driverLicense' };
 
 export default function IdentityScreen() {
   const { t } = useI18n();
@@ -116,14 +117,14 @@ export default function IdentityScreen() {
             {/* ID type */}
             <Text style={styles.label}>{t('idType')}</Text>
             <View style={styles.segment}>
-              {(['NIDA_ID', 'VOTER_ID'] as IdType[]).map((tp) => (
+              {(['NIDA_ID', 'VOTER_ID', 'DRIVER_LICENSE'] as IdType[]).map((tp) => (
                 <TouchableOpacity
                   key={tp}
                   style={[styles.segmentBtn, idType === tp && styles.segmentBtnActive]}
                   onPress={() => setIdType(tp)}
                 >
                   <Text style={[styles.segmentText, idType === tp && styles.segmentTextActive]}>
-                    {tp === 'NIDA_ID' ? t('nidaId') : t('voterId')}
+                    {t(ID_LABEL[tp])}
                   </Text>
                 </TouchableOpacity>
               ))}

@@ -28,6 +28,7 @@ import { DashboardService } from './dashboard.service';
 import { DocumentsService } from './documents.service';
 
 const BASE_URL = process.env.IRRIGATION_TEST_DATABASE_URL;
+const smsSent: { to: string; message: string }[] = [];
 const SCHEMA = 'irrigation_test';
 const describeDb = BASE_URL ? describe : describe.skip;
 
@@ -69,6 +70,10 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
     ['irrigation_allocations', 'VIEW'], ['irrigation_allocations', 'CREATE'], ['irrigation_allocations', 'EDIT'],
     ['irrigation_leadership', 'VIEW'], ['irrigation_leadership', 'CREATE'], ['irrigation_leadership', 'EDIT'],
   ]);
+  const APPROVER_ROLE = grants([
+    ['irrigation', 'VIEW'], ['irrigation', 'EDIT'], ['irrigation_allocations', 'VIEW'], ['irrigation_allocations', 'CREATE'],
+    ['irrigation_allocations', 'EDIT'], ['irrigation_transfer_approval', 'EDIT'],
+  ]);
   const LEADER_ROLE = grants([
     ['irrigation', 'VIEW'], ['irrigation_allocations', 'VIEW'], ['irrigation_allocations', 'CREATE'],
     ['irrigation_leadership', 'VIEW'], ['irrigation_leadership', 'CREATE'],
@@ -100,7 +105,11 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
     scope = new IrrigationScopeService(prisma as any);
     schemes = new SchemesService(prisma as any, scope);
     structure = new StructureService(prisma as any, scope, schemes);
-    allocations = new AllocationService(prisma as any, scope, structure);
+    allocations = new AllocationService(
+      prisma as any, scope, structure,
+      { send: async (to: string, message: string) => { smsSent.push({ to, message }); } } as any,
+      { create: async () => ({}) } as any,
+    );
     access = new LeaderAccessService(prisma as any);
     leadership = new LeadershipService(prisma as any, scope, allocations, access);
     dashboard = new DashboardService(prisma as any, scope, structure);
@@ -109,7 +118,7 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
     mamcosId = (await prisma.mamcos.create({ data: { name: `Madibira Test ${randomUUID().slice(0, 6)}` } })).id;
     otherMamcosId = (await prisma.mamcos.create({ data: { name: `Ubaruku Test ${randomUUID().slice(0, 6)}` } })).id;
     admin = (await makeUser('Admin', mamcosId)).user;
-    approver = (await makeUser('Approver', mamcosId)).user;
+    approver = (await makeUser('Approver', mamcosId, APPROVER_ROLE)).user;
     outsider = (await makeUser('Outsider', otherMamcosId)).user;
   });
 
@@ -331,7 +340,12 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
     it('closes the previous allocation and opens a new one, preserving history', async () => {
       const hectareId = await hectareOf(blockIds[1][0], 1);
       const first = await allocations.allocate(admin, { hectareId, farmerId: farmerIds[30] });
-      const transfer = await allocations.createTransfer(admin, { hectareId, toFarmerId: farmerIds[31], reason: 'Sold the plot' });
+      const requested = await allocations.createTransfer(admin, { hectareId, toFarmerId: farmerIds[31], reason: 'Sold the plot' });
+      // never completes on its own, and nothing moves until a Manager/Accountant signs off
+      expect(requested.status).toBe('PENDING_APPROVAL');
+      expect(await prisma.irrigationHectareAllocation.count({ where: { hectareId, farmerId: farmerIds[30], status: 'ACTIVE' } })).toBe(1);
+      await expect(allocations.approveTransfer(admin, requested.id)).rejects.toBeInstanceOf(ForbiddenException);
+      const transfer = await allocations.approveTransfer(approver, requested.id);
       expect(transfer.status).toBe('COMPLETED');
       const rows = await prisma.irrigationHectareAllocation.findMany({ where: { hectareId }, orderBy: { createdAt: 'asc' } });
       expect(rows.map((r) => [r.farmerId, r.status])).toEqual([[farmerIds[30], 'ENDED'], [farmerIds[31], 'ACTIVE']]);
@@ -340,10 +354,68 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
       expect(rows[1].allocatedOn).toEqual(transfer.effectiveDate);
       expect(rows[0].endReason).toBe('TRANSFERRED');
       expect(transfer.toAllocationId).toBe(rows[1].id);
-      expect(transfer.processedById).toBe(admin.id);
+      expect(transfer.processedById).toBe(approver.id);
       expect(await prisma.irrigationHectareAllocation.count({ where: { hectareId, status: 'ACTIVE' } })).toBe(1);
       const listed: any = await allocations.listTransfers(admin, { hectareId });
       expect(listed.data[0]).toMatchObject({ previousFarmer: { memberNumber: 'MBR-00031' }, newFarmer: { memberNumber: 'MBR-00032' }, reason: 'Sold the plot' });
+    });
+
+    it('blocks a transfer while the current holder has an active loan or unpaid fees, and allows it once settled', async () => {
+      const hectareId = await hectareOf(blockIds[1][1], 1);
+      await allocations.allocate(admin, { hectareId, farmerId: farmerIds[80] });
+      const loan = await prisma.loanRecord.create({
+        data: { farmerId: farmerIds[80], lenderName: 'Test Lender', originalAmount: 100000, amountOwed: 100000, isActive: true },
+      });
+      await expect(allocations.createTransfer(admin, { hectareId, toFarmerId: farmerIds[81], reason: 'Sale' })).rejects.toThrow(/active loan/);
+      const due = await prisma.farmerDue.create({
+        data: { mamcosId, farmerId: farmerIds[80], category: 'OTHER', description: 'Harvest fee', amount: 50000, issuedOn: new Date() },
+      });
+      await prisma.loanRecord.update({ where: { id: loan.id }, data: { amountOwed: 0, isActive: false } });
+      await expect(allocations.createTransfer(admin, { hectareId, toFarmerId: farmerIds[81], reason: 'Sale' })).rejects.toThrow(/50,000 TZS/);
+      expect(await prisma.irrigationHectareAllocation.count({ where: { hectareId, farmerId: farmerIds[80], status: 'ACTIVE' } })).toBe(1);
+      await prisma.farmerDue.update({ where: { id: due.id }, data: { status: 'CANCELLED' } });
+      const requested = await allocations.createTransfer(admin, { hectareId, toFarmerId: farmerIds[81], reason: 'Sale' });
+      // a new loan taken before sign-off blocks the approval too
+      const late = await prisma.loanRecord.create({ data: { farmerId: farmerIds[80], lenderName: 'Late Lender', originalAmount: 1000, amountOwed: 1000, isActive: true } });
+      await expect(allocations.approveTransfer(approver, requested.id)).rejects.toThrow(/active loan/);
+      await prisma.loanRecord.update({ where: { id: late.id }, data: { amountOwed: 0, isActive: false } });
+      expect((await allocations.approveTransfer(approver, requested.id)).status).toBe('COMPLETED');
+    });
+
+    it('waits for the receiving member to accept or decline when the scheme requires it', async () => {
+      await schemes.update(admin, schemeId, { requireRecipientAcceptance: true, requireAllocationApproval: false });
+      const farmerUser = async (farmerId: string): Promise<RequestUser> => {
+        const f = await prisma.farmer.findUniqueOrThrow({ where: { id: farmerId }, select: { userId: true } });
+        return { id: f.userId!, role: UserRole.FARMER, mamcosId } as RequestUser;
+      };
+      const hectareId = await hectareOf(blockIds[1][1], 2);
+      await allocations.allocate(admin, { hectareId, farmerId: farmerIds[82] });
+      smsSent.length = 0;
+
+      // declined: nothing moves and a reason is required
+      const first = await allocations.createTransfer(admin, { hectareId, toFarmerId: farmerIds[83], reason: 'Sale' });
+      expect(first.status).toBe('AWAITING_RECIPIENT');
+      expect(smsSent.some((m) => /transfer hectare/.test(m.message))).toBe(true);
+      await expect(allocations.createTransfer(admin, { hectareId, toFarmerId: farmerIds[84], reason: 'Again' })).rejects.toBeInstanceOf(ConflictException);
+      const stranger = await farmerUser(farmerIds[84]);
+      await expect(allocations.respondToTransfer(stranger, first.id, true)).rejects.toThrow(/not found/i);
+      const recipient = await farmerUser(farmerIds[83]);
+      expect((await allocations.incomingTransfers(recipient)).map((t) => t.id)).toContain(first.id);
+      await expect(allocations.respondToTransfer(recipient, first.id, false)).rejects.toBeInstanceOf(BadRequestException);
+      const declined = await allocations.respondToTransfer(recipient, first.id, false, 'Not interested');
+      expect(declined!.status).toBe('REJECTED');
+      expect(await prisma.irrigationHectareAllocation.count({ where: { hectareId, farmerId: farmerIds[82], status: 'ACTIVE' } })).toBe(1);
+
+      // accepted: still needs the Manager/Accountant sign-off before anything moves
+      const second = await allocations.createTransfer(admin, { hectareId, toFarmerId: farmerIds[83], reason: 'Sale' });
+      await expect(allocations.approveTransfer(approver, second.id)).rejects.toThrow(/not accepted/);
+      const accepted = await allocations.respondToTransfer(recipient, second.id, true);
+      expect(accepted!.status).toBe('PENDING_APPROVAL');
+      expect(await prisma.irrigationHectareAllocation.count({ where: { hectareId, farmerId: farmerIds[82], status: 'ACTIVE' } })).toBe(1);
+      expect((await allocations.approveTransfer(approver, second.id)).status).toBe('COMPLETED');
+      expect(await prisma.irrigationHectareAllocation.count({ where: { hectareId, farmerId: farmerIds[83], status: 'ACTIVE' } })).toBe(1);
+      await expect(allocations.respondToTransfer(recipient, second.id, true)).rejects.toBeInstanceOf(ConflictException);
+      await schemes.update(admin, schemeId, { requireRecipientAcceptance: false });
     });
 
     it('rejects transferring a free hectare, to the same holder, or with a future effective date', async () => {
@@ -365,12 +437,13 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
       const during: any = await dashboard.overview(admin, schemeId);
       expect(during.totals.pendingTransfers).toBe(1);
       expect(during.alerts.some((x: any) => /transfer\(s\) are waiting/.test(x.message))).toBe(true);
-      await expect(allocations.approveTransfer(admin, pending.id)).rejects.toThrow(/someone other/);
+      await expect(allocations.approveTransfer(admin, pending.id)).rejects.toBeInstanceOf(ForbiddenException);
       const done = await allocations.approveTransfer(approver, pending.id);
       expect(done).toMatchObject({ status: 'COMPLETED', approvedById: approver.id, processedById: approver.id });
       expect(await prisma.irrigationHectareAllocation.count({ where: { hectareId, status: 'ACTIVE', farmerId: farmerIds[41] } })).toBe(1);
       // a rejected transfer leaves the holder untouched
-      const second = await allocations.createTransfer(admin, { hectareId, toFarmerId: farmerIds[43], reason: 'Dispute' });
+      const second = await allocations.createTransfer(approver, { hectareId, toFarmerId: farmerIds[43], reason: 'Dispute' });
+      await expect(allocations.approveTransfer(approver, second.id)).rejects.toThrow(/someone other/);
       await allocations.closeTransfer(approver, second.id, 'REJECTED', 'Not supported by documents');
       expect(await prisma.irrigationHectareAllocation.count({ where: { hectareId, status: 'ACTIVE', farmerId: farmerIds[41] } })).toBe(1);
     });

@@ -6,6 +6,7 @@ import { marketplaceApi, API_BASE_URL } from '@/lib/api';
 import { apiError } from '@/lib/download';
 import { useFarmerData } from '../FarmerDataContext';
 import MoneyInput from '@/components/MoneyInput';
+import OverdueFarmsPanel from '@/components/marketplace/OverdueFarmsPanel';
 
 export default function FarmerMarketplacePage() {
   const { farmer, farms, landListings, tractors, reload } = useFarmerData();
@@ -29,7 +30,7 @@ export default function FarmerMarketplacePage() {
         setAccess(a.state); current = { ...listing, ...a.listing }; setSelected(current);
         if (a.state !== 'GRANTED') return;
       }
-      const [o, s, q] = await Promise.all([marketplaceApi.getOffers(current.id), current.isMultiYear ? marketplaceApi.getRentSchedule(current.id) : Promise.resolve(null), current.ownerId !== farmer?.id && current.leaseStatus === 'DRAFT' ? marketplaceApi.depositQuote(current.id) : Promise.resolve(null)]);
+      const [o, s, q] = await Promise.all([marketplaceApi.getOffers(current.id), current.isMultiYear ? marketplaceApi.getRentSchedule(current.id) : Promise.resolve(null), (current.ownerId !== farmer?.id || current.fromOverdueDebt) && current.leaseStatus === 'DRAFT' ? marketplaceApi.depositQuote(current.id) : Promise.resolve(null)]);
       setOffers(o.data); setSchedule(s?.data ?? null); setQuote(q?.data ?? null);
     } catch (e) { setError(apiError(e)); }
   };
@@ -45,10 +46,11 @@ export default function FarmerMarketplacePage() {
     catch (e) { setError(apiError(e)); } finally { setBusy(false); }
   }
   const available = landListings.filter((l) => l.leaseStatus === 'DRAFT' && `${l.farm?.farmCode} ${l.farm?.village} ${l.dealType}`.toLowerCase().includes(search.toLowerCase()));
-  const isOwner = selected?.ownerId === farmer?.id; const isRenter = selected?.renterId === farmer?.id;
+  // the owner of a farm given to M-LAX for an unpaid debt is treated like any other would-be renter
+  const isOwner = selected?.ownerId === farmer?.id && !selected?.fromOverdueDebt; const isRenter = selected?.renterId === farmer?.id;
   const locked = !!selected?.isPrivate && !isOwner && access !== 'GRANTED';
   async function book(e: FormEvent) { e.preventDefault(); await action(() => marketplaceApi.bookTractor({ tractorId, farmerId: farmer.id, hectares: Number(hectares), terrainGrade: terrain, scheduledDate: new Date(date).toISOString() }), 'Tractor booking requested.'); }
-  return <div className="page-shell"><h1 className="page-title">M-LAX Marketplace</h1><p className="page-subtitle">Find land, manage your rentals, negotiate offers, and book tractor services.</p>
+  return <div className="page-shell"><h1 className="page-title">M-LAX Marketplace</h1><p className="page-subtitle">Find land, manage your rentals, negotiate offers, and book tractor services.</p><OverdueFarmsPanel />
     {error && <div role="alert" className="alert-box alert-danger">{error}</div>}{message && <div role="status" className="alert-box alert-success">{message}</div>}
     {issued && <InsightPanel title="Your private deal code" subtitle={`Farm ${issued.farm ?? ''}`}>
       <p style={{ fontFamily: 'var(--font-outfit), sans-serif', fontSize: '1.8rem', fontWeight: 800, letterSpacing: '0.06em', color: 'var(--text-primary)', margin: '8px 0 12px' }}>{issued.code}</p>
@@ -74,7 +76,7 @@ export default function FarmerMarketplacePage() {
         {selected.agreementPdfUrl && <a className="btn-secondary" href={new URL(selected.agreementPdfUrl, API_BASE_URL.replace(/\/api\/v1\/?$/, '')).href} target="_blank" rel="noreferrer">Open lease agreement</a>}
         <p>{selected.mayodeProtected ? 'MAYODE internal protection is recorded for this lease.' : 'Protection begins after confirmed payment and verification.'} This status is separate from an insurance policy.</p>
         {schedule && <div className="table-wrap"><table><thead><tr><th>Year</th><th>Rent</th><th>Status</th></tr></thead><tbody>{schedule.years.map((y: any) => <tr key={y.year}><td>{y.year}</td><td>{money(y.amount)}</td><td>{y.paid ? 'Paid' : 'Due'}</td></tr>)}</tbody></table></div>}
-        {selected.leaseStatus === 'DRAFT' && !isOwner && !locked && <form className="form-grid" onSubmit={(e) => { e.preventDefault(); void action(() => marketplaceApi.submitOffer(selected.id, { farmerId: farmer.id, offerAmount: Number(bid) }), 'Offer submitted.'); }}><label className="form-label">Your offer (TZS)<MoneyInput className="input-field" required min="1" value={bid} onChange={(e) => setBid(e.target.value)} /></label><button className="btn-secondary">Make an offer</button></form>}
+        {selected.leaseStatus === 'DRAFT' && !isOwner && !locked && !selected.fromOverdueDebt && <form className="form-grid" onSubmit={(e) => { e.preventDefault(); void action(() => marketplaceApi.submitOffer(selected.id, { farmerId: farmer.id, offerAmount: Number(bid) }), 'Offer submitted.'); }}><label className="form-label">Your offer (TZS)<MoneyInput className="input-field" required min="1" value={bid} onChange={(e) => setBid(e.target.value)} /></label><button className="btn-secondary">Make an offer</button></form>}
         <div className="role-list">{offers.map((o) => <div className="role-list-item" key={o.id}><div><strong>{money(o.offerAmount)}</strong><p>{o.status}{o.counterAmount ? ` · Counter ${money(o.counterAmount)}` : ''}</p></div>
           {isOwner && o.status === 'PENDING' && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}><button className="btn-secondary" onClick={() => void action(() => marketplaceApi.respondToOffer(selected.id, o.id, { ownerId: farmer.id, action: 'accept' }), 'Offer accepted.')}>Accept</button><button className="btn-secondary" onClick={() => void action(() => marketplaceApi.respondToOffer(selected.id, o.id, { ownerId: farmer.id, action: 'reject' }), 'Offer declined.')}>Decline</button><button className="btn-secondary" onClick={() => { const value = window.prompt('Counter-offer in TZS'); if (value && Number(value) > 0) void action(() => marketplaceApi.respondToOffer(selected.id, o.id, { ownerId: farmer.id, action: 'counter', counterAmount: Number(value) }), 'Counter-offer sent.'); }}>Counter</button></div>}
           {!isOwner && o.farmerId === farmer?.id && o.status === 'COUNTERED' && <div><button className="btn-secondary" onClick={() => void action(() => marketplaceApi.respondToCounter(selected.id, o.id, { farmerId: farmer.id, accept: true }), 'Counter-offer accepted.')}>Accept counter</button><button className="btn-secondary" onClick={() => void action(() => marketplaceApi.respondToCounter(selected.id, o.id, { farmerId: farmer.id, accept: false }), 'Counter-offer declined.')}>Decline counter</button></div>}

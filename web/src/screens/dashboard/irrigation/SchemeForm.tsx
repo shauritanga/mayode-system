@@ -15,7 +15,7 @@ const STATUSES = ['PLANNED', 'ACTIVE', 'UNDER_MAINTENANCE', 'INACTIVE'];
 const blank = {
   code: '', name: '', mamcosId: '', region: '', district: '', ward: '', village: '', waterSource: '', establishedOn: '', description: '',
   status: 'ACTIVE', plannedCanalCount: '6', minBlocksPerCanal: '15', maxBlocksPerCanal: '16', hectaresPerBlock: '30',
-  maxHectaresPerFarmer: '', requireAllocationApproval: false,
+  maxHectaresPerFarmer: '', requireAllocationApproval: false, requireRecipientAcceptance: false,
 };
 
 function SchemeEditor({ schemeId, existing }: { schemeId?: string; existing: ReturnType<typeof useApi<any>> }) {
@@ -70,6 +70,7 @@ function SchemeEditor({ schemeId, existing }: { schemeId?: string; existing: Ret
       maxBlocksPerCanal: Number(form.maxBlocksPerCanal), hectaresPerBlock: Number(form.hectaresPerBlock),
       maxHectaresPerFarmer: form.maxHectaresPerFarmer === '' ? null : Number(form.maxHectaresPerFarmer),
       requireAllocationApproval: form.requireAllocationApproval,
+      requireRecipientAcceptance: form.requireRecipientAcceptance,
     };
     if (form.establishedOn) body.establishedOn = form.establishedOn;
     try {
@@ -150,7 +151,11 @@ function SchemeEditor({ schemeId, existing }: { schemeId?: string; existing: Ret
               <Field label="Hectares allowed per member" hint="Leave empty for no limit"><input type="number" min={1} className="input-field" value={form.maxHectaresPerFarmer} onChange={(e) => set('maxHectaresPerFarmer', e.target.value)} disabled={!canWrite} /></Field>
               <label className="form-label" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <input type="checkbox" checked={form.requireAllocationApproval} onChange={(e) => set('requireAllocationApproval', e.target.checked)} disabled={!canWrite} />
-                Allocations and transfers need a second person&apos;s approval
+                New allocations need a second person&apos;s approval (plot transfers always need Manager or Accountant sign-off)
+              </label>
+              <label className="form-label" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" checked={form.requireRecipientAcceptance} onChange={(e) => set('requireRecipientAcceptance', e.target.checked)} disabled={!canWrite} />
+                Transfers must be accepted by the receiving member (SMS + app) first
               </label>
             </FormGrid>
           </Panel>
@@ -173,6 +178,7 @@ const formFrom = (s: any) => !s ? blank : ({
   description: s.description ?? '', status: s.status, plannedCanalCount: String(s.plannedCanalCount), minBlocksPerCanal: String(s.minBlocksPerCanal),
   maxBlocksPerCanal: String(s.maxBlocksPerCanal), hectaresPerBlock: String(s.hectaresPerBlock),
   maxHectaresPerFarmer: s.maxHectaresPerFarmer == null ? '' : String(s.maxHectaresPerFarmer), requireAllocationApproval: !!s.requireAllocationApproval,
+  requireRecipientAcceptance: !!s.requireRecipientAcceptance,
 });
 
 /** Page 2 — register a scheme, or view / edit an existing one with its change history. */

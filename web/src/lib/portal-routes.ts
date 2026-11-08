@@ -33,6 +33,7 @@ export const PORTAL_SECTIONS = {
     "plot-allocation",
     "leadership",
     "board",
+    "farm-administration",
     "task-management",
     "assets",
     "payroll",

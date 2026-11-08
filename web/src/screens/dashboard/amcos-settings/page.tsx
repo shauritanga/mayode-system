@@ -29,8 +29,8 @@ interface Row {
 }
 
 // ───────────────────────── editing one charge ─────────────────────────
-function EditAmountModal({ title, subtitle, unit, amount, active, graceDays, note, onClose, onSave }: {
-  title: string; subtitle: string; unit: string; amount: number | null; active?: boolean; graceDays?: number; note?: string;
+function EditAmountModal({ title, subtitle, unit, amount, active, graceDays, graceMax = 365, graceHint, note, onClose, onSave }: {
+  title: string; subtitle: string; unit: string; amount: number | null; active?: boolean; graceDays?: number; graceMax?: number; graceHint?: string; note?: string;
   onClose: () => void; onSave: (v: { amount: number | null; active: boolean; graceDays?: number }) => Promise<void>;
 }) {
   const [value, setValue] = useState(amount == null ? '' : String(amount));
@@ -48,7 +48,7 @@ function EditAmountModal({ title, subtitle, unit, amount, active, graceDays, not
       <form id="amount-form" onSubmit={(e) => { e.preventDefault(); void save(); }} style={{ display: 'grid', gap: 14 }}>
         {error && <div role="alert" className="alert-box alert-danger">{error}</div>}
         <Field label={`Amount (${unit})`}>{unit.startsWith('TZS') ? <MoneyInput className="input-field" min="0" autoFocus value={value} placeholder="Not set" onChange={(e) => setValue(e.target.value)} /> : <input className="input-field" type="number" min="0" step="any" autoFocus value={value} placeholder="Not set" onChange={(e) => setValue(e.target.value)} />}</Field>
-        {graceDays != null && <Field label="Grace period (days)" hint="A late payment is charged only after this many days past the due date."><input className="input-field" type="number" min="0" max="365" value={grace} onChange={(e) => setGrace(e.target.value)} /></Field>}
+        {graceDays != null && <Field label="Grace period (days)" hint={graceHint ?? "A late payment is charged only after this many days past the due date."}><input className="input-field" type="number" min="0" max={graceMax} value={grace} onChange={(e) => setGrace(e.target.value)} /></Field>}
         {active != null && (
           <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 14 }}>
             <input type="checkbox" style={{ marginTop: 3 }} checked={on} onChange={(e) => setOn(e.target.checked)} />
@@ -203,7 +203,7 @@ export default function AmcosSettingsPage() {
   const [adding, setAdding] = useState(false);
   const [taxOpen, setTaxOpen] = useState(false);
   const [editing, setEditing] = useState<null | {
-    title: string; subtitle: string; unit: string; amount: number | null; active?: boolean; graceDays?: number; note?: string;
+    title: string; subtitle: string; unit: string; amount: number | null; active?: boolean; graceDays?: number; graceMax?: number; graceHint?: string; note?: string;
     save: (v: { amount: number | null; active: boolean; graceDays?: number }) => Promise<void>;
   }>(null);
   const types = useApi<any[]>(() => duesApi.types({ includeInactive: 'true' }), []);
@@ -278,6 +278,15 @@ export default function AmcosSettingsPage() {
       note: 'For example 5% with a 30 day grace period: a farmer who still owes 100,000 thirty days after the due date is charged 5,000 each month. You choose when to apply it, from the Dues page.',
       save: async (v) => { await chargesApi.update('LATE_PENALTY', { amount: v.amount ?? 0, isActive: v.active, graceDays: v.graceDays }); done('Late payment penalty saved.'); charges.reload(); setEditing(null); } }) : undefined,
   }] : [];
+  const defaultCharge = byCode('DEFAULT_PENALTY');
+  if (defaultCharge) penaltyRows.push({
+    key: 'DEFAULT_PENALTY', section: 'penalties', name: defaultCharge.name, how: `When a debt passes its due date the farmer's farms are blocked and run by the AMCOS for ${defaultCharge.graceDays} days. If it is still unpaid, the farms go to M-LAX and this penalty is added`, usedIn: 'Farms under administration',
+    amount: defaultCharge.amount > 0 ? `TZS ${Number(defaultCharge.amount).toLocaleString('en-US')} once` : 'Not set', on: defaultCharge.isActive,
+    edit: canCharges ? () => open({ title: defaultCharge.name, subtitle: 'Overdue debts and farms', unit: 'TZS', amount: defaultCharge.amount, active: defaultCharge.isActive, graceDays: defaultCharge.graceDays, graceMax: 30,
+      graceHint: 'How many days the farmer has to pay, with the farms under AMCOS administration, before they go to M-LAX. 1 to 30.',
+      note: 'When this is switched on, every morning the system finds farmers with a debt past its due date, blocks their farms from leasing and tells them by SMS. During the grace period they can pay and keep the farms, or another farmer can pay and farm them. Two days before it ends they get a last warning; then the farms go to M-LAX, this penalty is added, and the farmer receives nothing from the lease.',
+      save: async (v) => { await chargesApi.update('DEFAULT_PENALTY', { amount: v.amount ?? 0, isActive: v.active, graceDays: v.graceDays }); done('Overdue-debt penalty saved.'); charges.reload(); setEditing(null); } }) : undefined,
+  });
   const taxRows: Row[] = tax.data ? [
     {
       key: 'VAT', section: 'tax', name: 'VAT', how: tax.data.vatRegistered ? 'The AMCOS is registered for VAT: it is added to invoices and bills' : 'Not registered for VAT: no VAT is added', usedIn: 'Accounting → invoices, bills and the VAT return',
@@ -375,7 +384,7 @@ export default function AmcosSettingsPage() {
 
       {taxOpen && tax.data && <TaxDetailsModal tax={tax.data} onClose={() => setTaxOpen(false)} onSaved={(m) => { setTaxOpen(false); done(m); tax.reload(); }} />}
       {adding && <NewLevyModal onClose={() => setAdding(false)} onSaved={(m) => { setAdding(false); done(m); types.reload(); }} />}
-      {editing && <EditAmountModal title={editing.title} subtitle={editing.subtitle} unit={editing.unit} amount={editing.amount} active={editing.active} graceDays={editing.graceDays} note={editing.note} onClose={() => setEditing(null)} onSave={editing.save} />}
+      {editing && <EditAmountModal title={editing.title} subtitle={editing.subtitle} unit={editing.unit} amount={editing.amount} active={editing.active} graceDays={editing.graceDays} graceMax={editing.graceMax} graceHint={editing.graceHint} note={editing.note} onClose={() => setEditing(null)} onSave={editing.save} />}
     </main>
   );
 }

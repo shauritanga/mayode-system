@@ -1,3 +1,4 @@
+import { ModuleRef } from '@nestjs/core';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DueCategory, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,7 +31,19 @@ export class DuesService {
     private readonly prisma: PrismaService,
     private readonly ownership: OwnershipService,
     private readonly accounting: AccountingService,
+    private readonly moduleRef?: ModuleRef,
   ) {}
+
+  /** Tells the overdue-debt handling that this farmer's dues changed, so farms are given back once nothing overdue is left. */
+  private settled(mamcosId: string, farmerId: string) {
+    if (!this.moduleRef) return;
+    try {
+      // loaded on demand: the overdue-debt module itself depends on this one
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { FarmDefaultsService } = require('../farm-defaults/farm-defaults.service') as typeof import('../farm-defaults/farm-defaults.service');
+      void this.moduleRef.get(FarmDefaultsService, { strict: false }).afterDuesChange(mamcosId, farmerId);
+    } catch { /* the dues change stands even if this cannot run */ }
+  }
 
   private tenant(actor: RequestUser, requested?: string): string {
     const own = this.ownership.resolveTenantMamcosId(actor);
@@ -242,8 +255,8 @@ export class DuesService {
       const amount = dto.amount ?? balance;
       if (amount > balance) throw new BadRequestException(`Only ${balance.toLocaleString('en-US')} is still owed`);
       await tx.farmerDue.update({ where: { id }, data: { waivedAmount: cents(num(due.waivedAmount) + amount), waivedReason: dto.reason.trim() } });
-      return { waived: amount };
-    });
+      return { waived: amount, farmerId: due.farmerId };
+    }).then((r) => { this.settled(mamcosId, r.farmerId); return { waived: r.waived }; });
   }
 
   async cancel(actor: RequestUser, id: string, reason: string, mamcosIdParam?: string) {
@@ -253,6 +266,7 @@ export class DuesService {
     const paid = await this.prisma.duePayment.count({ where: { dueId: id, voidedAt: null } });
     if (paid) throw new BadRequestException('Void its payments before cancelling it');
     await this.prisma.farmerDue.update({ where: { id }, data: { status: 'CANCELLED', cancelReason: reason.trim() } });
+    this.settled(mamcosId, due.farmerId);
     if (due.postedIssue) {
       await this.accounting.postToLedger('FertiliserIssueVoid', id, today(), `Cancelled: ${due.description}`,
         [{ code: '4230', debit: num(due.amount) }, { code: '1310', credit: num(due.amount) }], mamcosId);
@@ -311,6 +325,7 @@ export class DuesService {
       await this.prisma.duePayment.delete({ where: { id: payment.id } }); // no receipt without its entry
       throw e;
     }
+    this.settled(mamcosId, payment.farmerId);
     return payment;
   }
 

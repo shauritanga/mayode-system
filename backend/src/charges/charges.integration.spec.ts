@@ -73,13 +73,16 @@ describeDb('AMCOS charges (PostgreSQL)', () => {
   afterAll(async () => { await prisma.$disconnect(); await pool.end(); });
 
   describe('the price list', () => {
-    it('gives every AMCOS the standard charges, switched off at zero, once', async () => {
+    it('gives every AMCOS the standard charges, all switched off, once', async () => {
       const c = await coop();
       const first = await charges.list(c.actor);
-      expect(first.map((x) => x.code)).toEqual(['MILLING_FEE', 'STORAGE_FEE', 'DELIVERY_FEE', 'LATE_PENALTY']);
-      expect(first.every((x) => !x.isActive && x.amount === 0)).toBe(true);
+      expect(first.map((x) => x.code)).toEqual(['MILLING_FEE', 'STORAGE_FEE', 'DELIVERY_FEE', 'LATE_PENALTY', 'DEFAULT_PENALTY']);
+      expect(first.every((x) => !x.isActive)).toBe(true);
+      // the overdue-debt penalty is ready at TZS 50,000 and 30 days' grace, but nothing is blocked until it is switched on
+      expect(first.filter((x) => x.code !== 'DEFAULT_PENALTY').every((x) => x.amount === 0)).toBe(true);
+      expect(first.find((x) => x.code === 'DEFAULT_PENALTY')).toMatchObject({ amount: 50_000, graceDays: 30 });
       await charges.list(c.actor);
-      expect(await prisma.amcosCharge.count({ where: { mamcosId: c.mamcos.id } })).toBe(4);
+      expect(await prisma.amcosCharge.count({ where: { mamcosId: c.mamcos.id } })).toBe(5);
     });
 
     it('will not switch a charge on at zero, accept more than 100 percent, or give grace days to a fee', async () => {

@@ -11,7 +11,7 @@ import {
   errMsg, fmtDate, todayISO, useApi, useCanalBlockOptions, useIrrigation, type MemberLite,
 } from './ui';
 
-const STATUSES = ['PENDING_APPROVAL', 'COMPLETED', 'REJECTED', 'CANCELLED'];
+const STATUSES = ['AWAITING_RECIPIENT', 'PENDING_APPROVAL', 'COMPLETED', 'REJECTED', 'CANCELLED'];
 
 function NewTransferModal({ schemeId, presetHectareId, onClose, onSaved }: { schemeId: string; presetHectareId?: string; onClose: () => void; onSaved: (m: string) => void }) {
   const [canalId, setCanalId] = useState('');
@@ -32,7 +32,7 @@ function NewTransferModal({ schemeId, presetHectareId, onClose, onSaved }: { sch
     setSaving(true); setError('');
     try {
       const res = await irrigationApi.createTransfer({ hectareId, toFarmerId: member.id, transferDate, effectiveDate, reason: reason.trim() });
-      onSaved(res.data.status === 'PENDING_APPROVAL' ? 'Transfer recorded and waiting for approval.' : 'Transfer completed. The previous allocation is closed and kept in the history.');
+      onSaved(res.data.status === 'AWAITING_RECIPIENT' ? 'Transfer requested. The receiving member has been sent an SMS and must accept it first.' : 'Transfer recorded. It completes once a Manager or Accountant signs it off.');
     } catch (e) { setError(errMsg(e, 'Could not record the transfer.')); setSaving(false); }
   };
   return (
@@ -82,6 +82,7 @@ export default function Transfers({ bare = false, adding: addingProp, onAddDone 
   const { data, loading, error, reload } = useApi<any>(schemeId ? () => irrigationApi.transfers({ schemeId, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page, pageSize: 20 }) : null, [schemeId, JSON.stringify(filters), page]);
   const setFilter = (k: string, v: string) => { setFilters((f) => ({ ...f, [k]: v })); setPage(1); };
   const canEdit = can('irrigation_allocations', 'EDIT');
+  const canApprove = can('irrigation_transfer_approval', 'EDIT');
   return (
     <>
       {!bare && (
@@ -94,7 +95,7 @@ export default function Transfers({ bare = false, adding: addingProp, onAddDone 
       <section className="table-panel">
         <Filters>
           <Field label="Search member"><input className="input-field" placeholder="Name or member no." value={filters.q} onChange={(e) => setFilter('q', e.target.value)} /></Field>
-          <Field label="Status"><select className="input-field" value={filters.status} onChange={(e) => setFilter('status', e.target.value)}><option value="">All</option>{STATUSES.map((s) => <option key={s} value={s}>{s === 'PENDING_APPROVAL' ? 'Pending approval' : s[0] + s.slice(1).toLowerCase()}</option>)}</select></Field>
+          <Field label="Status"><select className="input-field" value={filters.status} onChange={(e) => setFilter('status', e.target.value)}><option value="">All</option>{STATUSES.map((s) => <option key={s} value={s}>{s === 'PENDING_APPROVAL' ? 'Pending approval' : s === 'AWAITING_RECIPIENT' ? 'Awaiting recipient' : s[0] + s.slice(1).toLowerCase()}</option>)}</select></Field>
           <Field label="Effective from"><input type="date" className="input-field" value={filters.from} onChange={(e) => setFilter('from', e.target.value)} /></Field>
           <Field label="Effective to"><input type="date" className="input-field" value={filters.to} onChange={(e) => setFilter('to', e.target.value)} /></Field>
         </Filters>
@@ -111,7 +112,8 @@ export default function Transfers({ bare = false, adding: addingProp, onAddDone 
                 <td><StatusBadge value={t.status} /></td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button type="button" className="btn-secondary" onClick={() => setDocs(t)}>Documents{t.documents.length ? ` (${t.documents.length})` : ''}</button>
-                  {t.status === 'PENDING_APPROVAL' && canEdit && <> <button type="button" className="btn-primary" onClick={() => setAction({ kind: 'approve', transfer: t })}>Approve</button> <button type="button" className="btn-secondary" onClick={() => setAction({ kind: 'reject', transfer: t })}>Reject</button> <button type="button" className="btn-secondary" onClick={() => setAction({ kind: 'cancel', transfer: t })}>Cancel</button></>}
+                  {t.status === 'AWAITING_RECIPIENT' && canEdit && <button type="button" className="btn-secondary" onClick={() => setAction({ kind: 'cancel', transfer: t })}>Cancel</button>}
+                  {t.status === 'PENDING_APPROVAL' && canEdit && <> {canApprove && <button type="button" className="btn-primary" onClick={() => setAction({ kind: 'approve', transfer: t })}>Sign off</button>} <button type="button" className="btn-secondary" onClick={() => setAction({ kind: 'reject', transfer: t })}>Reject</button> <button type="button" className="btn-secondary" onClick={() => setAction({ kind: 'cancel', transfer: t })}>Cancel</button></>}
                 </td>
               </tr>
             ))}

@@ -6,7 +6,7 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
-import { ALLOCATION_RESOURCE, IRRIGATION_RESOURCE, LEADERSHIP_RESOURCE } from './irrigation-common';
+import { ALLOCATION_RESOURCE, IRRIGATION_RESOURCE, LEADERSHIP_RESOURCE, TRANSFER_APPROVAL_RESOURCE } from './irrigation-common';
 import { SchemesService } from './schemes.service';
 import { StructureService } from './structure.service';
 import { AllocationService } from './allocation.service';
@@ -16,13 +16,14 @@ import { DocumentsService } from './documents.service';
 import { IrrigationSetupService } from './irrigation-roles';
 import {
   AllocateHectareDto, AppointLeaderDto, SetGuardianDto, CreateBlockDto, CreateCanalDto, CreateDocumentDto, CreateHectareDto,
-  CreateSchemeDto, CreateTransferDto, EndLeadershipDto, ReasonDto, UpdateBlockDto, UpdateCanalDto, UpdateSchemeDto,
+  CreateSchemeDto, CreateTransferDto, DeclineTransferDto, EndLeadershipDto, ReasonDto, UpdateBlockDto, UpdateCanalDto, UpdateSchemeDto,
 } from './dto/irrigation.dto';
 
 type Q = Record<string, string>;
 const STRUCTURE = IRRIGATION_RESOURCE;
 const ALLOC = ALLOCATION_RESOURCE;
 const LEAD = LEADERSHIP_RESOURCE;
+const TRANSFER_APPROVAL = TRANSFER_APPROVAL_RESOURCE;
 
 /**
  * Irrigation Scheme Management API. Every route names its permission explicitly; services additionally confine
@@ -135,7 +136,7 @@ export class IrrigationController {
   listTransfers(@CurrentUser() u: RequestUser, @Query() q: Q) { return this.allocations.listTransfers(u, q); }
   @Post('transfers') @RequirePermission(ALLOC, 'CREATE')
   createTransfer(@CurrentUser() u: RequestUser, @Body() dto: CreateTransferDto) { return this.allocations.createTransfer(u, dto); }
-  @Post('transfers/:id/approve') @RequirePermission(ALLOC, 'EDIT')
+  @Post('transfers/:id/approve') @RequirePermission(TRANSFER_APPROVAL, 'EDIT')
   approveTransfer(@CurrentUser() u: RequestUser, @Param('id') id: string) { return this.allocations.approveTransfer(u, id); }
   @Post('transfers/:id/reject') @RequirePermission(ALLOC, 'EDIT')
   rejectTransfer(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: ReasonDto) { return this.allocations.closeTransfer(u, id, 'REJECTED', dto.reason); }
@@ -159,4 +160,23 @@ export class IrrigationController {
   createDocument(@CurrentUser() u: RequestUser, @Body() dto: CreateDocumentDto) { return this.documents.create(u, dto); }
   @Post('documents/:id/archive') @RequirePermission(STRUCTURE, 'EDIT')
   archiveDocument(@CurrentUser() u: RequestUser, @Param('id') id: string) { return this.documents.archive(u, id); }
+}
+
+/**
+ * The receiving member's side of a transfer. Open to any signed-in member: the service only lets the member the
+ * hectare is being transferred to see or answer a transfer.
+ */
+@ApiTags('irrigation')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('irrigation/my-transfers')
+export class MyTransfersController {
+  constructor(private readonly allocations: AllocationService) {}
+
+  @Get()
+  incoming(@CurrentUser() u: RequestUser) { return this.allocations.incomingTransfers(u); }
+  @Post(':id/accept')
+  accept(@CurrentUser() u: RequestUser, @Param('id') id: string) { return this.allocations.respondToTransfer(u, id, true); }
+  @Post(':id/decline')
+  decline(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: DeclineTransferDto) { return this.allocations.respondToTransfer(u, id, false, dto.reason); }
 }

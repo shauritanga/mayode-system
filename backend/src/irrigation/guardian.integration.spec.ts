@@ -28,6 +28,7 @@ describeDb('Hectare guardians (PostgreSQL)', () => {
   let structure: StructureService;
   let admin: RequestUser;
   let otherAdmin: RequestUser;
+  let approver: RequestUser;
   let mamcosA: string;
   let mamcosB: string;
   let hectares: string[] = [];
@@ -39,10 +40,11 @@ describeDb('Hectare guardians (PostgreSQL)', () => {
     permissions: [['irrigation', 'VIEW'], ['irrigation', 'EDIT'], ['irrigation_allocations', 'VIEW'], ['irrigation_allocations', 'CREATE'], ['irrigation_allocations', 'EDIT']]
       .map(([resource, action]) => ({ action, resource: { key: resource } })),
   };
-  const user = async (mamcosId: string): Promise<RequestUser> => {
+  const APPROVER = { ...MANAGER, permissions: [...MANAGER.permissions, { action: 'EDIT', resource: { key: 'irrigation_transfer_approval' } }] };
+  const user = async (mamcosId: string, role: any = MANAGER): Promise<RequestUser> => {
     const id = randomUUID();
     await prisma.user.create({ data: { id, phone: `+2557${Math.floor(Math.random() * 1e8).toString().padStart(8, '0')}`, passwordHash: 'x', role: UserRole.CUSTOM, mamcosId, firstName: 'Admin', lastName: 'Test' } });
-    return { id, role: UserRole.CUSTOM, mamcosId, customRole: MANAGER } as RequestUser;
+    return { id, role: UserRole.CUSTOM, mamcosId, customRole: role } as RequestUser;
   };
   const farmer = async (mamcosId: string, name: string) => {
     const userId = randomUUID();
@@ -60,12 +62,13 @@ describeDb('Hectare guardians (PostgreSQL)', () => {
     const scope = new IrrigationScopeService(prisma as any);
     const schemes = new SchemesService(prisma as any, scope);
     structure = new StructureService(prisma as any, scope, schemes);
-    allocations = new AllocationService(prisma as any, scope, structure);
+    allocations = new AllocationService(prisma as any, scope, structure, { send: async () => undefined } as any, { create: async () => ({}) } as any);
     const tag = randomUUID().slice(0, 5);
     mamcosA = (await prisma.mamcos.create({ data: { name: `Madibira G ${tag}` } })).id;
     mamcosB = (await prisma.mamcos.create({ data: { name: `Ubaruku G ${tag}` } })).id;
     admin = await user(mamcosA);
     otherAdmin = await user(mamcosB);
+    approver = await user(mamcosA, APPROVER);
     for (const n of ['Juma', 'Asha', 'Neema', 'Hawa', 'Zawadi']) await farmer(mamcosA, n);
     await farmer(mamcosB, 'Outsider');
     const scheme = await prisma.irrigationScheme.create({ data: { mamcosId: mamcosA, name: `Scheme ${tag}`, code: `G-${tag}`, maxHectaresPerFarmer: 1 } });
@@ -127,7 +130,9 @@ describeDb('Hectare guardians (PostgreSQL)', () => {
   });
 
   it('handing the hectare over completely ends the guardian\'s part', async () => {
-    const result: any = await allocations.createTransfer(admin, { hectareId: hectares[2], toFarmerId: f.Zawadi, reason: 'Neema gives the hectare to Zawadi' });
+    const requested: any = await allocations.createTransfer(admin, { hectareId: hectares[2], toFarmerId: f.Zawadi, reason: 'Neema gives the hectare to Zawadi' });
+    expect(requested.status).toBe('PENDING_APPROVAL');
+    const result: any = await allocations.approveTransfer(approver, requested.id);
     expect(result.status).toBe('COMPLETED');
     const juma = await detail('Juma');
     expect(juma.guided.current.map((g: any) => g.holder.name)).toEqual(['Hawa Mbarali']);

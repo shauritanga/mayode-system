@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import {
   DocumentType,
   MamcosStaffRole,
+  FarmerIdType,
   Prisma,
   UserRole,
   VerificationStatus,
@@ -21,6 +22,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { DocumentsService } from '../uploads/documents.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { writeAudit } from '../irrigation/irrigation-audit';
+import { deriveRegistrationTier } from './farmer-tier';
+import { idTypeFromDocument, normalizeIdentity, type FarmerIdentity } from './farmer-identity';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
 import { QueryFarmersDto } from './dto/query-farmers.dto';
@@ -33,6 +36,8 @@ import {
   UpsertHouseholdDto,
   LinkDocumentDto,
   SubmitIdentityDto,
+  RecordLocalVerificationDto,
+  RevokeLocalVerificationDto,
 } from './dto/farmer-actions.dto';
 import {
   CaptureConsentDto,
@@ -67,6 +72,44 @@ export class FarmersService {
   }
 
   /** Provision a login User + Farmer profile (admin / field-officer flow). */
+  /**
+   * Works out which ID (if any) a request carries and makes sure no other farmer already uses it. NIDA is optional:
+   * a voter ID or driver's license works instead. A bare legacy `nationalId` is treated as a NIDA number as given.
+   */
+  private async resolveIdentity(
+    input: { idType?: FarmerIdType; idNumber?: string; nationalId?: string },
+    excludeFarmerId?: string,
+  ): Promise<FarmerIdentity | null> {
+    let identity: FarmerIdentity | null = null;
+    if (input.idType) {
+      identity = normalizeIdentity(input.idType, input.idNumber ?? '');
+    } else if (input.idNumber?.trim()) {
+      throw new BadRequestException('Choose the ID type (NIDA, voter ID or driver\'s license) for this number');
+    } else if (input.nationalId?.trim()) {
+      const legacy = input.nationalId.trim();
+      identity = { idType: FarmerIdType.NIDA, idNumber: legacy, nationalId: legacy };
+    }
+    if (!identity) return null;
+    const clash = await this.prisma.farmer.findFirst({
+      where: {
+        ...(excludeFarmerId ? { id: { not: excludeFarmerId } } : {}),
+        OR: [
+          { idType: identity.idType, idNumber: identity.idNumber },
+          ...(identity.nationalId ? [{ nationalId: identity.nationalId }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (clash) throw new ConflictException('This ID number is already registered to another farmer');
+    return identity;
+  }
+
+  private identityData(identity: FarmerIdentity | null) {
+    return identity
+      ? { idType: identity.idType, idNumber: identity.idNumber, ...(identity.nationalId ? { nationalId: identity.nationalId } : {}) }
+      : {};
+  }
+
   async create(dto: CreateFarmerDto & { password: string }, actor?: RequestUser, options: { mustChangePassword?: boolean } = {}) {
     const tenantId = actor ? this.ownership.resolveTenantMamcosId(actor) : null;
     if (tenantId) dto = { ...dto, mamcosId: tenantId };
@@ -78,6 +121,8 @@ export class FarmersService {
         'A user with this phone number or email already exists',
       );
     }
+
+    const identity = await this.resolveIdentity(dto);
 
     // An AMCOS farmer is registered on the hectare they already hold, and that hectare's code is their ID.
     const hectare = dto.hectareId ? await this.hectareForRegistration(dto.hectareId, tenantId) : null;
@@ -116,7 +161,7 @@ export class FarmersService {
           email: dto.email,
           gender: dto.gender,
           dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
-          nationalId: dto.nationalId,
+          ...this.identityData(identity),
           mamcosId: dto.mamcosId,
           village: dto.village,
           ward: dto.ward,
@@ -219,6 +264,7 @@ export class FarmersService {
               { firstName: { contains: search, mode: 'insensitive' } },
               { lastName: { contains: search, mode: 'insensitive' } },
               { controlNumber: { contains: search, mode: 'insensitive' } },
+              { idNumber: { contains: search.trim(), mode: 'insensitive' } },
               { user: { phone: { contains: search } } },
             ],
           }
@@ -312,7 +358,78 @@ export class FarmersService {
     if (tenantId && farmer.mamcosId !== tenantId) {
       throw new NotFoundException(`Farmer with ID ${id} not found`);
     }
-    return farmer;
+    return { ...farmer, ...(await this.registrationInfo(farmer)) };
+  }
+
+  /** Tier, the identifier in use, and the (un-revoked) local verifications for one farmer. */
+  private async registrationInfo(farmer: { id: string; idType: FarmerIdType | null }) {
+    const [heldThroughGuardian, localVerifications] = await Promise.all([
+      this.prisma.irrigationHectareGuardian.count({
+        where: { endedOn: null, allocation: { farmerId: farmer.id, status: 'ACTIVE' } },
+      }),
+      this.prisma.farmerLocalVerification.findMany({
+        where: { farmerId: farmer.id },
+        orderBy: { createdAt: 'desc' },
+        include: { guarantor: { select: { id: true, firstName: true, lastName: true, controlNumber: true } } },
+      }),
+    ]);
+    const { tier, identifierUsed } = deriveRegistrationTier({
+      idType: farmer.idType,
+      heldThroughGuardian: heldThroughGuardian > 0,
+      hasLocalVerification: localVerifications.some((v) => !v.revokedAt),
+    });
+    return { registrationTier: tier, identifierUsed, localVerifications };
+  }
+
+  /**
+   * Tier 3: record how a farmer with no national ID was vouched for locally. A chairman guarantor must be a current
+   * Block or Canal Chairman of the farmer's own AMCOS.
+   */
+  async recordLocalVerification(farmerId: string, dto: RecordLocalVerificationDto, user: RequestUser) {
+    await this.ownership.assertFarmerAccess(user, farmerId);
+    const farmer = await this.findOne(farmerId, user);
+    const reference = dto.reference?.trim() || null;
+    const letterDocumentUrl = dto.letterDocumentUrl?.trim() || null;
+    let guarantor: { farmerId: string; position: 'BLOCK_LEADER' | 'CANAL_LEADER'; leadershipId: string } | null = null;
+
+    if (dto.method === 'VILLAGE_LETTER' && !letterDocumentUrl)
+      throw new BadRequestException('Attach a photo of the village or street government letter');
+    if (dto.method === 'LOCAL_VOTER_ID' && !reference) throw new BadRequestException('Enter the local voter ID number');
+    if (dto.method === 'GUARANTOR') {
+      if (!dto.guarantorFarmerId) throw new BadRequestException('Choose the Block or Canal Chairman who vouches for this farmer');
+      if (dto.guarantorFarmerId === farmerId) throw new BadRequestException('A farmer cannot vouch for themselves');
+      if (!farmer.mamcosId) throw new BadRequestException('A guarantor can only be used for a farmer who belongs to an AMCOS');
+      const now = new Date();
+      const lead = await this.prisma.irrigationLeadership.findFirst({
+        where: {
+          farmerId: dto.guarantorFarmerId, status: 'ACTIVE', OR: [{ termEnd: null }, { termEnd: { gte: now } }],
+          canal: { scheme: { mamcosId: farmer.mamcosId } },
+        },
+        orderBy: { appointedOn: 'desc' },
+        select: { id: true, position: true },
+      });
+      if (!lead) throw new BadRequestException('The guarantor must currently be a Block or Canal Chairman of this AMCOS');
+      guarantor = { farmerId: dto.guarantorFarmerId, position: lead.position, leadershipId: lead.id };
+    }
+
+    return this.prisma.farmerLocalVerification.create({
+      data: {
+        farmerId, method: dto.method, reference, letterDocumentUrl, notes: dto.notes?.trim() || null, recordedById: user.id,
+        ...(guarantor ? { guarantorFarmerId: guarantor.farmerId, guarantorPosition: guarantor.position, guarantorLeadershipId: guarantor.leadershipId } : {}),
+      },
+    });
+  }
+
+  async revokeLocalVerification(farmerId: string, verificationId: string, dto: RevokeLocalVerificationDto, user: RequestUser) {
+    await this.ownership.assertFarmerAccess(user, farmerId);
+    await this.findOne(farmerId, user);
+    const existing = await this.prisma.farmerLocalVerification.findFirst({ where: { id: verificationId, farmerId } });
+    if (!existing) throw new NotFoundException('Verification not found');
+    if (existing.revokedAt) throw new ConflictException('This verification was already revoked');
+    return this.prisma.farmerLocalVerification.update({
+      where: { id: verificationId },
+      data: { revokedAt: new Date(), revokedById: user.id, revokedReason: dto.reason.trim() },
+    });
   }
 
   async findMe(userId: string) {
@@ -350,11 +467,13 @@ export class FarmersService {
   async update(id: string, dto: UpdateFarmerDto, user: RequestUser) {
     await this.ownership.assertFarmerAccess(user, id);
     await this.findOne(id);
-    const { dateOfBirth, dataShareConsent, ...rest } = dto;
+    const { dateOfBirth, dataShareConsent, idType, idNumber, nationalId, ...rest } = dto;
+    const identity = await this.resolveIdentity({ idType, idNumber, nationalId }, id);
     return this.prisma.farmer.update({
       where: { id },
       data: {
         ...rest,
+        ...this.identityData(identity),
         ...(dateOfBirth ? { dateOfBirth: new Date(dateOfBirth) } : {}),
         ...(dataShareConsent !== undefined
           ? {
@@ -404,7 +523,7 @@ export class FarmersService {
       });
       for (const a of open) {
         await tx.$executeRaw`SELECT id FROM irrigation_hectares WHERE id = ${a.hectareId} FOR UPDATE`;
-        const pending = await tx.irrigationAllocationTransfer.count({ where: { hectareId: a.hectareId, status: 'PENDING_APPROVAL' } });
+        const pending = await tx.irrigationAllocationTransfer.count({ where: { hectareId: a.hectareId, status: { in: ['AWAITING_RECIPIENT', 'PENDING_APPROVAL'] } } });
         if (pending) throw new ConflictException('A transfer is awaiting approval for this farmer\'s hectare. Resolve it first.');
         const endedOn = a.allocatedOn > today ? a.allocatedOn : today;
         if (a.status === 'ACTIVE') {
@@ -638,6 +757,10 @@ export class FarmersService {
   ) {
     await this.ownership.assertFarmerAccess(user, farmerId);
     const farmer = await this.findOne(farmerId);
+    const identity = await this.resolveIdentity(
+      { idType: idTypeFromDocument(dto.idType), idNumber: dto.idNumber },
+      farmerId,
+    );
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.document.createMany({
@@ -646,7 +769,7 @@ export class FarmersService {
             farmerId,
             type: dto.idType,
             fileUrl: dto.idDocumentUrl,
-            fileName: `${dto.idType}-${dto.idNumber}`,
+            fileName: `${dto.idType}-${identity!.idNumber}`,
             uploadedById: user.id,
           },
           {
@@ -673,12 +796,12 @@ export class FarmersService {
       return tx.farmer.update({
         where: { id: farmerId },
         data: {
-          nationalId: dto.idNumber,
+          ...this.identityData(identity),
           photoUrl: dto.profilePhotoUrl ?? dto.faceCaptureUrl,
           // Re-submitting resets a prior rejection back to review.
           verificationStatus: VerificationStatus.PENDING,
         },
-        select: { id: true, verificationStatus: true, nationalId: true },
+        select: { id: true, verificationStatus: true, nationalId: true, idType: true, idNumber: true },
       });
     });
 

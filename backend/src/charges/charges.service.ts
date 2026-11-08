@@ -13,6 +13,8 @@ export const STANDARD_CHARGES = [
   { code: 'STORAGE_FEE', name: 'Storage fee (per month)', category: 'WAREHOUSE', basis: 'PER_KG', graceDays: 0 },
   { code: 'DELIVERY_FEE', name: 'Delivery fee', category: 'WAREHOUSE', basis: 'FLAT', graceDays: 0 },
   { code: 'LATE_PENALTY', name: 'Late payment penalty (per month)', category: 'PENALTY', basis: 'PERCENT', graceDays: 30 },
+  /** Charged once when a farmer's debt stays unpaid past the grace period; switching it on also starts the overdue-debt handling of their farms. */
+  { code: 'DEFAULT_PENALTY', name: 'Overdue-debt penalty (one-off)', category: 'PENALTY', basis: 'FLAT', graceDays: 30, amount: 50000 },
 ] as const;
 export type ChargeCode = (typeof STANDARD_CHARGES)[number]['code'];
 
@@ -38,7 +40,7 @@ export class ChargesService {
   /** Makes sure the standard charges exist for a cooperative. Safe to call any time. */
   async ensure(mamcosId: string, db: Db = this.prisma) {
     await db.amcosCharge.createMany({
-      data: STANDARD_CHARGES.map((c) => ({ mamcosId, code: c.code, name: c.name, category: c.category, basis: c.basis, graceDays: c.graceDays })),
+      data: STANDARD_CHARGES.map((c) => ({ mamcosId, code: c.code, name: c.name, category: c.category, basis: c.basis, graceDays: c.graceDays, amount: 'amount' in c ? c.amount : 0 })),
       skipDuplicates: true,
     });
   }
@@ -60,7 +62,8 @@ export class ChargesService {
     if (current.basis === 'PERCENT' && amount > 100) throw new BadRequestException('A percentage cannot be more than 100');
     const active = dto.isActive ?? current.isActive;
     if (active && amount <= 0) throw new BadRequestException('Enter an amount above zero before switching this charge on');
-    if (dto.graceDays != null && current.category !== 'PENALTY') throw new BadRequestException('Only the late payment penalty has grace days');
+    if (dto.graceDays != null && current.category !== 'PENALTY') throw new BadRequestException('Only the penalties have grace days');
+    if (dto.graceDays != null && code === 'DEFAULT_PENALTY' && (dto.graceDays < 1 || dto.graceDays > 30)) throw new BadRequestException('The grace period must be 1 to 30 days');
     const saved = await this.prisma.amcosCharge.update({
       where: { id: current.id },
       data: { amount, isActive: active, ...(dto.graceDays != null ? { graceDays: dto.graceDays } : {}), updatedById: actor.id },

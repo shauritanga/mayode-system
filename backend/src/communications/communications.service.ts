@@ -232,7 +232,15 @@ export class CommunicationsService implements OnModuleInit {
   }
 
   async send(actor: RequestUser, dto: SendCommunicationDto, mamcosIdParam?: string, options: { inline?: boolean } = {}) {
-    const mamcosId = this.tenant(actor, mamcosIdParam);
+    return this.dispatch(this.tenant(actor, mamcosIdParam), dto, actor.id, options);
+  }
+
+  /** A message the system sends on its own (for example when a farm is put on M-LAX), recorded like any other with no human sender. */
+  sendSystem(mamcosId: string, body: string, options: { inline?: boolean } = {}) {
+    return this.dispatch(mamcosId, { audience: 'ALL', channel: 'SMS', body }, null, options);
+  }
+
+  private async dispatch(mamcosId: string, dto: SendCommunicationDto, sentById: string | null, options: { inline?: boolean }) {
     const body = this.validate(dto);
     const audience = await this.audiencePeople(mamcosId, dto);
     const plan = this.plan(audience.people, dto.channel);
@@ -242,7 +250,7 @@ export class CommunicationsService implements OnModuleInit {
       const c = await tx.communication.create({
         data: {
           mamcosId, channel: dto.channel, audience: dto.audience, canalId: audience.canalId ?? null, blockId: audience.blockId ?? null, audienceLabel: audience.label, subject: dto.channel === 'SMS' ? null : dto.subject!.trim(), body,
-          totalRecipients: plan.length, skippedCount: plan.filter((p) => p.status === 'SKIPPED').length, sentById: actor.id,
+          totalRecipients: plan.length, skippedCount: plan.filter((p) => p.status === 'SKIPPED').length, sentById,
         },
       });
       await tx.communicationRecipient.createMany({

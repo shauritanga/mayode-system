@@ -40,6 +40,7 @@ import {
   verifyCode,
 } from './listing-access';
 import { RequestUser } from '../common/ownership.service';
+import { assertFarmNotBlocked } from '../farm-defaults/farm-block';
 import {
   DealType,
   LeaseStatus,
@@ -172,6 +173,8 @@ export class MarketplaceService {
         `Farmer ID ${ownerId} is not the owner of Farm ID ${farmId}`,
       );
     }
+
+    assertFarmNotBlocked(farm);
 
     const owner = await this.prisma.farmer.findUnique({
       where: { id: ownerId },
@@ -391,11 +394,15 @@ export class MarketplaceService {
       renterId,
       previousRenterId,
       facilitatedByStaffId,
+      defaultCaseId,
+      minimumPrice: _minimumPrice,
       ...publicData
     } = listing;
     const redacted = redactForViewer(publicData, state);
     return {
       ...redacted,
+      // that the farm is leased because of an overdue debt is shown; the debt itself never is
+      fromOverdueDebt: !!defaultCaseId,
       owner: owner
         ? { id: owner.id, firstName: owner.firstName, lastName: owner.lastName }
         : null,
@@ -769,6 +776,11 @@ export class MarketplaceService {
     }
 
     const askingPrice = dto.askingPrice ?? listing.askingPrice;
+    if (listing.minimumPrice != null && askingPrice < listing.minimumPrice) {
+      throw new BadRequestException(
+        `This farm is leased because of an overdue debt, so the price cannot be below ${listing.minimumPrice.toLocaleString('en-US')} (the debt and penalty)`,
+      );
+    }
     // Commission rate is always derived from dealType, never from client
     // input — same rule as createLandListing.
     const dealType = dto.dealType ?? listing.dealType;
@@ -810,6 +822,11 @@ export class MarketplaceService {
     });
     if (!listing) {
       throw new NotFoundException(`Land Listing with ID ${id} not found`);
+    }
+    if (listing.defaultCaseId && listing.leaseStatus === LeaseStatus.DRAFT) {
+      throw new BadRequestException(
+        'This listing comes from an overdue debt. It is withdrawn when the debt is cleared',
+      );
     }
     const hasActiveEscrow = listing.escrowPayments.some(
       (p) =>
@@ -902,7 +919,8 @@ export class MarketplaceService {
       );
     }
 
-    if (listing.ownerId === renterId) {
+    // An owner whose farm was given to M-LAX for an unpaid debt may lease it back like anyone else.
+    if (listing.ownerId === renterId && !listing.defaultCaseId) {
       throw new BadRequestException('A land owner cannot rent their own farm');
     }
 
@@ -1382,7 +1400,10 @@ export class MarketplaceService {
       },
     });
 
-    if (settlingSubLease) {
+    if (listing.defaultCaseId) {
+      // Given to M-LAX for an unpaid debt: the rent stays with MAYODE (it settles the debt with the AMCOS). The owner is paid nothing.
+      await this.settleOverdueDebtLease(listing.defaultCaseId);
+    } else if (settlingSubLease) {
       await this.disburseSubLeasePayout(
         pendingEscrow.id,
         listing,
@@ -1394,7 +1415,7 @@ export class MarketplaceService {
       await this.disburseOwnerPayout(pendingEscrow.id, listing);
     }
 
-    if (listing.owner.user?.phone) {
+    if (listing.owner.user?.phone && !listing.defaultCaseId) {
       await this.sms.send(
         listing.owner.user.phone,
         `MAYODE: Your M-LAX lease for ${listing.farm.farmCode} is now ACTIVE. Payout to your mobile money is on the way.`,
@@ -1429,6 +1450,26 @@ export class MarketplaceService {
     }
 
     return updatedListing;
+  }
+
+  /** A farm given to M-LAX for an unpaid debt has been leased: its farm leaves the case, and the case closes once none of its farms is still listed. */
+  private async settleOverdueDebtLease(caseId: string) {
+    await this.prisma.farm.updateMany({
+      where: { adminCaseId: caseId, isLeased: true },
+      data: { adminStatus: 'NORMAL', adminCaseId: null },
+    });
+    const stillListed = await this.prisma.landListing.count({
+      where: { defaultCaseId: caseId, leaseStatus: LeaseStatus.DRAFT },
+    });
+    await this.prisma.farmDefaultEvent.create({
+      data: { caseId, kind: 'LEASED_ON_MLAX', note: 'A farm was leased on M-LAX; the owner receives nothing from the lease' },
+    });
+    if (!stillListed) {
+      await this.prisma.farmDefaultCase.updateMany({
+        where: { id: caseId, status: 'AT_MLAX' },
+        data: { status: 'LEASED_ON_MLAX', resolvedOn: new Date(), resolvedNote: 'Leased on M-LAX; the rent settles the debt' },
+      });
+    }
   }
 
   /**
@@ -1697,6 +1738,11 @@ export class MarketplaceService {
     if (!listing) {
       throw new NotFoundException(
         `Land Listing with ID ${listingId} not found`,
+      );
+    }
+    if (listing.defaultCaseId) {
+      throw new BadRequestException(
+        'The price of this farm is set by MAYODE, so offers are not accepted. Apply to lease it at the listed price',
       );
     }
     if (listing.ownerId === farmerId) {
