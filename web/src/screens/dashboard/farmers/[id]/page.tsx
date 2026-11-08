@@ -8,6 +8,7 @@ import { hasPermission, isPathAllowed } from '@/lib/nav';
 import { useAuthStore } from '@/store/auth.store';
 import { API_BASE_URL, api, farmDefaultsApi, farmersApi, irrigationApi } from '@/lib/api';
 import { EditFarmerModal, LocalVerificationModal, RemoveFarmerModal } from './FarmerActions';
+import { printFarmerId } from './printFarmerId';
 import { BASE, CardsSkeleton, ConfirmDialog, Empty, LoadError, Panel, StatCard, StatusBadge, fmtDate, fmtHa, titleCase, useApi } from '../../irrigation/ui';
 
 const TIER_LABEL: Record<string, string> = { STANDARD: 'Tier 1 · Standard member', FAMILY: 'Tier 2 · Family / beneficiary', ALTERNATIVE_ID: 'Tier 3 · Alternative ID' };
@@ -44,6 +45,20 @@ export default function FarmerProfilePage() {
     ...(f.idNumber ? [['ID number', f.idNumber] as [string, any]] : []),
   ] : [];
   const d = land.data;
+  const printId = () => {
+    if (!f) return;
+    // Registration number is the farm id: canal.block + side, a dash, then the hectare number (5.15R-12).
+    const shamba = (d?.current ?? []).map((a: any) => {
+      const code: string = a.hectare.code, block: string = a.block?.code ?? '';
+      return block && code.startsWith(block) && /^\d+$/.test(code.slice(block.length)) ? `${block}-${code.slice(block.length)}` : code;
+    }).join(', ');
+    const ok = printFarmerId({
+      name, farmerId: f.controlNumber ?? '', photoUrl: photo, initials: `${f.firstName?.[0] ?? ''}${f.lastName?.[0] ?? ''}`.toUpperCase(),
+      amcosName: f.mamcos?.name ?? '', amcosAddress: [f.mamcos?.location, f.mamcos?.district].filter(Boolean).join(' - '), amcosCode: f.mamcos?.code ?? '',
+      shamba, village: f.village ?? '', ward: f.ward ?? '', issuedOn: fmtDate(f.createdAt),
+    });
+    if (!ok) window.alert('The browser blocked the print window. Allow pop-ups for this site and try again.');
+  };
   const guided = d ? [...d.guided.current, ...d.guided.history] : [];
   return (
     <>
@@ -77,8 +92,9 @@ export default function FarmerProfilePage() {
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
                   <h2 style={{ margin: 0, fontSize: 20 }}>{name}</h2>
                   <StatusBadge value={f.isBlacklisted ? 'BLACKLISTED' : f.verificationStatus} />
-                  {(canEdit || (canRemove && f.mamcosId)) && (
+                  {(
                     <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                      <button type="button" className="btn-secondary" onClick={printId}>Print ID</button>
                       {canEdit && <button type="button" className="btn-secondary" onClick={() => setDialog('edit')}>Edit</button>}
                       {canRemove && f.mamcosId && <button type="button" className="btn-secondary" style={{ color: 'var(--red-400)' }} onClick={() => setDialog('remove')}>Remove from AMCOS</button>}
                     </span>
