@@ -1,0 +1,211 @@
+/* ════════════════════════════════════════════════════════════════════
+   AMCOS portal theme — the clean, flat look of the rucky-rentals dashboard.
+   Every rule is scoped to :root[data-app='cooperatives'] (set in layout.tsx from
+   APP_MODE), so the admin and farmer portals that share globals.css are untouched.
+   Palette and proportions follow rucky-rentals resources/css/app.css.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Tokens: dark ── */
+:root[data-app='cooperatives'] {
+  --bg: #0e0f11;
+  --surface-1: #141518;
+  --surface-2: #1c1d21;
+  --surface-3: #222428;
+  --border-subtle: #2a2b30;
+  --border-strong: #3a3b41;
+  --text-1: #e8e9ec;
+  --text-2: #8b8d96;
+  --text-3: #6b6d76;
+
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-soft: rgba(59, 130, 246, 0.12);
+  --accent-softer: rgba(59, 130, 246, 0.06);
+  --accent-ring: rgba(59, 130, 246, 0.35);
+
+  --glass-bg: #141518;
+  --glass-card-bg: #141518;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.18);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+
+  --r-lg: 12px;
+  --amcos-green: #22c55e;
+  --amcos-green-dim: rgba(34, 197, 94, 0.12);
+  --amcos-amber: #f59e0b;
+  --amcos-amber-dim: rgba(245, 158, 11, 0.12);
+  --amcos-red: #ef4444;
+  --amcos-red-dim: rgba(239, 68, 68, 0.12);
+  --amcos-blue: #3b82f6;
+  --amcos-blue-dim: rgba(59, 130, 246, 0.12);
+  --amcos-purple: #8b5cf6;
+  --amcos-purple-dim: rgba(139, 92, 246, 0.12);
+}
+
+/* ── Tokens: light ── */
+:root[data-app='cooperatives'][data-theme='light'] {
+  --bg: #f5f5f7;
+  --surface-1: #ffffff;
+  --surface-2: #f0f1f3;
+  --surface-3: #e8e9ec;
+  --border-subtle: #e2e3e8;
+  --border-strong: #d2d3da;
+  --text-1: #111214;
+  --text-2: #5a5c66;
+  --text-3: #9a9ca6;
+
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.08);
+  --accent-softer: rgba(37, 99, 235, 0.04);
+  --accent-ring: rgba(37, 99, 235, 0.25);
+
+  --glass-bg: #ffffff;
+  --glass-card-bg: #ffffff;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.08);
+
+  --amcos-green: #16a34a;
+  --amcos-green-dim: rgba(22, 163, 74, 0.1);
+  --amcos-amber: #d97706;
+  --amcos-amber-dim: rgba(217, 119, 6, 0.1);
+  --amcos-red: #dc2626;
+  --amcos-red-dim: rgba(220, 38, 38, 0.1);
+  --amcos-blue: #2563eb;
+  --amcos-blue-dim: rgba(37, 99, 235, 0.08);
+  --amcos-purple: #7c3aed;
+  --amcos-purple-dim: rgba(124, 58, 237, 0.08);
+}
+
+/* ── Type ── */
+:root[data-app='cooperatives'] body {
+  font-family: var(--font-dm-sans), var(--font-inter), system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+:root[data-app='cooperatives'] ::selection { background: var(--accent-soft); }
+
+/* ── Shell: sidebar ── */
+:root[data-app='cooperatives'] .sidebar-desktop { width: 240px; background: var(--surface-1); border-right: 1px solid var(--border-subtle); }
+@media (min-width: 1024px) {
+  :root[data-app='cooperatives'] .shell-main { margin-left: 240px; }
+  :root[data-app='cooperatives'] .shell.sidebar-collapsed .sidebar-desktop { width: 64px; }
+  :root[data-app='cooperatives'] .shell.sidebar-collapsed .shell-main { margin-left: 64px; }
+  :root[data-app='cooperatives'] .shell-content { padding: 28px; }
+}
+:root[data-app='cooperatives'] .sidebar-logo { height: 60px; padding: 0 16px; border-bottom: 1px solid var(--border-subtle); gap: 10px; }
+:root[data-app='cooperatives'] .sidebar-logo-icon { width: 28px; height: 28px; border-radius: 7px; box-shadow: none; }
+:root[data-app='cooperatives'] .sidebar-logo-name { font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+:root[data-app='cooperatives'] .sidebar-logo-sub { font-size: 10px; font-weight: 500; letter-spacing: 0.02em; text-transform: none; }
+:root[data-app='cooperatives'] .sidebar-nav { padding: 12px 8px; gap: 2px; }
+:root[data-app='cooperatives'] .sidebar-group { margin-top: 10px; }
+:root[data-app='cooperatives'] .sidebar-group-label { padding: 8px 10px 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.8px; }
+:root[data-app='cooperatives'] .sidebar-link { padding: 8px 10px; gap: 10px; border-radius: 8px; font-size: 13.5px; font-weight: 450; }
+:root[data-app='cooperatives'] .sidebar-link:hover { background: var(--surface-3); color: var(--text-1); }
+:root[data-app='cooperatives'] .sidebar-link.active,
+:root[data-app='cooperatives'][data-theme='light'] .sidebar-link.active { color: var(--accent); font-weight: 500; }
+:root[data-app='cooperatives'] .sidebar-active-pill { border-radius: 8px; border: 0; background: var(--accent-soft); }
+:root[data-app='cooperatives'] .sidebar-footer { padding: 12px 8px; }
+
+/* ── Shell: top bar ── */
+:root[data-app='cooperatives'] .top-header { height: 60px; padding: 0 28px; gap: 12px; background: var(--surface-1); backdrop-filter: none; border-bottom: 1px solid var(--border-subtle); }
+:root[data-app='cooperatives'] .header-title { font-family: inherit; font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+:root[data-app='cooperatives'] .icon-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--surface-2); }
+:root[data-app='cooperatives'] .icon-btn:hover { background: var(--surface-3); }
+:root[data-app='cooperatives'] .icon-btn-dot { border-color: var(--surface-2); }
+
+/* ── Cards ── */
+:root[data-app='cooperatives'] .glass-card,
+:root[data-app='cooperatives'] .insight-panel,
+:root[data-app='cooperatives'] .table-panel,
+:root[data-app='cooperatives'] .ua-panel {
+  background: var(--surface-1);
+  backdrop-filter: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  animation: none;
+}
+:root[data-app='cooperatives'] .insight-panel { padding: 0 20px 18px; overflow: hidden; }
+:root[data-app='cooperatives'] .insight-panel-head { margin: 0 -20px 16px; padding: 16px 20px 12px; border-bottom: 1px solid var(--border-subtle); align-items: center; }
+:root[data-app='cooperatives'] .insight-panel h2 { font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: -0.2px; }
+:root[data-app='cooperatives'] .insight-panel p { margin: 2px 0 0; font-size: 12px; color: var(--text-3); }
+:root[data-app='cooperatives'] .section-toolbar { padding: 16px 20px 12px; }
+:root[data-app='cooperatives'] .section-toolbar > strong { font-size: 14px; font-weight: 600; letter-spacing: -0.2px; }
+/* A plain blue text link in a card header, like rucky's "View all" */
+:root[data-app='cooperatives'] .insight-panel-head a.badge,
+:root[data-app='cooperatives'] .insight-panel-head .badge-blue { padding: 0; border: 0; background: none; border-radius: 0; font-size: 12.5px; font-weight: 500; color: var(--accent); }
+:root[data-app='cooperatives'] .insight-panel-head a.badge:hover { text-decoration: underline; }
+
+/* ── Stat cards: white, icon chip, hover border (rucky .stat-card) ── */
+:root[data-app='cooperatives'] .scheme-stat-grid,
+:root[data-app='cooperatives'] .metric-grid { gap: 16px; }
+:root[data-app='cooperatives'] .stat-card,
+:root[data-app='cooperatives'] .kpi-card {
+  --stat-accent: var(--amcos-green);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  overflow: visible;
+  transform: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+:root[data-app='cooperatives'] .stat-card:hover,
+:root[data-app='cooperatives'] .kpi-card:hover { border-color: var(--accent); box-shadow: var(--shadow-sm), 0 0 0 1px var(--accent); transform: none; }
+:root[data-app='cooperatives'] .kpi-card-blue { --stat-accent: var(--amcos-blue); }
+:root[data-app='cooperatives'] .kpi-card-gold { --stat-accent: var(--amcos-amber); }
+:root[data-app='cooperatives'] .kpi-card-red { --stat-accent: var(--amcos-red); }
+:root[data-app='cooperatives'] .kpi-card-purple { --stat-accent: var(--amcos-purple); }
+:root[data-app='cooperatives'] .kpi-card .kpi-card-icon {
+  width: 34px; height: 34px; border-radius: 9px;
+  color: var(--stat-accent);
+  background: color-mix(in srgb, var(--stat-accent) 12%, transparent);
+}
+:root[data-app='cooperatives'] .kpi-card .kpi-card-icon svg { width: 16px; height: 16px; }
+:root[data-app='cooperatives'] .kpi-card .kpi-card-body,
+:root[data-app='cooperatives'] .kpi-card-solid .kpi-card-body { flex: none; flex-direction: column; flex-wrap: nowrap; align-items: flex-start; padding: 0; gap: 0; line-height: 1.2; }
+:root[data-app='cooperatives'] .kpi-card .kpi-card-body strong,
+:root[data-app='cooperatives'] .kpi-card-solid .kpi-card-body strong { flex: none; font-size: 26px; font-weight: 600; letter-spacing: -0.5px; line-height: 1.1; color: var(--text-1); }
+:root[data-app='cooperatives'] .kpi-card .kpi-card-body span,
+:root[data-app='cooperatives'] .kpi-card-solid .kpi-card-body span { margin-top: 4px; font-size: 12.5px; font-weight: 400; color: var(--text-2); }
+:root[data-app='cooperatives'] .kpi-card .kpi-card-body small,
+:root[data-app='cooperatives'] .kpi-card-solid .kpi-card-body small { margin-top: 2px; font-size: 11.5px; color: var(--text-3); }
+/* The solid variant used to fill the whole tile with colour; here it is the same white card. */
+:root[data-app='cooperatives'] .kpi-card-solid { padding: 20px; gap: 12px; background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: 12px; box-shadow: var(--shadow-sm); }
+:root[data-app='cooperatives'] .kpi-card-solid .kpi-card-icon { width: 34px; height: 34px; border-radius: 9px; color: var(--stat-accent); background: color-mix(in srgb, var(--stat-accent) 12%, transparent); }
+:root[data-app='cooperatives'] .kpi-card-plain { border: 0; box-shadow: none; padding: 14px 4px; background: transparent; flex-direction: row; align-items: center; }
+:root[data-app='cooperatives'] .kpi-card-plain:hover { box-shadow: none; }
+
+/* ── Tables ── */
+:root[data-app='cooperatives'] .data-table th { padding: 10px 16px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; color: var(--text-3); background: var(--surface-2); border-bottom: 1px solid var(--border-subtle); }
+:root[data-app='cooperatives'] .data-table td { padding: 11px 16px; font-size: 13px; border-bottom: 1px solid var(--border-subtle); }
+:root[data-app='cooperatives'] .data-table tbody tr:hover td { background: var(--surface-2); }
+
+/* ── Badges: soft tinted pills ── */
+:root[data-app='cooperatives'] .badge { padding: 3px 8px; font-size: 11.5px; font-weight: 500; border: 0; }
+:root[data-app='cooperatives'] .badge-green { background: var(--amcos-green-dim); color: var(--amcos-green); border: 0; }
+:root[data-app='cooperatives'] .badge-gold { background: var(--amcos-amber-dim); color: var(--amcos-amber); border: 0; }
+:root[data-app='cooperatives'] .badge-red { background: var(--amcos-red-dim); color: var(--amcos-red); border: 0; }
+:root[data-app='cooperatives'] .badge-blue { background: var(--amcos-blue-dim); color: var(--amcos-blue); border: 0; }
+:root[data-app='cooperatives'] .badge-gray { background: var(--surface-3); color: var(--text-2); border: 0; }
+
+/* ── Buttons and inputs ── */
+:root[data-app='cooperatives'] .btn-primary { padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; background: var(--accent); box-shadow: none; }
+:root[data-app='cooperatives'] .btn-primary:hover { filter: none; background: var(--accent-hover); box-shadow: none; transform: none; }
+:root[data-app='cooperatives'] .btn-secondary { padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; background: var(--surface-1); border: 1px solid var(--border-subtle); }
+:root[data-app='cooperatives'] .btn-secondary:hover { background: var(--surface-2); }
+:root[data-app='cooperatives'] .input-field { padding: 8px 12px; border-radius: 8px; font-size: 13px; background: var(--surface-2); border: 1px solid var(--border-subtle); }
+:root[data-app='cooperatives'] .input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ── Page headings ── */
+:root[data-app='cooperatives'] .page-shell { gap: 20px; }
+:root[data-app='cooperatives'] .page-kicker { font-size: 11px; font-weight: 600; letter-spacing: 0.6px; color: var(--accent); }
+:root[data-app='cooperatives'] .page-title { font-family: inherit; font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+:root[data-app='cooperatives'] .page-subtitle { font-size: 13px; color: var(--text-2); }
+:root[data-app='cooperatives'] .dash-two-col { gap: 16px; }

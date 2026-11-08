@@ -1,11 +1,18 @@
 import { APP_MODE, APP_MODE_LABEL, APP_MODE_LOGIN_COPY } from '@/lib/app-mode';
 import type { Metadata } from 'next';
-import { Inter, Outfit } from 'next/font/google';
+import { DM_Sans, Inter, Outfit } from 'next/font/google';
 import './globals.css';
+import './amcos-theme.css';
 
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
+  display: 'swap',
+});
+
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  variable: '--font-dm-sans',
   display: 'swap',
 });
 
@@ -42,7 +49,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className={`${inter.variable} ${outfit.variable}`}>
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" data-app={APP_MODE} className={`${inter.variable} ${outfit.variable} ${dmSans.variable}`}>
       <head>
         {/* Set the theme before first paint to avoid a dark→light flash for light-theme users. */}
         <script
