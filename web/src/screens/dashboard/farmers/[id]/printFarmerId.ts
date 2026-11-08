@@ -1,5 +1,5 @@
 /* Prints a farmer's membership identity card, modelled on the green paper card AMCOS members already carry:
-   photo and society stamp on top, then the member's details on dotted lines, and the reminder to pay contributions on time. */
+   photo and society name on top, then the member's details on dotted lines, and the reminder to pay contributions on time. */
 
 export interface FarmerIdCardData {
   name: string;
@@ -35,12 +35,9 @@ const cardHtml = (c: FarmerIdCardData) => {
   .top { position: relative; display: flex; gap: 4mm; align-items: flex-start; height: 27mm; }
   .photo { width: 22mm; height: 27mm; background: #fff; padding: 1mm; border-radius: 1mm; box-shadow: 0 .4mm 1.2mm rgba(0,0,0,.3); flex-shrink: 0; }
   .photo img, .photo .ph { width: 100%; height: 100%; object-fit: cover; display: grid; place-items: center; background: #2d6cdf; color: #fff; font-size: 7mm; font-weight: 700; }
-  .head { flex: 1; text-align: center; padding-top: 1mm; }
-  .stamp { display: inline-block; border: .5mm solid #1f3f9a; color: #1f3f9a; border-radius: 50%; padding: 2.4mm 4mm; transform: rotate(-6deg); opacity: .85; max-width: 52mm; }
-  .stamp b { display: block; font-size: 2.6mm; letter-spacing: .15mm; text-transform: uppercase; line-height: 1.25; }
-  .stamp span { display: block; font-size: 2.2mm; margin-top: .6mm; }
-  .society { position: relative; margin-top: 1.6mm; font-size: 2.55mm; font-weight: 700; line-height: 1.3; text-transform: uppercase; color: #082f1a; }
-  .society small { display: block; font-weight: 600; text-transform: none; font-size: 2.4mm; }
+  .head { flex: 1; padding-top: 2mm; }
+  .society { font-size: 3mm; font-weight: 700; line-height: 1.3; text-transform: uppercase; color: #082f1a; }
+  .society small { display: block; margin-top: 1mm; font-weight: 600; text-transform: none; font-size: 2.6mm; }
   .rows { position: relative; margin-top: 1.4mm; }
   .row { display: flex; align-items: baseline; gap: 1.5mm; font-size: 2.6mm; font-weight: 700; text-transform: uppercase; margin-top: 1.3mm; }
   .lbl { white-space: nowrap; }
@@ -51,9 +48,8 @@ const cardHtml = (c: FarmerIdCardData) => {
   </style></head><body><div class="card">
     <div class="top">
       <div class="photo">${photo}</div>
-      <div class="head"><div class="stamp"><b>${esc(c.amcosName)}</b><span>${esc(c.amcosAddress)}</span>${c.amcosCode ? `<span>Reg. ${esc(c.amcosCode)}</span>` : ''}</div></div>
+      <div class="head"><div class="society">${esc(c.amcosName)}<small>${esc(c.amcosAddress)}</small></div></div>
     </div>
-    <div class="society">${esc(c.amcosName)}<small>${esc(c.amcosAddress)}</small></div>
     <div class="rows">
       ${row('JINA LA MWANACHAMA', c.name)}
       ${row('NAMBA YA UANACHAMA (SHAMBA)', c.shamba || c.farmerId)}
