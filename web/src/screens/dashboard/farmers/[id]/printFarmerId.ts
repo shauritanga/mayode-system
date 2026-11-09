@@ -79,11 +79,11 @@ const cardHtml = (c: FarmerIdCardData) => {
   .org { position: absolute; left: 9mm; top: 6mm; width: 26mm; display: flex; gap: 2mm; align-items: center; }
   .chip { flex: none; width: 8mm; height: 8mm; border-radius: 2mm; background: #1f9d57; color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 3.4mm; letter-spacing: .1mm; }
   .org .nm { font-size: 2.3mm; font-weight: 800; line-height: 1.2; color: #0b3d22; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
-  .photo { position: absolute; left: 9mm; top: 18mm; width: 26mm; height: 34mm; border-radius: 2.2mm; overflow: hidden; background: #e6efe9; border: .3mm solid #cfe3d6; }
+  .photo { position: absolute; left: 9mm; top: 17.5mm; width: 26mm; height: 32mm; border-radius: 2.2mm; overflow: hidden; background: #e6efe9; border: .3mm solid #cfe3d6; }
   .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .ph { width: 100%; height: 100%; display: grid; place-items: center; background: linear-gradient(160deg, #3fc47c, #1f9d57); color: #fff; font-size: 9mm; font-weight: 800; }
-  .code { position: absolute; left: 9mm; top: 55mm; width: 26mm; text-align: center; }
-  .code svg { display: block; width: 100%; height: 8mm; }
+  .code { position: absolute; left: 9mm; top: 51.5mm; width: 26mm; text-align: center; }
+  .code svg { display: block; width: 100%; height: 7mm; }
   .code span { display: block; margin-top: .6mm; font-size: 2mm; letter-spacing: .3mm; color: #3d5246; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .head { position: absolute; left: 38mm; right: 0; top: 0; height: 15mm; padding: 3.6mm 4mm 0 5mm; color: #fff; background: linear-gradient(110deg, #279a58, #3fc47c); border-bottom: .8mm solid #f2b705; }
   .head .t { font-size: 3.2mm; font-weight: 800; letter-spacing: .1mm; white-space: nowrap; }
@@ -93,11 +93,8 @@ const cardHtml = (c: FarmerIdCardData) => {
   .lbl { font-size: 1.8mm; font-weight: 700; color: #5d7266; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .val { margin-top: 1.4mm; font-size: 3.5mm; font-weight: 800; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
   .val.big { font-size: 4.2mm; color: #0b3d22; }
-  .foot { position: absolute; left: 38mm; right: 0; bottom: 0; height: 13mm; padding: 2.2mm 4mm 0 5mm; color: #fff; background: linear-gradient(110deg, #1f9d57, #279a58); display: flex; gap: 5mm; align-items: flex-start; }
-  .foot .tb { flex: 1; min-width: 0; }
-  .foot .tb b { display: block; font-size: 2.5mm; letter-spacing: .2mm; }
-  .foot .tb span { display: block; margin-top: .9mm; font-size: 2.6mm; }
-  .foot .sg { width: 24mm; margin-top: 3.6mm; border-top: .25mm solid rgba(255,255,255,.85); padding-top: .7mm; text-align: right; font-size: 1.9mm; letter-spacing: .15mm; }
+  .foot { position: absolute; left: 0; right: 0; bottom: 0; height: 9mm; padding: 0 5mm 0 9mm; color: #fff; background: linear-gradient(110deg, #1f9d57, #279a58 55%, #3fc47c); border-top: .6mm solid #f2b705; display: flex; align-items: center; gap: 2mm; font-size: 2.9mm; white-space: nowrap; }
+  .foot b { letter-spacing: .25mm; }
   @media print { html, body { background: none; } body { display: block; min-height: 0; } }
   </style></head><body><div class="card">
     <div class="bar1"></div><div class="bar2"></div>
@@ -111,7 +108,7 @@ const cardHtml = (c: FarmerIdCardData) => {
       ${field('JINA LA MWANACHAMA', c.name)}
       ${field('KIJIJI ANAKOTOKEA', [c.village, c.ward].filter(Boolean).join(', '))}
     </div>
-    <div class="foot"><div class="tb"><b>TAMBUKA</b><span>Kulipa michango yako kwa wakati</span></div><div class="sg">SAHIHI / MUHURI</div></div>
+    <div class="foot"><b>TAMBUKA:</b><span>Kulipa michango yako kwa wakati</span></div>
   </div><script>window.onload=function(){setTimeout(function(){window.print();},300);};</script></body></html>`;
 };
 
