@@ -1,4 +1,5 @@
 'use client';
+import { farmId } from '@/lib/farm-id';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useState } from 'react';
@@ -25,7 +26,7 @@ export default function LeadershipHistory({ bare = false }: { bare?: boolean } =
         <Filters>
           <Field label="Member"><input className="input-field" placeholder="Name or member no." value={filters.q} onChange={(e) => setFilter('q', e.target.value)} /></Field>
           <Field label="Canal"><select className="input-field" value={filters.canalId} onChange={(e) => setFilter('canalId', e.target.value)}><option value="">All</option>{opts.canals.map((c: any) => <option key={c.id} value={c.id}>{c.code}</option>)}</select></Field>
-          <Field label="Block"><select className="input-field" value={filters.blockId} onChange={(e) => setFilter('blockId', e.target.value)}><option value="">All</option>{opts.blocks.map((b: any) => <option key={b.id} value={b.id}>{b.code}</option>)}</select></Field>
+          <Field label="Block"><select className="input-field" value={filters.blockId} onChange={(e) => setFilter('blockId', e.target.value)}><option value="">All</option>{opts.blocks.map((b: any) => <option key={b.id} value={b.id}>{farmId(b.code)}</option>)}</select></Field>
           <Field label="Position"><select className="input-field" value={filters.position} onChange={(e) => setFilter('position', e.target.value)}><option value="">All</option><option value="CANAL_LEADER">Canal leader</option><option value="BLOCK_LEADER">Block leader</option></select></Field>
           <Field label="Status"><select className="input-field" value={filters.status} onChange={(e) => setFilter('status', e.target.value)}><option value="">All</option><option value="ACTIVE">Active</option><option value="TERM_EXPIRED">Term expired</option><option value="ENDED">Ended</option></select></Field>
           <Field label="Appointed from"><input type="date" className="input-field" value={filters.from} onChange={(e) => setFilter('from', e.target.value)} /></Field>
@@ -36,7 +37,7 @@ export default function LeadershipHistory({ bare = false }: { bare?: boolean } =
             {data.data.map((l: any) => (
               <tr key={l.id}>
                 <td><Link href={`${BASE}/allocation/farmers/${l.leader.id}`}>{l.leader.name}</Link></td><td>{l.leader.memberNumber}</td><td>{titleCase(l.position)}</td>
-                <td>{l.block ? <Link href={`${BASE}/structure/blocks/${l.block.id}`}>{l.block.code}</Link> : <Link href={`${BASE}/structure/canals/${l.canal.id}`}>{l.canal.code}</Link>}</td>
+                <td>{l.block ? <Link href={`${BASE}/structure/blocks/${l.block.id}`}>{farmId(l.block.code)}</Link> : <Link href={`${BASE}/structure/canals/${l.canal.id}`}>{l.canal.code}</Link>}</td>
                 <td>{fmtDate(l.termStart)}</td><td>{l.endedOn ? fmtDate(l.endedOn) : l.termEnd ? `${fmtDate(l.termEnd)} (term)` : 'Open'}</td>
                 <td><StatusBadge value={l.status} label={l.status === 'TERM_EXPIRED' ? 'Term expired' : undefined} />{l.endReason && <div className="muted" style={{ fontSize: 11 }}>{l.endReason}</div>}</td>
                 <td style={{ fontSize: 12 }}>{l.replacedBy ? `Replaced by ${l.replacedBy.name}` : l.replaces ? `Replaced ${l.replaces.name}` : '—'}</td>

@@ -1,4 +1,5 @@
 'use client';
+import { farmId } from '@/lib/farm-id';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useState } from 'react';
@@ -39,7 +40,7 @@ function AddFarmerModal({ onClose, onCreated }: { onClose: () => void; onCreated
         email: form.email.trim() || undefined, village: form.village.trim() || undefined, hectareId: hectare!.id, guardianId: guardian?.id,
       });
       const name = form.firstName.trim();
-      onCreated(res.data.credentialsSms === 'sent' ? `${name} was registered on hectare ${hectare!.code}. Sign-in details were sent by SMS.` : `${name} was registered on hectare ${hectare!.code}, but the SMS could not be sent.`, res.data.temporaryPassword);
+      onCreated(res.data.credentialsSms === 'sent' ? `${name} was registered on hectare ${farmId(hectare!.code)}. Sign-in details were sent by SMS.` : `${name} was registered on hectare ${farmId(hectare!.code)}, but the SMS could not be sent.`, res.data.temporaryPassword);
     } catch (e) { setError(errMsg(e, 'Could not register this farmer.')); setSaving(false); }
   };
 

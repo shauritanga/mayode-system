@@ -1,4 +1,5 @@
 'use client';
+import { farmId } from '@/lib/farm-id';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useMemo, useState } from 'react';
@@ -66,11 +67,11 @@ export function HectareDetail({ id }: { id: string }) {
               <div>
                 <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Hectare</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 2 }}>
-                  <h1 style={{ margin: 0, fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 30, fontWeight: 800 }}>{h.code}</h1>
+                  <h1 style={{ margin: 0, fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 30, fontWeight: 800 }}>{farmId(h.code)}</h1>
                   <StatusBadge value={h.allocationStatus} />
                 </div>
                 <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-                  <Link href={`/dashboard/irrigation/structure/canals/${h.canal.id}`}>{h.canal.name}</Link> · <Link href={`/dashboard/irrigation/structure/blocks/${h.block.id}`}>Block {h.block.code}</Link>{side ? ` · ${side}` : ''} · {fmtHa(h.areaHectares)}
+                  <Link href={`/dashboard/irrigation/structure/canals/${h.canal.id}`}>{h.canal.name}</Link> · <Link href={`/dashboard/irrigation/structure/blocks/${h.block.id}`}>Block {farmId(h.block.code)}</Link>{side ? ` · ${side}` : ''} · {fmtHa(h.areaHectares)}
                 </div>
               </div>
               <div style={{ minWidth: 240 }}>

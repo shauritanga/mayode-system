@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import Link from 'next/link';
+import { farmId } from '@/lib/farm-id';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { hasPermission, isPathAllowed } from '@/lib/nav';
@@ -48,10 +49,7 @@ export default function FarmerProfilePage() {
   const printId = () => {
     if (!f) return;
     // Registration number is the farm id: canal.block + side, a dash, then the hectare number (5.15R-12).
-    const shamba = (d?.current ?? []).map((a: any) => {
-      const code: string = a.hectare.code, block: string = a.block?.code ?? '';
-      return block && code.startsWith(block) && /^\d+$/.test(code.slice(block.length)) ? `${block}-${code.slice(block.length)}` : code;
-    }).join(', ');
+    const shamba = (d?.current ?? []).map((a: any) => farmId(a.hectare.code)).join(', ');
     const ok = printFarmerId({
       name, farmerId: f.controlNumber ?? '', photoUrl: photo, initials: `${f.firstName?.[0] ?? ''}${f.lastName?.[0] ?? ''}`.toUpperCase(),
       amcosName: f.mamcos?.name ?? '', amcosAddress: [f.mamcos?.location, f.mamcos?.district].filter(Boolean).join(' - '), amcosCode: f.mamcos?.code ?? '',
@@ -120,7 +118,7 @@ export default function FarmerProfilePage() {
                   <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Hectare</th><th>Block</th><th>Canal</th><th>Since</th><th>Status</th><th>Guardian</th></tr></thead><tbody>
                     {[...d.current, ...d.pending].map((a: any) => (
                       <tr key={a.id}>
-                        <td><Link href={`${BASE}/structure/hectares/${a.hectare.id}`} style={{ fontWeight: 600 }}>{a.hectare.code}</Link></td>
+                        <td><Link href={`${BASE}/structure/hectares/${a.hectare.id}`} style={{ fontWeight: 600 }}>{farmId(a.hectare.code)}</Link></td>
                         <td><Link href={`${BASE}/structure/blocks/${a.block.id}`}>{a.block.code}</Link></td>
                         <td><Link href={`${BASE}/structure/canals/${a.canal.id}`}>{a.canal.code}</Link></td>
                         <td>{fmtDate(a.allocatedOn)}</td><td><StatusBadge value={a.status} /></td>
@@ -164,7 +162,7 @@ export default function FarmerProfilePage() {
                   <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Hectare</th><th>Registered to</th><th>Block</th><th>Canal</th><th>Since</th><th>Status</th></tr></thead><tbody>
                     {guided.map((g: any) => (
                       <tr key={g.id} style={g.endedOn ? { opacity: 0.6 } : undefined}>
-                        <td><Link href={`${BASE}/structure/hectares/${g.hectare.id}`} style={{ fontWeight: 600 }}>{g.hectare.code}</Link></td>
+                        <td><Link href={`${BASE}/structure/hectares/${g.hectare.id}`} style={{ fontWeight: 600 }}>{farmId(g.hectare.code)}</Link></td>
                         <td><Link href={`/dashboard/farmers/${g.holder.id}`}>{g.holder.name}</Link> <span className="muted">· {g.holder.memberNumber}</span></td>
                         <td>{g.block.code}</td><td>{g.canal.code}</td><td>{fmtDate(g.startedOn)}</td>
                         <td>{g.endedOn ? <span className="muted">Ended {fmtDate(g.endedOn)}</span> : <StatusBadge value="ACTIVE" />}</td>

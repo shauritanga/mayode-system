@@ -1,4 +1,5 @@
 'use client';
+import { farmId } from '@/lib/farm-id';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useState } from 'react';
@@ -40,15 +41,15 @@ function NewTransferModal({ schemeId, presetHectareId, onClose, onSaved }: { sch
       footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><button type="button" className="btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Record transfer'}</button></>}>
       <div style={{ display: 'grid', gap: 12 }}>
         {presetHectareId ? (
-          <Field label="Hectare"><div className="input-field">{chosen ? `${chosen.code}${chosen.farmer ? ` · held by ${chosen.farmer.name}` : ''}` : 'Loading…'}</div></Field>
+          <Field label="Hectare"><div className="input-field">{chosen ? `${farmId(chosen.code)}${chosen.farmer ? ` · held by ${chosen.farmer.name}` : ''}` : 'Loading…'}</div></Field>
         ) : (
           <FormGrid>
             <Field label="Canal"><select className="input-field" value={canalId} onChange={(e) => { setCanalId(e.target.value); setBlockId(''); setHectareId(''); }}><option value="">Select canal</option>{opts.canals.map((c: any) => <option key={c.id} value={c.id}>{c.code}</option>)}</select></Field>
-            <Field label="Block"><select className="input-field" value={blockId} onChange={(e) => { setBlockId(e.target.value); setHectareId(''); }}><option value="">Select block</option>{opts.blocks.map((b: any) => <option key={b.id} value={b.id}>{b.code}</option>)}</select></Field>
+            <Field label="Block"><select className="input-field" value={blockId} onChange={(e) => { setBlockId(e.target.value); setHectareId(''); }}><option value="">Select block</option>{opts.blocks.map((b: any) => <option key={b.id} value={b.id}>{farmId(b.code)}</option>)}</select></Field>
             <Field label="Allocated hectare" wide>
               <select className="input-field" value={hectareId} onChange={(e) => setHectareId(e.target.value)} disabled={!blockId}>
                 <option value="">{hectares.loading ? 'Loading…' : 'Select hectare'}</option>
-                {(hectares.data?.data ?? []).map((h: any) => <option key={h.id} value={h.id}>{h.code} · {h.farmer?.name}</option>)}
+                {(hectares.data?.data ?? []).map((h: any) => <option key={h.id} value={h.id}>{farmId(h.code)} · {h.farmer?.name}</option>)}
               </select>
             </Field>
           </FormGrid>
@@ -103,7 +104,7 @@ export default function Transfers({ bare = false, adding: addingProp, onAddDone 
           <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Hectare</th><th>Previous farmer</th><th>New farmer</th><th>Transfer date</th><th>Effective</th><th>Reason</th><th>Approved by</th><th>Processed by</th><th>Status</th><th /></tr></thead><tbody>
             {data.data.map((t: any) => (
               <tr key={t.id}>
-                <td><Link href={`${BASE}/structure/hectares/${t.hectare.id}`} style={{ fontWeight: 600 }}>{t.hectare.code}</Link></td>
+                <td><Link href={`${BASE}/structure/hectares/${t.hectare.id}`} style={{ fontWeight: 600 }}>{farmId(t.hectare.code)}</Link></td>
                 <td><Link href={`${BASE}/allocation/farmers/${t.previousFarmer.id}`}>{t.previousFarmer.name}</Link><div className="muted" style={{ fontSize: 11 }}>{t.previousFarmer.memberNumber}</div></td>
                 <td><Link href={`${BASE}/allocation/farmers/${t.newFarmer.id}`}>{t.newFarmer.name}</Link><div className="muted" style={{ fontSize: 11 }}>{t.newFarmer.memberNumber}</div></td>
                 <td>{fmtDate(t.transferDate)}</td><td>{fmtDate(t.effectiveDate)}</td>
@@ -123,7 +124,7 @@ export default function Transfers({ bare = false, adding: addingProp, onAddDone 
       </section>
       {adding && <NewTransferModal schemeId={schemeId} presetHectareId={search.get('hectareId') ?? undefined} onClose={closeAdd} onSaved={(m) => { closeAdd(); setMessage({ tone: 'success', text: m }); reload(); }} />}
       {docs && (
-        <Modal title={`Documents · ${docs.hectare.code}`} onClose={() => { setDocs(null); reload(); }} width="720px" footer={<button type="button" className="btn-secondary" onClick={() => { setDocs(null); reload(); }}>Close</button>}>
+        <Modal title={`Documents · ${farmId(docs.hectare.code)}`} onClose={() => { setDocs(null); reload(); }} width="720px" footer={<button type="button" className="btn-secondary" onClick={() => { setDocs(null); reload(); }}>Close</button>}>
           <DocumentsPanel schemeId={schemeId} transferId={docs.id} canAdd={can('irrigation', 'CREATE')} />
         </Modal>
       )}
@@ -131,7 +132,7 @@ export default function Transfers({ bare = false, adding: addingProp, onAddDone 
         title={action.kind === 'approve' ? 'Approve transfer' : action.kind === 'reject' ? 'Reject transfer' : 'Cancel transfer'}
         danger={action.kind !== 'approve'} askReason={action.kind !== 'approve'} reasonLabel="Reason" confirmLabel={action.kind === 'approve' ? 'Approve and complete' : action.kind === 'reject' ? 'Reject' : 'Cancel transfer'}
         body={action.kind === 'approve'
-          ? <>Approving moves <strong>{action.transfer.hectare.code}</strong> from {action.transfer.previousFarmer.name} to <strong>{action.transfer.newFarmer.name}</strong>. The previous allocation is closed and cannot be reopened.</>
+          ? <>Approving moves <strong>{farmId(action.transfer.hectare.code)}</strong> from {action.transfer.previousFarmer.name} to <strong>{action.transfer.newFarmer.name}</strong>. The previous allocation is closed and cannot be reopened.</>
           : <>The hectare stays with {action.transfer.previousFarmer.name}. This request is closed and kept in the history.</>}
         onConfirm={async (reason) => {
           const id = action.transfer.id;

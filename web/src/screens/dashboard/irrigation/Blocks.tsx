@@ -1,4 +1,5 @@
 'use client';
+import { farmId } from '@/lib/farm-id';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useState } from 'react';
@@ -42,7 +43,7 @@ export function BlockFormModal({ block, canalId, canals, onClose, onSaved }: {
     } catch (e) { setError(errMsg(e, 'Could not save the block.')); setSaving(false); }
   };
   return (
-    <Modal title={editing ? `Edit ${block.code}` : 'Add block'} subtitle={editing ? undefined : 'The hectare units are generated automatically.'} onClose={() => !saving && onClose()} width="520px"
+    <Modal title={editing ? `Edit ${farmId(block.code)}` : 'Add block'} subtitle={editing ? undefined : 'The hectare units are generated automatically.'} onClose={() => !saving && onClose()} width="520px"
       footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><button type="submit" form="block-form" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save block' : 'Create block'}</button></>}>
       <form id="block-form" onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
         <FormGrid>
@@ -98,7 +99,7 @@ export function BlockList({ adding, onAddDone }: { adding?: boolean; onAddDone?:
             {data.data.map((b: any) => (
               <tr key={b.id}>
                 <td style={{ fontWeight: 600 }}>{b.blockNumber}</td>
-                <td><Link href={`${BASE}/structure/blocks/${b.id}`}>{b.code}</Link></td>
+                <td><Link href={`${BASE}/structure/blocks/${b.id}`}>{farmId(b.code)}</Link></td>
                 <td><Link href={`${BASE}/structure/canals/${b.canal.id}`}>{b.canal.code}</Link></td>
                 <td>{b.side ? titleCase(b.side) : <span className="muted">Not set</span>}</td>
                 <td className="num">{fmtHa(b.areaHectares)}</td><td className="num">{b.stats.hectareUnits}</td>
@@ -204,7 +205,7 @@ export function BlockDetail({ id }: { id: string }) {
   const pct = b && b.stats.hectareUnits ? Math.round((b.stats.allocatedUnits / b.stats.hectareUnits) * 1000) / 10 : 0;
   return (
     <>
-      <PageHeader title={b ? `${b.code} · ${b.name ?? `Block ${b.blockNumber}`}` : 'Block'}
+      <PageHeader title={b ? `${farmId(b.code)} · ${b.name ?? `Block ${b.blockNumber}`}` : 'Block'}
         subtitle={b ? `${b.canal.name}${b.side ? ` (${titleCase(b.side)} side)` : ''} · ${b.scheme.name}` : undefined}
         crumbs={[{ label: 'Irrigation', href: BASE }, { label: 'Block List', href: `${BASE}/structure/blocks` }, { label: b?.code ?? '…' }]}
         actions={b && <>
@@ -229,7 +230,7 @@ export function BlockDetail({ id }: { id: string }) {
               <Panel title="Allocation progress"><ProgressBar pct={pct} height={14} /><div className="muted" style={{ fontSize: 12, marginTop: 8 }}>{b.stats.allocatedUnits} of {b.stats.hectareUnits} hectares allocated ({pct}%)</div></Panel>
               <Panel title="Identity">
                 <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, margin: 0 }}>
-                  {[['Block code', b.code], ['Block number', b.blockNumber], ['Parent canal', <Link key="c" href={`${BASE}/structure/canals/${b.canal.id}`}>{b.canal.code} · {b.canal.name}</Link>], ['Scheme', b.scheme.name], ['Canal leader', b.canalLeader?.name ?? '—'],
+                  {[['Block code', farmId(b.code)], ['Block number', b.blockNumber], ['Parent canal', <Link key="c" href={`${BASE}/structure/canals/${b.canal.id}`}>{b.canal.code} · {b.canal.name}</Link>], ['Scheme', b.scheme.name], ['Canal leader', b.canalLeader?.name ?? '—'],
                     ['Block leader', b.leader ? `${b.leader.name} (${b.leader.memberNumber})` : 'Not assigned'], ['Description', b.description || '—'], ['Created', `${fmtDate(b.createdAt)}${b.createdByName ? ` by ${b.createdByName}` : ''}`]].map(([k, v]) => (
                     <div key={String(k)}><dt className="muted" style={{ fontSize: 12 }}>{k}</dt><dd style={{ margin: '2px 0 0' }}>{v as any}</dd></div>
                   ))}
@@ -250,7 +251,7 @@ export function BlockDetail({ id }: { id: string }) {
             <Panel title="Farmers on this block" pad={false}>
               {farmers.loading ? <TableSkeleton cols={4} /> : !farmers.data?.data.length ? <Empty title="No farmers allocated yet" hint="Use Hectare Allocation to assign members to this block's hectares." action={can('irrigation_allocations', 'CREATE') ? <Link className="btn-primary" href={`${BASE}/allocation/allocate?blockId=${id}`}>Allocate hectares</Link> : undefined} /> : (
                 <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Hectare</th><th>Farmer</th><th>Member no.</th><th>Allocated</th></tr></thead><tbody>
-                  {farmers.data.data.map((a: any) => <tr key={a.id}><td><Link href={`${BASE}/structure/hectares/${a.hectare.id}`}>{a.hectare.code}</Link></td><td><Link href={`${BASE}/allocation/farmers/${a.farmer.id}`}>{a.farmer.name}</Link></td><td>{a.farmer.memberNumber}</td><td>{fmtDate(a.allocatedOn)}</td></tr>)}
+                  {farmers.data.data.map((a: any) => <tr key={a.id}><td><Link href={`${BASE}/structure/hectares/${a.hectare.id}`}>{farmId(a.hectare.code)}</Link></td><td><Link href={`${BASE}/allocation/farmers/${a.farmer.id}`}>{a.farmer.name}</Link></td><td>{a.farmer.memberNumber}</td><td>{fmtDate(a.allocatedOn)}</td></tr>)}
                 </tbody></table></div>
               )}
             </Panel>
@@ -275,7 +276,7 @@ export function BlockDetail({ id }: { id: string }) {
         </>
       )}
       {editing && b && <BlockFormModal block={b} canals={canals} onClose={() => setEditing(false)} onSaved={(m) => { setEditing(false); setMessage(m); block.reload(); }} />}
-      {archiveOpen && b && <ConfirmDialog title={`Archive ${b.code}`} danger confirmLabel="Archive block" body={<>Archiving removes <strong>{b.code}</strong> from active lists. It is refused while any hectare is allocated or a block leader is assigned. Nothing is deleted and it can be restored.</>}
+      {archiveOpen && b && <ConfirmDialog title={`Archive ${farmId(b.code)}`} danger confirmLabel="Archive block" body={<>Archiving removes <strong>{farmId(b.code)}</strong> from active lists. It is refused while any hectare is allocated or a block leader is assigned. Nothing is deleted and it can be restored.</>}
         onConfirm={async () => { await irrigationApi.archiveBlock(id); block.reload(); }} onClose={() => setArchiveOpen(false)} />}
     </>
   );

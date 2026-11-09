@@ -1,4 +1,5 @@
 'use client';
+import { farmId } from '@/lib/farm-id';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useState } from 'react';
@@ -55,7 +56,7 @@ export function FarmerDetail({ farmerId }: { farmerId: string }) {
             {!data.current.length && !data.pending.length ? <Empty title="No hectares assigned" hint="This member holds no hectare in the irrigation scheme." /> : (
               <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Hectare</th><th>Block</th><th>Canal</th><th>Scheme</th><th>Since</th><th>Status</th><th>Guardian</th></tr></thead><tbody>
                 {[...data.current, ...data.pending].map((a: any) => (
-                  <tr key={a.id}><td><Link href={`${BASE}/structure/hectares/${a.hectare.id}`} style={{ fontWeight: 600 }}>{a.hectare.code}</Link></td><td><Link href={`${BASE}/structure/blocks/${a.block.id}`}>{a.block.code}</Link></td>
+                  <tr key={a.id}><td><Link href={`${BASE}/structure/hectares/${a.hectare.id}`} style={{ fontWeight: 600 }}>{farmId(a.hectare.code)}</Link></td><td><Link href={`${BASE}/structure/blocks/${a.block.id}`}>{farmId(a.block.code)}</Link></td>
                     <td><Link href={`${BASE}/structure/canals/${a.canal.id}`}>{a.canal.code}</Link></td><td>{a.scheme.name}</td><td>{fmtDate(a.allocatedOn)}</td><td><StatusBadge value={a.status} /></td><td>{a.guardian ? <Link href={`${BASE}/allocation/farmers/${a.guardian.id}`}>{a.guardian.name}</Link> : '—'}</td></tr>
                 ))}
               </tbody></table></div>
@@ -67,9 +68,9 @@ export function FarmerDetail({ farmerId }: { farmerId: string }) {
               <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Hectare</th><th>Registered to</th><th>Block</th><th>Canal</th><th>Since</th><th>Status</th></tr></thead><tbody>
                 {[...data.guided.current, ...data.guided.history].map((g: any) => (
                   <tr key={g.id} style={g.endedOn ? { opacity: 0.6 } : undefined}>
-                    <td><Link href={`${BASE}/structure/hectares/${g.hectare.id}`} style={{ fontWeight: 600 }}>{g.hectare.code}</Link></td>
+                    <td><Link href={`${BASE}/structure/hectares/${g.hectare.id}`} style={{ fontWeight: 600 }}>{farmId(g.hectare.code)}</Link></td>
                     <td><Link href={`${BASE}/allocation/farmers/${g.holder.id}`}>{g.holder.name}</Link> <span className="muted">· {g.holder.memberNumber}</span></td>
-                    <td><Link href={`${BASE}/structure/blocks/${g.block.id}`}>{g.block.code}</Link></td><td><Link href={`${BASE}/structure/canals/${g.canal.id}`}>{g.canal.code}</Link></td>
+                    <td><Link href={`${BASE}/structure/blocks/${g.block.id}`}>{farmId(g.block.code)}</Link></td><td><Link href={`${BASE}/structure/canals/${g.canal.id}`}>{g.canal.code}</Link></td>
                     <td>{fmtDate(g.startedOn)}</td>
                     <td>{g.endedOn ? <span className="muted">Ended {fmtDate(g.endedOn)} · {titleCase(String(g.endReason).replace(/^ENDED: /, '')) || '—'}</span> : <StatusBadge value="ACTIVE" />}</td>
                   </tr>
@@ -80,21 +81,21 @@ export function FarmerDetail({ farmerId }: { farmerId: string }) {
           <Panel title="Allocation history" pad={false}>
             {!data.history.length ? <Empty title="No past allocations" /> : (
               <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Hectare</th><th>From</th><th>To</th><th>Status</th><th>How it ended</th></tr></thead><tbody>
-                {data.history.map((a: any) => <tr key={a.id}><td><Link href={`${BASE}/structure/hectares/${a.hectare.id}`}>{a.hectare.code}</Link></td><td>{fmtDate(a.allocatedOn)}</td><td>{fmtDate(a.endedOn)}</td><td><StatusBadge value={a.status} /></td><td>{a.endReason ?? '—'}</td></tr>)}
+                {data.history.map((a: any) => <tr key={a.id}><td><Link href={`${BASE}/structure/hectares/${a.hectare.id}`}>{farmId(a.hectare.code)}</Link></td><td>{fmtDate(a.allocatedOn)}</td><td>{fmtDate(a.endedOn)}</td><td><StatusBadge value={a.status} /></td><td>{a.endReason ?? '—'}</td></tr>)}
               </tbody></table></div>
             )}
           </Panel>
           {data.transfers.length > 0 && (
             <Panel title="Transfers" pad={false}>
               <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Hectare</th><th>Direction</th><th>Other member</th><th>Effective</th><th>Status</th><th>Reason</th></tr></thead><tbody>
-                {data.transfers.map((t: any) => <tr key={t.id}><td>{t.hectare.code}</td><td>{t.direction === 'IN' ? 'Received' : 'Handed over'}</td><td>{t.otherParty}</td><td>{fmtDate(t.effectiveDate)}</td><td><StatusBadge value={t.status} /></td><td>{t.reason}</td></tr>)}
+                {data.transfers.map((t: any) => <tr key={t.id}><td>{farmId(t.hectare.code)}</td><td>{t.direction === 'IN' ? 'Received' : 'Handed over'}</td><td>{t.otherParty}</td><td>{fmtDate(t.effectiveDate)}</td><td><StatusBadge value={t.status} /></td><td>{t.reason}</td></tr>)}
               </tbody></table></div>
             </Panel>
           )}
           {data.leadership.length > 0 && (
             <Panel title="Leadership" pad={false}>
               <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Position</th><th>Canal / block</th><th>Term</th><th>Status</th></tr></thead><tbody>
-                {data.leadership.map((l: any) => <tr key={l.id}><td>{titleCase(l.position)}</td><td>{l.block?.code ?? l.canal.code}</td><td>{fmtDate(l.termStart)} – {l.termEnd ? fmtDate(l.termEnd) : 'open'}</td><td><StatusBadge value={l.status} /></td></tr>)}
+                {data.leadership.map((l: any) => <tr key={l.id}><td>{titleCase(l.position)}</td><td>{farmId(l.block?.code) ?? l.canal.code}</td><td>{fmtDate(l.termStart)} – {l.termEnd ? fmtDate(l.termEnd) : 'open'}</td><td><StatusBadge value={l.status} /></td></tr>)}
               </tbody></table></div>
             </Panel>
           )}

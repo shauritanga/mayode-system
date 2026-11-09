@@ -1,4 +1,5 @@
 'use client';
+import { farmId } from '@/lib/farm-id';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useState } from 'react';
@@ -42,7 +43,7 @@ export default function AllocateWorkspace({ bare = false }: { bare?: boolean } =
     setSaving(true);
     try {
       const res = await irrigationApi.allocate({ hectareId: picked.id, farmerId: member!.id, guardianId: guardian?.id, allocatedOn: date, notes: notes.trim() || undefined });
-      setMessage({ tone: 'success', text: res.data.status === 'PENDING_APPROVAL' ? `${picked.code} requested for ${member!.name}. It needs approval from someone else.` : `${picked.code} allocated to ${member!.name}.` });
+      setMessage({ tone: 'success', text: res.data.status === 'PENDING_APPROVAL' ? `${farmId(picked.code)} requested for ${member!.name}. It needs approval from someone else.` : `${farmId(picked.code)} allocated to ${member!.name}.` });
       reset(); hectares.reload(); pending.reload();
     } catch (e) { setMessage({ tone: 'error', text: errMsg(e, 'Could not save the allocation.') }); setConfirm(false); hectares.reload(); } finally { setSaving(false); }
   };
@@ -56,20 +57,20 @@ export default function AllocateWorkspace({ bare = false }: { bare?: boolean } =
       <Panel title="1 · Choose the block">
         <FormGrid>
           <Field label="Canal"><select className="input-field" value={canalId} onChange={(e) => { setCanalId(e.target.value); setBlockId(''); reset(); }}><option value="">All canals</option>{opts.canals.map((c: any) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></Field>
-          <Field label="Block"><select className="input-field" value={blockId} onChange={(e) => { setBlockId(e.target.value); reset(); }}><option value="">Select block</option>{opts.blocks.map((b: any) => <option key={b.id} value={b.id}>{b.code} ({b.stats.allocatedUnits}/{b.stats.hectareUnits} allocated)</option>)}</select></Field>
+          <Field label="Block"><select className="input-field" value={blockId} onChange={(e) => { setBlockId(e.target.value); reset(); }}><option value="">Select block</option>{opts.blocks.map((b: any) => <option key={b.id} value={b.id}>{farmId(b.code)} ({b.stats.allocatedUnits}/{b.stats.hectareUnits} allocated)</option>)}</select></Field>
         </FormGrid>
       </Panel>
 
       {!blockId ? <Panel pad={false}><Empty title="Select a block to see its hectares" /></Panel> : (
         <>
           <LoadError message={hectares.error} onRetry={hectares.reload} />
-          <Panel title={`2 · Pick a hectare${block ? ` in ${block.code}` : ''}`}>
+          <Panel title={`2 · Pick a hectare${block ? ` in ${farmId(block.code)}` : ''}`}>
             {hectares.loading ? <TableSkeleton rows={3} cols={6} /> : !hectares.data?.data.length ? <Empty title="This block has no hectare units" hint="Open the block and generate its hectare units." /> : (
               <HectareGrid hectares={hectares.data.data} onPick={(h) => { setPickedId(h.id); setMember(null); setGuardian(null); }} />
             )}
           </Panel>
           {picked && (
-            <Panel title={`3 · ${picked.code}`}>
+            <Panel title={`3 · ${farmId(picked.code)}`}>
               <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>Hectare {picked.hectareNumber} · {picked.areaHectares} ha · <StatusBadge value={picked.allocationStatus} /></div>
               {picked.allocationStatus === 'AVAILABLE' ? (
                 !canAllocate ? <span className="muted">Your role cannot allocate hectares.</span> : (
@@ -109,7 +110,7 @@ export default function AllocateWorkspace({ bare = false }: { bare?: boolean } =
         <Panel title={`Allocations awaiting approval (${pending.data.data.length})`} pad={false}>
           <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Hectare</th><th>Farmer</th><th>Requested by</th><th>Date</th><th /></tr></thead><tbody>
             {pending.data.data.map((a: any) => (
-              <tr key={a.id}><td>{a.hectare.code}</td><td>{a.farmer.name} <span className="muted">· {a.farmer.memberNumber}</span></td><td>{a.requestedBy ?? '—'}</td><td>{fmtDate(a.allocatedOn)}</td>
+              <tr key={a.id}><td>{farmId(a.hectare.code)}</td><td>{a.farmer.name} <span className="muted">· {a.farmer.memberNumber}</span></td><td>{a.requestedBy ?? '—'}</td><td>{fmtDate(a.allocatedOn)}</td>
                 <td style={{ whiteSpace: 'nowrap' }}><PendingActions allocation={a} onDone={(m) => { setMessage({ tone: 'success', text: m }); pending.reload(); hectares.reload(); }} onError={(m) => setMessage({ tone: 'error', text: m })} /></td></tr>
             ))}
           </tbody></table></div>
@@ -120,7 +121,7 @@ export default function AllocateWorkspace({ bare = false }: { bare?: boolean } =
         <Modal title="Confirm allocation" onClose={() => !saving && setConfirm(false)} width="460px"
           footer={<><button type="button" className="btn-secondary" onClick={() => setConfirm(false)} disabled={saving}>Back</button><button type="button" className="btn-primary" onClick={submit} disabled={saving}>{saving ? 'Saving…' : 'Confirm and save'}</button></>}>
           <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', margin: 0, fontSize: 14 }}>
-            <dt className="muted">Hectare</dt><dd style={{ margin: 0 }}>{picked.code} · {picked.areaHectares} ha</dd>
+            <dt className="muted">Hectare</dt><dd style={{ margin: 0 }}>{farmId(picked.code)} · {picked.areaHectares} ha</dd>
             <dt className="muted">Registered to</dt><dd style={{ margin: 0 }}>{member.name} · {member.memberNumber}</dd>
             {guardian && <><dt className="muted">Guardian</dt><dd style={{ margin: 0 }}>{guardian.name} · {guardian.memberNumber}</dd></>}
             <dt className="muted">Currently holds</dt><dd style={{ margin: 0 }}>{member.hectaresHeld} hectare(s) in this scheme</dd>
@@ -129,13 +130,13 @@ export default function AllocateWorkspace({ bare = false }: { bare?: boolean } =
         </Modal>
       )}
       {guardianFor && <GuardianModal hectare={guardianFor} schemeId={schemeId} onClose={() => setGuardianFor(null)}
-        onSaved={() => { setMessage({ tone: 'success', text: `Guardian saved for ${guardianFor.code}.` }); setGuardianFor(null); hectares.reload(); }} />}
-      {endingGuardian && <ConfirmDialog title={`End guardianship of ${endingGuardian.code}`} danger askReason reasonLabel="Reason" confirmLabel="End guardianship"
-        body={<><strong>{endingGuardian.guardian?.name}</strong> will no longer be the guardian of {endingGuardian.code}. The hectare stays registered to {endingGuardian.farmer?.name}. The record is kept in the history.</>}
-        onConfirm={async (reason) => { await irrigationApi.endGuardian(endingGuardian.allocationId, { reason }); setMessage({ tone: 'success', text: `Guardianship of ${endingGuardian.code} ended.` }); hectares.reload(); }} onClose={() => setEndingGuardian(null)} />}
-      {releasing && <ConfirmDialog title={`Release ${releasing.code}`} danger askReason reasonLabel="Reason for releasing" confirmLabel="Release hectare"
-        body={<>This ends <strong>{releasing.farmer?.name}</strong>&apos;s hold on {releasing.code} today and makes it available again. The record is kept in the history.</>}
-        onConfirm={async (reason) => { await irrigationApi.releaseAllocation(releasing.allocationId, { reason }); setMessage({ tone: 'success', text: `${releasing.code} released.` }); reset(); hectares.reload(); }} onClose={() => setReleasing(null)} />}
+        onSaved={() => { setMessage({ tone: 'success', text: `Guardian saved for ${farmId(guardianFor.code)}.` }); setGuardianFor(null); hectares.reload(); }} />}
+      {endingGuardian && <ConfirmDialog title={`End guardianship of ${farmId(endingGuardian.code)}`} danger askReason reasonLabel="Reason" confirmLabel="End guardianship"
+        body={<><strong>{endingGuardian.guardian?.name}</strong> will no longer be the guardian of {farmId(endingGuardian.code)}. The hectare stays registered to {endingGuardian.farmer?.name}. The record is kept in the history.</>}
+        onConfirm={async (reason) => { await irrigationApi.endGuardian(endingGuardian.allocationId, { reason }); setMessage({ tone: 'success', text: `Guardianship of ${farmId(endingGuardian.code)} ended.` }); hectares.reload(); }} onClose={() => setEndingGuardian(null)} />}
+      {releasing && <ConfirmDialog title={`Release ${farmId(releasing.code)}`} danger askReason reasonLabel="Reason for releasing" confirmLabel="Release hectare"
+        body={<>This ends <strong>{releasing.farmer?.name}</strong>&apos;s hold on {farmId(releasing.code)} today and makes it available again. The record is kept in the history.</>}
+        onConfirm={async (reason) => { await irrigationApi.releaseAllocation(releasing.allocationId, { reason }); setMessage({ tone: 'success', text: `${farmId(releasing.code)} released.` }); reset(); hectares.reload(); }} onClose={() => setReleasing(null)} />}
     </>
   );
 }
@@ -145,10 +146,10 @@ function PendingActions({ allocation, onDone, onError }: { allocation: any; onDo
   const [busy, setBusy] = useState(false);
   return (
     <>
-      <button type="button" className="btn-primary" disabled={busy} onClick={async () => { setBusy(true); try { await irrigationApi.approveAllocation(allocation.id); onDone(`${allocation.hectare.code} approved.`); } catch (e) { onError(errMsg(e)); } finally { setBusy(false); } }}>Approve</button>{' '}
+      <button type="button" className="btn-primary" disabled={busy} onClick={async () => { setBusy(true); try { await irrigationApi.approveAllocation(allocation.id); onDone(`${farmId(allocation.hectare.code)} approved.`); } catch (e) { onError(errMsg(e)); } finally { setBusy(false); } }}>Approve</button>{' '}
       <button type="button" className="btn-secondary" onClick={() => setReject(true)}>Reject</button>
-      {reject && <ConfirmDialog title="Reject allocation" danger askReason reasonLabel="Reason" confirmLabel="Reject" body={<>Reject the request for <strong>{allocation.hectare.code}</strong>? The hectare becomes available again.</>}
-        onConfirm={async (reason) => { await irrigationApi.rejectAllocation(allocation.id, { reason }); onDone(`${allocation.hectare.code} request rejected.`); }} onClose={() => setReject(false)} />}
+      {reject && <ConfirmDialog title="Reject allocation" danger askReason reasonLabel="Reason" confirmLabel="Reject" body={<>Reject the request for <strong>{farmId(allocation.hectare.code)}</strong>? The hectare becomes available again.</>}
+        onConfirm={async (reason) => { await irrigationApi.rejectAllocation(allocation.id, { reason }); onDone(`${farmId(allocation.hectare.code)} request rejected.`); }} onClose={() => setReject(false)} />}
     </>
   );
 }
@@ -163,7 +164,7 @@ function GuardianModal({ hectare, schemeId, onClose, onSaved }: { hectare: any; 
     try { await irrigationApi.setGuardian(hectare.allocationId, { guardianId: guardian!.id, note: note.trim() || undefined }); onSaved(); } catch (e) { setError(errMsg(e)); setSaving(false); }
   };
   return (
-    <Modal title={hectare.guardian ? 'Change guardian' : 'Add guardian'} subtitle={`${hectare.code} · registered to ${hectare.farmer?.name}`} onClose={() => !saving && onClose()} width="480px"
+    <Modal title={hectare.guardian ? 'Change guardian' : 'Add guardian'} subtitle={`${farmId(hectare.code)} · registered to ${hectare.farmer?.name}`} onClose={() => !saving && onClose()} width="480px"
       footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><button type="button" className="btn-primary" onClick={save} disabled={saving || !guardian}>{saving ? 'Saving…' : 'Save guardian'}</button></>}>
       <div style={{ display: 'grid', gap: 12 }}>
         <MemberPicker schemeId={schemeId} value={guardian} onChange={setGuardian} label="Guardian" />

@@ -1,4 +1,5 @@
 'use client';
+import { farmId } from '@/lib/farm-id';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useEffect, useRef, useState } from 'react';
@@ -22,7 +23,7 @@ export default function HectarePicker({ value, onChange, error, up = false }: { 
     document.addEventListener('mousedown', away);
     return () => document.removeEventListener('mousedown', away);
   }, []);
-  const pick = (h: any) => { onChange({ id: h.id, code: h.code }); setOpen(false); setQ(''); };
+  const pick = (h: any) => { onChange({ id: h.id, code: farmId(h.code) }); setOpen(false); setQ(''); };
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((i) => Math.min(i + 1, list.length - 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
@@ -46,7 +47,7 @@ export default function HectarePicker({ value, onChange, error, up = false }: { 
               : list.map((h, i) => (
                 <button key={h.id} type="button" role="option" aria-selected={value?.id === h.id} onMouseEnter={() => setActive(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(h)}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', border: 0, borderBottom: '1px solid var(--border-subtle, #2a2f2c)', color: 'inherit', cursor: 'pointer', fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13.5, fontWeight: 600, background: i === active ? 'rgba(127,127,127,.14)' : 'none' }}>
-                  {h.code}
+                  {farmId(h.code)}
                 </button>
               ))}
             {list.length >= 20 && <div className="muted" style={{ padding: '8px 12px', fontSize: 12 }}>Type to narrow the list…</div>}
