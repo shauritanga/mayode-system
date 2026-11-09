@@ -30,6 +30,7 @@ import { MembershipsModule } from './memberships/memberships.module';
 import { FarmingSeasonsModule } from './farming-seasons/farming-seasons.module';
 import { FarmLeasesModule } from './farm-leases/farm-leases.module';
 import { AmcosRentalsModule } from './amcos-rentals/amcos-rentals.module';
+import { HarvestFeesModule } from './harvest-fees/harvest-fees.module';
 import { FarmAlertsModule } from './farm-alerts/farm-alerts.module';
 import { SmsModule } from './messaging/sms.module';
 import { MessagingModule } from './messaging/messaging.module';
@@ -174,6 +175,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     FarmingSeasonsModule,
     FarmLeasesModule,
     AmcosRentalsModule,
+    HarvestFeesModule,
     FarmAlertsModule,
     MessagingModule,
     RewardsModule,

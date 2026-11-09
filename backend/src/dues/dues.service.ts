@@ -17,7 +17,7 @@ const fullName = (f: { firstName: string; lastName: string }) => `${f.firstName}
 
 /** Where a payment of each kind of due is booked as income (or, for fertiliser, as the receivable coming down). */
 const CREDIT_ACCOUNT: Record<DueCategory, string> = {
-  LEVY: '4210', MEMBERSHIP_FEE: '4200', CANAL_CLEANING: '4220', FERTILISER: '1310', OTHER: '4210',
+  LEVY: '4210', MEMBERSHIP_FEE: '4200', CANAL_CLEANING: '4220', FERTILISER: '1310', HARVEST_FEE: '4210', OTHER: '4210',
 };
 
 const farmerSelect = { id: true, firstName: true, lastName: true, controlNumber: true, user: { select: { phone: true } } } as const;

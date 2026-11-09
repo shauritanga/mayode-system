@@ -833,6 +833,17 @@ export const farmLeasesApi = {
   officerVerify: (id: string, data: object) => api.patch(`/farm-leases/${id}/officer-verify`, data),
   remove: (id: string) => api.delete(`/farm-leases/${id}`),
 };
+// ── Harvest fees: per-hectare rates (Manager-approved), opening a harvest for a block, and the clearance list ──
+export const harvestApi = {
+  structure: () => api.get('/harvest/structure'),
+  rates: () => api.get('/harvest/rates'),
+  proposeRate: (data: object) => api.post('/harvest/rates', data),
+  decideRate: (id: string, data: object) => api.patch(`/harvest/rates/${id}/decision`, data),
+  open: (data: object) => api.post('/harvest/open', data),
+  clearance: (blockId: string, typeId?: string) => api.get(`/harvest/blocks/${blockId}/clearance`, { params: typeId ? { typeId } : undefined }),
+  canalSummary: (canalId: string) => api.get(`/harvest/canals/${canalId}/summary`),
+};
+
 // ── The cooperative's record of farms rented through M-LAX (never carries prices) ──
 export const amcosRentalsApi = {
   list: (params?: object) => api.get('/amcos-rentals', { params }),

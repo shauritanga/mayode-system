@@ -29,12 +29,12 @@ export const IRRIGATION_ROLE_TEMPLATES: RoleTemplate[] = [
   {
     name: CANAL_LEADER_ROLE,
     description: 'Sees only the canal they currently lead with its blocks and hectares. Allocates hectares there and appoints its block leaders.',
-    grants: { irrigation: V, irrigation_allocations: VCE, irrigation_leadership: VCE },
+    grants: { irrigation: V, irrigation_allocations: VCE, irrigation_leadership: VCE, harvest_clearance: V },
   },
   {
     name: BLOCK_LEADER_ROLE,
     description: 'Sees only the block they currently lead with its hectares and farmers. Read-only unless an administrator adds rights.',
-    grants: { irrigation: V, irrigation_allocations: V, irrigation_leadership: V },
+    grants: { irrigation: V, irrigation_allocations: V, irrigation_leadership: V, harvest_clearance: V },
   },
 ];
 

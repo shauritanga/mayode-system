@@ -431,10 +431,11 @@ model IrrigationCanal {
   createdAt           DateTime         @default(now()) @map("created_at")
   updatedAt           DateTime         @updatedAt @map("updated_at")
 
-  scheme      IrrigationScheme       @relation(fields: [schemeId], references: [id], onDelete: Restrict)
-  blocks      IrrigationBlock[]
-  leaderships IrrigationLeadership[]
-  documents   IrrigationDocument[]
+  scheme       IrrigationScheme       @relation(fields: [schemeId], references: [id], onDelete: Restrict)
+  blocks       IrrigationBlock[]
+  leaderships  IrrigationLeadership[]
+  documents    IrrigationDocument[]
+  harvestRates HarvestFeeRate[]
 
   @@unique([schemeId, canalNumber])
   @@unique([schemeId, code])
@@ -468,6 +469,7 @@ model IrrigationBlock {
   hectares            IrrigationHectare[]
   leaderships         IrrigationLeadership[]
   documents           IrrigationDocument[]
+  harvestRates        HarvestFeeRate[]
   machineryActivities MachineryActivity[]
 
   @@unique([canalId, blockNumber])
@@ -5499,6 +5501,7 @@ enum DueCategory {
   MEMBERSHIP_FEE
   CANAL_CLEANING
   FERTILISER
+  HARVEST_FEE
   OTHER
 }
 
@@ -6052,4 +6055,44 @@ model AmcosRentalRecord {
   @@index([mamcosId, status])
   @@index([hectareId])
   @@map("amcos_rental_records")
+}
+
+enum HarvestRateScope {
+  AMCOS
+  CANAL
+  BLOCK
+}
+
+enum HarvestRateStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  SUPERSEDED
+  REJECTED
+}
+
+/// The per-hectare harvest fee. One AMCOS-wide rate, which a canal or a block may override. A proposed rate takes effect only
+/// when someone other than the proposer approves it; approving replaces the previous active rate of the same scope (kept as SUPERSEDED).
+model HarvestFeeRate {
+  id             String            @id @default(uuid())
+  mamcosId       String            @map("mamcos_id")
+  scope          HarvestRateScope
+  canalId        String?           @map("canal_id")
+  blockId        String?           @map("block_id")
+  ratePerHectare Decimal           @map("rate_per_hectare") @db.Decimal(14, 2)
+  status         HarvestRateStatus @default(PENDING_APPROVAL)
+  note           String?
+  requestedById  String            @map("requested_by_id")
+  decidedById    String?           @map("decided_by_id")
+  decidedAt      DateTime?         @map("decided_at")
+  decisionNote   String?           @map("decision_note")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  canal IrrigationCanal? @relation(fields: [canalId], references: [id], onDelete: Restrict)
+  block IrrigationBlock? @relation(fields: [blockId], references: [id], onDelete: Restrict)
+
+  @@index([mamcosId, status])
+  @@index([canalId])
+  @@index([blockId])
+  @@map("harvest_fee_rates")
 }
