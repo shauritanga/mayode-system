@@ -8,8 +8,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+  ServiceUnavailableException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClickPesaService } from '../payments/clickpesa.service';
 import { SmsService } from '../messaging/sms.service';
@@ -40,6 +39,7 @@ import {
   verifyCode,
 } from './listing-access';
 import { RequestUser } from '../common/ownership.service';
+import { AmcosRentalsService } from '../amcos-rentals/amcos-rentals.service';
 import { assertFarmNotBlocked } from '../farm-defaults/farm-block';
 import {
   DealType,
@@ -74,6 +74,18 @@ const DEAL_TYPE_COMMISSION_RATE: Record<DealType, number> = {
   RELATIONSHIP: 0.05,
 };
 
+/** Strips every price, fee and payment detail from a listing, keeping only the status of its deposit. */
+export function withoutMoney(listing: Record<string, any>): Record<string, any> {
+  const {
+    askingPrice: _a, suggestedPrice: _s, finalPrice: _f, commissionRate: _cr, commissionAmount: _ca, minimumPrice: _m,
+    rentScheduleJson: _r, autoDropPrice: _d, pricingModel: _p, paymentPlan: _pp, lastInstallmentYear: _l, escrowPayments, ...rest
+  } = listing;
+  return {
+    ...rest,
+    escrowPayments: (escrowPayments ?? []).map((e: any) => ({ id: e.id, status: e.status, installmentYear: e.installmentYear, depositedAt: e.depositedAt, releasedAt: e.releasedAt })),
+  };
+}
+
 @Injectable()
 export class MarketplaceService {
   private readonly logger = new Logger(MarketplaceService.name);
@@ -86,6 +98,7 @@ export class MarketplaceService {
     private readonly leaseDocument: LeaseDocumentService,
     private readonly disputes: DisputesService,
     private readonly accounting: AccountingService,
+    @Optional() private readonly amcosRentals?: AmcosRentalsService,
   ) {}
 
   /** ClickPesa requires an alphanumeric order reference — generate a unique one. */
@@ -161,6 +174,9 @@ export class MarketplaceService {
       autoDropPrice,
       autoDropDays,
       facilitatedByStaffId,
+      rentOutReason,
+      leaseTerms,
+      seasonCount,
     } = createLandListingDto;
 
     const farm = await this.prisma.farm.findUnique({ where: { id: farmId } });
@@ -243,6 +259,11 @@ export class MarketplaceService {
         )
       : null;
 
+    // The hectare being rented out, so the cooperative's record and the hectare page can show it.
+    const hectareId = this.amcosRentals
+      ? await this.amcosRentals.resolveHectareId(ownerId, createLandListingDto.hectareId)
+      : (createLandListingDto.hectareId ?? null);
+
     const issuedCode =
       dealType === DealType.RELATIONSHIP ? generateCode() : undefined;
 
@@ -266,6 +287,10 @@ export class MarketplaceService {
         autoDropPrice,
         autoDropDays,
         facilitatedByStaffId,
+        rentOutReason: rentOutReason?.trim() || undefined,
+        leaseTerms: leaseTerms?.trim() || undefined,
+        seasonCount,
+        hectareId,
         // A Relationship deal is private: the owner gets a code for the one person they choose.
         ...(issuedCode
           ? {
@@ -653,6 +678,7 @@ export class MarketplaceService {
           })
         : null;
     if (user.role === 'FARMER' && !farmer) return [];
+    const cooperativeStaff = user.role !== 'FARMER' && user.role !== 'SUPER_ADMIN' && !!user.mamcosId;
     const listings = await this.prisma.landListing.findMany({
       where: farmer
         ? { OR: [{ ownerId: farmer.id }, { renterId: farmer.id }] }
@@ -688,10 +714,12 @@ export class MarketplaceService {
           ? 'OWNER'
           : 'OPEN';
       const safe = redactForViewer(listing, state);
-      return {
+      const shaped = {
         ...safe,
         ...(state === 'OWNER' || state === 'OPEN' ? { privateDeal } : {}),
       };
+      // A cooperative's staff see who rents what and when, never what it costs or how it was paid.
+      return cooperativeStaff ? withoutMoney(shaped) : shaped;
     });
   }
 
@@ -844,6 +872,7 @@ export class MarketplaceService {
       data: { leaseStatus: LeaseStatus.TERMINATED },
       include: { farm: true },
     });
+    await this.amcosRentals?.markTerminated(id);
     await this.prisma.farm.update({
       where: { id: cancelled.farmId },
       data: { isAvailableForRent: false },
@@ -1388,6 +1417,9 @@ export class MarketplaceService {
         leaseLockedUntil: leaseEndDate,
       },
     });
+
+    // The cooperative keeps its own record of the rental (no money in it): who, which hectare, when, how long, on what terms and why.
+    await this.amcosRentals?.recordActivated(listingId);
 
     // If this deposit settles a sub-lease (the original renter re-listed
     // their season), route the payout to them instead of the owner.

@@ -11,6 +11,7 @@ import { PaymentsModule } from '../payments/payments.module';
 import { UploadsModule } from '../uploads/uploads.module';
 import { DisputesModule } from '../disputes/disputes.module';
 import { AccountingModule } from '../accounting/accounting.module';
+import { AmcosRentalsModule } from '../amcos-rentals/amcos-rentals.module';
 
 /**
  * Global so PaymentsController can inject MarketplaceService to reconcile
@@ -20,7 +21,7 @@ import { AccountingModule } from '../accounting/accounting.module';
  */
 @Global()
 @Module({
-  imports: [PaymentsModule, UploadsModule, DisputesModule, AccountingModule],
+  imports: [PaymentsModule, UploadsModule, DisputesModule, AccountingModule, AmcosRentalsModule],
   controllers: [MarketplaceController],
   providers: [
     MarketplaceActorGuard,

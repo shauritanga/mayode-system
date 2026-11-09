@@ -485,9 +485,11 @@ model IrrigationHectare {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  block       IrrigationBlock                @relation(fields: [blockId], references: [id], onDelete: Restrict)
-  allocations IrrigationHectareAllocation[]
-  transfers   IrrigationAllocationTransfer[]
+  block         IrrigationBlock                @relation(fields: [blockId], references: [id], onDelete: Restrict)
+  allocations   IrrigationHectareAllocation[]
+  transfers     IrrigationAllocationTransfer[]
+  landListings  LandListing[]
+  rentalRecords AmcosRentalRecord[]
 
   @@unique([blockId, hectareNumber])
   @@map("irrigation_hectares")
@@ -1918,6 +1920,11 @@ model LandListing {
   facilitatedByStaffId String?     @map("facilitated_by_staff_id") // Desk officer who gets the agent fee
   agreementPdfUrl      String?     @map("agreement_pdf_url")
   agreementGeneratedAt DateTime?   @map("agreement_generated_at")
+  /// What the AMCOS keeps on record (never the money): why the owner lets the farm out, the agreed terms, the length in seasons, and the hectare involved.
+  rentOutReason        String?     @map("rent_out_reason")
+  leaseTerms           String?     @map("lease_terms")
+  seasonCount          Int?        @map("season_count")
+  hectareId            String?     @map("hectare_id")
   // Multi-year leases (Step-Up / Rice-Linked pricing)
   paymentPlan          String?     @default("PREPAID") @map("payment_plan") // "PREPAID" | "ANNUAL"
   rentScheduleJson     Json?       @map("rent_schedule_json")
@@ -1949,7 +1956,10 @@ model LandListing {
   ownershipTransfers LandListingOwnershipTransfer[]
   offers             LandListingOffer[]
   improvements       LandListingImprovement[]
+  hectare            IrrigationHectare?             @relation(fields: [hectareId], references: [id])
+  rentalRecord       AmcosRentalRecord?
 
+  @@index([hectareId])
   @@map("land_listings")
 }
 
@@ -3183,6 +3193,7 @@ model Dispute {
   farmId            String?       @map("farm_id")
   leaseId           String?       @map("lease_id")
   farmingSeasonId   String?       @map("farming_season_id")
+  rentalRecordId    String?       @map("rental_record_id")
   type              DisputeType
   description       String
   claimantIds       String[]      @map("claimant_ids")
@@ -3196,11 +3207,13 @@ model Dispute {
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  farm          Farm?          @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  lease         FarmLease?     @relation(fields: [leaseId], references: [id], onDelete: Cascade)
-  farmingSeason FarmingSeason? @relation(fields: [farmingSeasonId], references: [id])
+  farm          Farm?              @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  lease         FarmLease?         @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  farmingSeason FarmingSeason?     @relation(fields: [farmingSeasonId], references: [id])
+  rentalRecord  AmcosRentalRecord? @relation(fields: [rentalRecordId], references: [id])
 
   @@index([farmId, status])
+  @@index([rentalRecordId])
   @@map("disputes")
 }
 
@@ -6000,4 +6013,43 @@ model FarmDefaultEvent {
 
   @@index([caseId, createdAt])
   @@map("farm_default_events")
+}
+
+/// The AMCOS's own record of a farm rented through M-LAX: who, which hectare, when, for how long, on what terms and why.
+/// It deliberately holds no money (no rent, deposit, commission or payout), so it can be shown to the cooperative as it is.
+/// Names are copied at the time of the rental so the record stays readable if a profile changes later.
+model AmcosRentalRecord {
+  id              String    @id @default(uuid())
+  listingId       String    @unique @map("listing_id")
+  mamcosId        String    @map("mamcos_id")
+  farmId          String    @map("farm_id")
+  farmCode        String    @map("farm_code")
+  hectareId       String?   @map("hectare_id")
+  hectareCode     String?   @map("hectare_code")
+  ownerFarmerId   String    @map("owner_farmer_id")
+  ownerName       String    @map("owner_name")
+  tenantFarmerId  String    @map("tenant_farmer_id")
+  tenantName      String    @map("tenant_name")
+  startDate       DateTime  @map("start_date")
+  endDate         DateTime  @map("end_date")
+  durationMonths  Int       @map("duration_months")
+  seasonCount     Int?      @map("season_count")
+  reason          String?
+  terms           String
+  /// ACTIVE until the end date passes (shown as ENDED then), or TERMINATED if the rental was cancelled early.
+  status          String    @default("ACTIVE")
+  terminatedAt    DateTime? @map("terminated_at")
+  witnessNote     String?   @map("witness_note")
+  witnessNoteById String?   @map("witness_note_by_id")
+  witnessNoteAt   DateTime? @map("witness_note_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  listing  LandListing        @relation(fields: [listingId], references: [id])
+  hectare  IrrigationHectare? @relation(fields: [hectareId], references: [id])
+  disputes Dispute[]
+
+  @@index([mamcosId, status])
+  @@index([hectareId])
+  @@map("amcos_rental_records")
 }

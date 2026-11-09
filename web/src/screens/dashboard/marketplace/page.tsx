@@ -98,6 +98,7 @@ const leaseStatusBadge = (status: string) => {
 const emptyListingForm = {
   farmId: '', ownerId: '', askingPrice: '', dealType: 'STANDARD', commissionRate: '0.10',
   leaseDurationMonths: '6', isFlashDeal: false, autoDropPrice: '', autoDropDays: '',
+  rentOutReason: '', leaseTerms: '', seasonCount: '',
 };
 const emptyTractorOwnerForm = { name: '', phone: '', location: '' };
 const emptyTractorForm = { registrationNo: '', model: '', horsePower: '', pricePerHectare: '', location: '' };
@@ -205,6 +206,10 @@ export default function MarketplacePage() {
         isFlashDeal: listingForm.isFlashDeal,
         autoDropPrice: listingForm.autoDropPrice ? Number(listingForm.autoDropPrice) : undefined,
         autoDropDays: listingForm.autoDropDays ? Number(listingForm.autoDropDays) : undefined,
+        // Kept on the cooperative's record of the rental; no prices in these.
+        rentOutReason: listingForm.rentOutReason.trim() || undefined,
+        leaseTerms: listingForm.leaseTerms.trim() || undefined,
+        seasonCount: listingForm.seasonCount ? Number(listingForm.seasonCount) : undefined,
       });
       setListingForm({ ...emptyListingForm });
       setShowListingForm(false);
@@ -590,6 +595,14 @@ export default function MarketplacePage() {
                 </div>
               )}
             </div>
+            <TextField label="Length in farming seasons" value={listingForm.seasonCount} onChange={v => setL('seasonCount', v.replace(/\D/g, ''))} placeholder="1 or 2" />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <TextField label="Why is the farm being rented out?" value={listingForm.rentOutReason} onChange={v => setL('rentOutReason', v)} placeholder="e.g. Family challenges, cannot cultivate this season" />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Terms and conditions (the cooperative keeps a copy; do not write prices here)</label>
+              <textarea className="input-field" rows={3} maxLength={4000} value={listingForm.leaseTerms} onChange={e => setL('leaseTerms', e.target.value)} placeholder="Leave empty to use the standard terms" />
+            </div>
             <div>
               <label style={labelStyle}>Deal type</label>
               <select className="input-field" value={listingForm.dealType} onChange={e => setL('dealType', e.target.value)}>
@@ -897,7 +910,7 @@ export default function MarketplacePage() {
                               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{l.owner?.firstName} {l.owner?.lastName}</div>
                               <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{l.owner?.controlNumber}</div>
                             </td>
-                            <td style={{ fontWeight: 700, color: 'var(--accent)' }}>{Number(l.askingPrice).toLocaleString()} TZS</td>
+                            <td style={{ fontWeight: 700, color: 'var(--accent)' }}>{l.askingPrice != null ? `${Number(l.askingPrice).toLocaleString()} TZS` : '—'}</td>
                             <td style={{ color: 'var(--gold-400)', fontSize: '12px' }}>{l.suggestedPrice ? `${Number(l.suggestedPrice).toLocaleString()} TZS` : '—'}</td>
                             <td>
                               <span className={`badge ${l.isFlashDeal ? 'badge-red' : l.dealType === 'RELATIONSHIP' ? 'badge-blue' : 'badge-gold'}`}>

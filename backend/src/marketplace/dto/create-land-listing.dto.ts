@@ -5,6 +5,8 @@ import {
   IsOptional,
   IsEnum,
   IsBoolean,
+  IsInt,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -133,4 +135,27 @@ export class CreateLandListingDto {
   @IsString()
   @IsOptional()
   paymentPlan?: string;
+
+  @ApiPropertyOptional({ example: 'Family reasons: I cannot cultivate this season.', description: 'Why the owner lets the farm out. Kept on the cooperative\'s record.' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(1000)
+  rentOutReason?: string;
+
+  @ApiPropertyOptional({ description: 'Agreed terms in the owner\'s words. A standard text is used when empty. Never include prices: the cooperative reads this.' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(4000)
+  leaseTerms?: string;
+
+  @ApiPropertyOptional({ example: 2, description: 'Length of the rental in farming seasons' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  seasonCount?: number;
+
+  @ApiPropertyOptional({ description: 'The irrigation hectare being rented out. Defaults to the owner\'s only hectare.' })
+  @IsString()
+  @IsOptional()
+  hectareId?: string;
 }

@@ -4,7 +4,7 @@ import { farmId } from '@/lib/farm-id';
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { duesApi, irrigationApi, machineryApi } from '@/lib/api';
+import { amcosRentalsApi, duesApi, irrigationApi, machineryApi } from '@/lib/api';
 import { CardsSkeleton, Empty, LoadError, Panel, StatCard, StatusBadge, Tabs, fmtDate, fmtHa, titleCase, useApi, useIrrigation } from './ui';
 
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
@@ -20,6 +20,9 @@ export function HectareDetail({ id }: { id: string }) {
   const holder = h?.farmer;
   // Charges belong to the farmer, not the hectare, so this is the current holder's account (a farmer holds one hectare here).
   const money = useApi<any>(holder && can('dues', 'VIEW') ? () => duesApi.statement(holder.id) : null, [holder?.id]);
+  // Rentals of this hectare made through M-LAX, as the cooperative recorded them (no prices).
+  const rentals = useApi<any>(h && can('farm_leases', 'VIEW') ? () => amcosRentalsApi.forHectare(h.id) : null, [h?.id]);
+  const rented = rentals.data?.current ?? null;
   const work = useApi<any>(h && can('machinery', 'VIEW') ? () => machineryApi.activities({ blockId: h.block.id, pageSize: 20 }) : null, [h?.block?.id]);
 
   const events = useMemo<Event[]>(() => {
@@ -69,6 +72,7 @@ export function HectareDetail({ id }: { id: string }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 2 }}>
                   <h1 style={{ margin: 0, fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 30, fontWeight: 800 }}>{farmId(h.code)}</h1>
                   <StatusBadge value={h.allocationStatus} />
+                  {rented && <span className="badge badge-gold" title="Rented out through M-LAX">Rented out</span>}
                 </div>
                 <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
                   <Link href={`/dashboard/irrigation/structure/canals/${h.canal.id}`}>{h.canal.name}</Link> · <Link href={`/dashboard/irrigation/structure/blocks/${h.block.id}`}>Block {farmId(h.block.code)}</Link>{side ? ` · ${side}` : ''} · {fmtHa(h.areaHectares)}
@@ -90,6 +94,25 @@ export function HectareDetail({ id }: { id: string }) {
               {h.allocationStatus === 'ALLOCATED' && can('irrigation_allocations', 'CREATE') && <Link className="btn-secondary" href={`/dashboard/plot-allocation?tab=transfers&add=1&hectareId=${h.id}`}>Transfer</Link>}
             </div>
           </section>
+
+          {(rented || rentals.data?.history?.length) ? (
+            <section className="table-panel" style={{ padding: '16px 22px', marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Rented through M-LAX</div>
+              {rented ? (
+                <div style={{ fontSize: 13.5, lineHeight: 1.6 }}>
+                  <div><strong>{rented.tenantName}</strong> is farming this hectare for <strong>{rented.ownerName}</strong>.</div>
+                  <div className="muted">{fmtDate(rented.startDate)} – {fmtDate(rented.endDate)}{rented.seasonCount ? ` · ${rented.seasonCount} season${rented.seasonCount === 1 ? '' : 's'}` : ''}</div>
+                  {rented.reason && <div style={{ marginTop: 4 }}>Reason: {rented.reason}</div>}
+                  <div style={{ marginTop: 6 }}><Link href="/dashboard/rentals">Open the rental record</Link></div>
+                </div>
+              ) : <div className="muted" style={{ fontSize: 13.5 }}>Not rented out at the moment.</div>}
+              {rentals.data?.history?.length > 0 && (
+                <div className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>
+                  Earlier: {rentals.data.history.map((r: any) => `${r.tenantName} (${fmtDate(r.startDate)} – ${fmtDate(r.endDate)})`).join('; ')}
+                </div>
+              )}
+            </section>
+          ) : null}
 
           {holder && canSeeMoney && (
             <div className="metric-grid" style={{ marginBottom: 16 }}>

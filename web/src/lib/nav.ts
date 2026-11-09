@@ -291,6 +291,7 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/rice-calendar', label: 'Rice Calendar', icon: BookOpen01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'rice_protocols' },
       { href: '/dashboard/seasons', label: 'Seasons', icon: Calendar01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'farming_seasons' },
       { href: '/dashboard/leases', label: 'Renter Assignments', icon: HandshakeIcon, roles: ['MAMCOS_SECRETARY'], resource: 'farm_leases' },
+      { href: '/dashboard/rentals', label: 'M-LAX Rentals', icon: HandshakeIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER', 'AUDITOR'], resource: 'farm_leases' },
       { href: '/dashboard/weather', label: 'Weather', icon: CloudSunRainIcon, roles: ['MAMCOS_SECRETARY', 'FIELD_OFFICER'], resource: 'weather' },
     ],
   },

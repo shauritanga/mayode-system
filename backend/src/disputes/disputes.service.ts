@@ -69,25 +69,30 @@ export class DisputesService {
     return dispute;
   }
 
-  findAll(status?: DisputeStatus) {
+  /** A cooperative's staff only see disputes about their own cooperative's farms. Super Admin and platform staff see all. */
+  private farmScope(user?: RequestUser): Prisma.DisputeWhereInput {
+    return user && user.role !== 'SUPER_ADMIN' && user.mamcosId ? { farm: { mamcosId: user.mamcosId } } : {};
+  }
+
+  findAll(status?: DisputeStatus, user?: RequestUser) {
     return this.prisma.dispute.findMany({
-      where: status ? { status } : undefined,
+      where: { ...(status ? { status } : {}), ...this.farmScope(user) },
       orderBy: { createdAt: 'desc' },
       include: DISPUTE_INCLUDE,
     });
   }
 
-  findForFarm(farmId: string) {
+  findForFarm(farmId: string, user?: RequestUser) {
     return this.prisma.dispute.findMany({
-      where: { farmId },
+      where: { farmId, ...this.farmScope(user) },
       orderBy: { createdAt: 'desc' },
       include: DISPUTE_INCLUDE,
     });
   }
 
   async resolve(id: string, dto: ResolveDisputeDto, user: RequestUser) {
-    const dispute = await this.prisma.dispute.findUnique({
-      where: { id },
+    const dispute = await this.prisma.dispute.findFirst({
+      where: { id, ...this.farmScope(user) },
       include: DISPUTE_INCLUDE,
     });
     if (!dispute) throw new NotFoundException(`Dispute ${id} not found`);

@@ -833,6 +833,14 @@ export const farmLeasesApi = {
   officerVerify: (id: string, data: object) => api.patch(`/farm-leases/${id}/officer-verify`, data),
   remove: (id: string) => api.delete(`/farm-leases/${id}`),
 };
+// ── The cooperative's record of farms rented through M-LAX (never carries prices) ──
+export const amcosRentalsApi = {
+  list: (params?: object) => api.get('/amcos-rentals', { params }),
+  get: (id: string) => api.get(`/amcos-rentals/${id}`),
+  forHectare: (hectareId: string) => api.get(`/amcos-rentals/hectare/${hectareId}`),
+  saveWitnessNote: (id: string, note: string) => api.put(`/amcos-rentals/${id}/witness-note`, { note }),
+  raiseDispute: (id: string, data: object) => api.post(`/amcos-rentals/${id}/disputes`, data),
+};
 export const seasonalAssignmentsApi = {
   getAll: () => api.get('/seasonal-assignments'),
 };

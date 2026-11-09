@@ -54,15 +54,15 @@ export class DisputesController {
   @ApiOperation({
     summary: 'All disputes, optionally filtered by status (staff only)',
   })
-  findAll(@Query('status') status?: DisputeStatus) {
-    return this.disputes.findAll(status);
+  findAll(@CurrentUser() user: RequestUser, @Query('status') status?: DisputeStatus) {
+    return this.disputes.findAll(status, user);
   }
 
   @Get('farm/:farmId')
   @Roles(...STAFF_ROLES)
   @ApiOperation({ summary: 'Disputes for a specific farm' })
-  findForFarm(@Param('farmId') farmId: string) {
-    return this.disputes.findForFarm(farmId);
+  findForFarm(@Param('farmId') farmId: string, @CurrentUser() user: RequestUser) {
+    return this.disputes.findForFarm(farmId, user);
   }
 
   @Patch(':id/resolve')
