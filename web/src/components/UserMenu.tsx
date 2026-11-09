@@ -54,6 +54,7 @@ export default function UserMenu({ variant = 'header', collapsed = false }: { va
     <div ref={ref} style={{ position: 'relative' }}>
       <button
         id="user-menu-trigger"
+        className={variant === 'sidebar' ? 'um-trigger' : undefined}
         onClick={() => setOpen((o) => !o)}
         title={collapsed ? displayName : undefined}
         aria-label={collapsed ? `Account menu — ${displayName}` : undefined}
@@ -72,21 +73,21 @@ export default function UserMenu({ variant = 'header', collapsed = false }: { va
         }}
       >
         <span
-          className="avatar-circle"
+          className="avatar-circle um-avatar"
           style={{ width: avatarSize, height: avatarSize, fontSize: variant === 'header' ? '13px' : '14px' }}
         >
           {initialsText}
         </span>
         {variant === 'sidebar' && !collapsed && (
-          <span style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="um-info" style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+            <div className="um-name" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {displayName}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{roleLabel(user)}</div>
+            <div className="um-role" style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{roleLabel(user)}</div>
           </span>
         )}
         {!collapsed && (
-          <HugeiconsIcon icon={ChevronDownIcon} size={14} color="var(--text-secondary)" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+          <HugeiconsIcon className="um-chevron" icon={ChevronDownIcon} size={14} color="var(--text-secondary)" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
         )}
       </button>
 
@@ -101,7 +102,7 @@ export default function UserMenu({ variant = 'header', collapsed = false }: { va
               : { top: 'calc(100% + 10px)', right: 0 }
           }
         >
-          <div style={{ padding: '8px 10px 10px' }}>
+          <div className="um-head" style={{ padding: '8px 10px 10px' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>{displayName}</div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>{roleLabel(user)}</div>
           </div>

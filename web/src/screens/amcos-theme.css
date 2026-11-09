@@ -218,3 +218,16 @@
 :root[data-app='cooperatives'] .page-title { font-family: inherit; font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
 :root[data-app='cooperatives'] .page-subtitle { font-size: 13px; color: var(--text-2); }
 :root[data-app='cooperatives'] .dash-two-col { gap: 16px; }
+
+/* Sidebar user card (rucky-rentals): flat row with a soft blue ring avatar, name + role, no boxed button. */
+:root[data-app='cooperatives'] .sidebar-footer { border-top: 1px solid var(--border-subtle); }
+:root[data-app='cooperatives'] .um-trigger { background: transparent !important; border: 0 !important; border-radius: 8px !important; padding: 8px 10px !important; gap: 10px !important; }
+:root[data-app='cooperatives'] .sidebar-desktop.collapsed .um-trigger { padding: 4px !important; }
+:root[data-app='cooperatives'] .um-trigger:hover { background: var(--surface-3) !important; }
+:root[data-app='cooperatives'] .um-avatar { width: 28px !important; height: 28px !important; font-size: 11px !important; font-weight: 600 !important; font-family: inherit !important; background: var(--accent-soft) !important; color: var(--accent) !important; border: 1.5px solid var(--accent); }
+:root[data-app='cooperatives'] .um-name { font-size: 13px !important; font-weight: 500 !important; color: var(--text-1) !important; }
+:root[data-app='cooperatives'] .um-role { font-size: 11px !important; color: var(--text-3, var(--text-2)) !important; }
+:root[data-app='cooperatives'] .sidebar-footer .dropdown-menu { border-radius: 12px; padding: 4px 6px; box-shadow: 0 8px 30px rgba(0,0,0,.3); }
+:root[data-app='cooperatives'] .sidebar-footer .dropdown-item { border-radius: 8px; padding: 9px 10px; font-size: 13px; font-weight: 400; }
+:root[data-app='cooperatives'] .sidebar-footer .dropdown-divider { margin: 4px 0; }
+:root[data-app='cooperatives'] .sidebar-footer .um-head { padding: 10px 10px 8px !important; }
