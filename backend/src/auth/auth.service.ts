@@ -135,6 +135,12 @@ export class AuthService {
       jti: randomUUID(),
     };
 
+    // The web portals end a session that sits idle: their refresh token only lasts SESSION_IDLE_MINUTES (default 30), and
+    // every refresh issues a new one, so a user who keeps working stays in and one who leaves is signed out. The mobile app
+    // (no portal header) keeps the long 7-day token because farmers use it in the field.
+    const idleMinutes = portal ? Math.max(5, Number(this.configService.get<string>('SESSION_IDLE_MINUTES')) || 30) : 0;
+    const refreshLifetime = idleMinutes ? `${idleMinutes}m` : this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d';
+
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(accessTokenPayload, {
         secret:
@@ -147,13 +153,13 @@ export class AuthService {
         secret:
           this.configService.get<string>('JWT_REFRESH_SECRET') ||
           'mayode-refresh-secret-key-change-in-production-2026',
-        expiresIn: (this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ||
-          '7d') as any,
+        expiresIn: refreshLifetime as any,
       }),
     ]);
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    if (idleMinutes) expiresAt.setMinutes(expiresAt.getMinutes() + idleMinutes);
+    else expiresAt.setDate(expiresAt.getDate() + 7);
 
     await this.prisma.refreshToken.create({
       data: {

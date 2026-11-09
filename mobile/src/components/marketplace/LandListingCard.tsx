@@ -21,6 +21,10 @@ export function LandListingCard({ listing: l, onPress }: LandListingCardProps) {
         </View>
       </View>
 
+      {l.underAmcosAdministration && (
+        <Text style={styles.subText}>{`🏛 ${t('mlaxUnderAmcos')} · ${[l.owner?.firstName, l.owner?.lastName].filter(Boolean).join(' ')}`}</Text>
+      )}
+
       <View style={styles.priceBox}>
         <Text style={styles.priceLabel}>{t('askingPrice')}</Text>
         {/* A private deal's price is for the owner and the renter who entered the code. */}

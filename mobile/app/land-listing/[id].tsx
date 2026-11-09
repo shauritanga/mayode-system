@@ -253,6 +253,12 @@ export default function LandListingDetail() {
         <View style={styles.card}>
           <Text style={styles.farmCode}>{listing.farm?.farmCode}</Text>
           <Text style={styles.subText}>{listing.isPrivate ? `🔒 ${t('mlaxPrivateDeal')}` : listing.dealType} · {listing.leaseStatus}</Text>
+          {listing.underAmcosAdministration && (
+            <View style={styles.protectedBadge}>
+              <Text style={{ fontWeight: '700' }}>{`🏛 ${t('mlaxUnderAmcos')}`}</Text>
+              <Text>{t('mlaxUnderAmcosOwner', { name: [listing.owner?.firstName, listing.owner?.lastName].filter(Boolean).join(' ') })}</Text>
+            </View>
+          )}
           <View style={styles.priceBox}>
             <Text style={styles.priceLabel}>{t('askingPrice')}</Text>
             <Text style={styles.priceValue}>{listing.priceHidden || listing.askingPrice == null ? '🔒' : `${Number(listing.askingPrice).toLocaleString()} TZS`}</Text>

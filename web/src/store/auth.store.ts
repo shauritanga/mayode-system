@@ -56,6 +56,7 @@ export const useAuthStore = create<AuthState>()(
           localStorage.setItem('accessToken', accessToken);
           if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
           sessionStorage.setItem(LOGIN_ALERTS_FLAG, 'pending');
+          localStorage.setItem('mayode-last-activity', String(Date.now())); // a new sign-in starts a fresh idle clock
         }
         set({ user, accessToken, isAuthenticated: true });
       },
@@ -64,6 +65,7 @@ export const useAuthStore = create<AuthState>()(
         if (typeof window !== 'undefined') {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
+          localStorage.removeItem('mayode-last-activity');
         }
         set({ user: null, accessToken: null, isAuthenticated: false });
       },

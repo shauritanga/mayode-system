@@ -428,6 +428,8 @@ export class MarketplaceService {
       ...redacted,
       // that the farm is leased because of an overdue debt is shown; the debt itself never is
       fromOverdueDebt: !!defaultCaseId,
+      // The farm is still its owner's, but it is held by the AMCOS until the debt is cleared; every listing view says so.
+      underAmcosAdministration: !!defaultCaseId,
       owner: owner
         ? { id: owner.id, firstName: owner.firstName, lastName: owner.lastName }
         : null,
