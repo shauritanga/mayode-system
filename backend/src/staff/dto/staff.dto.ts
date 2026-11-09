@@ -1,9 +1,11 @@
-import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength, ValidateIf } from 'class-validator';
 
 export class CreateStaffDto {
-  @IsString() @IsNotEmpty() @MaxLength(80) firstName: string;
-  @IsString() @IsNotEmpty() @MaxLength(80) lastName: string;
-  @IsString() @Matches(/^\+?[0-9\s-]{9,15}$/, { message: 'Phone number must be valid (9-15 digits)' }) phone: string;
+  /** An existing farmer of this cooperative to make staff. Their own login, name and phone are kept; the rest of the person fields are ignored. */
+  @IsOptional() @IsUUID() farmerId?: string;
+  @ValidateIf((o: CreateStaffDto) => !o.farmerId) @IsString() @IsNotEmpty() @MaxLength(80) firstName?: string;
+  @ValidateIf((o: CreateStaffDto) => !o.farmerId) @IsString() @IsNotEmpty() @MaxLength(80) lastName?: string;
+  @ValidateIf((o: CreateStaffDto) => !o.farmerId) @IsString() @Matches(/^\+?[0-9\s-]{9,15}$/, { message: 'Phone number must be valid (9-15 digits)' }) phone?: string;
   @IsOptional() @IsEmail() email?: string;
   /** Field officers default to the cooperative's "Field Officer" role; every other kind of staff needs a role. */
   @IsOptional() @IsUUID() roleId?: string;

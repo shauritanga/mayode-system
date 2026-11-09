@@ -7,10 +7,10 @@ import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { AuthService } from '../auth/auth.service';
 import { SmsService } from '../messaging/sms.service';
 import { assertWithinCeiling, grantsOfRole, type DelegatingActor } from '../auth/delegation';
-import { isLegacyFarmerRole } from '../auth/farmer-role';
+import { isLegacyFarmerRole, NOT_LEGACY_FARMER_ROLE, STAFF_ACCOUNT } from '../auth/farmer-role';
 import { createRoleTemplates, FIELD_OFFICER_ROLE } from '../roles/role-templates';
 import { LEADER_ROLE_NAMES } from '../irrigation/irrigation-roles';
-import { generateTemporaryPassword, redactPassword, welcomeSms } from '../field-officers/officer-credentials';
+import { generateTemporaryPassword, redactPassword, staffAccessSms, welcomeSms } from '../field-officers/officer-credentials';
 import { CreateStaffDto } from './dto/staff.dto';
 
 export type StaffKind = 'ADMIN' | 'SECRETARY' | 'FIELD_OFFICER' | 'CANAL_LEADER' | 'BLOCK_LEADER' | 'STAFF';
@@ -40,7 +40,7 @@ export class StaffService {
     const mamcosId = this.tenant(actor, q.mamcosId);
     const users = await this.prisma.user.findMany({
       where: {
-        role: { notIn: [UserRole.FARMER, UserRole.SUPER_ADMIN] },
+        AND: [STAFF_ACCOUNT],
         OR: [{ mamcosId }, { mamcosStaff: { mamcosId } }],
       },
       include: {
@@ -91,6 +91,7 @@ export class StaffService {
         mustChangePassword: u.mustChangePassword,
         lastLoginAt: u.lastLoginAt,
         createdAt: u.createdAt,
+        alsoFarmer: u.role === UserRole.FARMER,
         isYou: u.id === actor.id,
       };
     });
@@ -138,6 +139,8 @@ export class StaffService {
   /** Creates the login with a generated temporary password and texts it; if the SMS fails the password is returned once. */
   async create(dto: CreateStaffDto, actor: RequestUser, mamcosIdParam?: string) {
     const mamcosId = this.tenant(actor, mamcosIdParam);
+    if (dto.farmerId) return this.createFromFarmer(dto, actor, mamcosId);
+    if (!dto.firstName || !dto.lastName || !dto.phone) throw new BadRequestException('Enter the name and phone number');
     const fieldOfficer = dto.staffType === 'FIELD_OFFICER';
     let roleId = dto.roleId;
     if (!roleId) {
@@ -158,15 +161,81 @@ export class StaffService {
     const language = dto.language ?? 'sw';
     const user = await this.auth.createStaffAccount(
       {
-        firstName: dto.firstName.trim(), lastName: dto.lastName.trim(), phone: dto.phone, email: dto.email || undefined,
+        firstName: dto.firstName!.trim(), lastName: dto.lastName!.trim(), phone: dto.phone!, email: dto.email || undefined,
         password, roleId, language,
         ...(fieldOfficer ? { staffType: UserRole.FIELD_OFFICER, assignedArea: dto.assignedArea?.trim() || undefined } : {}),
       },
       actor as unknown as DelegatingActor,
       { mustChangePassword: true, ...(this.ownership.resolveTenantMamcosId(actor) ? {} : { onBehalfOfMamcosId: mamcosId }) },
     );
-    const sent = await this.send(user.phone, dto.firstName.trim(), language, password, false);
+    const sent = await this.send(user.phone, dto.firstName!.trim(), language, password, false);
     return { id: user.id, credentialsSms: sent ? 'sent' : 'failed', ...(sent ? {} : { temporaryPassword: password }) };
+  }
+
+  /** Registered farmers of this cooperative who are not staff yet (a farmer who already holds a cooperative role is left out). */
+  async farmerCandidates(actor: RequestUser, q?: string, mamcosIdParam?: string) {
+    const mamcosId = this.tenant(actor, mamcosIdParam);
+    const text = (q ?? '').trim();
+    const farmers = await this.prisma.farmer.findMany({
+      where: {
+        mamcosId, isBlacklisted: false,
+        user: { role: UserRole.FARMER, isActive: true, OR: [{ roleId: null }, { customRole: { mamcosId: null, name: { equals: 'Farmer', mode: 'insensitive' } } }] },
+        ...(text ? { OR: [
+          { firstName: { contains: text, mode: 'insensitive' } }, { lastName: { contains: text, mode: 'insensitive' } },
+          { controlNumber: { contains: text, mode: 'insensitive' } }, { user: { phone: { contains: text.replace(/\s/g, '') } } },
+        ] } : {}),
+      },
+      select: { id: true, firstName: true, lastName: true, controlNumber: true, village: true, user: { select: { phone: true } } },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }], take: 20,
+    });
+    return farmers.map((f) => ({ farmerId: f.id, name: `${f.firstName} ${f.lastName}`.trim(), memberNumber: f.controlNumber, phone: f.user.phone, village: f.village }));
+  }
+
+  /** Makes a registered farmer staff on their own login: same phone and password, still a farmer. Nothing is reset; they are told by SMS. */
+  private async createFromFarmer(dto: CreateStaffDto, actor: RequestUser, mamcosId: string) {
+    if (dto.staffType === 'FIELD_OFFICER') throw new BadRequestException('Field officers are added as new people, not from farmers');
+    if (!dto.roleId) throw new BadRequestException('Choose a role for this staff member');
+    const farmer = await this.prisma.farmer.findFirst({
+      where: { id: dto.farmerId, mamcosId },
+      select: { firstName: true, lastName: true, user: { select: { id: true, phone: true, role: true, roleId: true, isActive: true, firstName: true, lastName: true, language: true, customRole: { select: { name: true, mamcosId: true } } } } },
+    });
+    if (!farmer) throw new NotFoundException('That farmer is not registered in your cooperative');
+    const user = farmer.user;
+    if (!user.isActive) throw new BadRequestException('This farmer’s login is switched off');
+    if (user.role !== UserRole.FARMER || (user.roleId && !(user.customRole && isLegacyFarmerRole(user.customRole)))) {
+      throw new BadRequestException('This person is already on the staff');
+    }
+    const role = await this.prisma.role.findUnique({ where: { id: dto.roleId }, include: { permissions: { include: { resource: true } } } });
+    if (!role || role.mamcosId !== mamcosId || !role.isActive || role.isSystem || isLegacyFarmerRole(role)) {
+      throw new BadRequestException('Choose a role from your cooperative');
+    }
+    if (LEADER_ROLE_NAMES.includes(role.name)) {
+      throw new BadRequestException('Canal and block leaders become staff automatically when they are appointed in Scheme Management');
+    }
+    assertWithinCeiling(actor as never, grantsOfRole(role));
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { roleId: role.id, mamcosId, firstName: user.firstName ?? farmer.firstName, lastName: user.lastName ?? farmer.lastName },
+    });
+    const text = staffAccessSms({ firstName: farmer.firstName, language: user.language, portalUrl: this.config.get<string>('PORTAL_URL') || undefined });
+    const sent = await this.sms.sendTransactional(user.phone, text, 'staff_access', text);
+    return { id: user.id, credentialsSms: sent ? 'sent' : 'failed', existingLogin: true };
+  }
+
+  /** Takes the staff role away from a farmer who is also staff. The farmer login, farms and records are untouched. */
+  async removeAccess(id: string, actor: RequestUser, mamcosIdParam?: string) {
+    const mamcosId = this.tenant(actor, mamcosIdParam);
+    if (id === actor.id) throw new BadRequestException('You cannot remove your own staff access');
+    const target = await this.prisma.user.findFirst({
+      where: { id, role: UserRole.FARMER, mamcosId, roleId: { not: null }, customRole: NOT_LEGACY_FARMER_ROLE, farmer: { isNot: null } },
+      select: { id: true, customRole: { select: { name: true } } },
+    });
+    if (!target) throw new NotFoundException('This person is not a farmer with staff access');
+    if (target.customRole && LEADER_ROLE_NAMES.includes(target.customRole.name)) {
+      throw new BadRequestException('Leader access ends when the appointment ends in Scheme Management');
+    }
+    await this.prisma.user.update({ where: { id }, data: { roleId: null, mamcosId: null } });
+    return { removed: true };
   }
 
   /** New temporary password, signs the person out everywhere, texts it. */
@@ -174,7 +243,7 @@ export class StaffService {
     const mamcosId = this.tenant(actor, mamcosIdParam);
     if (id === actor.id) throw new BadRequestException('Change your own password from your profile');
     const target = await this.prisma.user.findFirst({
-      where: { id, role: { notIn: [UserRole.FARMER, UserRole.SUPER_ADMIN] }, OR: [{ mamcosId }, { mamcosStaff: { mamcosId } }] },
+      where: { id, AND: [STAFF_ACCOUNT], OR: [{ mamcosId }, { mamcosStaff: { mamcosId } }] },
       select: { id: true, phone: true, firstName: true, language: true },
     });
     if (!target) throw new NotFoundException('Staff member not found');

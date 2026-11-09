@@ -6,6 +6,7 @@ import { AccountingService } from '../accounting/accounting.service';
 import { SmsService } from '../messaging/sms.service';
 import { writeAudit } from '../irrigation/irrigation-audit';
 import { resolveCashAccount } from '../accounting/cash-resolve';
+import { STAFF_ACCOUNT } from '../auth/farmer-role';
 import { CreatePayeeDto, CreateRunDto, PostRunDto, UpdateLineDto, UpdatePayeeDto } from './dto/payroll.dto';
 
 const num = (v: unknown) => (v == null ? 0 : Number(v));
@@ -63,7 +64,7 @@ export class PayrollService {
     const mamcosId = this.tenant(actor, mamcosIdParam);
     const users = await this.prisma.user.findMany({
       where: {
-        role: { notIn: [UserRole.FARMER, UserRole.SUPER_ADMIN] }, isActive: true,
+        AND: [STAFF_ACCOUNT], isActive: true,
         OR: [{ mamcosId }, { mamcosStaff: { mamcosId } }],
         payrollPayees: { none: { mamcosId } },
       },
@@ -85,7 +86,7 @@ export class PayrollService {
   async addPayee(actor: RequestUser, dto: CreatePayeeDto, mamcosIdParam?: string) {
     const mamcosId = this.tenant(actor, mamcosIdParam);
     const user = await this.prisma.user.findFirst({
-      where: { id: dto.userId, role: { notIn: [UserRole.FARMER, UserRole.SUPER_ADMIN] }, OR: [{ mamcosId }, { mamcosStaff: { mamcosId } }] },
+      where: { id: dto.userId, AND: [STAFF_ACCOUNT], OR: [{ mamcosId }, { mamcosStaff: { mamcosId } }] },
       select: { id: true },
     });
     if (!user) throw new NotFoundException('That person is not staff or a leader of this cooperative');

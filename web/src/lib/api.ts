@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { APP_MODE } from '@/lib/app-mode';
 
 // NOTE: the Nest backend mounts every route under the `api/v1` global
 // prefix (see backend/src/main.ts), so NEXT_PUBLIC_API_URL must include it,
@@ -8,7 +9,8 @@ export const API_BASE_URL =
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
+  // X-App-Mode tells the API which portal this is, so a farmer who is also staff acts as the right one.
+  headers: { 'Content-Type': 'application/json', 'X-App-Mode': APP_MODE },
   timeout: 15000,
 });
 
@@ -73,7 +75,7 @@ api.interceptors.response.use(
 
     isRefreshing = true;
     try {
-      const res = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
+      const res = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { headers: { 'X-App-Mode': APP_MODE } });
       const { accessToken, refreshToken: newRefreshToken } = res.data;
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', newRefreshToken);
@@ -977,7 +979,9 @@ export const irrigationApi = {
 export const staffApi = {
   list: (params?: object) => api.get('/staff', { params }),
   roleOptions: () => api.get('/staff/role-options'),
+  farmerCandidates: (q: string) => api.get('/staff/farmer-candidates', { params: { q } }),
   create: (data: object) => api.post('/staff', data),
+  removeAccess: (id: string) => api.post(`/staff/${id}/remove-access`),
   resetCredentials: (id: string) => api.post(`/staff/${id}/reset-credentials`),
 };
 

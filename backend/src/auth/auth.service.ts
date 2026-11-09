@@ -1,4 +1,4 @@
-import { assertAssignedRole } from './role-access';
+import { applyPortal, assertAssignedRole, type Portal } from './role-access';
 import { isLegacyFarmerRole } from './farmer-role';
 import {
   Injectable,
@@ -111,7 +111,9 @@ export class AuthService {
       } | null;
     },
     controlNumber?: string,
+    portal?: Portal,
   ): Promise<AuthResponseDto> {
+    user = applyPortal(user, portal);
     assertAssignedRole(user);
     // Flatten the custom-role matrix for clients: the web dashboard uses it
     // to hide navigation/routes the API would reject with 403. Empty for
@@ -186,8 +188,8 @@ export class AuthService {
    * Current-session profile for clients (nav guards, permission-aware UI).
    * Same user shape as login/refresh so the frontend has a single source.
    */
-  async me(userId: string) {
-    const user = await this.prisma.user.findUnique({
+  async me(userId: string, portal?: Portal) {
+    const found = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
         farmer: true,
@@ -196,9 +198,10 @@ export class AuthService {
         },
       },
     });
-    if (!user || !user.isActive) {
+    if (!found || !found.isActive) {
       throw new UnauthorizedException('User is inactive or unauthorized');
     }
+    const user = applyPortal(found, portal);
     assertAssignedRole(user);
     const permissions = (user.customRole?.permissions ?? []).map((p) => ({
       resource: p.resource.key,
@@ -591,7 +594,7 @@ export class AuthService {
   /**
    * User Login
    */
-  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
+  async login(loginDto: LoginDto, portal?: Portal): Promise<AuthResponseDto> {
     const { password } = loginDto;
     const phone = normalizeMsisdn(loginDto.phone);
 
@@ -622,13 +625,13 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    return this.generateTokens(user, user.farmer?.controlNumber);
+    return this.generateTokens(user, user.farmer?.controlNumber, portal);
   }
 
   /**
    * Refresh Access Token
    */
-  async refresh(refreshTokenDto: RefreshTokenDto): Promise<AuthResponseDto> {
+  async refresh(refreshTokenDto: RefreshTokenDto, portal?: Portal): Promise<AuthResponseDto> {
     const { refreshToken } = refreshTokenDto;
 
     const storedToken = await this.prisma.refreshToken.findUnique({
@@ -672,6 +675,7 @@ export class AuthService {
     return this.generateTokens(
       storedToken.user,
       storedToken.user.farmer?.controlNumber,
+      portal,
     );
   }
 

@@ -31,6 +31,15 @@ export interface WelcomeSmsInput {
   account?: 'officer' | 'cooperative_admin' | 'staff' | 'farmer';
 }
 
+/** Told to a farmer who was made AMCOS staff on their existing login: nothing is reset. */
+export function staffAccessSms(input: { firstName: string; language?: string | null; portalUrl?: string }): string {
+  const { firstName, portalUrl } = input;
+  return (input.language === 'en'
+    ? [`Dear ${firstName}, you have been added as AMCOS staff.`, `Sign in to the cooperative dashboard with your usual phone number and password.`, portalUrl ? `Dashboard: ${portalUrl}` : '']
+    : [`Ndugu ${firstName}, umeongezwa kuwa mfanyakazi wa AMCOS.`, `Ingia dashibodi ya ushirika kwa namba yako ya simu na nenosiri lako la kawaida.`, portalUrl ? `Dashibodi: ${portalUrl}` : '']
+  ).filter(Boolean).join('\n');
+}
+
 /** The SMS an officer receives with their sign-in details (Swahili unless English is chosen). */
 export function welcomeSms(input: WelcomeSmsInput): string {
   const { firstName, phone, password, portalUrl, appUrl, reissued } = input;
@@ -40,7 +49,7 @@ export function welcomeSms(input: WelcomeSmsInput): string {
   if (input.language === 'en') {
     return [
       reissued
-        ? `MAYODE: ${firstName}, your sign-in details were reset.`
+        ? `Dear ${firstName}, your sign-in details were reset.`
         : `Welcome to MAYODE, ${firstName}. Your ${admin ? 'cooperative administrator' : staff ? 'AMCOS staff' : farmer ? 'farmer' : 'Field Officer'} account is ready.`,
       `Dashboard login: ${phone} / ${password}`,
       portalUrl ? `Dashboard: ${portalUrl}` : '',
@@ -52,7 +61,7 @@ export function welcomeSms(input: WelcomeSmsInput): string {
   }
   return [
     reissued
-      ? `MAYODE: ${firstName}, taarifa zako za kuingia zimebadilishwa.`
+      ? `Ndugu ${firstName}, taarifa zako za kuingia zimebadilishwa.`
       : `Karibu MAYODE, ${firstName}. Akaunti yako ya ${admin ? 'msimamizi wa ushirika' : staff ? 'mfanyakazi wa ushirika' : farmer ? 'mkulima' : 'Afisa Ugani'} imeundwa.`,
     `Kuingia dashibodi: ${phone} / ${password}`,
     portalUrl ? `Dashibodi: ${portalUrl}` : '',

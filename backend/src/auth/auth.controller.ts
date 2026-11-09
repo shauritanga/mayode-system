@@ -9,6 +9,7 @@ import {
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { portalOf } from './role-access';
 import {
   ApiTags,
   ApiOperation,
@@ -167,8 +168,8 @@ export class AuthController {
     status: HttpStatus.TOO_MANY_REQUESTS,
     description: 'Too many login attempts — try again later',
   })
-  async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
-    return this.authService.login(loginDto);
+  async login(@Body() loginDto: LoginDto, @Req() req: Request): Promise<AuthResponseDto> {
+    return this.authService.login(loginDto, portalOf(req.headers['x-app-mode']));
   }
 
   @Post('refresh')
@@ -185,8 +186,9 @@ export class AuthController {
   })
   async refresh(
     @Body() refreshTokenDto: RefreshTokenDto,
+    @Req() req: Request,
   ): Promise<AuthResponseDto> {
-    return this.authService.refresh(refreshTokenDto);
+    return this.authService.refresh(refreshTokenDto, portalOf(req.headers['x-app-mode']));
   }
 
   @Post('change-password')
@@ -204,8 +206,8 @@ export class AuthController {
     summary:
       'Current-session profile: role, custom role name, and flattened resource permissions for client-side guards',
   })
-  async me(@CurrentUser() user: { id: string }) {
-    return this.authService.me(user.id);
+  async me(@CurrentUser() user: { id: string }, @Req() req: Request) {
+    return this.authService.me(user.id, portalOf(req.headers['x-app-mode']));
   }
 
   @Post('logout')

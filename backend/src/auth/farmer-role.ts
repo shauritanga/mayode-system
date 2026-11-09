@@ -1,3 +1,5 @@
+import { UserRole } from '@prisma/client';
+
 /**
  * Farmers are not a managed role. They have their own dashboard and mobile app, and what they may do
  * is fixed in code (see isFarmerRoute in role-access.ts), not in a grant matrix an admin edits.
@@ -16,3 +18,14 @@ export const NOT_LEGACY_FARMER_ROLE = {
 export function isLegacyFarmerRole(role: { name: string; mamcosId?: string | null }): boolean {
   return !role.mamcosId && role.name?.trim().toLowerCase() === LEGACY_FARMER_ROLE_NAME.toLowerCase();
 }
+
+/**
+ * Prisma filter for "this login belongs to AMCOS staff": any non-farmer, non-Super-Admin account, and also a farmer
+ * who was given a cooperative role (they stay a farmer and are staff too). Combine with the tenant filter.
+ */
+export const STAFF_ACCOUNT = {
+  OR: [
+    { role: { notIn: [UserRole.FARMER, UserRole.SUPER_ADMIN] } },
+    { role: UserRole.FARMER, roleId: { not: null }, customRole: NOT_LEGACY_FARMER_ROLE },
+  ],
+};

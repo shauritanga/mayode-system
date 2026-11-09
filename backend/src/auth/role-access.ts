@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { PermissionAction, UserRole } from '@prisma/client';
 import { PERMISSION_KEY, RequiredPermission } from './decorators/require-permission.decorator';
 import { ROLES_KEY } from './decorators/roles.decorator';
+import { isLegacyFarmerRole } from './farmer-role';
 
 export interface AccessUser {
   role: UserRole;
@@ -59,4 +60,25 @@ export function requiredPermission(reflector: Reflector, context: ExecutionConte
   const action = actions[context.switchToHttp().getRequest().method];
   if (!action) throw new ForbiddenException('Unsupported permission action');
   return { resource, action };
+}
+
+/** Which portal a request comes from (X-App-Mode header). Mobile and unknown callers send none and are treated as farmers. */
+export type Portal = 'farmers' | 'cooperatives' | 'admin';
+export const portalOf = (value: unknown): Portal | undefined => {
+  const v = String(Array.isArray(value) ? value[0] : value ?? '').toLowerCase();
+  return v === 'farmers' || v === 'cooperatives' || v === 'admin' ? v : undefined;
+};
+
+/**
+ * A registered farmer who was also made staff keeps role FARMER and gets a cooperative role (roleId + mamcosId).
+ * Which of the two they act as depends on the portal: staff portals see the staff role, the farmer portal and the
+ * mobile app see an ordinary farmer. Everyone else is returned unchanged.
+ */
+export function applyPortal<T extends { role: UserRole; roleId?: string | null; mamcosId?: string | null;
+  customRole?: { name: string; mamcosId?: string | null; isActive: boolean; isSystem?: boolean } | null }>(user: T, portal?: Portal): T {
+  const staffToo = user.role === UserRole.FARMER && !!user.roleId && !!user.mamcosId && !!user.customRole &&
+    user.customRole.isActive && !user.customRole.isSystem && !isLegacyFarmerRole(user.customRole);
+  if (!staffToo) return user;
+  if (portal === 'cooperatives' || portal === 'admin') return { ...user, role: UserRole.CUSTOM };
+  return { ...user, roleId: null, customRole: null };
 }

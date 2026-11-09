@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { normalizeMsisdn, SmsService } from '../messaging/sms.service';
 import { EmailService } from './email.service';
+import { STAFF_ACCOUNT } from '../auth/farmer-role';
 import { AudienceDto, PageQueryDto, SendCommunicationDto } from './dto/communications.dto';
 
 const SMS_LIMIT = 480; // three standard segments
@@ -144,7 +145,7 @@ export class CommunicationsService implements OnModuleInit {
       }
       case 'STAFF': {
         const users = await this.prisma.user.findMany({
-          where: { role: { notIn: ['FARMER', 'SUPER_ADMIN'] }, OR: [{ mamcosId }, { mamcosStaff: { mamcosId } }] },
+          where: { AND: [STAFF_ACCOUNT], OR: [{ mamcosId }, { mamcosStaff: { mamcosId } }] },
           select: { id: true, firstName: true, lastName: true, phone: true, email: true, isActive: true }, orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
         });
         return {

@@ -1,4 +1,4 @@
-import { assertAssignedRole } from '../role-access';
+import { applyPortal, assertAssignedRole, portalOf } from '../role-access';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -14,14 +14,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
+      passReqToCallback: true,
       secretOrKey:
         configService.get<string>('JWT_SECRET') ||
         'mayode-super-secret-key-change-in-production-2026',
     });
   }
 
-  async validate(payload: { sub: string; phone: string; role: string }) {
-    const user = await this.prisma.user.findUnique({
+  async validate(req: { headers?: Record<string, unknown> }, payload: { sub: string; phone: string; role: string }) {
+    const found = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       include: {
         farmer: true,
@@ -32,9 +33,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       },
     });
 
-    if (!user || !user.isActive) {
+    if (!found || !found.isActive) {
       throw new UnauthorizedException('User is inactive or unauthorized');
     }
+    // A farmer who is also staff acts as staff only on the staff portals.
+    const user = applyPortal(found, portalOf(req?.headers?.['x-app-mode']));
 
     assertAssignedRole(user);
 

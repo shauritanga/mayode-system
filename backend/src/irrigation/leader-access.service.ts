@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma, UserRole } from '@prisma/client';
+import { isLegacyFarmerRole } from '../auth/farmer-role';
 import { PrismaService } from '../prisma/prisma.service';
 import { createRoleTemplates } from '../roles/role-templates';
 import { today } from './irrigation-common';
@@ -22,7 +23,7 @@ export class LeaderAccessService {
   async sync(tx: Prisma.TransactionClient, farmerId: string): Promise<'upgraded' | 'reverted' | 'unchanged'> {
     const farmer = await tx.farmer.findUnique({
       where: { id: farmerId },
-      select: { id: true, mamcosId: true, user: { select: { id: true, role: true, roleId: true, mamcosId: true } } },
+      select: { id: true, mamcosId: true, user: { select: { id: true, role: true, roleId: true, mamcosId: true, customRole: { select: { name: true, mamcosId: true } } } } },
     });
     if (!farmer?.user || !farmer.mamcosId) return 'unchanged';
     const user = farmer.user;
@@ -40,7 +41,9 @@ export class LeaderAccessService {
     const isLeaderRole = (id?: string | null) => !!id && leaderRoles.some((r) => r.id === id);
 
     if (wantedName) {
-      const alreadyStaff = user.role !== UserRole.FARMER && !isLeaderRole(user.roleId);
+      // A farmer who was made staff in the Staff screen (role FARMER + a cooperative role) already has a staff role.
+      const staffAlready = user.role !== UserRole.FARMER || (!!user.roleId && !!user.customRole && !isLegacyFarmerRole(user.customRole));
+      const alreadyStaff = staffAlready && !isLeaderRole(user.roleId);
       if (alreadyStaff) return 'unchanged';
       let role = leaderRoles.find((r) => r.name === wantedName);
       if (!role) {
