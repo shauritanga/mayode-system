@@ -1,4 +1,3 @@
-◇ injected env (29) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
 -- AlterTable
 ALTER TABLE "land_listings" ADD COLUMN     "hectare_id" TEXT,
 ADD COLUMN     "lease_terms" TEXT,
