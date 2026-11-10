@@ -188,3 +188,7 @@ export class EmancipationRequestDto {
 export class EmancipationDecisionDto {
   @IsOptional() @IsString() @MaxLength(1000) note?: string;
 }
+
+export class NoteBody {
+  @IsOptional() @IsString() @MaxLength(1000) note?: string;
+}

@@ -235,8 +235,50 @@ describeDb('Hectare guardians (PostgreSQL)', () => {
 
   it('the new member routes and emancipation routes declare who may use them', () => {
     const proto = IrrigationController.prototype as any;
+    expect(Reflect.getMetadata(PERMISSION_KEY, proto.verifyAllocation)).toEqual({ resource: 'irrigation_verification', action: 'EDIT' });
     expect(Reflect.getMetadata(PERMISSION_KEY, proto.approveEmancipation)).toEqual({ resource: 'irrigation_transfer_approval', action: 'EDIT' });
     expect(Reflect.getMetadata(PERMISSION_KEY, proto.requestEmancipation)).toEqual({ resource: 'irrigation_allocations', action: 'CREATE' });
+  });
+
+  it('a new farmer waits for the block chairman, who alone can confirm or refuse; the chairman’s own registration is immediate', async () => {
+    const block = await prisma.irrigationBlock.findFirstOrThrow({ where: { hectares: { some: { id: hectares[0] } } } });
+    const base = 20;
+    const extra: string[] = [];
+    for (let n = 1; n <= 3; n++) extra.push((await prisma.irrigationHectare.create({ data: { blockId: block.id, hectareNumber: base + n, code: `GV${n}` } })).id);
+    for (const n of ['Chair', 'Plot1', 'Plot2', 'Plot3']) await farmer(mamcosA, n);
+    await prisma.irrigationLeadership.create({ data: { position: 'BLOCK_LEADER', canalId: block.canalId, blockId: block.id, farmerId: f.Chair, appointedOn: new Date('2026-01-01'), termStart: new Date('2026-01-01') } });
+    const chair = { id: uid.Chair, role: UserRole.CUSTOM, mamcosId: mamcosA } as RequestUser;
+    texts.length = 0;
+
+    // registered by the office: waits, the chairman is told
+    const a: any = await allocations.allocate(admin, { hectareId: extra[0], farmerId: f.Plot1 });
+    expect(a).toMatchObject({ status: 'PENDING_APPROVAL', awaitingChairman: true });
+    const chairPhone = (await prisma.user.findUniqueOrThrow({ where: { id: uid.Chair } })).phone;
+    expect(texts.find((t) => t.to === chairPhone)!.text).toMatch(/Plot1 Mbarali amesajiliwa kwenye shamba .*Tafadhali thibitisha/);
+    expect(((await allocations.listAllocations(admin, { status: 'PENDING_APPROVAL' })) as any).data.find((r: any) => r.id === a.id)).toMatchObject({ awaitingChairman: true });
+    await expect(allocations.approve(approver, a.id)).rejects.toThrow(/chairman has not confirmed/);
+    await expect(allocations.verifyAllocation(admin, a.id, 'I confirm')).rejects.toThrow(/Only the block or canal chairman/); // the office cannot confirm for them
+    await expect(allocations.verifyAllocation(asUser('Plot2'), a.id)).rejects.toBeInstanceOf(Error);
+    expect(((await allocations.verifyAllocation(chair, a.id, 'He farms this plot every season')) as any)).toMatchObject({ status: 'ACTIVE', awaitingChairman: false, chairmanVerifiedById: uid.Chair });
+    await expect(allocations.verifyAllocation(chair, a.id)).rejects.toThrow(/not waiting for a chairman/);
+
+    // the chairman refuses
+    const b: any = await allocations.allocate(admin, { hectareId: extra[1], farmerId: f.Plot2 });
+    await expect(allocations.chairmanReject(chair, b.id, 'no')).rejects.toBeInstanceOf(BadRequestException);
+    expect(((await allocations.chairmanReject(chair, b.id, 'This plot is farmed by someone else'))) as any).toMatchObject({ status: 'REJECTED', rejectedReason: 'Chairman: This plot is farmed by someone else' });
+    expect(await prisma.irrigationHectareAllocation.count({ where: { hectareId: extra[1], status: { in: ['ACTIVE', 'PENDING_APPROVAL'] } } })).toBe(0); // the hectare is free again
+
+    // the chairman registers a farmer in their own block: already verified, no waiting
+    const c: any = await allocations.allocate(chair, { hectareId: extra[2], farmerId: f.Plot3 });
+    expect(c).toMatchObject({ status: 'ACTIVE', awaitingChairman: false, chairmanVerifiedById: uid.Chair });
+
+    // a scheme can switch the step off
+    await prisma.irrigationScheme.updateMany({ where: { mamcosId: mamcosA }, data: { requireChairmanVerification: false } });
+    await prisma.irrigationHectare.create({ data: { blockId: block.id, hectareNumber: base + 9, code: 'GV9' } });
+    await farmer(mamcosA, 'Plot4');
+    const d: any = await allocations.allocate(admin, { hectareId: (await prisma.irrigationHectare.findFirstOrThrow({ where: { code: 'GV9' } })).id, farmerId: f.Plot4 });
+    expect(d).toMatchObject({ status: 'ACTIVE', awaitingChairman: false });
+    await prisma.irrigationScheme.updateMany({ where: { mamcosId: mamcosA }, data: { requireChairmanVerification: true } });
   });
 
   it('guardian routes need the allocation edit permission', () => {

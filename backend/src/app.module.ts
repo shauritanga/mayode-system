@@ -67,6 +67,7 @@ import { DuesModule } from './dues/dues.module';
 import { ChargesModule } from './charges/charges.module';
 import { BoardModule } from './board/board.module';
 import { MeetingsModule } from './meetings/meetings.module';
+import { TendersModule } from './tenders/tenders.module';
 import { FarmDefaultsModule } from './farm-defaults/farm-defaults.module';
 import { CommunicationsModule } from './communications/communications.module';
 import { AccountingModule } from './accounting/accounting.module';
@@ -154,6 +155,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     ChargesModule,
     BoardModule,
     MeetingsModule,
+    TendersModule,
     FarmDefaultsModule,
     CommunicationsModule,
     GovernanceModule,

@@ -289,6 +289,7 @@ model MamcosStaff {
 model Mamcos {
   id                  String   @id @default(uuid())
   amcosMeetings       AmcosMeeting[]
+  tenders             Tender[]
   name                String   @unique
   /// Short code a farmer types on sign-up to ask to join this AMCOS (e.g. MDB-4F2A91).
   code                String?  @unique
@@ -391,6 +392,8 @@ model IrrigationScheme {
   requireAllocationApproval  Boolean          @default(false) @map("require_allocation_approval")
   /// Transfers wait for the receiving member to accept (SMS + app) before any approval or execution.
   requireRecipientAcceptance Boolean          @default(true) @map("require_recipient_acceptance")
+  /// A new allocation made by anyone but the block's own chairman waits for the block or canal chairman to confirm the farmer is the real cultivator. Skipped for a block with no chairman.
+  requireChairmanVerification Boolean         @default(true) @map("require_chairman_verification")
   createdById                String?          @map("created_by_id")
   updatedById                String?          @map("updated_by_id")
   updatedAt                  DateTime         @default(now()) @updatedAt @map("updated_at")
@@ -523,6 +526,11 @@ model IrrigationHectareAllocation {
   approvedById   String?                 @map("approved_by_id")
   approvedAt     DateTime?               @map("approved_at")
   rejectedReason String?                 @map("rejected_reason")
+  /// Waiting for the block or canal chairman to confirm the cultivator before the allocation can go live.
+  awaitingChairman     Boolean           @default(false) @map("awaiting_chairman")
+  chairmanVerifiedById String?           @map("chairman_verified_by_id")
+  chairmanVerifiedAt   DateTime?         @map("chairman_verified_at")
+  chairmanNote         String?           @map("chairman_note")
   endedById      String?                 @map("ended_by_id")
   createdAt      DateTime                @default(now()) @map("created_at")
   updatedAt      DateTime                @updatedAt @map("updated_at")
@@ -6327,4 +6335,207 @@ model HarvestReconciliation {
 
   @@unique([mamcosId, day])
   @@map("harvest_reconciliations")
+}
+
+// ============================================================
+// INFRASTRUCTURE TENDERS AND CONTRACTORS
+// ============================================================
+
+enum ContractorKind {
+  COMPANY
+  INDIVIDUAL
+  MEMBER_GROUP
+}
+
+enum ContractorStatus {
+  PENDING
+  VETTED
+  REJECTED
+  SUSPENDED
+}
+
+/// An outside company, person or member group that may bid for maintenance contracts. Signs in with its own login (userId);
+/// can bid only once an AMCOS Procurement Officer, Manager or Super Admin has vetted it.
+model Contractor {
+  id              String           @id @default(uuid())
+  userId          String           @unique @map("user_id")
+  kind            ContractorKind
+  name            String
+  contactPerson   String?          @map("contact_person")
+  phone           String
+  email           String?
+  tin             String?
+  businessRegNo   String?          @map("business_reg_no")
+  /// For a member group: the member number of a registered AMCOS member who stands behind it.
+  memberNumber    String?          @map("member_number")
+  address         String?
+  equipment       String?
+  equipmentCount  Int              @default(0) @map("equipment_count")
+  yearsExperience Int              @default(0) @map("years_experience")
+  payoutMethod    String?          @map("payout_method")
+  payoutAccount   String?          @map("payout_account")
+  payoutName      String?          @map("payout_name")
+  status          ContractorStatus @default(PENDING)
+  vettedById      String?          @map("vetted_by_id")
+  vettedAt        DateTime?        @map("vetted_at")
+  vettingNote     String?          @map("vetting_note")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  bids    TenderBid[]
+  tenders Tender[]
+
+  @@index([status])
+  @@map("contractors")
+}
+
+enum TenderCategory {
+  CANAL_CLEARING
+  DESILTING
+  ROAD_GRADING
+  DRAINAGE_REPAIR
+  OTHER
+}
+
+/// DRAFT -> OPEN (published, bids sealed) -> EVALUATION (bids opened, ranked, recommended) -> AWARDED (Manager signed off)
+/// -> COMPLETED (every milestone paid). CANCELLED from any step before COMPLETED.
+enum TenderStatus {
+  DRAFT
+  OPEN
+  EVALUATION
+  AWARDED
+  COMPLETED
+  CANCELLED
+}
+
+model Tender {
+  id                String         @id @default(uuid())
+  mamcosId          String         @map("mamcos_id")
+  reference         String
+  title             String
+  scope             String
+  category          TenderCategory
+  canalId           String?        @map("canal_id")
+  blockIds          String[]       @map("block_ids")
+  budgetCeiling     Decimal        @map("budget_ceiling") @db.Decimal(14, 2)
+  opensAt           DateTime       @map("opens_at")
+  closesAt          DateTime       @map("closes_at")
+  requiredEquipment Int            @default(1) @map("required_equipment")
+  /// Evaluation weights (sum 100): price, equipment offered, years of experience, past performance on MAYOData.
+  wPrice            Int            @map("w_price")
+  wEquipment        Int            @map("w_equipment")
+  wExperience       Int            @map("w_experience")
+  wPerformance      Int            @map("w_performance")
+  status            TenderStatus   @default(DRAFT)
+  publishedAt       DateTime?      @map("published_at")
+  bidsOpenedAt      DateTime?      @map("bids_opened_at")
+  bidsOpenedById    String?        @map("bids_opened_by_id")
+  recommendedBidId  String?        @map("recommended_bid_id")
+  recommendedById   String?        @map("recommended_by_id")
+  recommendedAt     DateTime?      @map("recommended_at")
+  recommendNote     String?        @map("recommend_note")
+  approvedById      String?        @map("approved_by_id")
+  approvedAt        DateTime?      @map("approved_at")
+  awardedBidId      String?        @map("awarded_bid_id")
+  contractorId      String?        @map("contractor_id")
+  contractPrice     Decimal?       @map("contract_price") @db.Decimal(14, 2)
+  /// 1 to 5, given by the Manager when the work is complete; feeds the contractor's past-performance score.
+  rating            Int?
+  completedAt       DateTime?      @map("completed_at")
+  cancelReason      String?        @map("cancel_reason")
+  createdById       String         @map("created_by_id")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  mamcos     Mamcos           @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  contractor Contractor?      @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  bids       TenderBid[]
+  milestones TenderMilestone[]
+  events     TenderEvent[]
+
+  @@unique([mamcosId, reference])
+  @@index([status, closesAt])
+  @@map("tenders")
+}
+
+enum BidStatus {
+  SUBMITTED
+  WITHDRAWN
+}
+
+model TenderBid {
+  id                 String     @id @default(uuid())
+  tenderId           String     @map("tender_id")
+  contractorId       String     @map("contractor_id")
+  /// Anonymous label shown to evaluators until a bid is recommended.
+  code               String
+  price              Decimal    @db.Decimal(14, 2)
+  technicalProposal  String     @map("technical_proposal")
+  equipmentOffered   Int        @map("equipment_offered")
+  completionDays     Int        @map("completion_days")
+  documentUrls       String[]   @map("document_urls")
+  status             BidStatus  @default(SUBMITTED)
+  submittedAt        DateTime   @default(now()) @map("submitted_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+
+  tender     Tender     @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  contractor Contractor @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+
+  @@unique([tenderId, contractorId])
+  @@unique([tenderId, code])
+  @@map("tender_bids")
+}
+
+/// PENDING (work under way) -> SUBMITTED (contractor says it is done) -> SIGNED_OFF (a canal or block chairman inspected it)
+/// -> APPROVED (Manager approved the payment) -> PAID (Accountant paid and booked it). A chairman may send it back to PENDING.
+enum MilestoneStatus {
+  PENDING
+  SUBMITTED
+  SIGNED_OFF
+  APPROVED
+  PAID
+}
+
+model TenderMilestone {
+  id             String          @id @default(uuid())
+  tenderId       String          @map("tender_id")
+  number         Int
+  title          String
+  percent        Int
+  /// Worked out when the contract is awarded: share of the contract price.
+  amount         Decimal?        @db.Decimal(14, 2)
+  status         MilestoneStatus @default(PENDING)
+  submittedAt    DateTime?       @map("submitted_at")
+  submitNote     String?         @map("submit_note")
+  evidenceUrls   String[]        @map("evidence_urls")
+  reworkNote     String?         @map("rework_note")
+  signedOffById  String?         @map("signed_off_by_id")
+  signedOffAt    DateTime?       @map("signed_off_at")
+  signOffNote    String?         @map("sign_off_note")
+  approvedById   String?         @map("approved_by_id")
+  approvedAt     DateTime?       @map("approved_at")
+  paidById       String?         @map("paid_by_id")
+  paidAt         DateTime?       @map("paid_at")
+  paidMethod     String?         @map("paid_method")
+  paidReference  String?         @map("paid_reference")
+
+  tender Tender @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+
+  @@unique([tenderId, number])
+  @@map("tender_milestones")
+}
+
+/// The tender's record: every step, by whom and when. Append-only (the database refuses changes), so nothing can be rewritten.
+model TenderEvent {
+  id        String   @id @default(uuid())
+  tenderId  String   @map("tender_id")
+  kind      String
+  actorId   String?  @map("actor_id")
+  detail    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tender Tender @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+
+  @@index([tenderId, createdAt])
+  @@map("tender_events")
 }

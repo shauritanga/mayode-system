@@ -13,8 +13,10 @@ import { StructureService } from './structure.service';
 import { SmsService } from '../messaging/sms.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AllocateHectareDto, CreateTransferDto, SetGuardianDto } from './dto/irrigation.dto';
+import { farmIdDisplay } from './irrigation-codes';
 
 const OPEN = ['ACTIVE', 'PENDING_APPROVAL'] as const;
+interface Chairman { farmerId: string; position: string; userId: string | null; phone: string | null; language: string }
 const farmerSelect = { id: true, firstName: true, lastName: true, controlNumber: true } as const;
 
 const OPEN_HECTARE_MSG = 'This hectare already has an active or pending allocation';
@@ -145,22 +147,29 @@ export class AllocationService {
     const scheme = hectare.block.canal.scheme;
     const allocatedOn = dto.allocatedOn ? toDate(dto.allocatedOn, 'allocation date') : today();
     if (allocatedOn > today()) throw new BadRequestException('Allocation date cannot be in the future');
+    const pending: { ask: { chairmen: Chairman[]; plot: string; farmerName: string; block: { code: string } } | null } = { ask: null };
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const created = await this.prisma.$transaction(async (tx) => {
         const farmer = await this.requireMember(tx, dto.farmerId, scheme);
         await lockMember(tx, farmer.id);
         await this.assertWithinMemberLimit(tx, farmer.id, scheme);
-        const direct = !scheme.requireAllocationApproval;
+        // The chairman of the block (or of its canal) confirms the farmer really cultivates it, unless the chairman is the one registering.
+        const chairmen = scheme.requireChairmanVerification ? await this.chairmenOf(tx, hectare.block) : [];
+        const byChairman = chairmen.some((c) => c.userId === actor.id);
+        const awaitingChairman = chairmen.length > 0 && !byChairman;
+        const direct = !scheme.requireAllocationApproval && !awaitingChairman;
         // The partial unique index is the authority; this check only gives a friendlier message first.
         const taken = await tx.irrigationHectareAllocation.findFirst({ where: { hectareId: hectare.id, status: { in: [...OPEN] } } });
         if (taken) throw new ConflictException(OPEN_HECTARE_MSG);
         const created = await tx.irrigationHectareAllocation.create({
           data: {
             hectareId: hectare.id, farmerId: farmer.id, status: direct ? 'ACTIVE' : 'PENDING_APPROVAL', allocatedOn,
-            notes: dto.notes?.trim() || null, requestedById: actor.id,
+            notes: dto.notes?.trim() || null, requestedById: actor.id, awaitingChairman,
+            ...(byChairman ? { chairmanVerifiedById: actor.id, chairmanVerifiedAt: new Date(), chairmanNote: 'Registered by the chairman' } : {}),
             ...(direct ? { approvedById: actor.id, approvedAt: new Date() } : {}),
           },
         });
+        if (awaitingChairman) pending.ask = { chairmen, plot: farmIdDisplay(hectare.code), farmerName: fullName(farmer) ?? '', block: hectare.block };
         if (dto.guardianId) {
           const guardian = await this.requireGuardian(tx, dto.guardianId, farmer.id, scheme);
           await tx.irrigationHectareGuardian.create({ data: { allocationId: created.id, guardianId: guardian.id, startedOn: allocatedOn, createdById: actor.id } });
@@ -168,9 +177,87 @@ export class AllocationService {
         await writeAudit(tx, actor, 'irrigation_hectare', hectare.id, direct ? 'allocate' : 'request-allocation', null, { ...created, guardianId: dto.guardianId ?? null } as any);
         return created;
       });
+      if (pending.ask) await this.askChairmen(pending.ask.chairmen, pending.ask.plot, pending.ask.farmerName, pending.ask.block.code);
+      return created;
     } catch (error) {
       rethrowIntegrity(error, { irrigation_hectare_allocations_one_open_per_hectare: OPEN_HECTARE_MSG, 'Unique constraint failed': OPEN_HECTARE_MSG });
     }
+  }
+
+  // ───────────────────────── chairman verification ─────────────────────────
+
+  /** The block leader and the canal leader of a block (current terms only), with how to reach them. */
+  private async chairmenOf(db: Db, block: { id: string; canalId: string }): Promise<Chairman[]> {
+    const rows = await db.irrigationLeadership.findMany({
+      where: {
+        status: 'ACTIVE', AND: [{ OR: [{ termEnd: null }, { termEnd: { gte: today() } }] },
+          { OR: [{ position: 'BLOCK_LEADER', blockId: block.id }, { position: 'CANAL_LEADER', canalId: block.canalId }] }],
+      },
+      select: { farmerId: true, position: true, farmer: { select: { user: { select: { id: true, phone: true, language: true } } } } },
+    });
+    return rows.map((r) => ({ farmerId: r.farmerId, position: r.position, userId: r.farmer.user?.id ?? null, phone: r.farmer.user?.phone ?? null, language: r.farmer.user?.language ?? 'sw' }));
+  }
+
+  /** Best-effort SMS and app alert to the chairmen who must confirm a new farmer. */
+  private async askChairmen(chairmen: Chairman[], plot: string, farmer: string, block: string) {
+    for (const c of chairmen) {
+      try {
+        const en = c.language === 'en';
+        const body = en
+          ? `MAYODE: ${farmer} was registered on plot ${plot} (block ${farmIdDisplay(block)}). Please confirm they really cultivate it in the MAYODE portal before it goes live.`
+          : `MAYODE: ${farmer} amesajiliwa kwenye shamba ${plot} (block ${farmIdDisplay(block)}). Tafadhali thibitisha kuwa analima kweli kwenye tovuti ya MAYODE kabla halijaanza kutumika.`;
+        if (c.userId) await this.notifications.create({ userId: c.userId, type: 'irrigation.allocation.verify', title: en ? 'Confirm a new farmer' : 'Thibitisha mkulima mpya', body });
+        if (c.phone) await this.sms.send(c.phone, body, 'irrigation_verify');
+      } catch { /* best-effort */ }
+    }
+  }
+
+  /** Only the chairman of this block (or its canal) may answer; the office cannot confirm on their behalf. */
+  private async assertChairmanOf(actor: RequestUser, allocation: { hectare: { block: { id: string; canalId: string } } }) {
+    const chairmen = await this.chairmenOf(this.prisma, allocation.hectare.block);
+    if (!chairmen.some((c) => c.userId === actor.id)) throw new ForbiddenException('Only the block or canal chairman of this plot can confirm the cultivator');
+  }
+
+  /** The chairman confirms the farmer is the legitimate cultivator. The allocation goes live, unless the scheme also wants an approver. */
+  async verifyAllocation(actor: RequestUser, id: string, note?: string) {
+    const scope = await this.scopeService.resolve(actor);
+    const allocation = await this.loadAllocation(scope, id);
+    if (allocation.status !== 'PENDING_APPROVAL' || !allocation.awaitingChairman) throw new ConflictException('This allocation is not waiting for a chairman');
+    await this.assertChairmanOf(actor, allocation);
+    const scheme = allocation.hectare.block.canal.scheme;
+    return this.prisma.$transaction(async (tx) => {
+      const live = !scheme.requireAllocationApproval;
+      if (live) {
+        await lockMember(tx, allocation.farmerId);
+        await this.assertWithinMemberLimit(tx, allocation.farmerId, scheme, 0);
+      }
+      const claimed = await tx.irrigationHectareAllocation.updateMany({
+        where: { id, status: 'PENDING_APPROVAL', awaitingChairman: true },
+        data: { awaitingChairman: false, chairmanVerifiedById: actor.id, chairmanVerifiedAt: new Date(), chairmanNote: note?.trim() || null, ...(live ? { status: 'ACTIVE', approvedById: actor.id, approvedAt: new Date() } : {}) },
+      });
+      if (!claimed.count) throw new ConflictException('This allocation has changed. Reload and try again');
+      await writeAudit(tx, actor, 'irrigation_hectare', allocation.hectareId, 'chairman-verify', { status: allocation.status }, { status: live ? 'ACTIVE' : 'PENDING_APPROVAL', allocationId: id });
+      return tx.irrigationHectareAllocation.findUniqueOrThrow({ where: { id } });
+    });
+  }
+
+  /** The chairman says this farmer is not the cultivator: the allocation is rejected with the reason. */
+  async chairmanReject(actor: RequestUser, id: string, reason: string) {
+    const scope = await this.scopeService.resolve(actor);
+    const allocation = await this.loadAllocation(scope, id);
+    if (allocation.status !== 'PENDING_APPROVAL' || !allocation.awaitingChairman) throw new ConflictException('This allocation is not waiting for a chairman');
+    await this.assertChairmanOf(actor, allocation);
+    if (reason.trim().length < 3) throw new BadRequestException('Say why this is not the cultivator');
+    return this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.irrigationHectareAllocation.updateMany({
+        where: { id, status: 'PENDING_APPROVAL', awaitingChairman: true },
+        data: { status: 'REJECTED', awaitingChairman: false, rejectedReason: `Chairman: ${reason.trim()}`, approvedById: actor.id, approvedAt: new Date() },
+      });
+      if (!claimed.count) throw new ConflictException('This allocation has changed. Reload and try again');
+      await this.closeGuardian(tx, id, today(), 'ALLOCATION_REJECTED', actor.id);
+      await writeAudit(tx, actor, 'irrigation_hectare', allocation.hectareId, 'chairman-reject', { status: allocation.status }, { status: 'REJECTED', reason });
+      return tx.irrigationHectareAllocation.findUniqueOrThrow({ where: { id } });
+    });
   }
 
   private async loadAllocation(scope: IrrigationScope, id: string) {
@@ -186,6 +273,7 @@ export class AllocationService {
     const scope = await this.scopeService.resolve(actor);
     const allocation = await this.loadAllocation(scope, id);
     if (allocation.status !== 'PENDING_APPROVAL') throw new ConflictException('Only pending allocations can be approved');
+    if (allocation.awaitingChairman) throw new ConflictException('The block chairman has not confirmed this farmer yet');
     if (allocation.requestedById && allocation.requestedById === actor.id)
       throw new ConflictException('An allocation must be approved by someone other than the person who requested it');
     const scheme = allocation.hectare.block.canal.scheme;
@@ -272,6 +360,7 @@ export class AllocationService {
       hectare: r.hectare, farmer: { id: r.farmer.id, name: fullName(r.farmer), memberNumber: r.farmer.controlNumber },
       guardian: r.guardians[0] ? { id: r.guardians[0].guardian.id, name: fullName(r.guardians[0].guardian), memberNumber: r.guardians[0].guardian.controlNumber } : null,
       requestedBy: names.get(r.requestedById ?? '') ?? null, approvedBy: names.get(r.approvedById ?? '') ?? null,
+      awaitingChairman: r.awaitingChairman, chairmanVerifiedAt: r.chairmanVerifiedAt, chairmanNote: r.chairmanNote,
     })), total, page, pageSize);
   }
 

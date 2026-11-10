@@ -200,6 +200,22 @@ describeDb('AMCOS charges (PostgreSQL)', () => {
       expect((await charges.previewPenalties(c.actor)).rows).toHaveLength(0);
     });
 
+    it('is added by the daily timer with nobody pressing a button, once a month, and only where it is switched on', async () => {
+      const on = await coop(); const off = await coop();
+      await set(on, 'LATE_PENALTY', 5, { graceDays: 30 });
+      await owe(on, -45);
+      await prisma.farmerDue.create({ data: { mamcosId: off.mamcos.id, farmerId: off.farmer.id, category: 'LEVY', description: 'Levy 2026', amount: 100_000, issuedOn: new Date(`${ymd(-90)}T00:00:00Z`), dueDate: new Date(`${ymd(-45)}T00:00:00Z`) } });
+      const first = await charges.applyAutomatically();
+      expect(first.charged).toBeGreaterThanOrEqual(1);
+      const mine = await prisma.farmerDue.findMany({ where: { farmerId: on.farmer.id, description: { startsWith: 'Late penalty' } } });
+      expect(mine).toHaveLength(1);
+      expect(Number(mine[0].amount)).toBe(5_000);
+      expect(mine[0].createdById).toBeNull(); // charged by the system, not a person
+      expect(await prisma.farmerDue.count({ where: { farmerId: off.farmer.id, description: { startsWith: 'Late penalty' } } })).toBe(0);
+      await charges.applyAutomatically(); // running again the same month adds nothing
+      expect(await prisma.farmerDue.count({ where: { farmerId: on.farmer.id, description: { startsWith: 'Late penalty' } } })).toBe(1);
+    });
+
     it('leaves alone what is within the grace days, not yet due, or fully paid', async () => {
       const c = await coop();
       await set(c, 'LATE_PENALTY', 5, { graceDays: 30 });

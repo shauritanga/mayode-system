@@ -55,6 +55,7 @@ const CHART = [
   ['5310', 'Stock losses and shrinkage', AccountType.EXPENSE],
   ['5400', 'Depreciation expense', AccountType.EXPENSE],
   ['5410', 'Repairs and maintenance', AccountType.EXPENSE],
+  ['5420', 'Infrastructure maintenance contracts', AccountType.EXPENSE],
   ['5500', 'Salaries and wages', AccountType.EXPENSE],
   ['5600', 'Fuel and transport', AccountType.EXPENSE],
   ['5610', 'Utilities and communication', AccountType.EXPENSE],
@@ -453,6 +454,8 @@ export class AccountingService {
     if (accounts.length !== new Set(dto.lines.map((line) => line.accountId)).size) {
       throw new BadRequestException('Choose active accounts for every journal line.');
     }
+    // Contract payments are booked only by the tender module, after a chairman's sign-off and a Manager's approval.
+    if (accounts.some((a) => a.code === '5420')) throw new BadRequestException('Infrastructure maintenance contracts are booked only through a tender, not by a manual journal.');
     const mamcosId = scope.mamcosId ?? null;
     const cashIds = [...new Set(dto.lines.map((l) => l.cashAccountId).filter((x): x is string => !!x))];
     if (cashIds.length) {

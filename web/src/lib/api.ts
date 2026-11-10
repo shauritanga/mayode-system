@@ -994,6 +994,8 @@ export const irrigationApi = {
   allocations: (params?: object) => api.get('/irrigation/allocations', { params }),
   allocate: (data: object) => api.post('/irrigation/allocations', data),
   approveAllocation: (id: string) => api.post(`/irrigation/allocations/${id}/approve`),
+  verifyAllocation: (id: string, data: object = {}) => api.post(`/irrigation/allocations/${id}/verify`, data),
+  chairmanRejectAllocation: (id: string, data: object) => api.post(`/irrigation/allocations/${id}/chairman-reject`, data),
   rejectAllocation: (id: string, data: object) => api.post(`/irrigation/allocations/${id}/reject`, data),
   releaseAllocation: (id: string, data: object) => api.post(`/irrigation/allocations/${id}/release`, data),
   setGuardian: (id: string, data: object) => api.post(`/irrigation/allocations/${id}/guardian`, data),
@@ -1134,6 +1136,45 @@ export const meetingsApi = {
   start: (id: string) => api.post(`/meetings/${id}/start`),
   addResolution: (id: string, data: object) => api.post(`/meetings/${id}/resolutions`, data),
   close: (id: string, data: object) => api.post(`/meetings/${id}/close`, data),
+};
+
+export const tendersApi = {
+  structure: () => api.get('/tenders/structure'),
+  list: (params?: object) => api.get('/tenders', { params }),
+  create: (data: object) => api.post('/tenders', data),
+  get: (id: string) => api.get(`/tenders/${id}`),
+  publish: (id: string) => api.post(`/tenders/${id}/publish`),
+  cancel: (id: string, reason: string) => api.post(`/tenders/${id}/cancel`, { reason }),
+  openBids: (id: string) => api.post(`/tenders/${id}/open-bids`),
+  recommend: (id: string, bidId: string, note?: string) => api.post(`/tenders/${id}/recommend`, { bidId, note }),
+  returnRecommendation: (id: string, reason: string) => api.post(`/tenders/${id}/return`, { reason }),
+  approve: (id: string) => api.post(`/tenders/${id}/approve`),
+  rate: (id: string, rating: number) => api.post(`/tenders/${id}/rate`, { rating }),
+  contractors: (params?: object) => api.get('/tenders/contractors', { params }),
+  vet: (id: string, data: object) => api.post(`/tenders/contractors/${id}/vet`, data),
+  inspections: () => api.get('/tenders/milestones/mine'),
+  signOff: (id: string, note: string) => api.post(`/tenders/milestones/${id}/sign-off`, { note }),
+  rework: (id: string, note: string) => api.post(`/tenders/milestones/${id}/rework`, { note }),
+  approvePayment: (id: string) => api.post(`/tenders/milestones/${id}/approve-payment`),
+  pay: (id: string, data: object) => api.post(`/tenders/milestones/${id}/pay`, data),
+};
+
+/** The contractor's own portal. */
+export const contractorApi = {
+  me: () => api.get('/contractor/me'),
+  update: (data: object) => api.put('/contractor/me', data),
+  tenders: () => api.get('/contractor/tenders'),
+  bids: () => api.get('/contractor/bids'),
+  contracts: () => api.get('/contractor/contracts'),
+  bid: (tenderId: string, data: object) => api.put(`/contractor/tenders/${tenderId}/bid`, data),
+  withdraw: (tenderId: string) => api.post(`/contractor/tenders/${tenderId}/withdraw`),
+  submitMilestone: (id: string, data: object) => api.post(`/contractor/milestones/${id}/submit`, data),
+};
+
+/** No sign-in needed. */
+export const publicTendersApi = {
+  list: () => api.get('/public/tenders'),
+  registerContractor: (data: object) => api.post('/public/contractors/register', data),
 };
 
 export const farmDefaultsApi = {

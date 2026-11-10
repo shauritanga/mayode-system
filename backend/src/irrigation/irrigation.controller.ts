@@ -16,7 +16,7 @@ import { DocumentsService } from './documents.service';
 import { EmancipationService } from './emancipation.service';
 import { IrrigationSetupService } from './irrigation-roles';
 import {
-  AllocateHectareDto, AppointLeaderDto, EmancipationDecisionDto, EmancipationRequestDto, MyTransferRequestDto, SetGuardianDto, CreateBlockDto, CreateCanalDto, CreateDocumentDto, CreateHectareDto,
+  AllocateHectareDto, AppointLeaderDto, NoteBody, EmancipationDecisionDto, EmancipationRequestDto, MyTransferRequestDto, SetGuardianDto, CreateBlockDto, CreateCanalDto, CreateDocumentDto, CreateHectareDto,
   CreateSchemeDto, CreateTransferDto, DeclineTransferDto, EndLeadershipDto, ReasonDto, UpdateBlockDto, UpdateCanalDto, UpdateSchemeDto,
 } from './dto/irrigation.dto';
 
@@ -25,6 +25,8 @@ const STRUCTURE = IRRIGATION_RESOURCE;
 const ALLOC = ALLOCATION_RESOURCE;
 const LEAD = LEADERSHIP_RESOURCE;
 const TRANSFER_APPROVAL = TRANSFER_APPROVAL_RESOURCE;
+/** Held by block and canal chairmen: confirming that a farmer registered in their block really cultivates the plot. */
+const VERIFY = 'irrigation_verification';
 
 /**
  * Irrigation Scheme Management API. Every route names its permission explicitly; services additionally confine
@@ -122,6 +124,11 @@ export class IrrigationController {
   approve(@CurrentUser() u: RequestUser, @Param('id') id: string) { return this.allocations.approve(u, id); }
   @Post('allocations/:id/reject') @RequirePermission(ALLOC, 'EDIT')
   reject(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: ReasonDto) { return this.allocations.reject(u, id, dto.reason); }
+  // A chairman confirms (or refuses) a farmer registered in their block; the service checks they really are that block's or canal's chairman.
+  @Post('allocations/:id/verify') @RequirePermission(VERIFY, 'EDIT')
+  verifyAllocation(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: NoteBody) { return this.allocations.verifyAllocation(u, id, dto.note); }
+  @Post('allocations/:id/chairman-reject') @RequirePermission(VERIFY, 'EDIT')
+  chairmanReject(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: ReasonDto) { return this.allocations.chairmanReject(u, id, dto.reason); }
   @Post('allocations/:id/guardian') @RequirePermission(ALLOC, 'EDIT')
   setGuardian(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: SetGuardianDto) { return this.allocations.setGuardian(u, id, dto); }
   @Post('allocations/:id/guardian/end') @RequirePermission(ALLOC, 'EDIT')

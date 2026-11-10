@@ -768,7 +768,7 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
       for (const name of handlers) {
         const required = reflector.get(PERMISSION_KEY, proto[name]);
         expect({ name, required: !!required }).toEqual({ name, required: true });
-        expect(['irrigation', 'irrigation_allocations', 'irrigation_leadership', 'irrigation_transfer_approval', 'roles']).toContain(required.resource);
+        expect(['irrigation', 'irrigation_allocations', 'irrigation_leadership', 'irrigation_transfer_approval', 'irrigation_verification', 'roles']).toContain(required.resource);
       }
     });
 
@@ -787,6 +787,8 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
   // ───────────────────────── full scheme ─────────────────────────
   describe('fully allocated scheme', () => {
     it('allocates every one of the 2,820 hectares to a unique member and reports 100% on every dashboard', async () => {
+      // This test fills the whole scheme in one pass; the chairman-confirmation step is covered in the guardian suite.
+      await prisma.irrigationScheme.update({ where: { id: schemeId }, data: { requireChairmanVerification: false } });
       // Clear partial state so the whole scheme can be filled in one clean pass through the service.
       const free = await prisma.irrigationHectare.findMany({
         where: { allocations: { none: { status: { in: ['ACTIVE', 'PENDING_APPROVAL'] } } } },

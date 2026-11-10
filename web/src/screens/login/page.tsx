@@ -184,6 +184,11 @@ function LoginForm() {
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
+          {APP_MODE === 'admin' && (
+            <p style={{ marginTop: 16, fontSize: 13, textAlign: 'center' }}>
+              Contractor or member group? <a href="/contractor-register">Register to bid</a> · <a href="/tenders">See open tenders</a>
+            </p>
+          )}
 
           <p style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '28px' }}>
             © {new Date().getFullYear()} MAYODE GROUP. All rights reserved.

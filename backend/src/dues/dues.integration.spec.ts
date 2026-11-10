@@ -35,6 +35,7 @@ describeDb('Farmer dues (PostgreSQL)', () => {
   let neema: string; // holds none
   let outsider: string; // belongs to AMCOS B
   let levy: any;
+  const texts: { to: string; text: string }[] = [];
 
   const farmer = async (mamcosId: string, name: string) => {
     const userId = randomUUID();
@@ -50,7 +51,9 @@ describeDb('Farmer dues (PostgreSQL)', () => {
     expect(current_schema).toBe(SCHEMA);
     const ownership = new OwnershipService(prisma as any);
     ledger = new AccountingService(prisma as any, ownership);
-    svc = new DuesService(prisma as any, ownership, ledger);
+    const sms = { send: async (to: string, text: string) => { texts.push({ to, text }); } };
+    const refs: any = { get: (cls: any) => (cls?.name === 'SmsService' ? sms : { afterDuesChange: async () => undefined }) };
+    svc = new DuesService(prisma as any, ownership, ledger, refs);
     const tag = randomUUID().slice(0, 5);
     mamcosA = (await prisma.mamcos.create({ data: { name: `Madibira D ${tag}` } })).id;
     mamcosB = (await prisma.mamcos.create({ data: { name: `Ubaruku D ${tag}` } })).id;
@@ -118,6 +121,14 @@ describeDb('Farmer dues (PostgreSQL)', () => {
       const p1: any = await svc.recordPayment(adminA, ashaLevy.id, { amount: 5_000, method: 'CASH' });
       const p2: any = await svc.recordPayment(adminA, ashaLevy.id, { amount: 10_000, method: 'MOBILE_MONEY', reference: 'MP123' });
       expect([p1.receiptNo, p2.receiptNo]).toEqual(['RCT-000001', 'RCT-000002']);
+      // the receipt names the plots the money is for, and the farmer gets it by SMS straight away
+      expect(p1.farmIds).toEqual(['H1', 'H2']);
+      const ashaPhone = (await prisma.user.findFirstOrThrow({ where: { farmer: { id: asha } } })).phone;
+      await new Promise((r) => setTimeout(r, 200));
+      const receipt = texts.find((t) => t.to === ashaPhone && /RCT-000001/.test(t.text))!;
+      expect(receipt.text).toMatch(/Stakabadhi ya MAYODE RCT-000001: TZS 5,000 imepokelewa kwa .*\(Shamba H1, H2\)\. Salio TZS 15,000/);
+      expect(((await svc.detail(adminA, ashaLevy.id)) as any).farmIds).toEqual(['H1', 'H2']);
+      expect(((await svc.statement(adminA, asha)) as any).farmIds).toEqual(['H1', 'H2']);
       const d: any = await svc.detail(adminA, ashaLevy.id);
       expect(d).toMatchObject({ paid: 15_000, balance: 5_000, state: 'PARTIAL' });
       expect(d.payments).toHaveLength(2);

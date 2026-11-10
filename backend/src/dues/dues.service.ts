@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { resolveCashAccount } from '../accounting/cash-resolve';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { AccountingService } from '../accounting/accounting.service';
+import { farmIdDisplay } from '../irrigation/irrigation-codes';
 import {
   ChargeDto, CreateDueDto, CreateDueTypeDto, DueListQueryDto, IssueFertiliserDto, RecordPaymentDto, UpdateDueTypeDto,
 } from './dto/dues.dto';
@@ -33,6 +34,41 @@ export class DuesService {
     private readonly accounting: AccountingService,
     private readonly moduleRef?: ModuleRef,
   ) {}
+
+  /** The Farm IDs (1:1R-1) of the hectares a farmer holds, so a receipt names the plot the money is for. */
+  async farmIdsOf(farmerId: string): Promise<string[]> {
+    const held = await this.prisma.irrigationHectareAllocation.findMany({
+      where: { farmerId, status: 'ACTIVE' }, select: { hectare: { select: { code: true } } }, orderBy: { allocatedOn: 'asc' },
+    });
+    return held.map((h) => farmIdDisplay(h.hectare.code));
+  }
+
+  /** The instant digital receipt: an SMS to the farmer with the receipt number, what it was for, the Farm ID and the balance left. Best-effort. */
+  private async sendReceipt(mamcosId: string, farmerId: string, payment: { receiptNo: string; amount: unknown; paidOn: Date; createdAt: Date }, description: string, dueId: string) {
+    if (!this.moduleRef) return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { SmsService } = require('../messaging/sms.service') as typeof import('../messaging/sms.service');
+      const sms = this.moduleRef.get(SmsService, { strict: false });
+      const [farmer, ids, due] = await Promise.all([
+        this.prisma.farmer.findUnique({ where: { id: farmerId }, select: { user: { select: { phone: true, language: true } } } }),
+        this.farmIdsOf(farmerId),
+        this.prisma.farmerDue.findUnique({ where: { id: dueId }, include: { payments: { where: { voidedAt: null }, select: { amount: true, createdAt: true } } } }),
+      ]);
+      const phone = farmer?.user?.phone;
+      if (!phone) return;
+      // the balance as it stood when this payment was made, not after later ones
+      const left = due ? cents(num(due.amount) - num(due.waivedAmount) - due.payments.filter((p) => p.createdAt <= payment.createdAt).reduce((n, p) => n + num(p.amount), 0)) : 0;
+      const tz = (n: number) => `TZS ${Math.round(n).toLocaleString('en-US')}`;
+      const plots = ids.length ? ids.slice(0, 4).join(', ') + (ids.length > 4 ? ` +${ids.length - 4}` : '') : '';
+      const en = farmer?.user?.language === 'en';
+      const text = en
+        ? `MAYODE receipt ${payment.receiptNo}: ${tz(num(payment.amount))} received for ${description}${plots ? ` (Farm ID ${plots})` : ''}. ${left > 0 ? `Balance ${tz(left)}.` : 'Fully paid. Thank you.'}`
+        : `Stakabadhi ya MAYODE ${payment.receiptNo}: ${tz(num(payment.amount))} imepokelewa kwa ${description}${plots ? ` (Shamba ${plots})` : ''}. ${left > 0 ? `Salio ${tz(left)}.` : 'Umemaliza kulipa. Asante.'}`;
+      await sms.send(phone, text, 'due_receipt');
+    } catch { /* the payment stands even if the text cannot be sent */ }
+    void mamcosId;
+  }
 
   /** Tells the overdue-debt handling that this farmer's dues changed, so farms are given back once nothing overdue is left. */
   private settled(mamcosId: string, farmerId: string) {
@@ -332,7 +368,8 @@ export class DuesService {
       throw e;
     }
     this.settled(mamcosId, payment.farmerId);
-    return payment;
+    void this.sendReceipt(mamcosId, payment.farmerId, payment, due!.description, id);
+    return { ...payment, farmIds: await this.farmIdsOf(payment.farmerId) };
   }
 
   async voidPayment(actor: RequestUser, paymentId: string, reason: string, mamcosIdParam?: string) {
@@ -406,7 +443,7 @@ export class DuesService {
     const mamcosId = this.tenant(actor, mamcosIdParam);
     const d = await this.prisma.farmerDue.findFirst({ where: { id, mamcosId }, include: this.include });
     if (!d) throw new NotFoundException('Due not found');
-    return { ...this.shapeDue(d), payments: d.payments.map((p) => ({ ...p, amount: num(p.amount) })) };
+    return { ...this.shapeDue(d), farmIds: await this.farmIdsOf(d.farmerId), payments: d.payments.map((p) => ({ ...p, amount: num(p.amount) })) };
   }
 
   /** A farmer's whole account with the AMCOS: everything charged, every receipt, what is still owed. */
@@ -417,7 +454,7 @@ export class DuesService {
     const dues = rows.map((r) => ({ ...this.shapeDue(r), payments: r.payments.map((p) => ({ ...p, amount: num(p.amount) })) }));
     const live = dues.filter((d) => d.state !== 'CANCELLED');
     return {
-      farmer: farmerShape(farmer), dues,
+      farmer: farmerShape(farmer), farmIds: await this.farmIdsOf(farmerId), dues,
       totals: { charged: cents(live.reduce((n, d) => n + d.amount, 0)), paid: cents(live.reduce((n, d) => n + d.paid, 0)), outstanding: cents(live.reduce((n, d) => n + d.balance, 0)) },
     };
   }

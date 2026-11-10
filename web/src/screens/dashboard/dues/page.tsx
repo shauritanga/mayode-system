@@ -90,7 +90,7 @@ function PayModal({ due, onClose, onSaved }: { due: any; onClose: () => void; on
     setSaving(true); setError('');
     try {
       const p: any = (await duesApi.pay(due.id, { amount, paidOn: form.paidOn, method: form.method, cashAccountId: form.cashAccountId || undefined, reference: form.reference.trim() || undefined, note: form.note.trim() || undefined })).data;
-      onSaved(`Payment recorded. Receipt ${p.receiptNo}.`);
+      onSaved(`Payment recorded. Receipt ${p.receiptNo}${p.farmIds?.length ? ` for Farm ID ${p.farmIds.join(', ')}` : ''}. The farmer was sent it by SMS.`);
     } catch (e) { setError(errMsg(e)); setSaving(false); }
   };
   return (
@@ -223,7 +223,7 @@ function DueDetail({ id, can, onClose, onChanged }: { id: string; can: (r: strin
             <StatCard label="Balance" value={tzs(d.balance)} tone={d.overdue ? 'warn' : undefined} hint={d.dueDate ? `${d.overdue ? 'Was due' : 'Due'} ${fmtDate(d.dueDate)}` : undefined} />
           </div>
           <div className="muted" style={{ fontSize: 13 }}>
-            {cat(d.category)}{d.hectares != null ? ` · ${d.hectares} ha` : ''}{d.quantity != null ? ` · ${d.quantity} ${d.unit} at ${tzs(d.unitPrice)}` : ''} · charged {fmtDate(d.issuedOn)}
+            {d.farmIds?.length > 0 && <>Farm ID {d.farmIds.join(', ')} · </>}{cat(d.category)}{d.hectares != null ? ` · ${d.hectares} ha` : ''}{d.quantity != null ? ` · ${d.quantity} ${d.unit} at ${tzs(d.unitPrice)}` : ''} · charged {fmtDate(d.issuedOn)}
             {d.waivedAmount > 0 && <> · waived {tzs(d.waivedAmount)} ({d.waivedReason})</>}
             {d.state === 'CANCELLED' && <> · cancelled ({d.cancelReason})</>}
           </div>

@@ -155,6 +155,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: '/dashboard/board', label: 'Board Members', icon: Shield01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'board_members' },
       { href: '/dashboard/meetings', label: 'Meetings', icon: Calendar01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'board_meetings' },
+      { href: '/dashboard/tenders', label: 'Tenders', icon: ClipboardIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], anyResource: ['tenders', 'tender_milestones', 'tender_contractors'] },
     ],
   },
   {
@@ -271,6 +272,7 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/auditor', label: 'Auditor Dashboard', icon: File01Icon, roles: ['AUDITOR'], resource: 'reports', persona: true },
       { href: '/dashboard/financial-provider', label: 'Credit Dashboard', icon: Wallet01Icon, roles: ['FINANCIAL_PROVIDER'], resource: 'farmers', persona: true },
       { href: '/dashboard/buyer', label: 'Buyer Portal', icon: DashboardSquare01Icon, roles: ['BUYER'], resource: 'buyer_portal', persona: true },
+      { href: '/dashboard/contractor', label: 'Contractor Portal', icon: ClipboardIcon, roles: ['CUSTOM'], resource: 'tender_bidding', persona: true },
     ],
   },
   {
@@ -454,7 +456,7 @@ const COOPERATIVE_PORTAL_HIDDEN_HREFS = new Set([
  */
 const COOPERATIVE_MENU_ORDER = [
   '/dashboard', '/dashboard/farmers', '/dashboard/irrigation', '/dashboard/scheme-structure', '/dashboard/plot-allocation', '/dashboard/dues', '/dashboard/harvest', '/dashboard/farm-administration', '/dashboard/rentals', '/dashboard/ops-orders', '/dashboard/task-management',
-  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/payroll', '/dashboard/ops-warehouse', '/dashboard/staff', '/dashboard/board', '/dashboard/meetings', '/dashboard/leadership', '/dashboard/suppliers', '/dashboard/sales',
+  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/payroll', '/dashboard/ops-warehouse', '/dashboard/staff', '/dashboard/board', '/dashboard/meetings', '/dashboard/tenders', '/dashboard/leadership', '/dashboard/suppliers', '/dashboard/sales',
   '/dashboard/reports', '/dashboard/credit', '/dashboard/traceability', '/dashboard/disputes', '/dashboard/governance', '/dashboard/ai',
   '/dashboard/audit-log', '/dashboard/roles', '/dashboard/amcos-settings', '/dashboard/settings',
 ];

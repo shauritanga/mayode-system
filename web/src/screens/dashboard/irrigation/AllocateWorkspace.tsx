@@ -33,7 +33,7 @@ export default function AllocateWorkspace({ bare = false }: { bare?: boolean } =
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const opts = useCanalBlockOptions(schemeId, canalId);
   const hectares = useApi<any>(blockId ? () => irrigationApi.hectares({ blockId, pageSize: 200 }) : null, [blockId]);
-  const pending = useApi<any>(schemeId && can('irrigation_allocations', 'EDIT') ? () => irrigationApi.allocations({ schemeId, status: 'PENDING_APPROVAL', pageSize: 50 }) : null, [schemeId]);
+  const pending = useApi<any>(schemeId && (can('irrigation_allocations', 'EDIT') || can('irrigation_verification', 'EDIT')) ? () => irrigationApi.allocations({ schemeId, status: 'PENDING_APPROVAL', pageSize: 50 }) : null, [schemeId]);
   const block = opts.blocks.find((b: any) => b.id === blockId);
 
   const picked = hectares.data?.data.find((h: any) => h.id === pickedId) ?? null;
@@ -43,7 +43,7 @@ export default function AllocateWorkspace({ bare = false }: { bare?: boolean } =
     setSaving(true);
     try {
       const res = await irrigationApi.allocate({ hectareId: picked.id, farmerId: member!.id, guardianId: guardian?.id, allocatedOn: date, notes: notes.trim() || undefined });
-      setMessage({ tone: 'success', text: res.data.status === 'PENDING_APPROVAL' ? `${farmId(picked.code)} requested for ${member!.name}. It needs approval from someone else.` : `${farmId(picked.code)} allocated to ${member!.name}.` });
+      setMessage({ tone: 'success', text: res.data.awaitingChairman ? `${farmId(picked.code)} registered for ${member!.name}. It goes live when the block chairman confirms they cultivate it; the chairman has been sent an SMS.` : res.data.status === 'PENDING_APPROVAL' ? `${farmId(picked.code)} requested for ${member!.name}. It needs approval from someone else.` : `${farmId(picked.code)} allocated to ${member!.name}.` });
       reset(); hectares.reload(); pending.reload();
     } catch (e) { setMessage({ tone: 'error', text: errMsg(e, 'Could not save the allocation.') }); setConfirm(false); hectares.reload(); } finally { setSaving(false); }
   };
@@ -142,8 +142,21 @@ export default function AllocateWorkspace({ bare = false }: { bare?: boolean } =
 }
 
 function PendingActions({ allocation, onDone, onError }: { allocation: any; onDone: (m: string) => void; onError: (m: string) => void }) {
+  const { can } = useIrrigation();
   const [reject, setReject] = useState(false);
   const [busy, setBusy] = useState(false);
+  if (allocation.awaitingChairman) {
+    // Only the chairman of this block (or its canal) can answer; the server checks who is asking.
+    if (!can('irrigation_verification', 'EDIT')) return <span className="muted" style={{ fontSize: 12.5 }}>Waiting for the block chairman to confirm</span>;
+    return (
+      <>
+        <button type="button" className="btn-primary" disabled={busy} onClick={async () => { setBusy(true); try { await irrigationApi.verifyAllocation(allocation.id); onDone(`${farmId(allocation.hectare.code)} confirmed: ${allocation.farmer.name} is the cultivator.`); } catch (e) { onError(errMsg(e)); } finally { setBusy(false); } }}>Confirm cultivator</button>
+        <button type="button" className="btn-secondary" onClick={() => setReject(true)}>Not the cultivator</button>
+        {reject && <ConfirmDialog title="Not the cultivator" danger askReason reasonLabel="Why" confirmLabel="Refuse" body={<><strong>{allocation.farmer.name}</strong> is not farming <strong>{farmId(allocation.hectare.code)}</strong>? The request is rejected and the hectare becomes available again.</>}
+          onConfirm={async (reason) => { await irrigationApi.chairmanRejectAllocation(allocation.id, { reason }); onDone(`${farmId(allocation.hectare.code)} refused.`); }} onClose={() => setReject(false)} />}
+      </>
+    );
+  }
   return (
     <>
       <button type="button" className="btn-primary" disabled={busy} onClick={async () => { setBusy(true); try { await irrigationApi.approveAllocation(allocation.id); onDone(`${farmId(allocation.hectare.code)} approved.`); } catch (e) { onError(errMsg(e)); } finally { setBusy(false); } }}>Approve</button>{' '}

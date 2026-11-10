@@ -39,6 +39,10 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       farm_alerts: V,
       rice_protocols: V,
       weather: V,
+      // Sees whether a farmer has paid (never changes it) and registers plots on the Canal / Block / Plot screens.
+      dues: V,
+      irrigation: V,
+      irrigation_allocations: VC,
     },
   },
   {
@@ -110,6 +114,8 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       workspace: V, farmers: V, accounting: VCE, finance: VCE, dues: VCE, payroll: VCE, assets: VE,
       loans: V, suppliers: V, reports: V, audit_logs: V, irrigation_transfer_approval: ['EDIT'],
       harvest_fees: VCE, harvest_clearance: V, harvest_passes: V,
+      // Verifies that arrears are cleared before a defaulted plot is re-rented.
+      farm_administration: V, farm_leases: V,
     },
   },
   {
@@ -120,6 +126,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       irrigation: V, irrigation_allocations: V, irrigation_leadership: V, communication: V, governance: V,
       suppliers: V, inventory: V, warehouses: V, reports: V, audit_logs: V, irrigation_transfer_approval: ['EDIT'],
       harvest_fees: V, harvest_fee_approval: ['EDIT'], harvest_clearance: V, harvest_passes: V,
+      farm_administration: V, farm_leases: V,
     },
   },
   {

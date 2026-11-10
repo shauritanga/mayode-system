@@ -133,6 +133,22 @@ export class ChargesService {
     return { charged, total: plan.total, month: plan.month };
   }
 
+  /**
+   * The daily timer: every AMCOS that switched the late payment penalty on has it applied to whatever is overdue beyond the grace
+   * days, with nobody pressing a button. Once a month per charge (the same rule as the manual run), so running it daily is safe.
+   */
+  async applyAutomatically(): Promise<{ amcos: number; charged: number; total: number }> {
+    const on = await this.prisma.amcosCharge.findMany({ where: { code: 'LATE_PENALTY', isActive: true, amount: { gt: 0 } }, select: { mamcosId: true } });
+    let charged = 0; let total = 0;
+    for (const { mamcosId } of on) {
+      const plan = await this.penaltyPlan(mamcosId);
+      for (const r of plan.rows) {
+        if (await this.chargeFarmer(this.prisma, { mamcosId, farmerId: r.farmerId, description: r.label, amount: r.amount, createdById: null })) { charged++; total = cents(total + r.amount); }
+      }
+    }
+    return { amcos: on.length, charged, total };
+  }
+
   // ───────────────────────── storage fee ─────────────────────────
 
   private async storagePlan(mamcosId: string, month: string) {
