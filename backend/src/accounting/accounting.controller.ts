@@ -37,6 +37,10 @@ import { FarmerAccountsService } from './farmer-accounts.service';
 import { PeriodLockService } from './period-lock.service';
 import { ReconciliationService } from './reconciliation.service';
 import { TaxService } from './tax.service';
+import { ReportExportService } from './report-export.service';
+import { GenerateReportDto, ListReportArchiveDto } from './dto/report-export.dto';
+import type { Response } from 'express';
+import { Res } from '@nestjs/common';
 @ApiTags('accounting')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -51,6 +55,7 @@ export class AccountingController {
     private readonly cash: CashTransactionsService,
     private readonly cashAccounts: CashAccountsService,
     private readonly farmerAccounts: FarmerAccountsService,
+    private readonly reportExports: ReportExportService,
   ) {}
   // Every report and posting below is confined to one cooperative's books: the caller's own, or — for Super Admin — the
   // one named in ?mamcosId=, or everything when none is named. See AccountingService.scopeFor.
@@ -115,6 +120,25 @@ export class AccountingController {
   @RequirePermission('accounting', 'EDIT')
   reverseJournal(@Param('journalId') journalId: string, @Body() dto: ReverseJournalDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
     return this.accounting.reverseJournal(journalId, dto, this.accounting.scopeFor(user, mamcosId), user.id);
+  }
+  // PDF / Word / Excel statements for a chosen period. Every one generated is archived so it can be downloaded again.
+  @Post('report-exports')
+  @RequirePermission('accounting', 'VIEW')
+  generateReport(@Body() dto: GenerateReportDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.reportExports.generate(this.accounting.scopeFor(user, mamcosId), user, dto);
+  }
+  @Get('report-exports')
+  @RequirePermission('accounting', 'VIEW')
+  listReports(@Query() q: ListReportArchiveDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.reportExports.list(this.accounting.scopeFor(user, mamcosId), q);
+  }
+  @Get('report-exports/:id/download')
+  @RequirePermission('accounting', 'VIEW')
+  async downloadReport(@Param('id') id: string, @CurrentUser() user: RequestUser, @Res() res: Response, @Query('mamcosId') mamcosId?: string) {
+    const f = await this.reportExports.file(this.accounting.scopeFor(user, mamcosId), id);
+    res.setHeader('Content-Type', f.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${f.fileName}"`);
+    res.send(Buffer.from(f.content));
   }
   @Get('ratios') ratios(
     @CurrentUser() user: RequestUser,

@@ -1392,4 +1392,8 @@ export const SW_MESSAGES: Record<string, string> = {
   "Combine harvester not found": "Kombaini haijapatikana",
   "Enter the combine harvester’s registration number": "Weka namba ya usajili ya kombaini",
   "A combine harvester with this registration number is already registered": "Kombaini yenye namba hii ya usajili tayari imesajiliwa",
+  "Report not found": "Ripoti haijapatikana",
+  "Choose a financial year, a month, or a start and end date": "Chagua mwaka wa fedha, mwezi, au tarehe ya kuanza na ya kuisha",
+  "Dates must be written as YYYY-MM-DD": "Tarehe ziandikwe kama YYYY-MM-DD",
+  "The start date is after the end date": "Tarehe ya kuanza iko baada ya tarehe ya kuisha",
 };

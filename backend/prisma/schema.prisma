@@ -7010,3 +7010,30 @@ model HarvestCollection {
   @@index([combineId])
   @@map("harvest_collections")
 }
+
+// ============================================================
+// ACCOUNTING REPORT EXPORTS: every PDF / Word / Excel statement the accountant generates is kept so it can be downloaded again
+// ============================================================
+model AccountingReportArchive {
+  id            String   @id @default(uuid())
+  mamcosId      String?  @map("mamcos_id")
+  /// COMPREHENSIVE_INCOME | FINANCIAL_POSITION | CASH_FLOWS | CHANGES_IN_EQUITY | TRIAL_BALANCE | GENERAL_LEDGER | INCOME_EXPENDITURE
+  reportType    String   @map("report_type")
+  /// PDF | DOCX | XLSX
+  format        String
+  /// The full statement heading, e.g. "Statement of Financial Position as at 31 December 2026".
+  title         String
+  periodFrom    String?  @map("period_from")
+  periodTo      String   @map("period_to")
+  fileName      String   @map("file_name")
+  mimeType      String   @map("mime_type")
+  sizeBytes     Int      @map("size_bytes")
+  content       Bytes
+  preparedBy    String?  @map("prepared_by")
+  approvedBy    String?  @map("approved_by")
+  generatedById String?  @map("generated_by_id")
+  generatedAt   DateTime @default(now()) @map("generated_at")
+
+  @@index([mamcosId, generatedAt])
+  @@map("accounting_report_archive")
+}

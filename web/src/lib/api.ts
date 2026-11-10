@@ -298,6 +298,9 @@ export const loansApi = {
 };
 export const accountingApi = {
   statements: (params?: object) => api.get('/accounting/statements', { params }),
+  generateReport: (data: object) => api.post('/accounting/report-exports', data),
+  reportArchive: (params?: object) => api.get('/accounting/report-exports', { params }),
+  downloadReport: (id: string) => api.get(`/accounting/report-exports/${id}/download`, { responseType: 'blob' }),
   profitLoss: (params?: object) => api.get('/accounting/profit-loss', { params }),
   balanceSheet: (params?: object) => api.get('/accounting/balance-sheet', { params }),
   cashFlow: (params?: object) => api.get('/accounting/cash-flow', { params }),

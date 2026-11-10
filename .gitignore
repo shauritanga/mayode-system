@@ -29,3 +29,5 @@ mobile/*.ipa
 # server access credentials
 server-credentials.json
 proposal/
+
+.claude/settings.local.json

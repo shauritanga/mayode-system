@@ -12,6 +12,7 @@ import { CashBookView, MoneyAccountsView } from './money';
 import { FarmerAccountsView, PayoutsView } from './farmers';
 import { BankReconciliationView, CashTransactionsView, DocumentsView, PeriodCloseView, VatReturnView } from './controls';
 import MoneyInput from '@/components/MoneyInput';
+import { ReportExportView } from './exports';
 
 const MENU = [
   ['Farmers', 'farmer-accounts', ['Owed to Farmers', 'Payouts', 'Farmer Statements']],
@@ -23,7 +24,7 @@ const MENU = [
   ['Assets & Loans', 'assets-loans', ['Equipment Register', 'Depreciation', 'Borrowings', 'Interest']],
   ['General Ledger', 'general-ledger', ['Chart of Accounts', 'Journal Entries', 'Trial Balance', 'Account Balances', 'Period Close']],
   ['Budgets & Cooperative Funds', 'budgets-cooperative-funds', ['Annual Budgets', 'Member Contributions', 'Reserves', 'Approved Allocations']],
-  ['Financial Reports', 'financial-reports', ['Income Statement', 'Balance Sheet', 'Cash Flow Statement', 'Farmer Liabilities']],
+  ['Financial Reports', 'financial-reports', ['Income Statement', 'Balance Sheet', 'Cash Flow Statement', 'Farmer Liabilities', 'Export & Archive']],
   ['Tax & Compliance', 'tax-compliance', ['VAT Return']],
 ] as const;
 
@@ -375,6 +376,7 @@ export default function AccountingPage() {
     : customKey === 'general-ledger/period-close' ? <PeriodCloseView canClose={!!canEditAccounting} canReopen={!!canDeleteAccounting} />
     : customKey === 'expenses-income/expenses' ? <CashTransactionsView kind="EXPENSE" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
     : customKey === 'expenses-income/other-income' ? <CashTransactionsView kind="INCOME" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
+    : customKey === 'financial-reports/export-archive' ? <ReportExportView />
     : customKey === 'tax-compliance/vat-return' ? <VatReturnView canCreate={!!canCreateAccounting} />
     : customKey === 'rice-sales-receivables/customer-debtors' ? <DocumentsView kind="invoice" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
     : customKey === 'purchases-suppliers/supplier-bills' ? <DocumentsView kind="bill" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
