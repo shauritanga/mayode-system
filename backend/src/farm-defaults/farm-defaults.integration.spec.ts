@@ -289,4 +289,19 @@ describeDb('Farms of farmers with overdue debts (PostgreSQL)', () => {
     expect(Reflect.getMetadata(PERMISSION_KEY, proto.takeOver)).toMatchObject({ resource: 'farm_administration', action: 'EDIT' });
     expect(Reflect.getMetadata(PERMISSION_KEY, proto.check)).toMatchObject({ resource: 'farm_administration', action: 'CREATE' });
   });
+
+  it('lets only the annual levy lead to M-LAX: an overdue harvest fee or contribution stays a pending payment', async () => {
+    const harvester = await farmer(mamcosA, 'Harvester');
+    await farm(harvester, mamcosA, 'H1');
+    for (const category of ['HARVEST_FEE', 'OTHER', 'MEMBERSHIP_FEE'] as const) {
+      await prisma.farmerDue.create({ data: { mamcosId: mamcosA, farmerId: harvester, category, description: `${category} overdue`, amount: 30_000, issuedOn: new Date(iso(-60)), dueDate: new Date(iso(-40)) } });
+    }
+    await fd.runCheck(mamcosA);
+    expect(await prisma.farmDefaultCase.count({ where: { farmerId: harvester } })).toBe(0);
+    expect((await farmsOf(harvester)).every((f) => f.adminStatus === 'NORMAL')).toBe(true);
+    // the same debt as a levy does lead to a case
+    await prisma.farmerDue.create({ data: { mamcosId: mamcosA, farmerId: harvester, category: 'LEVY', description: 'Levy overdue', amount: 30_000, issuedOn: new Date(iso(-60)), dueDate: new Date(iso(-40)) } });
+    await fd.runCheck(mamcosA);
+    expect(await prisma.farmDefaultCase.count({ where: { farmerId: harvester } })).toBe(1);
+  });
 });

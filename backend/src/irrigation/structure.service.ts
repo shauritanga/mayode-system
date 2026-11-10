@@ -523,6 +523,20 @@ export class StructureService {
     };
   }
 
+  /** The hectare's combine harvests: bags, income and what was paid and collected. */
+  private async harvestSummary(mamcosId: string | null, hectareId: string) {
+    if (!mamcosId) return null;
+    const rows = await this.prisma.harvestCollection.findMany({ where: { mamcosId, hectareId, voidedAt: null }, orderBy: { harvestedOn: 'desc' }, include: { combine: { select: { registrationNumber: true } } } });
+    const n = (v: unknown) => (v == null ? 0 : Number(v));
+    const priced = rows.filter((r) => r.pricePerBag != null);
+    return {
+      harvests: rows.length, bags: Math.round(rows.reduce((t, r) => t + n(r.totalBags), 0) * 1000) / 1000,
+      income: priced.length ? Math.round(priced.reduce((t, r) => t + n(r.totalBags) * n(r.pricePerBag), 0) * 100) / 100 : null,
+      collected: rows.filter((r) => r.status === 'COLLECTED').reduce((t, r) => t + n(r.amount), 0), pending: rows.filter((r) => r.status === 'PENDING').reduce((t, r) => t + n(r.amount), 0),
+      recent: rows.slice(0, 8).map((r) => ({ id: r.id, receiptNo: r.receiptNo, harvestedOn: r.harvestedOn, combine: r.combine.registrationNumber, bags: n(r.totalBags), amount: n(r.amount), status: r.status, collectedByName: r.collectedByName, collectedAt: r.collectedAt })),
+    };
+  }
+
   /** Loans tied to this plot: shown to those who may see the member's money. */
   private async plotLoans(hectareId: string) {
     const rows = await this.prisma.loanRecord.findMany({ where: { hectareId }, orderBy: { createdAt: 'desc' }, take: 20 });
@@ -559,6 +573,7 @@ export class StructureService {
       leaders: { block: contact(blockLeaders.get(hectare.blockId)), canal: contact(canalLeaders.get(hectare.block.canalId)) },
       standing,
       loans: this.debt.canSee(scope) ? await this.plotLoans(id) : [],
+      harvests: await this.harvestSummary(hectare.block.canal.scheme.mamcosId, id),
       block: { id: hectare.block.id, code: hectare.block.code, name: hectare.block.name, blockNumber: hectare.block.blockNumber, side: hectare.block.side },
       canal: { id: hectare.block.canal.id, code: hectare.block.canal.code, name: hectare.block.canal.name, canalNumber: hectare.block.canal.canalNumber },
       scheme: { id: hectare.block.canal.scheme.id, name: hectare.block.canal.scheme.name },

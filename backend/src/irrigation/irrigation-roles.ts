@@ -30,12 +30,12 @@ export const IRRIGATION_ROLE_TEMPLATES: RoleTemplate[] = [
   {
     name: CANAL_LEADER_ROLE,
     description: 'Sees only the canal they currently lead with its blocks and hectares. Allocates hectares there and appoints its block leaders.',
-    grants: { irrigation: V, irrigation_allocations: VCE, irrigation_leadership: VCE, irrigation_verification: ['VIEW', 'EDIT'], harvest_clearance: V, harvest_passes: VCE, payroll_attendance: VCE, water: VCE, water_schedules: V, maintenance_schedule: V },
+    grants: { irrigation: V, irrigation_allocations: VCE, irrigation_leadership: VCE, irrigation_verification: ['VIEW', 'EDIT'], harvest_clearance: V, harvest_passes: VCE, payroll_attendance: VCE, water: VCE, water_schedules: V, maintenance_schedule: V, combine_harvesters: V, harvest_collections: VCE },
   },
   {
     name: BLOCK_LEADER_ROLE,
     description: 'Sees only the block they currently lead with its hectares and farmers. Read-only unless an administrator adds rights.',
-    grants: { irrigation: V, irrigation_allocations: V, irrigation_leadership: V, irrigation_verification: ['VIEW', 'EDIT'], harvest_clearance: V, harvest_passes: VCE, payroll_attendance: VCE, water: VCE, water_schedules: V, maintenance_schedule: V },
+    grants: { irrigation: V, irrigation_allocations: V, irrigation_leadership: V, irrigation_verification: ['VIEW', 'EDIT'], harvest_clearance: V, harvest_passes: VCE, payroll_attendance: VCE, water: VCE, water_schedules: V, maintenance_schedule: V, combine_harvesters: V, harvest_collections: VCE },
   },
   {
     name: COMBINE_OPERATOR_ROLE,

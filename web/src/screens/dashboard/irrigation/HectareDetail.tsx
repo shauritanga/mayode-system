@@ -5,7 +5,7 @@ import { farmId } from '@/lib/farm-id';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { amcosRentalsApi, duesApi, irrigationApi, machineryApi } from '@/lib/api';
-import { CardsSkeleton, Empty, LoadError, Panel, StatCard, StatusBadge, Tabs, fmtDate, fmtHa, titleCase, useApi, useIrrigation } from './ui';
+import { CardsSkeleton, Empty, LoadError, Panel, StatCard, StatusBadge, Tabs, fmtDate, fmtHa, fmtNum, titleCase, useApi, useIrrigation } from './ui';
 
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 type Tab = 'activity' | 'payments' | 'charges' | 'history';
@@ -124,6 +124,27 @@ export function HectareDetail({ id }: { id: string }) {
             </div>
             {emancipationNote && <div className="muted" role="status" style={{ fontSize: 13, marginTop: 10 }}>{emancipationNote}</div>}
           </section>
+
+          {h.harvests && (
+            <section className="table-panel" style={{ padding: '16px 22px', marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Harvest and income</div>
+              {!h.harvests.harvests ? <div className="muted" style={{ fontSize: 13.5 }}>No combine harvest recorded for this hectare yet.</div> : (
+                <>
+                  <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13.5, marginBottom: 10 }}>
+                    <div><span className="muted">Harvests</span><div style={{ fontWeight: 700 }}>{h.harvests.harvests}</div></div>
+                    <div><span className="muted">Bags</span><div style={{ fontWeight: 700 }}>{fmtNum(h.harvests.bags, 1)}</div></div>
+                    <div><span className="muted">Income</span><div style={{ fontWeight: 700 }}>{h.harvests.income == null ? 'set a bag price' : tzs(h.harvests.income)}</div></div>
+                    <div><span className="muted">Paid and collected</span><div style={{ fontWeight: 700 }}>{tzs(h.harvests.collected)}</div></div>
+                    <div><span className="muted">Not collected yet</span><div style={{ fontWeight: 700, color: h.harvests.pending ? 'var(--gold-400)' : undefined }}>{tzs(h.harvests.pending)}</div></div>
+                  </div>
+                  <table className="data-table"><thead><tr><th>Harvested</th><th>Combine</th><th className="num">Bags</th><th className="num">Paid</th><th>Collected by</th></tr></thead><tbody>
+                    {h.harvests.recent.map((r: any) => <tr key={r.id}><td>{fmtDate(r.harvestedOn)}<div className="muted" style={{ fontSize: 11 }}>{r.receiptNo}</div></td><td>{r.combine}</td><td className="num">{fmtNum(r.bags, 1)}</td><td className="num">{tzs(r.amount)}</td>
+                      <td>{r.status === 'COLLECTED' ? <>{r.collectedByName}<div className="muted" style={{ fontSize: 11 }}>{fmtDate(r.collectedAt)}</div></> : <span className="badge badge-gold">Not collected yet</span>}</td></tr>)}
+                  </tbody></table>
+                </>
+              )}
+            </section>
+          )}
 
           {(rented || rentals.data?.history?.length) ? (
             <section className="table-panel" style={{ padding: '16px 22px', marginBottom: 16 }}>

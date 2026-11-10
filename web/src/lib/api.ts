@@ -1123,6 +1123,23 @@ export const maintenanceApi = {
   done: (id: string, data: object) => api.post(`/maintenance/${id}/done`, data),
   update: (id: string, data: object) => api.patch(`/maintenance/${id}`, data),
 };
+/** Combine harvesters and the harvest payments collected for them. */
+export const harvestCollectionsApi = {
+  settings: () => api.get('/harvest-collections/settings'),
+  saveSettings: (data: object) => api.put('/harvest-collections/settings', data),
+  combines: () => api.get('/harvest-collections/combines'),
+  lookupCombine: (registration: string) => api.get('/harvest-collections/combines/lookup', { params: { registration } }),
+  createCombine: (data: object) => api.post('/harvest-collections/combines', data),
+  updateCombine: (id: string, data: object) => api.patch(`/harvest-collections/combines/${id}`, data),
+  context: (farmId: string) => api.get('/harvest-collections/context', { params: { farmId } }),
+  list: (params?: object) => api.get('/harvest-collections', { params }),
+  create: (data: object) => api.post('/harvest-collections', data),
+  receipt: (id: string) => api.get(`/harvest-collections/${id}`),
+  collect: (id: string, collectorFarmerId?: string) => api.post(`/harvest-collections/${id}/collect`, { collectorFarmerId }),
+  void: (id: string, reason: string) => api.post(`/harvest-collections/${id}/void`, { reason }),
+  byCombine: (params?: object) => api.get('/harvest-collections/report/by-combine', { params }),
+  pendingPayments: () => api.get('/harvest-collections/pending-payments'),
+};
 export const complianceReportApi = { get: () => api.get('/compliance-report') };
 
 /** Water schedules, the daily water log and water issues. */

@@ -119,6 +119,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       farm_administration: V, farm_leases: V,
       payroll_attendance: V, water: V, water_schedules: V,
       cash_drawer: ['VIEW', 'EDIT'], input_distribution: V, purchase_orders: V, maintenance_schedule: V,
+      combine_harvesters: V, harvest_collections: V,
     },
   },
   {
@@ -132,7 +133,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       farm_administration: V, farm_leases: V,
       payroll_approval: ['EDIT'], water: V, water_schedules: V,
       cash_drawer: V, input_distribution: V, purchase_orders: V, purchase_order_approval: ['EDIT'], maintenance_schedule: V,
-      users: VCE, roles: VCE,
+      users: VCE, roles: VCE, combine_harvesters: VCE, harvest_collections: V,
     },
   },
   {

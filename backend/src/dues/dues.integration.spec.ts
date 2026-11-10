@@ -126,7 +126,7 @@ describeDb('Farmer dues (PostgreSQL)', () => {
       const ashaPhone = (await prisma.user.findFirstOrThrow({ where: { farmer: { id: asha } } })).phone;
       await new Promise((r) => setTimeout(r, 200));
       const receipt = texts.find((t) => t.to === ashaPhone && /RCT-000001/.test(t.text))!;
-      expect(receipt.text).toMatch(/Stakabadhi ya MAYODE RCT-000001: TZS 5,000 imepokelewa kwa .*\(Shamba H1, H2\)\. Salio TZS 15,000/);
+      expect(receipt.text).toMatch(/Asante\. .* imepokea malipo ya Shamba H1, H2: TZS 5,000 \(stakabadhi RCT-000001\)\. Salio TZS 15,000/);
       expect(((await svc.detail(adminA, ashaLevy.id)) as any).farmIds).toEqual(['H1', 'H2']);
       expect(((await svc.statement(adminA, asha)) as any).farmIds).toEqual(['H1', 'H2']);
       const d: any = await svc.detail(adminA, ashaLevy.id);

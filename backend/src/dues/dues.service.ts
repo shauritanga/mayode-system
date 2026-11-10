@@ -1,3 +1,4 @@
+import { leadersOfFarmer } from '../farm-defaults/leaders';
 import { ModuleRef } from '@nestjs/core';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DueCategory, Prisma } from '@prisma/client';
@@ -56,16 +57,27 @@ export class DuesService {
         this.prisma.farmerDue.findUnique({ where: { id: dueId }, include: { payments: { where: { voidedAt: null }, select: { amount: true, createdAt: true } } } }),
       ]);
       const phone = farmer?.user?.phone;
-      if (!phone) return;
       // the balance as it stood when this payment was made, not after later ones
       const left = due ? cents(num(due.amount) - num(due.waivedAmount) - due.payments.filter((p) => p.createdAt <= payment.createdAt).reduce((n, p) => n + num(p.amount), 0)) : 0;
       const tz = (n: number) => `TZS ${Math.round(n).toLocaleString('en-US')}`;
       const plots = ids.length ? ids.slice(0, 4).join(', ') + (ids.length > 4 ? ` +${ids.length - 4}` : '') : '';
+      const amcos = (await this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { name: true } }))?.name ?? 'AMCOS';
       const en = farmer?.user?.language === 'en';
-      const text = en
-        ? `MAYODE receipt ${payment.receiptNo}: ${tz(num(payment.amount))} received for ${description}${plots ? ` (Farm ID ${plots})` : ''}. ${left > 0 ? `Balance ${tz(left)}.` : 'Fully paid. Thank you.'}`
-        : `Stakabadhi ya MAYODE ${payment.receiptNo}: ${tz(num(payment.amount))} imepokelewa kwa ${description}${plots ? ` (Shamba ${plots})` : ''}. ${left > 0 ? `Salio ${tz(left)}.` : 'Umemaliza kulipa. Asante.'}`;
-      await sms.send(phone, text, 'due_receipt');
+      if (phone) {
+        const text = en
+          ? `Thank you. ${amcos} has received payment for ${plots ? `Farm ID ${plots}` : description}: ${tz(num(payment.amount))} (receipt ${payment.receiptNo}). ${left > 0 ? `Balance ${tz(left)}. ` : ''}We appreciate your continued commitment to fulfilling your contribution obligations. Thank you for your cooperation and continued support.`
+          : `Asante. ${amcos} imepokea malipo ya ${plots ? `Shamba ${plots}` : description}: ${tz(num(payment.amount))} (stakabadhi ${payment.receiptNo}). ${left > 0 ? `Salio ${tz(left)}. ` : ''}Tunathamini kujitolea kwako kutimiza michango yako. Asante kwa ushirikiano na uungwaji mkono wako.`;
+        await sms.send(phone, text, 'due_receipt');
+      }
+      // the block and canal leaders hear of every payment too
+      const who = due ? await this.prisma.farmer.findUnique({ where: { id: farmerId }, select: { firstName: true, lastName: true } }) : null;
+      for (const l of await leadersOfFarmer(this.prisma, farmerId)) {
+        const name = who ? `${who.firstName} ${who.lastName}`.trim() : '';
+        const body = l.language === 'en'
+          ? `${amcos}: payment received from ${name}${plots ? ` (Farm ID ${plots})` : ''}: ${tz(num(payment.amount))} for ${description}. Receipt ${payment.receiptNo}.`
+          : `${amcos}: malipo yamepokelewa kutoka kwa ${name}${plots ? ` (Shamba ${plots})` : ''}: ${tz(num(payment.amount))} kwa ${description}. Stakabadhi ${payment.receiptNo}.`;
+        await sms.send(l.phone, body, 'due_receipt').catch(() => undefined);
+      }
     } catch { /* the payment stands even if the text cannot be sent */ }
     void mamcosId;
   }

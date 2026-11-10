@@ -6928,3 +6928,85 @@ model MaintenanceLog {
   @@index([scheduleId, doneOn])
   @@map("maintenance_logs")
 }
+
+// ============================================================
+// COMBINE HARVESTERS AND THE HARVEST PAYMENTS COLLECTED FOR THEM
+// ============================================================
+
+enum HarvestCollectionStatus {
+  PENDING
+  COLLECTED
+}
+
+/// A combine harvester, known by its registration number (stored upper-case without spaces). Payments are tracked against it.
+model CombineHarvester {
+  id                 String   @id @default(uuid())
+  mamcosId           String   @map("mamcos_id")
+  registrationNumber String   @map("registration_number")
+  make               String?
+  model              String?
+  ownerName          String   @map("owner_name")
+  ownerPhone         String?  @map("owner_phone")
+  operatorName       String?  @map("operator_name")
+  operatorPhone      String?  @map("operator_phone")
+  note               String?
+  isActive           Boolean  @default(true) @map("is_active")
+  createdById        String?  @map("created_by_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  collections HarvestCollection[]
+
+  @@unique([mamcosId, registrationNumber])
+  @@map("combine_harvesters")
+}
+
+/// How paddy in the field is counted: so many baskets make one bag, and (optionally) what a bag is worth, for the income of a hectare.
+model HarvestSetting {
+  mamcosId       String   @id @map("mamcos_id")
+  basketsPerBag  Decimal  @default(2) @map("baskets_per_bag") @db.Decimal(8, 3)
+  pricePerBag    Decimal? @map("price_per_bag") @db.Decimal(14, 2)
+  updatedById    String?  @map("updated_by_id")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("harvest_settings")
+}
+
+/// What one combine harvest of one hectare yielded and what was paid for it. PENDING until the canal or block leader has received the money
+/// and recorded it. Never deleted: a mistake is voided with a reason.
+model HarvestCollection {
+  id                String                  @id @default(uuid())
+  mamcosId          String                  @map("mamcos_id")
+  receiptNo         String                  @map("receipt_no")
+  hectareId         String                  @map("hectare_id")
+  blockId           String                  @map("block_id")
+  farmerId          String?                 @map("farmer_id")
+  combineId         String                  @map("combine_id")
+  harvestedOn       DateTime                @map("harvested_on") @db.Date
+  quantityKg        Decimal?                @map("quantity_kg") @db.Decimal(12, 2)
+  bagsCounted       Int                     @default(0) @map("bags_counted")
+  basketsCounted    Decimal                 @default(0) @map("baskets_counted") @db.Decimal(10, 2)
+  basketsPerBag     Decimal                 @map("baskets_per_bag") @db.Decimal(8, 3)
+  totalBags         Decimal                 @map("total_bags") @db.Decimal(12, 3)
+  pricePerBag       Decimal?                @map("price_per_bag") @db.Decimal(14, 2)
+  amount            Decimal                 @db.Decimal(14, 2)
+  status            HarvestCollectionStatus @default(PENDING)
+  collectedAt       DateTime?               @map("collected_at")
+  collectedByFarmerId String?               @map("collected_by_farmer_id")
+  collectedByName   String?                 @map("collected_by_name")
+  collectedByPosition String?               @map("collected_by_position")
+  note              String?
+  recordedById      String                  @map("recorded_by_id")
+  voidedAt          DateTime?               @map("voided_at")
+  voidReason        String?                 @map("void_reason")
+  voidedById        String?                 @map("voided_by_id")
+  createdAt         DateTime                @default(now()) @map("created_at")
+
+  combine CombineHarvester @relation(fields: [combineId], references: [id], onDelete: Restrict)
+
+  @@unique([mamcosId, receiptNo])
+  @@index([hectareId])
+  @@index([blockId, status])
+  @@index([combineId])
+  @@map("harvest_collections")
+}

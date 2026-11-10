@@ -37,6 +37,7 @@ export const PORTAL_SECTIONS = {
     "tenders",
     "water",
     "cash-drawer",
+    "combine-harvests",
     "inputs",
     "purchase-orders",
     "maintenance",

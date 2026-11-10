@@ -4,14 +4,36 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import Modal from '@/components/Modal';
-import { farmDefaultsApi } from '@/lib/api';
+import { farmDefaultsApi, harvestCollectionsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { ConfirmDialog, Empty, Field, LoadError, Notice, PageHeader, TableSkeleton, Tabs, errMsg, fmtDate, fmtNum, useApi, useCan, useDebounced } from '@/screens/dashboard/irrigation/ui';
 
-type Stage = 'open' | 'notice' | 'mlax' | 'resolved';
+type Stage = 'open' | 'notice' | 'mlax' | 'resolved' | 'pending';
 const STATUS_LABEL: Record<string, string> = { UNDER_AMCOS: 'Under AMCOS', MLAX_NOTICE: 'Last warning sent', AT_MLAX: 'On M-LAX', RECLAIMED: 'Debt paid, farms returned', TAKEN_OVER: 'Taken over by a farmer', LEASED_ON_MLAX: 'Leased on M-LAX', CLOSED: 'Released by the AMCOS' };
 const EVENT_LABEL: Record<string, string> = { OPENED: 'Farms blocked', MLAX_NOTICE: 'Last warning: two days left', AT_MLAX: 'Listed on M-LAX', RECLAIMED: 'Debt paid, farms returned', TAKEN_OVER: 'Taken over by a farmer', RELEASED: 'Released by the AMCOS', LEASED_ON_MLAX: 'A farm was leased on M-LAX', PAID_TOO_LATE: 'Debt paid after the farms were on M-LAX' };
 const money = (n: number) => `TZS ${fmtNum(n)}`;
+
+/** Money waiting to be paid or collected that is not overdue debt: it never leads to M-LAX. */
+function PendingPayments() {
+  const { data, loading, error, reload } = useApi<any>(() => harvestCollectionsApi.pendingPayments(), []);
+  const rows: any[] = data?.data ?? [];
+  return (
+    <section className="table-panel">
+      <div style={{ padding: '10px 14px', fontSize: 13 }} className="muted">Combine harvest payments the leaders have not yet recorded, and unpaid harvest fees and contributions. Only the annual farm levy follows the overdue-debt steps above; these are followed up but never sent to M-LAX.</div>
+      <LoadError message={error} onRetry={reload} />
+      {loading && !data ? <TableSkeleton cols={5} /> : !rows.length ? <Empty title="Nothing pending" /> : (
+        <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>What</th><th>Who</th><th>Farm ID</th><th className="num">Amount</th><th>Waiting</th></tr></thead><tbody>
+          {rows.map((r) => (
+            <tr key={`${r.kind}-${r.id}`}>
+              <td>{r.what}<div className="muted" style={{ fontSize: 11 }}>{r.detail}</div></td><td>{r.who || '—'}</td><td>{r.farmIds?.join(', ') || '—'}</td>
+              <td className="num">{money(r.amount)}</td><td><span className={`badge ${r.kind === 'HARVEST_PAYMENT' ? 'badge-gold' : 'badge-gray'}`}>{r.daysWaiting} day{r.daysWaiting === 1 ? '' : 's'}</span></td>
+            </tr>
+          ))}
+        </tbody></table></div>
+      )}
+    </section>
+  );
+}
 
 function left(deadline: string | null) {
   if (!deadline) return '—';
@@ -137,7 +159,7 @@ export default function FarmAdministrationPage() {
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const [dialog, setDialog] = useState<{ kind: 'takeover' | 'release' | 'detail'; c: any } | null>(null);
   const [checking, setChecking] = useState(false);
-  const list = useApi<any>(user?.mamcosId ? () => farmDefaultsApi.list({ stage }) : null, [stage, refresh, user?.mamcosId]);
+  const list = useApi<any>(user?.mamcosId ? () => farmDefaultsApi.list({ stage: stage === 'pending' ? 'open' : stage }) : null, [stage, refresh, user?.mamcosId]);
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(null), 7000); return () => clearTimeout(t); }, [notice]);
 
   if (!can('farm_administration', 'VIEW')) return <Empty title="You do not have access to this section" hint="Ask an administrator to grant the farms under administration permission." />;
@@ -166,9 +188,9 @@ export default function FarmAdministrationPage() {
       )}
       <Tabs tabs={[
         { id: 'open' as const, label: `Under AMCOS (${counts.open})` }, { id: 'notice' as const, label: `Last 2 days (${counts.notice})` },
-        { id: 'mlax' as const, label: `On M-LAX (${counts.mlax})` }, { id: 'resolved' as const, label: `Resolved (${counts.resolved})` },
+        { id: 'mlax' as const, label: `On M-LAX (${counts.mlax})` }, { id: 'resolved' as const, label: `Resolved (${counts.resolved})` }, { id: 'pending' as const, label: 'Pending payments' },
       ]} active={stage} onChange={setStage} />
-      <section className="table-panel">
+      {stage === 'pending' ? <PendingPayments /> : <section className="table-panel">
         {list.loading && !list.data ? <TableSkeleton cols={6} /> : !rows.length ? (
           <Empty title={stage === 'open' ? 'No farms under AMCOS administration' : 'Nothing here'}
             hint={stage === 'open' ? 'When a farmer’s debt passes its due date, their farms appear here.' : undefined} />
@@ -195,7 +217,7 @@ export default function FarmAdministrationPage() {
             </table>
           </div>
         )}
-      </section>
+      </section>}
       {dialog?.kind === 'detail' && <Detail c={dialog.c} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'takeover' && <TakeOverDialog c={dialog.c} onClose={() => setDialog(null)} onDone={done} />}
       {dialog?.kind === 'release' && <ReleaseDialog c={dialog.c} onClose={() => setDialog(null)} onDone={done} />}

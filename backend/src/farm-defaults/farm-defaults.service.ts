@@ -63,8 +63,10 @@ export class FarmDefaultsService {
   /** What the farmer must clear: debts past the grace period, plus penalty dues (which have no due date). */
   private async outstanding(db: Db, mamcosId: string, farmerId: string, lateSince?: Date) {
     const cutoff = dateOf(localDate(new Date())); // a debt is overdue the day after its due date
+    // Only the annual farm levy (and the penalty this procedure adds) follows the overdue-debt procedure. Harvest charges and other
+    // contributions stay as pending payments and never lead to M-LAX.
     const dues = await db.farmerDue.findMany({
-      where: { mamcosId, farmerId, status: 'ACTIVE' },
+      where: { mamcosId, farmerId, status: 'ACTIVE', OR: [{ category: 'LEVY' }, { description: { startsWith: 'Late penalty' } }, { description: { startsWith: 'Overdue-debt penalty' } }] },
       include: { payments: { where: { voidedAt: null }, select: { amount: true } } },
       orderBy: { issuedOn: 'asc' },
     });
@@ -128,7 +130,7 @@ export class FarmDefaultsService {
     let reminded = 0;
     for (const { mamcosId } of mamcoses) {
       const due = await this.prisma.farmerDue.findMany({
-        where: { mamcosId, status: 'ACTIVE', dueReminderSentAt: null, dueDate: { gte: from, lte: today } },
+        where: { mamcosId, status: 'ACTIVE', category: 'LEVY', dueReminderSentAt: null, dueDate: { gte: from, lte: today } },
         include: { payments: { where: { voidedAt: null }, select: { amount: true } }, farmer: { select: { id: true, firstName: true, lastName: true } } },
       });
       const perFarmer = new Map<string, { name: string; total: number; what: string[]; ids: string[] }>();
@@ -174,7 +176,7 @@ export class FarmDefaultsService {
     const rate = await this.charges.rate(mamcosId, 'DEFAULT_PENALTY');
     if (!rate) return { enabled: false, opened: 0, farmers: [] as string[] };
     const cutoff = dateOf(localDate(new Date()));
-    const late = await this.prisma.farmerDue.findMany({ where: { mamcosId, status: 'ACTIVE', dueDate: { not: null, lt: cutoff } }, select: { farmerId: true }, distinct: ['farmerId'] });
+    const late = await this.prisma.farmerDue.findMany({ where: { mamcosId, status: 'ACTIVE', category: 'LEVY', dueDate: { not: null, lt: cutoff } }, select: { farmerId: true }, distinct: ['farmerId'] });
     const opened: string[] = [];
     for (const { farmerId } of late) {
       try {
