@@ -35,6 +35,7 @@ export const PORTAL_SECTIONS = {
     "board",
     "meetings",
     "tenders",
+    "water",
     "farm-administration",
     "task-management",
     "assets",

@@ -1065,17 +1065,45 @@ export const assetsApi = {
 };
 
 export const payrollApi = {
+  titles: () => api.get('/payroll/titles'),
+  createTitle: (data: object) => api.post('/payroll/titles', data),
   payees: () => api.get('/payroll/payees'),
   candidates: () => api.get('/payroll/candidates'),
   addPayee: (data: object) => api.post('/payroll/payees', data),
   updatePayee: (id: string, data: object) => api.patch(`/payroll/payees/${id}`, data),
+  verifyPayee: (id: string) => api.post(`/payroll/payees/${id}/verify`),
+  history: (id: string) => api.get(`/payroll/payees/${id}/history`),
+  attendance: (params?: object) => api.get('/payroll/attendance', { params }),
+  markAttendance: (data: object) => api.post('/payroll/attendance', data),
+  markDay: (data: object) => api.post('/payroll/attendance/day', data),
+  removeAttendance: (id: string) => api.delete(`/payroll/attendance/${id}`),
+  outputs: (params?: object) => api.get('/payroll/output', { params }),
+  addOutput: (data: object) => api.post('/payroll/output', data),
+  budgets: () => api.get('/payroll/budgets'),
+  setBudget: (costCenter: string, monthlyLimit: number) => api.put(`/payroll/budgets/${costCenter}`, { monthlyLimit }),
   runs: () => api.get('/payroll/runs'),
   createRun: (data: object) => api.post('/payroll/runs', data),
   run: (id: string) => api.get(`/payroll/runs/${id}`),
   deleteRun: (id: string) => api.delete(`/payroll/runs/${id}`),
+  recompile: (id: string) => api.post(`/payroll/runs/${id}/recompile`),
   updateLine: (id: string, lineId: string, data: object) => api.patch(`/payroll/runs/${id}/lines/${lineId}`, data),
+  submit: (id: string, data: object = {}) => api.post(`/payroll/runs/${id}/submit`, data),
+  returnRun: (id: string, reason: string) => api.post(`/payroll/runs/${id}/return`, { reason }),
+  approve: (id: string, data: object) => api.post(`/payroll/runs/${id}/approve`, data),
   post: (id: string, data: object) => api.post(`/payroll/runs/${id}/post`, data),
   payslip: (id: string, lineId: string) => api.get(`/payroll/runs/${id}/payslips/${lineId}`),
+};
+
+/** Water schedules, the daily water log and water issues. */
+export const waterApi = {
+  structure: () => api.get('/water/structure'),
+  overview: () => api.get('/water/overview'),
+  schedules: () => api.get('/water/schedules'),
+  createSchedule: (data: object) => api.post('/water/schedules', data),
+  updateSchedule: (id: string, data: object) => api.patch(`/water/schedules/${id}`, data),
+  logs: (params?: object) => api.get('/water/logs', { params }),
+  log: (data: object) => api.post('/water/logs', data),
+  resolve: (id: string, resolution: string) => api.post(`/water/logs/${id}/resolve`, { resolution }),
 };
 
 export const duesApi = {

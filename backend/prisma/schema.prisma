@@ -290,6 +290,7 @@ model Mamcos {
   id                  String   @id @default(uuid())
   amcosMeetings       AmcosMeeting[]
   tenders             Tender[]
+  payrollJobTitles    PayrollJobTitle[]
   name                String   @unique
   /// Short code a farmer types on sign-up to ask to join this AMCOS (e.g. MDB-4F2A91).
   code                String?  @unique
@@ -5650,8 +5651,11 @@ model IrrigationHectareGuardian {
 // PAYROLL (AMCOS staff and leaders)
 // ============================================================
 
+/// DRAFT (compiled, adjustable) -> SUBMITTED (the Accountant reconciled it) -> APPROVED (the Manager checked the money and authorised it) -> POSTED (paid and booked).
 enum PayrollRunStatus {
   DRAFT
+  SUBMITTED
+  APPROVED
   POSTED
 }
 
@@ -5661,26 +5665,147 @@ enum PayrollPayMethod {
   BANK
 }
 
-/// A person the AMCOS pays a monthly salary: a staff member or a canal/block leader (both have a login).
-model PayrollPayee {
-  id            String   @id @default(uuid())
-  mamcosId      String   @map("mamcos_id")
-  userId        String   @map("user_id")
-  /// What they are paid as, e.g. Cashier or Canal leader C01.
-  title         String
-  monthlySalary Decimal  @map("monthly_salary") @db.Decimal(14, 2)
-  startDate     DateTime @map("start_date") @db.Date
-  isActive      Boolean  @default(true) @map("is_active")
-  createdById   String?  @map("created_by_id")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+enum PayrollTier {
+  CORE_ADMIN
+  FIELD_LEADERSHIP
+  SUPPORT
+}
 
-  mamcos Mamcos        @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
-  user   User          @relation(fields: [userId], references: [id], onDelete: Restrict)
-  lines  PayrollLine[]
+enum WageType {
+  MONTHLY
+  DAILY
+  PIECE
+}
+
+/// The budget line a wage is charged to, each with its own ledger account.
+enum CostCenter {
+  ADMIN_OVERHEAD
+  FACILITY_MAINTENANCE
+  SECURITY
+  IRRIGATION_OPS
+  WAREHOUSE_OPS
+}
+
+/// What a stipend depends on: nothing, the gate opener's logged water days, or the chairman's own water-log entries.
+enum ComplianceKind {
+  NONE
+  WATER_LOG
+  CHAIRMAN_LOG
+}
+
+/// A job title the AMCOS defined: which tier it belongs to, which budget line it is charged to, how it is paid, and what verifies it.
+model PayrollJobTitle {
+  id         String         @id @default(uuid())
+  mamcosId   String         @map("mamcos_id")
+  name       String
+  tier       PayrollTier
+  costCenter CostCenter     @map("cost_center")
+  wageType   WageType       @map("wage_type")
+  compliance ComplianceKind @default(NONE)
+  isActive   Boolean        @default(true) @map("is_active")
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  mamcos Mamcos @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+
+  @@unique([mamcosId, name])
+  @@map("payroll_job_titles")
+}
+
+/// A person the AMCOS pays: a staff member or leader with a login, or a support worker without one. Every payee has a worker ID,
+/// a phone number and payout details; pay terms take effect only after a Manager verifies them.
+model PayrollPayee {
+  id             String         @id @default(uuid())
+  mamcosId       String         @map("mamcos_id")
+  userId         String?        @map("user_id")
+  workerCode     String         @map("worker_code")
+  /// Name for a worker without a login; people with a login are named from their account.
+  fullName       String?        @map("full_name")
+  phone          String?
+  idType         String?        @map("id_type")
+  idNumber       String?        @map("id_number")
+  payoutMethod   String?        @map("payout_method")
+  payoutAccount  String?        @map("payout_account")
+  payoutName     String?        @map("payout_name")
+  titleId        String?        @map("title_id")
+  /// What they are paid as, e.g. Cashier or Canal leader C01.
+  title          String
+  tier           PayrollTier    @default(CORE_ADMIN)
+  costCenter     CostCenter     @default(ADMIN_OVERHEAD) @map("cost_center")
+  wageType       WageType       @default(MONTHLY) @map("wage_type")
+  compliance     ComplianceKind @default(NONE)
+  /// The fixed monthly salary (MONTHLY only).
+  monthlySalary  Decimal        @map("monthly_salary") @db.Decimal(14, 2)
+  /// The daily rate (DAILY) or the price per unit (PIECE).
+  rate           Decimal?       @db.Decimal(14, 2)
+  pieceUnit      String?        @map("piece_unit")
+  startDate      DateTime       @map("start_date") @db.Date
+  contractEnd    DateTime?      @map("contract_end") @db.Date
+  isActive       Boolean        @default(true) @map("is_active")
+  /// Set by a Manager (not the person who added them). Changing the pay or payout account clears it until verified again.
+  verifiedById   String?        @map("verified_by_id")
+  verifiedAt     DateTime?      @map("verified_at")
+  createdById    String?        @map("created_by_id")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  mamcos      Mamcos              @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  user        User?               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  lines       PayrollLine[]
+  attendance  PayrollAttendance[]
+  outputs     PayrollOutput[]
 
   @@unique([mamcosId, userId])
+  @@unique([mamcosId, workerCode])
+  @@unique([mamcosId, phone])
   @@map("payroll_payees")
+}
+
+/// A day a daily-wage worker worked (a whole day, or half a day), recorded by their supervisor.
+model PayrollAttendance {
+  id           String       @id @default(uuid())
+  mamcosId     String       @map("mamcos_id")
+  payeeId      String       @map("payee_id")
+  date         DateTime     @db.Date
+  fraction     Decimal      @default(1) @db.Decimal(3, 2)
+  note         String?
+  recordedById String       @map("recorded_by_id")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  payee PayrollPayee @relation(fields: [payeeId], references: [id], onDelete: Restrict)
+
+  @@unique([payeeId, date])
+  @@index([mamcosId, date])
+  @@map("payroll_attendance")
+}
+
+/// Work a piece-rate worker did on a day (bags sorted, loads carried), recorded by their supervisor.
+model PayrollOutput {
+  id           String       @id @default(uuid())
+  mamcosId     String       @map("mamcos_id")
+  payeeId      String       @map("payee_id")
+  date         DateTime     @db.Date
+  quantity     Decimal      @db.Decimal(12, 2)
+  note         String?
+  recordedById String       @map("recorded_by_id")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  payee PayrollPayee @relation(fields: [payeeId], references: [id], onDelete: Restrict)
+
+  @@index([payeeId, date])
+  @@index([mamcosId, date])
+  @@map("payroll_outputs")
+}
+
+/// The most a budget line may cost in one month's payroll. A run over its limit cannot be submitted or approved.
+model PayrollBudget {
+  mamcosId     String     @map("mamcos_id")
+  costCenter   CostCenter @map("cost_center")
+  monthlyLimit Decimal    @map("monthly_limit") @db.Decimal(14, 2)
+  updatedById  String?    @map("updated_by_id")
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  @@id([mamcosId, costCenter])
+  @@map("payroll_budgets")
 }
 
 /// One month's pay run. A DRAFT can be edited freely; POSTED pays it and writes the AMCOS ledger, and is then final.
@@ -5699,6 +5824,13 @@ model PayrollRun {
   createdById     String?           @map("created_by_id")
   postedById      String?           @map("posted_by_id")
   postedAt        DateTime?         @map("posted_at")
+  submittedById   String?           @map("submitted_by_id")
+  submittedAt     DateTime?         @map("submitted_at")
+  approvedById    String?           @map("approved_by_id")
+  approvedAt      DateTime?         @map("approved_at")
+  approveNote     String?           @map("approve_note")
+  /// The money account the Manager authorised this run to be paid from; its balance covered the run when approved.
+  approvedCashAccountId String?     @map("approved_cash_account_id")
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
@@ -5723,6 +5855,16 @@ model PayrollLine {
   deductions    Decimal @default(0) @db.Decimal(14, 2)
   deductionNote String? @map("deduction_note")
   net           Decimal @db.Decimal(14, 2)
+  tier          PayrollTier    @default(CORE_ADMIN)
+  costCenter    CostCenter     @default(ADMIN_OVERHEAD) @map("cost_center")
+  wageType      WageType       @default(MONTHLY) @map("wage_type")
+  /// Days worked (DAILY) or units done (PIECE).
+  units         Decimal?       @db.Decimal(12, 2)
+  rate          Decimal?       @db.Decimal(14, 2)
+  /// How the gross was worked out, in words: "22 days x 15,000" or "21 of 24 water logs (87.5%)".
+  basis         String?
+  /// 0 to 1: the share of a compliance-linked stipend earned.
+  complianceFactor Decimal?    @map("compliance_factor") @db.Decimal(5, 4)
 
   run   PayrollRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
   payee PayrollPayee @relation(fields: [payeeId], references: [id], onDelete: Restrict)
@@ -6538,4 +6680,56 @@ model TenderEvent {
 
   @@index([tenderId, createdAt])
   @@map("tender_events")
+}
+
+// ============================================================
+// WATER: irrigation schedules and the daily log that stipends are checked against
+// ============================================================
+
+/// When water is to run on a canal (or one block of it): the weekdays (0 = Sunday), the period, and the gate opener responsible.
+model WaterSchedule {
+  id               String    @id @default(uuid())
+  mamcosId         String    @map("mamcos_id")
+  canalId          String    @map("canal_id")
+  blockId          String?   @map("block_id")
+  weekdays         Int[]
+  startsOn         DateTime  @map("starts_on") @db.Date
+  endsOn           DateTime? @map("ends_on") @db.Date
+  gateOpenerPayeeId String?  @map("gate_opener_payee_id")
+  note             String?
+  isActive         Boolean   @default(true) @map("is_active")
+  createdById      String?   @map("created_by_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([mamcosId, canalId])
+  @@map("water_schedules")
+}
+
+/// One entry in the water log: the gate opened and closed on a day, who did it, who recorded it, and any water issue (leak, shortage, dispute, blockage).
+model WaterLog {
+  id                String    @id @default(uuid())
+  mamcosId          String    @map("mamcos_id")
+  canalId           String    @map("canal_id")
+  blockId           String?   @map("block_id")
+  date              DateTime  @db.Date
+  openedAt          DateTime? @map("opened_at")
+  closedAt          DateTime? @map("closed_at")
+  /// The gate opener on duty (a payroll payee); the person recording may be the chairman.
+  gateOpenerPayeeId String?   @map("gate_opener_payee_id")
+  loggedById        String    @map("logged_by_id")
+  scheduleId        String?   @map("schedule_id")
+  note              String?
+  /// LEAK, SHORTAGE, DISPUTE, BLOCKAGE or OTHER; null when nothing went wrong.
+  issueType         String?   @map("issue_type")
+  issueNote         String?   @map("issue_note")
+  issueStatus       String?   @map("issue_status")
+  resolvedById      String?   @map("resolved_by_id")
+  resolvedAt        DateTime? @map("resolved_at")
+  resolution        String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@index([mamcosId, date])
+  @@index([canalId, date])
+  @@index([gateOpenerPayeeId, date])
+  @@map("water_logs")
 }

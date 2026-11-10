@@ -43,6 +43,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       dues: V,
       irrigation: V,
       irrigation_allocations: VC,
+      water: VC, // logs water issues found in the field
     },
   },
   {
@@ -116,6 +117,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       harvest_fees: VCE, harvest_clearance: V, harvest_passes: V,
       // Verifies that arrears are cleared before a defaulted plot is re-rented.
       farm_administration: V, farm_leases: V,
+      payroll_attendance: V, water: V, water_schedules: V,
     },
   },
   {
@@ -127,12 +129,13 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       suppliers: V, inventory: V, warehouses: V, reports: V, audit_logs: V, irrigation_transfer_approval: ['EDIT'],
       harvest_fees: V, harvest_fee_approval: ['EDIT'], harvest_clearance: V, harvest_passes: V,
       farm_administration: V, farm_leases: V,
+      payroll_approval: ['EDIT'], water: V, water_schedules: V,
     },
   },
   {
     name: 'Procurement Officer',
     description: 'Buys for the AMCOS: manages suppliers and stock coming in. No payments, payroll or accounts.',
-    grants: { workspace: V, suppliers: VCE, inventory: VCE, warehouses: V, assets: V, reports: V },
+    grants: { workspace: V, suppliers: VCE, inventory: VCE, warehouses: V, assets: V, reports: V, payroll_attendance: VCE },
   },
 ];
 
