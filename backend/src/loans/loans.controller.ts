@@ -1,5 +1,5 @@
 import { PermissionResource } from '../auth/role-access';
-import { Body, Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
@@ -8,7 +8,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
-import { CreateLoanDto } from './dto/loans.dto';
+import { CreateLoanDto, SetLoanPlotDto } from './dto/loans.dto';
 import { LoansService } from './loans.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
@@ -28,6 +28,12 @@ export class LoansController {
   @RequirePermission('loans', 'CREATE')
   create(@Body() dto: CreateLoanDto) {
     return this.loans.create(dto);
+  }
+  @Patch(':id/plot')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAMCOS_SECRETARY)
+  @RequirePermission('loans', 'EDIT')
+  setPlot(@Param('id') id: string, @Body() dto: SetLoanPlotDto, @CurrentUser() user: RequestUser) {
+    return this.loans.setPlot(id, dto.hectareId, user);
   }
   @Get('farmer/:farmerId')
   @Roles(

@@ -21,6 +21,18 @@ const STATE_TONE: Record<string, string> = { OPEN: 'badge-gold', PARTIAL: 'badge
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 const cat = (v?: string) => CATEGORY_LABEL[v ?? ''] ?? titleCase(v);
 const day = (v?: string | null) => (v ? String(v).slice(0, 10) : '');
+/** Opens a one-page receipt for the browser to print: what the farmer holds as proof of payment. */
+function printReceipt(d: any, p: any) {
+  const w = window.open('', '_blank', 'width=420,height=600');
+  if (!w) return;
+  const esc = (v: unknown) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  const row = (k: string, v: string) => `<tr><td style="color:#555;padding:3px 12px 3px 0">${esc(k)}</td><td style="padding:3px 0"><strong>${esc(v)}</strong></td></tr>`;
+  w.document.write(`<!doctype html><title>Receipt ${esc(p.receiptNo)}</title><body style="font-family:Arial,sans-serif;max-width:360px;margin:24px auto"><h2 style="margin:0">Payment receipt</h2><p style="margin:2px 0 14px;color:#555">${esc(p.receiptNo)}</p><table>${[
+    row('Received from', d.farmer?.name ?? ''), row('Member no.', d.farmer?.memberNumber ?? ''), d.farmIds?.length ? row('Farm ID', d.farmIds.join(', ')) : '',
+    row('For', d.description ?? ''), row('Date', day(p.paidOn)), row('Paid by', METHOD_LABEL[p.method] ?? p.method), row('Amount', tzs(p.amount)), row('Balance of this charge', tzs(d.balance)),
+  ].join('')}</table><p style="margin-top:28px;color:#555;font-size:12px">${p.voidedAt ? 'THIS RECEIPT HAS BEEN VOIDED.' : 'Thank you. Keep this receipt as proof of payment.'}</p><script>window.onload=function(){window.print()}</script></body>`);
+  w.document.close();
+}
 const errBox = (m: string) => m && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 13, marginTop: 10 }}>{m}</div>;
 
 function Footer({ onClose, saving, form, label }: { onClose: () => void; saving: boolean; form: string; label: string }) {
@@ -28,7 +40,7 @@ function Footer({ onClose, saving, form, label }: { onClose: () => void; saving:
 }
 
 /** Searchable dropdown of the AMCOS's farmers: opens on click, narrows as you type, picks with the mouse or arrow keys. */
-function FarmerPicker({ value, onChange, error }: { value: any; onChange: (f: any) => void; error?: string }) {
+export function FarmerPicker({ value, onChange, error }: { value: any; onChange: (f: any) => void; error?: string }) {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -238,7 +250,7 @@ function DueDetail({ id, can, onClose, onChanged }: { id: string; can: (r: strin
                       <td>{p.receiptNo}{p.reference && <div className="muted" style={{ fontSize: 11 }}>{p.reference}</div>}</td>
                       <td>{fmtDate(p.paidOn)}</td><td>{METHOD_LABEL[p.method]}</td>
                       <td className="num" style={p.voidedAt ? { textDecoration: 'line-through' } : undefined}>{tzs(p.amount)}</td>
-                      <td>{p.voidedAt ? <span className="badge badge-gray" title={p.voidReason}>Void</span> : can('dues', 'DELETE') && <button type="button" className="btn-secondary" onClick={() => setSub({ void: p })}>Void</button>}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>{!p.voidedAt && <button type="button" className="btn-secondary" style={{ marginRight: 6 }} onClick={() => printReceipt(d, p)}>Print</button>}{p.voidedAt ? <span className="badge badge-gray" title={p.voidReason}>Void</span> : can('dues', 'DELETE') && <button type="button" className="btn-secondary" onClick={() => setSub({ void: p })}>Void</button>}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -1094,6 +1094,37 @@ export const payrollApi = {
   payslip: (id: string, lineId: string) => api.get(`/payroll/runs/${id}/payslips/${lineId}`),
 };
 
+/** Staff task tools: the cashier's day close, inputs handed to farmers, purchase orders, maintenance schedules and the compliance checklist. */
+export const cashDrawerApi = {
+  today: (day?: string) => api.get('/cash-drawer/today', { params: { day } }),
+  close: (data: object) => api.post('/cash-drawer/close', data),
+  list: (params?: object) => api.get('/cash-drawer', { params }),
+  receive: (id: string, note?: string) => api.post(`/cash-drawer/${id}/receive`, { note }),
+};
+export const inputDistributionApi = {
+  items: () => api.get('/input-distribution/items'),
+  list: (params?: object) => api.get('/input-distribution', { params }),
+  issue: (data: object) => api.post('/input-distribution', data),
+  acknowledge: (id: string, code: string) => api.post(`/input-distribution/${id}/acknowledge`, { code }),
+  resend: (id: string) => api.post(`/input-distribution/${id}/resend`),
+};
+export const purchaseOrdersApi = {
+  list: (params?: object) => api.get('/purchase-orders', { params }),
+  get: (id: string) => api.get(`/purchase-orders/${id}`),
+  create: (data: object) => api.post('/purchase-orders', data),
+  approve: (id: string) => api.post(`/purchase-orders/${id}/approve`),
+  cancel: (id: string, reason: string) => api.post(`/purchase-orders/${id}/cancel`, { reason }),
+  receive: (id: string, data: object) => api.post(`/purchase-orders/${id}/receive`, data),
+};
+export const maintenanceApi = {
+  structure: () => api.get('/maintenance/structure'),
+  list: () => api.get('/maintenance'),
+  create: (data: object) => api.post('/maintenance', data),
+  done: (id: string, data: object) => api.post(`/maintenance/${id}/done`, data),
+  update: (id: string, data: object) => api.patch(`/maintenance/${id}`, data),
+};
+export const complianceReportApi = { get: () => api.get('/compliance-report') };
+
 /** Water schedules, the daily water log and water issues. */
 export const waterApi = {
   structure: () => api.get('/water/structure'),

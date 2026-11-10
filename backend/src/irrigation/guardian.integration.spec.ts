@@ -281,6 +281,25 @@ describeDb('Hectare guardians (PostgreSQL)', () => {
     await prisma.irrigationScheme.updateMany({ where: { mamcosId: mamcosA }, data: { requireChairmanVerification: true } });
   });
 
+  it('a transfer is refused up front when the receiver has no room, or when the owner’s farms are under AMCOS administration', async () => {
+    const me = asUser('Juma'); // holds hectare GH1 and the scheme allows one hectare per member
+    const plot1Number = (await prisma.farmer.findUniqueOrThrow({ where: { id: f.Plot1 } })).controlNumber; // already holds one
+    await expect(allocations.requestMyTransfer(me, { hectareId: hectares[0], toMember: plot1Number, reason: 'Selling' })).rejects.toThrow(/at most 1 hectare/);
+    await expect(allocations.createTransfer(admin, { hectareId: hectares[0], toFarmerId: f.Plot1, reason: 'Office request' })).rejects.toThrow(/at most 1 hectare/);
+
+    await farmer(mamcosA, 'Spare');
+    const spareNumber = (await prisma.farmer.findUniqueOrThrow({ where: { id: f.Spare } })).controlNumber;
+    const c = await prisma.farmDefaultCase.create({ data: { mamcosId: mamcosA, farmerId: f.Juma, status: 'UNDER_AMCOS', openedOn: new Date(), graceDays: 30, debtAtOpen: 50_000 } });
+    await expect(allocations.requestMyTransfer(me, { hectareId: hectares[0], toMember: spareNumber, reason: 'Selling' })).rejects.toThrow(/under AMCOS administration because of an overdue debt/);
+    await prisma.farmDefaultCase.update({ where: { id: c.id }, data: { status: 'RECLAIMED' } }); // the debt was cleared
+    const ok: any = await allocations.requestMyTransfer(me, { hectareId: hectares[0], toMember: spareNumber, reason: 'Selling' });
+    expect(ok.status).toBe('AWAITING_RECIPIENT');
+
+    // a second transfer to the same receiver would take them past the limit once both complete: the first one counts
+    await expect(allocations.createTransfer(admin, { hectareId: hectares[4], toFarmerId: f.Spare, reason: 'Another one' })).rejects.toThrow(/at most 1 hectare/);
+    await allocations.cancelMyTransfer(me, ok.id);
+  });
+
   it('guardian routes need the allocation edit permission', () => {
     const proto = IrrigationController.prototype as any;
     for (const name of ['setGuardian', 'endGuardian']) expect(Reflect.getMetadata(PERMISSION_KEY, proto[name])).toEqual({ resource: 'irrigation_allocations', action: 'EDIT' });

@@ -56,6 +56,19 @@ export class AllocationService {
    * A hectare cannot change hands while the outgoing holder still owes the AMCOS (input, fertilizer or harvest fees)
    * or has an active loan. Checked when the transfer is requested and again when it executes, since approval may come later.
    */
+  /** A farmer whose farms are already under AMCOS administration for an overdue debt cannot hand a hectare to someone else. */
+  private async assertNotUnderAdministration(db: Db, farmerId: string) {
+    const open = await db.farmDefaultCase.count({ where: { farmerId, status: { in: ['UNDER_AMCOS', 'MLAX_NOTICE', 'AT_MLAX'] } } });
+    if (open) throw new ConflictException('This hectare cannot be transferred: the holder’s farms are under AMCOS administration because of an overdue debt. It is released when the debt is cleared');
+  }
+
+  /** The receiving member must have room under the scheme's limit, counting transfers already on their way to them. */
+  private async assertRecipientHasRoom(db: Prisma.TransactionClient, toFarmerId: string, scheme: { id: string; maxHectaresPerFarmer: number | null }) {
+    if (scheme.maxHectaresPerFarmer == null) return;
+    const incoming = await db.irrigationAllocationTransfer.count({ where: { toFarmerId, status: { in: ['AWAITING_RECIPIENT', 'PENDING_APPROVAL'] }, hectare: { block: { canal: { schemeId: scheme.id } } } } });
+    await this.assertWithinMemberLimit(db, toFarmerId, scheme, 1 + incoming);
+  }
+
   private async assertNoOutstandingLiabilities(db: Db, farmerId: string, mamcosId: string | null) {
     const dues = mamcosId
       ? await db.farmerDue.findMany({
@@ -408,6 +421,9 @@ export class AllocationService {
       const result = await this.prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT id FROM irrigation_hectares WHERE id = ${hectare.id} FOR UPDATE`;
         await this.requireMember(tx, dto.toFarmerId, scheme);
+        if (await tx.irrigationAllocationTransfer.count({ where: { hectareId: hectare.id, status: { in: ['AWAITING_RECIPIENT', 'PENDING_APPROVAL'] } } })) throw new ConflictException('A transfer is already awaiting approval for this hectare');
+        await this.assertRecipientHasRoom(tx, dto.toFarmerId, scheme);
+        await this.assertNotUnderAdministration(tx, current.farmerId);
         await this.assertNoOutstandingLiabilities(tx, current.farmerId, scheme.mamcosId);
         const transfer = await tx.irrigationAllocationTransfer.create({
           data: {
@@ -443,6 +459,7 @@ export class AllocationService {
     if (from.status !== 'ACTIVE' || from.farmerId !== transfer.fromFarmerId)
       throw new ConflictException('The allocation being transferred has changed since this request was made');
     await this.assertWithinMemberLimit(tx, transfer.toFarmerId, transfer.hectare.block.canal.scheme);
+    await this.assertNotUnderAdministration(tx, transfer.fromFarmerId);
     await this.assertNoOutstandingLiabilities(tx, transfer.fromFarmerId, transfer.hectare.block.canal.scheme.mamcosId);
     await tx.irrigationHectareAllocation.update({
       where: { id: from.id },
@@ -506,7 +523,7 @@ export class AllocationService {
           toFarmer: { select: { userId: true, user: { select: { phone: true } } } },
         },
       });
-      const body = `${fullName(t.fromFarmer)} wants to transfer hectare ${t.hectare.code} to you. Open the MAYODE app to accept or decline.`;
+      const body = `${fullName(t.fromFarmer)} wants to transfer hectare ${farmIdDisplay(t.hectare.code)} to you. Open the MAYODE app to accept or decline.`;
       if (t.toFarmer.userId) {
         await this.notifications.create({
           userId: t.toFarmer.userId, type: 'irrigation.transfer.incoming', title: 'Plot transfer waiting for you', body, data: { transferId },

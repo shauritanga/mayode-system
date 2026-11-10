@@ -22,7 +22,24 @@ export class LoansService {
     private readonly accounting: AccountingService,
   ) {}
 
+  /** A plot can carry a loan only for the member who works it: its allocation holder, or a guardian of that allocation. */
+  private async assertHoldsPlot(farmerId: string, hectareId: string) {
+    const held = await this.prisma.irrigationHectareAllocation.findFirst({
+      where: { hectareId, status: 'ACTIVE', OR: [{ farmerId }, { guardians: { some: { guardianId: farmerId, endedOn: null } } }] },
+      select: { id: true },
+    });
+    if (!held) throw new BadRequestException('This member does not hold that plot');
+  }
+
+  async setPlot(loanId: string, hectareId: string | null | undefined, user: RequestUser) {
+    const loan = await this.prisma.loanRecord.findFirst({ where: { id: loanId, farmer: await this.farmerScope(user) } });
+    if (!loan) throw new NotFoundException('Loan not found');
+    if (hectareId) await this.assertHoldsPlot(loan.farmerId, hectareId);
+    return this.prisma.loanRecord.update({ where: { id: loanId }, data: { hectareId: hectareId ?? null } });
+  }
+
   async create(dto: CreateLoanDto) {
+    if (dto.hectareId) await this.assertHoldsPlot(dto.farmerId, dto.hectareId);
     let lenderPayoutPhone = dto.lenderPayoutPhone;
     let lenderPayoutName = dto.lenderPayoutName;
     let lenderName = dto.lenderName;

@@ -1,4 +1,4 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, Min, Max } from 'class-validator';
+import { IsBoolean, IsNumber, IsOptional, IsString, Min, Max, IsUUID } from 'class-validator';
 
 export class CreateLoanDto {
   @IsString() farmerId: string;
@@ -10,6 +10,13 @@ export class CreateLoanDto {
   @IsOptional() @IsString() repaymentSchedule?: string;
   @IsOptional() @IsString() lenderPayoutPhone?: string;
   @IsOptional() @IsString() lenderPayoutName?: string;
+  /** The plot (hectare) the loan is for. Leave out for a loan to the member as a whole. */
+  @IsOptional() @IsUUID() hectareId?: string;
+}
+
+export class SetLoanPlotDto {
+  /** null clears the link. */
+  @IsOptional() @IsUUID() hectareId?: string | null;
 }
 
 export class CreateLenderDto {

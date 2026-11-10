@@ -123,6 +123,9 @@ export const navGroups: NavGroup[] = [
     label: 'AMCOS Charges',
     items: [
       { href: '/dashboard/dues', label: 'AMCOS Charges', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'dues' },
+      { href: '/dashboard/cash-drawer', label: 'Cash Drawer', icon: Wallet01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'cash_drawer' },
+      { href: '/dashboard/inputs', label: 'Input Distribution', icon: Package01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'input_distribution' },
+      { href: '/dashboard/purchase-orders', label: 'Purchase Orders', icon: ShoppingCart02Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'purchase_orders' },
       { href: '/dashboard/harvest', label: 'Harvest Fees', icon: WheatIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'harvest_clearance' },
     ],
   },
@@ -157,6 +160,8 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/meetings', label: 'Meetings', icon: Calendar01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'board_meetings' },
       { href: '/dashboard/tenders', label: 'Tenders', icon: ClipboardIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], anyResource: ['tenders', 'tender_milestones', 'tender_contractors'] },
       { href: '/dashboard/water', label: 'Water & Gates', icon: DropletIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'water' },
+      { href: '/dashboard/maintenance', label: 'Maintenance', icon: Shield01Icon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'maintenance_schedule' },
+      { href: '/dashboard/compliance-report', label: 'Compliance Checklist', icon: ClipboardIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'MAMCOS_SECRETARY'], resource: 'governance' },
     ],
   },
   {
@@ -456,8 +461,8 @@ const COOPERATIVE_PORTAL_HIDDEN_HREFS = new Set([
  * oversight, then setup). Anything not listed keeps its original relative order after these.
  */
 const COOPERATIVE_MENU_ORDER = [
-  '/dashboard', '/dashboard/farmers', '/dashboard/irrigation', '/dashboard/scheme-structure', '/dashboard/plot-allocation', '/dashboard/dues', '/dashboard/harvest', '/dashboard/farm-administration', '/dashboard/rentals', '/dashboard/ops-orders', '/dashboard/task-management',
-  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/payroll', '/dashboard/ops-warehouse', '/dashboard/staff', '/dashboard/board', '/dashboard/meetings', '/dashboard/tenders', '/dashboard/water', '/dashboard/leadership', '/dashboard/suppliers', '/dashboard/sales',
+  '/dashboard', '/dashboard/farmers', '/dashboard/irrigation', '/dashboard/scheme-structure', '/dashboard/plot-allocation', '/dashboard/dues', '/dashboard/cash-drawer', '/dashboard/inputs', '/dashboard/purchase-orders', '/dashboard/harvest', '/dashboard/farm-administration', '/dashboard/rentals', '/dashboard/ops-orders', '/dashboard/task-management',
+  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/payroll', '/dashboard/ops-warehouse', '/dashboard/staff', '/dashboard/board', '/dashboard/meetings', '/dashboard/tenders', '/dashboard/water', '/dashboard/maintenance', '/dashboard/compliance-report', '/dashboard/leadership', '/dashboard/suppliers', '/dashboard/sales',
   '/dashboard/reports', '/dashboard/credit', '/dashboard/traceability', '/dashboard/disputes', '/dashboard/governance', '/dashboard/ai',
   '/dashboard/audit-log', '/dashboard/roles', '/dashboard/amcos-settings', '/dashboard/settings',
 ];

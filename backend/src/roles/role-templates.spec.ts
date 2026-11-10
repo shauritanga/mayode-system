@@ -122,8 +122,10 @@ describe('Back-office role templates', () => {
     for (const r of ['Cashier', 'Procurement Officer']) expect(can(r, 'payroll', 'VIEW')).toBe(false);
     expect(can('Cashier', 'dues', 'CREATE')).toBe(true);
     expect(can('Procurement Officer', 'suppliers', 'CREATE')).toBe(true);
-    // nobody but the cooperative admin deletes, and none of these manage users or roles
+    // nobody but the cooperative admin deletes; only the Manager administers users and roles
     expect(grants.some((x) => x.action === 'DELETE')).toBe(false);
-    expect(grants.some((x) => x.resourceId === 'res-users' || x.resourceId === 'res-roles')).toBe(false);
+    const admins = grants.filter((x) => x.resourceId === 'res-users' || x.resourceId === 'res-roles');
+    expect(admins.length).toBeGreaterThan(0);
+    expect(admins.every((x) => x.roleId === 'role-Manager')).toBe(true);
   });
 });

@@ -106,18 +106,19 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
   {
     name: 'Cashier',
     description: 'Collects and records member payments and charges. Cannot change accounts, pay salaries or manage staff.',
-    grants: { workspace: V, farmers: V, dues: VCE, accounting: V, harvest_fees: VCE, harvest_clearance: V, harvest_passes: V },
+    grants: { workspace: V, farmers: V, dues: VCE, accounting: V, harvest_fees: VCE, harvest_clearance: V, harvest_passes: V, cash_drawer: ['VIEW', 'CREATE'] },
   },
   {
     name: 'Accountant',
     description: 'Keeps the books: ledger, charges, assets and the monthly payroll. Cannot manage users or roles.',
     grants: {
       workspace: V, farmers: V, accounting: VCE, finance: VCE, dues: VCE, payroll: VCE, assets: VE,
-      loans: V, suppliers: V, reports: V, audit_logs: V, irrigation_transfer_approval: ['EDIT'],
+      loans: VCE, suppliers: V, reports: V, audit_logs: V, irrigation_transfer_approval: ['EDIT'],
       harvest_fees: VCE, harvest_clearance: V, harvest_passes: V,
       // Verifies that arrears are cleared before a defaulted plot is re-rented.
       farm_administration: V, farm_leases: V,
       payroll_attendance: V, water: V, water_schedules: V,
+      cash_drawer: ['VIEW', 'EDIT'], input_distribution: V, purchase_orders: V, maintenance_schedule: V,
     },
   },
   {
@@ -130,12 +131,17 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       harvest_fees: V, harvest_fee_approval: ['EDIT'], harvest_clearance: V, harvest_passes: V,
       farm_administration: V, farm_leases: V,
       payroll_approval: ['EDIT'], water: V, water_schedules: V,
+      cash_drawer: V, input_distribution: V, purchase_orders: V, purchase_order_approval: ['EDIT'], maintenance_schedule: V,
+      users: VCE, roles: VCE,
     },
   },
   {
     name: 'Procurement Officer',
     description: 'Buys for the AMCOS: manages suppliers and stock coming in. No payments, payroll or accounts.',
-    grants: { workspace: V, suppliers: VCE, inventory: VCE, warehouses: V, assets: V, reports: V, payroll_attendance: VCE },
+    grants: {
+      workspace: V, suppliers: VCE, inventory: VCE, warehouses: V, assets: VE, reports: V, payroll_attendance: VCE,
+      input_distribution: VCE, purchase_orders: VCE, maintenance_schedule: VCE,
+    },
   },
 ];
 

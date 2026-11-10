@@ -523,6 +523,12 @@ export class StructureService {
     };
   }
 
+  /** Loans tied to this plot: shown to those who may see the member's money. */
+  private async plotLoans(hectareId: string) {
+    const rows = await this.prisma.loanRecord.findMany({ where: { hectareId }, orderBy: { createdAt: 'desc' }, take: 20 });
+    return rows.map((l) => ({ id: l.id, lender: l.lenderName, originalAmount: Number(l.originalAmount), amountOwed: Number(l.amountOwed), createdAt: l.createdAt }));
+  }
+
   async getHectare(actor: RequestUser, id: string) {
     const scope = await this.scopeService.resolve(actor);
     const hectare = await this.scopeService.assertHectare(scope, id);
@@ -552,6 +558,7 @@ export class StructureService {
       ...view,
       leaders: { block: contact(blockLeaders.get(hectare.blockId)), canal: contact(canalLeaders.get(hectare.block.canalId)) },
       standing,
+      loans: this.debt.canSee(scope) ? await this.plotLoans(id) : [],
       block: { id: hectare.block.id, code: hectare.block.code, name: hectare.block.name, blockNumber: hectare.block.blockNumber, side: hectare.block.side },
       canal: { id: hectare.block.canal.id, code: hectare.block.canal.code, name: hectare.block.canal.name, canalNumber: hectare.block.canal.canalNumber },
       scheme: { id: hectare.block.canal.scheme.id, name: hectare.block.canal.scheme.name },

@@ -1155,6 +1155,8 @@ model LoanRecord {
   linkedInputCosts InputCost[]
   instalments      LoanInstalment[]
   application      LoanApplication?
+  /// The plot (hectare) this loan is tied to, when it is for one plot rather than the whole farmer.
+  hectareId        String?          @map("hectare_id")
 
   @@map("loan_records")
 }
@@ -6732,4 +6734,197 @@ model WaterLog {
   @@index([canalId, date])
   @@index([gateOpenerPayeeId, date])
   @@map("water_logs")
+}
+
+// ============================================================
+// STAFF TASKS: cash drawer, input distribution, purchase orders, maintenance schedules
+// ============================================================
+
+/// The Cashier's end-of-day tally: what was collected (from the receipts they issued), the cash actually counted, and the difference.
+/// The Accountant receives it. One per cashier per day.
+model CashDrawerClose {
+  id             String    @id @default(uuid())
+  mamcosId       String    @map("mamcos_id")
+  day            DateTime  @db.Date
+  cashierId      String    @map("cashier_id")
+  paymentsCount  Int       @map("payments_count")
+  expectedCash   Decimal   @map("expected_cash") @db.Decimal(14, 2)
+  expectedMobile Decimal   @map("expected_mobile") @db.Decimal(14, 2)
+  expectedBank   Decimal   @map("expected_bank") @db.Decimal(14, 2)
+  countedCash    Decimal   @map("counted_cash") @db.Decimal(14, 2)
+  /// Counted cash minus expected cash: negative = short, positive = over.
+  variance       Decimal   @db.Decimal(14, 2)
+  note           String?
+  status         String    @default("SUBMITTED")
+  submittedAt    DateTime  @default(now()) @map("submitted_at")
+  receivedById   String?   @map("received_by_id")
+  receivedAt     DateTime? @map("received_at")
+  receiveNote    String?   @map("receive_note")
+
+  @@unique([mamcosId, day, cashierId])
+  @@index([mamcosId, status])
+  @@map("cash_drawer_closes")
+}
+
+/// Inputs (fertilizer, seed, chemicals) handed to a farmer: stock goes out, the cost is charged to the farmer, and the farmer
+/// acknowledges receipt with a code sent to their phone (their digital signature).
+model InputIssue {
+  id          String    @id @default(uuid())
+  mamcosId    String    @map("mamcos_id")
+  reference   String
+  farmerId    String    @map("farmer_id")
+  itemId      String    @map("item_id")
+  itemName    String    @map("item_name")
+  quantity    Float
+  unit        String
+  unitPrice   Decimal   @map("unit_price") @db.Decimal(14, 2)
+  amount      Decimal   @db.Decimal(14, 2)
+  dueId       String?   @map("due_id")
+  /// The farmer's Farm IDs when the inputs were issued.
+  farmIds     String[]  @map("farm_ids")
+  dueDate     DateTime? @map("due_date") @db.Date
+  ackCodeHash String    @map("ack_code_hash")
+  /// PENDING until the farmer gives the code; then ACKNOWLEDGED.
+  ackStatus   String    @default("PENDING") @map("ack_status")
+  ackAt       DateTime? @map("ack_at")
+  ackById     String?   @map("ack_by_id")
+  /// Wrong codes tried since the code was last sent; after 5 the code is locked until the office sends a new one.
+  ackAttempts Int       @default(0) @map("ack_attempts")
+  note        String?
+  issuedById  String    @map("issued_by_id")
+  issuedAt    DateTime  @default(now()) @map("issued_at")
+
+  @@unique([mamcosId, reference])
+  @@index([mamcosId, ackStatus])
+  @@index([farmerId])
+  @@map("input_issues")
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+/// A purchase order to a supplier. The Procurement Officer drafts it; a Manager approves it (so procurement never approves its own spending);
+/// delivery receipts record what arrived, which brings stock in.
+model PurchaseOrder {
+  id           String              @id @default(uuid())
+  mamcosId     String              @map("mamcos_id")
+  number       String
+  supplierId   String              @map("supplier_id")
+  status       PurchaseOrderStatus @default(DRAFT)
+  expectedOn   DateTime?           @map("expected_on") @db.Date
+  note         String?
+  totalAmount  Decimal             @map("total_amount") @db.Decimal(14, 2)
+  createdById  String              @map("created_by_id")
+  approvedById String?             @map("approved_by_id")
+  approvedAt   DateTime?           @map("approved_at")
+  cancelReason String?             @map("cancel_reason")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  lines    PurchaseOrderLine[]
+  receipts DeliveryReceipt[]
+
+  @@unique([mamcosId, number])
+  @@index([mamcosId, status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id          String   @id @default(uuid())
+  orderId     String   @map("order_id")
+  itemName    String   @map("item_name")
+  /// When the line is a farm input, delivery adds to that input's stock.
+  inputItemId String?  @map("input_item_id")
+  unit        String
+  quantity    Decimal  @db.Decimal(12, 2)
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(14, 2)
+  received    Decimal  @default(0) @db.Decimal(12, 2)
+
+  order PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lines DeliveryReceiptLine[]
+
+  @@map("purchase_order_lines")
+}
+
+model DeliveryReceipt {
+  id           String   @id @default(uuid())
+  mamcosId     String   @map("mamcos_id")
+  orderId      String   @map("order_id")
+  number       String
+  receivedOn   DateTime @map("received_on") @db.Date
+  /// The supplier's own delivery note number.
+  deliveryNote String?  @map("delivery_note")
+  note         String?
+  receivedById String   @map("received_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  order PurchaseOrder        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  lines DeliveryReceiptLine[]
+
+  @@unique([mamcosId, number])
+  @@map("delivery_receipts")
+}
+
+model DeliveryReceiptLine {
+  id          String   @id @default(uuid())
+  receiptId   String   @map("receipt_id")
+  orderLineId String   @map("order_line_id")
+  quantity    Decimal  @db.Decimal(12, 2)
+
+  receipt   DeliveryReceipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  orderLine PurchaseOrderLine @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+
+  @@map("delivery_receipt_lines")
+}
+
+enum MaintenanceTarget {
+  CANAL
+  BLOCK
+  GATE
+  EQUIPMENT
+  OTHER
+}
+
+/// A recurring maintenance job: desilting a canal every season, greasing a water gate every month, servicing a pump. Each time it is done
+/// the next due date moves on.
+model MaintenanceSchedule {
+  id           String            @id @default(uuid())
+  mamcosId     String            @map("mamcos_id")
+  title        String
+  target       MaintenanceTarget
+  canalId      String?           @map("canal_id")
+  blockId      String?           @map("block_id")
+  assetId      String?           @map("asset_id")
+  location     String?
+  intervalDays Int               @map("interval_days")
+  nextDueOn    DateTime          @map("next_due_on") @db.Date
+  lastDoneOn   DateTime?         @map("last_done_on") @db.Date
+  isActive     Boolean           @default(true) @map("is_active")
+  createdById  String?           @map("created_by_id")
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  logs MaintenanceLog[]
+
+  @@index([mamcosId, nextDueOn])
+  @@map("maintenance_schedules")
+}
+
+model MaintenanceLog {
+  id         String   @id @default(uuid())
+  scheduleId String   @map("schedule_id")
+  doneOn     DateTime @map("done_on") @db.Date
+  doneById   String   @map("done_by_id")
+  note       String?
+  cost       Decimal? @db.Decimal(14, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  schedule MaintenanceSchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+
+  @@index([scheduleId, doneOn])
+  @@map("maintenance_logs")
 }

@@ -90,6 +90,7 @@ export function HectareDetail({ id }: { id: string }) {
                     {h.standing && (h.standing.overdue > 0
                       ? <div style={{ marginTop: 6 }}><span className="badge badge-red">Overdue {tzs(h.standing.overdue)}</span></div>
                       : <div style={{ marginTop: 6 }}><span className="badge badge-green">{h.standing.outstanding > 0 ? `Owes ${tzs(h.standing.outstanding)}, not yet due` : 'Nothing owed'}</span></div>)}
+                    {h.loans?.length > 0 && <div style={{ marginTop: 6, fontSize: 12.5 }}>{h.loans.map((l: any) => <div key={l.id}><span className="badge badge-gold">Loan</span> {l.lender}: owes {tzs(l.amountOwed)} of {tzs(l.originalAmount)}</div>)}</div>}
                   </>
                 ) : <div style={{ fontSize: 15, marginTop: 2 }}>Nobody yet</div>}
               </div>
