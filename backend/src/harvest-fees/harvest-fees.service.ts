@@ -13,11 +13,12 @@ const cents = (n: number) => Math.round(n * 100) / 100;
 const day = (value: string | Date) => new Date(`${(typeof value === 'string' ? value : value.toISOString()).slice(0, 10)}T00:00:00.000Z`);
 const typeName = (season: string, blockCode: string) => `Harvest fee ${season} · ${blockCode}`;
 
-export type ClearanceStatus = 'GREEN' | 'YELLOW' | 'RED' | 'NOT_CHARGED' | 'UNALLOCATED';
+export type ClearanceStatus = 'GREEN' | 'YELLOW' | 'RED' | 'NOT_CHARGED' | 'UNALLOCATED' | 'HELD';
 
 /** What decides a hectare's colour. Clearance is granted only for GREEN. */
-export function clearanceFor(p: { holder: boolean; charged: boolean; balance: number; activeLoan: boolean }): ClearanceStatus {
+export function clearanceFor(p: { holder: boolean; charged: boolean; balance: number; activeLoan: boolean; held?: boolean }): ClearanceStatus {
   if (!p.holder) return 'UNALLOCATED';
+  if (p.held) return 'HELD';
   if (!p.charged) return 'NOT_CHARGED';
   if (p.balance > 0) return 'RED';
   return p.activeLoan ? 'YELLOW' : 'GREEN';
@@ -212,6 +213,12 @@ export class HarvestFeesService {
   async clearance(blockId: string, actor: RequestUser, typeId?: string) {
     const scope = await this.scopeService.resolve(actor);
     const block = await this.scopeService.assertBlock(scope, blockId);
+    return this.clearanceOfBlock(block, typeId);
+  }
+
+  /** The same list for a block already loaded and checked by the caller. */
+  async clearanceOfBlock(block: { id: string; code: string; name: string | null; canal: { scheme: { mamcosId: string | null } } }, typeId?: string) {
+    const blockId = block.id;
     const mamcosId = block.canal.scheme.mamcosId;
     if (!mamcosId) throw new NotFoundException('Block not found');
     const harvests = await this.harvestsOf(mamcosId, block.code);
@@ -238,6 +245,10 @@ export class HarvestFeesService {
     const loans = farmerIds.length
       ? await this.prisma.loanRecord.groupBy({ by: ['farmerId'], where: { farmerId: { in: farmerIds }, isActive: true, amountOwed: { gt: 0 } }, _count: true })
       : [];
+    const passes = harvest
+      ? await this.prisma.harvestPass.findMany({ where: { typeId: harvest.id, blockId }, select: { hectareId: true, code: true, status: true } })
+      : [];
+    const passOf = new Map(passes.map((p) => [p.hectareId, p]));
     const dueOf = new Map(dues.map((d) => [d.farmerId, d]));
     const loanSet = new Set(loans.map((l) => l.farmerId));
     const rate = harvest ? num(harvest.rate) : 0;
@@ -248,14 +259,15 @@ export class HarvestFeesService {
       const farmer = alloc?.farmer;
       const due = farmer ? dueOf.get(farmer.id) : undefined;
       const balance = due ? balanceOf(due) : 0;
-      const status = clearanceFor({ holder: !!farmer, charged: !!due, balance, activeLoan: !!farmer && loanSet.has(farmer.id) });
+      const pass = passOf.get(h.id) ?? null;
+      const status = clearanceFor({ holder: !!farmer, charged: !!due, balance, activeLoan: !!farmer && loanSet.has(farmer.id), held: pass?.status === 'VOID' });
       const g = alloc?.guardians[0]?.guardian;
       return {
         hectareId: h.id, code: h.code, areaHectares: num(h.areaHectares),
         farmer: farmer ? { id: farmer.id, name: name(farmer), memberNumber: farmer.controlNumber } : null,
         guardian: g ? { id: g.id, name: name(g) } : null,
         fee: cents(num(h.areaHectares) * rate), farmerBalance: balance, hasLoan: !!farmer && loanSet.has(farmer.id),
-        status, cleared: status === 'GREEN',
+        status, cleared: status === 'GREEN', pass: pass ? { code: pass.code, status: pass.status } : null, harvested: pass?.status === 'USED',
       };
     });
     const count = (s: ClearanceStatus) => rows.filter((r) => r.status === s).length;
@@ -263,7 +275,7 @@ export class HarvestFeesService {
       block: { id: block.id, code: block.code, name: block.name },
       harvest: harvest ? { typeId: harvest.id, season: harvest.season, ratePerHectare: rate } : null,
       harvests: harvests.map((h) => ({ typeId: h.id, season: h.season })),
-      summary: { total: rows.length, green: count('GREEN'), yellow: count('YELLOW'), red: count('RED'), notCharged: count('NOT_CHARGED'), unallocated: count('UNALLOCATED') },
+      summary: { total: rows.length, green: count('GREEN'), yellow: count('YELLOW'), red: count('RED'), notCharged: count('NOT_CHARGED'), unallocated: count('UNALLOCATED'), held: count('HELD'), harvested: rows.filter((r) => r.harvested).length },
       hectares: rows,
     };
   }

@@ -17,6 +17,7 @@ const ALL: PermissionAction[] = ['VIEW', 'CREATE', 'EDIT', 'DELETE'];
 export const CANAL_LEADER_ROLE = 'Canal Leader';
 export const BLOCK_LEADER_ROLE = 'Block Leader';
 export const LEADER_ROLE_NAMES = [CANAL_LEADER_ROLE, BLOCK_LEADER_ROLE];
+export const COMBINE_OPERATOR_ROLE = 'Combine Operator';
 
 export const IRRIGATION_ROLE_TEMPLATES: RoleTemplate[] = [
   {
@@ -29,12 +30,17 @@ export const IRRIGATION_ROLE_TEMPLATES: RoleTemplate[] = [
   {
     name: CANAL_LEADER_ROLE,
     description: 'Sees only the canal they currently lead with its blocks and hectares. Allocates hectares there and appoints its block leaders.',
-    grants: { irrigation: V, irrigation_allocations: VCE, irrigation_leadership: VCE, harvest_clearance: V },
+    grants: { irrigation: V, irrigation_allocations: VCE, irrigation_leadership: VCE, harvest_clearance: V, harvest_passes: VCE },
   },
   {
     name: BLOCK_LEADER_ROLE,
     description: 'Sees only the block they currently lead with its hectares and farmers. Read-only unless an administrator adds rights.',
-    grants: { irrigation: V, irrigation_allocations: V, irrigation_leadership: V, harvest_clearance: V },
+    grants: { irrigation: V, irrigation_allocations: V, irrigation_leadership: V, harvest_clearance: V, harvest_passes: VCE },
+  },
+  {
+    name: COMBINE_OPERATOR_ROLE,
+    description: 'Combine harvester operator: sees the harvest fee schedule and each block\u2019s plots, logs arrival in a block and checks the pass code of a plot before harvesting it. Nothing else.',
+    grants: { harvest_clearance: V, harvest_fees: V, harvest_passes: VCE },
   },
 ];
 

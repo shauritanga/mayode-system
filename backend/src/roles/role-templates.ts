@@ -101,7 +101,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
   {
     name: 'Cashier',
     description: 'Collects and records member payments and charges. Cannot change accounts, pay salaries or manage staff.',
-    grants: { workspace: V, farmers: V, dues: VCE, accounting: V, harvest_fees: VCE, harvest_clearance: V },
+    grants: { workspace: V, farmers: V, dues: VCE, accounting: V, harvest_fees: VCE, harvest_clearance: V, harvest_passes: V },
   },
   {
     name: 'Accountant',
@@ -109,7 +109,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     grants: {
       workspace: V, farmers: V, accounting: VCE, finance: VCE, dues: VCE, payroll: VCE, assets: VE,
       loans: V, suppliers: V, reports: V, audit_logs: V, irrigation_transfer_approval: ['EDIT'],
-      harvest_fees: VCE, harvest_clearance: V,
+      harvest_fees: VCE, harvest_clearance: V, harvest_passes: V,
     },
   },
   {
@@ -119,7 +119,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       workspace: V, farmers: V, accounting: V, finance: V, dues: V, payroll: V, assets: V, machinery: V,
       irrigation: V, irrigation_allocations: V, irrigation_leadership: V, communication: V, governance: V,
       suppliers: V, inventory: V, warehouses: V, reports: V, audit_logs: V, irrigation_transfer_approval: ['EDIT'],
-      harvest_fees: V, harvest_fee_approval: ['EDIT'], harvest_clearance: V,
+      harvest_fees: V, harvest_fee_approval: ['EDIT'], harvest_clearance: V, harvest_passes: V,
     },
   },
   {

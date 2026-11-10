@@ -6,6 +6,7 @@ import Modal from '@/components/Modal';
 import { harvestApi } from '@/lib/api';
 import { farmId } from '@/lib/farm-id';
 import { useAuthStore } from '@/store/auth.store';
+import { Arrivals, Incidents, PassCheck, Reconciliation } from './Gate';
 import {
   ConfirmDialog, Empty, Field, Filters, FormGrid, LoadError, Notice, PageHeader, StatCard, TableSkeleton, Tabs, errMsg, fmtDate, useApi, useCan,
 } from '@/screens/dashboard/irrigation/ui';
@@ -18,6 +19,7 @@ const STATUS: Record<string, { label: string; tone: string; hint: string }> = {
   RED: { label: 'Locked · unpaid', tone: 'badge-red', hint: 'Harvest fee not fully paid. Do not clear this hectare.' },
   NOT_CHARGED: { label: 'Fee not set', tone: 'badge-gray', hint: 'No harvest fee has been charged for this hectare yet.' },
   UNALLOCATED: { label: 'No holder', tone: 'badge-gray', hint: 'Nobody holds this hectare.' },
+  HELD: { label: 'On hold', tone: 'badge-red', hint: 'The AMCOS has put this hectare on hold. Do not clear it.' },
 };
 const RATE_TONE: Record<string, string> = { ACTIVE: 'badge-green', PENDING_APPROVAL: 'badge-gold', SUPERSEDED: 'badge-gray', REJECTED: 'badge-red' };
 const RATE_LABEL: Record<string, string> = { ACTIVE: 'In use', PENDING_APPROVAL: 'Waiting for approval', SUPERSEDED: 'Replaced', REJECTED: 'Rejected' };
@@ -29,10 +31,22 @@ function useStructure() {
 
 /** The list a Block Chairman checks before a combine harvester starts on a hectare. */
 function Clearance({ blocks }: { blocks: any[] }) {
+  const can = useCan();
+  const [bump, setBump] = useState(0);
+  const [rowMessage, setRowMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [holding, setHolding] = useState<any>(null);
   const [blockId, setBlockId] = useState('');
   const [typeId, setTypeId] = useState('');
   const chosen = blockId || blocks[0]?.id || '';
-  const { data, loading, error, reload } = useApi<any>(chosen ? () => harvestApi.clearance(chosen, typeId || undefined) : null, [chosen, typeId]);
+  const { data, loading, error, reload } = useApi<any>(chosen ? () => harvestApi.clearance(chosen, typeId || undefined) : null, [chosen, typeId, bump]);
+  const showPasses = can('harvest_passes', 'VIEW');
+  const canSignOff = can('harvest_passes', 'EDIT') && can('irrigation_allocations', 'VIEW');
+  const canHold = can('harvest_fees', 'EDIT');
+  const act = async (fn: () => Promise<any>, ok: string) => {
+    setRowMessage(null);
+    try { await fn(); setRowMessage({ tone: 'success', text: ok }); } catch (e) { setRowMessage({ tone: 'error', text: errMsg(e, 'That did not work.') }); }
+    setBump((n) => n + 1);
+  };
   const s = data?.summary;
   return (
     <div>
@@ -43,6 +57,9 @@ function Clearance({ blocks }: { blocks: any[] }) {
           {data.harvests.map((h: any) => <option key={h.typeId} value={h.typeId}>{h.season}</option>)}</select></Field>}
       </Filters>
       <LoadError message={error} onRetry={reload} />
+      {showPasses && chosen && <PassCheck onUsed={() => setBump((n) => n + 1)} />}
+      {showPasses && chosen && <Arrivals blockId={chosen} blockCode={blocks.find((b) => b.id === chosen)?.code ?? ''} refresh={bump} />}
+      {rowMessage && <Notice tone={rowMessage.tone} onDismiss={() => setRowMessage(null)}>{rowMessage.text}</Notice>}
       {data && !data.harvest && <Notice tone="error">No harvest fee has been opened for this block yet, so no hectare can be cleared. Ask the cashier to open the harvest in the Collection tab.</Notice>}
       {s && (
         <div className="metric-grid" style={{ marginBottom: 16 }}>
@@ -50,13 +67,15 @@ function Clearance({ blocks }: { blocks: any[] }) {
           <StatCard label="Locked · unpaid" value={s.red} tone={s.red ? 'warn' : 'good'} />
           <StatCard label="Locked · loan" value={s.yellow} tone={s.yellow ? 'warn' : 'good'} />
           <StatCard label="Fee not set" value={s.notCharged} />
+          <StatCard label="On hold" value={s.held ?? 0} tone={s.held ? 'warn' : 'good'} />
+          <StatCard label="Harvested" value={s.harvested ?? 0} />
           <StatCard label="No holder" value={s.unallocated} />
         </div>
       )}
       {loading && !data ? <TableSkeleton cols={6} /> : !data?.hectares?.length ? <Empty title="No hectares in this block" /> : (
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
-            <thead><tr><th>Hectare</th><th>Farmer</th><th>Hectares</th><th>Harvest fee</th><th>Still owed</th><th>Clearance</th></tr></thead>
+            <thead><tr><th>Hectare</th><th>Farmer</th><th>Hectares</th><th>Harvest fee</th><th>Still owed</th><th>Clearance</th>{showPasses && <th>Pass code</th>}{(canSignOff || canHold) && <th />}</tr></thead>
             <tbody>
               {data.hectares.map((h: any) => {
                 const st = STATUS[h.status];
@@ -67,7 +86,15 @@ function Clearance({ blocks }: { blocks: any[] }) {
                     <td>{h.areaHectares}</td>
                     <td>{data.harvest ? tzs(h.fee) : '—'}</td>
                     <td>{h.status === 'NOT_CHARGED' || h.status === 'UNALLOCATED' ? '—' : tzs(h.farmerBalance)}{h.hasLoan && <div className="muted" style={{ fontSize: 11 }}>Has an unpaid loan</div>}</td>
-                    <td><span className={`badge ${st.tone}`} title={st.hint}>{st.label}</span></td>
+                    <td><span className={`badge ${st.tone}`} title={st.hint}>{st.label}</span>{h.harvested && <div className="muted" style={{ fontSize: 11 }}>Harvested</div>}</td>
+                    {showPasses && <td style={{ fontFamily: 'ui-monospace, Menlo, monospace', letterSpacing: 1 }}>{h.pass ? h.pass.code : <span className="muted">—</span>}</td>}
+                    {(canSignOff || canHold) && (
+                      <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                        {canSignOff && h.status === 'GREEN' && !h.harvested && <button type="button" className="btn-primary" onClick={() => act(() => harvestApi.usePass({ hectareId: h.hectareId, typeId: data.harvest?.typeId }), `${farmId(h.code)} is signed off for harvest.`)}>Sign off</button>}
+                        {canHold && h.pass && h.pass.status === 'ISSUED' && <> <button type="button" className="btn-secondary" onClick={() => setHolding(h)}>Hold</button></>}
+                        {canHold && h.pass && h.status === 'HELD' && <button type="button" className="btn-secondary" onClick={() => act(async () => { const p = await harvestApi.lookupPass(h.pass.code); await harvestApi.releasePass(p.data.id); }, `${farmId(h.code)} is released.`)}>Release</button>}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -75,6 +102,9 @@ function Clearance({ blocks }: { blocks: any[] }) {
           </table>
         </div>
       )}
+      {holding && <ConfirmDialog title={`Put ${farmId(holding.code)} on hold?`} confirmLabel="Put on hold" danger askReason reasonLabel="Reason"
+        body={<>The plot is locked even though its fee is paid, until the office releases it.</>}
+        onConfirm={async (reason) => { const p = await harvestApi.lookupPass(holding.pass.code); await harvestApi.holdPass(p.data.id, reason); setRowMessage({ tone: 'success', text: `${farmId(holding.code)} is on hold.` }); setBump((n) => n + 1); }} onClose={() => setHolding(null)} />}
     </div>
   );
 }
@@ -256,14 +286,15 @@ function Rates({ canals, blocks }: { canals: any[]; blocks: any[] }) {
   );
 }
 
-type Tab = 'clearance' | 'collection' | 'rates';
+type Tab = 'clearance' | 'collection' | 'rates' | 'incidents' | 'reconcile';
 
 export default function HarvestPage() {
   const can = useCan();
   const { canals, blocks, seasons } = useStructure();
   const tabs: { id: Tab; label: string }[] = [
     ...(can('harvest_clearance', 'VIEW') ? [{ id: 'clearance' as Tab, label: 'Clearance' }, { id: 'collection' as Tab, label: 'Collection' }] : []),
-    ...(can('harvest_fees', 'VIEW') ? [{ id: 'rates' as Tab, label: 'Rates' }] : []),
+    ...(can('harvest_passes', 'VIEW') ? [{ id: 'incidents' as Tab, label: 'Gate incidents' }] : []),
+    ...(can('harvest_fees', 'VIEW') ? [{ id: 'reconcile' as Tab, label: 'Daily reconciliation' }, { id: 'rates' as Tab, label: 'Rates' }] : []),
   ];
   const [tab, setTab] = useState<Tab | null>(null);
   const active: Tab = tab && tabs.some((t) => t.id === tab) ? tab : tabs[0]?.id ?? 'clearance';
@@ -275,6 +306,8 @@ export default function HarvestPage() {
         {active === 'clearance' && <Clearance blocks={blocks} />}
         {active === 'collection' && <Collection canals={canals} blocks={blocks} seasons={seasons} canOpen={can('harvest_fees', 'CREATE')} />}
         {active === 'rates' && <Rates canals={canals} blocks={blocks} />}
+        {active === 'incidents' && <Incidents blocks={blocks} />}
+        {active === 'reconcile' && <Reconciliation />}
       </div>
     </div>
   );

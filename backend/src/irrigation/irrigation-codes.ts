@@ -26,3 +26,13 @@ export function normalizeFarmId(text: string): string {
   if (block) return `${block[1]}.${block[2]}`;
   return text.trim();
 }
+
+/** The way a farm id is shown to people: 5.15R12 becomes 5:15R-12 (the same as the web screens). Other codes are returned unchanged. */
+export function farmIdDisplay(code?: string | null): string {
+  if (!code) return code ?? '';
+  const hectare = /^(\d+)\.(\d+[LR])(\d+)$/.exec(code);
+  if (hectare) return `${hectare[1]}:${hectare[2]}-${hectare[3]}`;
+  const block = /^(\d+)\.(\d+[LR])$/.exec(code);
+  if (block) return `${block[1]}:${block[2]}`;
+  return code;
+}

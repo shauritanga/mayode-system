@@ -6219,3 +6219,112 @@ model IrrigationEmancipationRequest {
   @@index([guardianId])
   @@map("irrigation_emancipation_requests")
 }
+
+// ============================================================
+// HARVEST PASSES, ARRIVALS, INCIDENTS AND THE DAILY RECONCILIATION
+// ============================================================
+
+enum HarvestPassStatus {
+  ISSUED
+  USED
+  VOID
+}
+
+/// Issued for a hectare the moment its harvest fee is fully paid (and the holder has no active loan). The short code is texted to the
+/// farmer, the block leader and any combine operator on site. One per hectare per harvest; a VOID pass is a hold set by the office.
+model HarvestPass {
+  id          String            @id @default(uuid())
+  mamcosId    String            @map("mamcos_id")
+  typeId      String            @map("type_id")
+  blockId     String            @map("block_id")
+  hectareId   String            @map("hectare_id")
+  farmerId    String            @map("farmer_id")
+  code        String            @unique
+  status      HarvestPassStatus @default(ISSUED)
+  issuedAt    DateTime          @default(now()) @map("issued_at")
+  usedAt      DateTime?         @map("used_at")
+  usedById    String?           @map("used_by_id")
+  /// CODE (the operator gave the SMS code) or CHAIRMAN (the block leader signed the plot off in the system).
+  usedVia     String?           @map("used_via")
+  arrivalId   String?           @map("arrival_id")
+  voidedAt    DateTime?         @map("voided_at")
+  voidedById  String?           @map("voided_by_id")
+  voidReason  String?           @map("void_reason")
+
+  @@unique([typeId, hectareId])
+  @@index([mamcosId, blockId])
+  @@index([farmerId])
+  @@map("harvest_passes")
+}
+
+/// A combine harvester logged into a block (by the operator or the block leader) and out again.
+model HarvestArrival {
+  id            String    @id @default(uuid())
+  mamcosId      String    @map("mamcos_id")
+  blockId       String    @map("block_id")
+  operatorName  String    @map("operator_name")
+  operatorPhone String?   @map("operator_phone")
+  machine       String?
+  note          String?
+  loggedById    String    @map("logged_by_id")
+  arrivedAt     DateTime  @default(now()) @map("arrived_at")
+  departedAt    DateTime? @map("departed_at")
+  departedById  String?   @map("departed_by_id")
+
+  @@index([mamcosId, blockId, departedAt])
+  @@map("harvest_arrivals")
+}
+
+enum HarvestIncidentStatus {
+  OPEN
+  RESOLVED
+}
+
+/// A harvester stopped at an uncleared plot, or a dispute raised in a block; the canal leader resolves it. Never edited, only resolved.
+model HarvestIncident {
+  id           String                @id @default(uuid())
+  mamcosId     String                @map("mamcos_id")
+  blockId      String                @map("block_id")
+  hectareId    String?               @map("hectare_id")
+  /// BLOCKED (an uncleared plot was presented for harvest) or DISPUTE (raised by hand).
+  kind         String
+  description  String
+  status       HarvestIncidentStatus @default(OPEN)
+  raisedById   String                @map("raised_by_id")
+  resolvedById String?               @map("resolved_by_id")
+  resolvedAt   DateTime?             @map("resolved_at")
+  resolution   String?
+  createdAt    DateTime              @default(now()) @map("created_at")
+
+  @@index([mamcosId, status])
+  @@index([blockId])
+  @@map("harvest_incidents")
+}
+
+/// How collected harvest fees are ring-fenced: this share goes to the maintenance fund, the rest to operations. Set by the Manager.
+model HarvestFundSplit {
+  mamcosId           String   @id @map("mamcos_id")
+  maintenancePercent Int      @map("maintenance_percent")
+  updatedById        String?  @map("updated_by_id")
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("harvest_fund_splits")
+}
+
+/// The Accountant's daily sign-off: what was collected that day and how it divides between operations and maintenance.
+model HarvestReconciliation {
+  id                 String   @id @default(uuid())
+  mamcosId           String   @map("mamcos_id")
+  day                DateTime @db.Date
+  paymentsCount      Int      @map("payments_count")
+  collected          Decimal  @db.Decimal(14, 2)
+  operating          Decimal  @db.Decimal(14, 2)
+  maintenance        Decimal  @db.Decimal(14, 2)
+  maintenancePercent Int      @map("maintenance_percent")
+  note               String?
+  reconciledById     String   @map("reconciled_by_id")
+  reconciledAt       DateTime @default(now()) @map("reconciled_at")
+
+  @@unique([mamcosId, day])
+  @@map("harvest_reconciliations")
+}

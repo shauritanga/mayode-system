@@ -842,6 +842,22 @@ export const harvestApi = {
   open: (data: object) => api.post('/harvest/open', data),
   clearance: (blockId: string, typeId?: string) => api.get(`/harvest/blocks/${blockId}/clearance`, { params: typeId ? { typeId } : undefined }),
   canalSummary: (canalId: string) => api.get(`/harvest/canals/${canalId}/summary`),
+  // the gate: passes, arrivals, incidents
+  lookupPass: (code: string) => api.get('/harvest/passes/lookup', { params: { code } }),
+  usePass: (data: object) => api.post('/harvest/passes/use', data),
+  holdPass: (id: string, reason: string) => api.post(`/harvest/passes/${id}/hold`, { reason }),
+  releasePass: (id: string) => api.post(`/harvest/passes/${id}/release`),
+  arrivals: (params?: object) => api.get('/harvest/arrivals', { params }),
+  logArrival: (data: object) => api.post('/harvest/arrivals', data),
+  depart: (id: string) => api.post(`/harvest/arrivals/${id}/depart`),
+  incidents: (params?: object) => api.get('/harvest/incidents', { params }),
+  reportIncident: (data: object) => api.post('/harvest/incidents', data),
+  resolveIncident: (id: string, resolution: string) => api.post(`/harvest/incidents/${id}/resolve`, { resolution }),
+  // ring-fencing and the daily reconciliation
+  split: () => api.get('/harvest/fund-split'),
+  setSplit: (maintenancePercent: number) => api.put('/harvest/fund-split', { maintenancePercent }),
+  reconciliation: (day?: string) => api.get('/harvest/reconciliation', { params: day ? { day } : undefined }),
+  reconcile: (day: string, note?: string) => api.post('/harvest/reconciliation', { day, note }),
 };
 
 // ── The cooperative's record of farms rented through M-LAX (never carries prices) ──

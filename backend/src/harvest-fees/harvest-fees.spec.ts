@@ -55,6 +55,7 @@ function build(over: any = {}) {
     irrigationBlock: { findFirst: jest.fn().mockResolvedValue({ id: 'b1' }) },
     farmingSeason: { findFirst: jest.fn().mockResolvedValue({ id: 's1', name: '2026/27' }) },
     irrigationHectareAllocation: { findMany: jest.fn().mockResolvedValue([{ farmerId: 'f1', hectare: { areaHectares: 1 } }, { farmerId: 'f1', hectare: { areaHectares: 1 } }, { farmerId: 'f2', hectare: { areaHectares: 1 } }]) },
+    harvestPass: { findMany: jest.fn().mockResolvedValue([]) },
     farmerDueType: { ...tx.farmerDueType, findUnique: jest.fn().mockResolvedValue(null) },
     farmerDue: { ...tx.farmerDue, findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((fn: any) => fn(tx)),

@@ -43,6 +43,12 @@ export class DuesService {
       const { FarmDefaultsService } = require('../farm-defaults/farm-defaults.service') as typeof import('../farm-defaults/farm-defaults.service');
       void this.moduleRef.get(FarmDefaultsService, { strict: false }).afterDuesChange(mamcosId, farmerId);
     } catch { /* the dues change stands even if this cannot run */ }
+    try {
+      // a paid harvest fee gives the farmer's plots their harvest passes
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { HarvestGateService } = require('../harvest-fees/harvest-gate.service') as typeof import('../harvest-fees/harvest-gate.service');
+      void this.moduleRef.get(HarvestGateService, { strict: false }).afterDuesChange(mamcosId, farmerId);
+    } catch { /* the payment stands even if this cannot run */ }
   }
 
   private tenant(actor: RequestUser, requested?: string): string {
