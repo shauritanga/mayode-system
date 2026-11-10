@@ -5566,6 +5566,8 @@ model FarmerDue {
   issuedOn     DateTime    @map("issued_on") @db.Date
   dueDate      DateTime?   @map("due_date") @db.Date
   postedIssue  Boolean     @default(false) @map("posted_issue")
+  /// When the "due today" SMS went to the farmer (and a digest to their leaders); null until then.
+  dueReminderSentAt DateTime? @map("due_reminder_sent_at")
   createdById  String?     @map("created_by_id")
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")

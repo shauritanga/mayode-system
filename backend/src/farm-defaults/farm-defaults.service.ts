@@ -10,7 +10,8 @@ import { CommunicationsService } from '../communications/communications.service'
 import { FarmingSeasonsService } from '../farming-seasons/farming-seasons.service';
 import { localDate } from '../accounting/tax';
 import { CaseQueryDto, ReleaseDto, TakeOverDto } from './dto/farm-defaults.dto';
-import { Msg, blockedMessage, farmAvailableMessage, noticeMessage, onMlaxMessage, reclaimedMessage, takenOverMessage, toLang } from './farm-defaults.messages';
+import { Msg, blockedMessage, dueTodayMessage, farmAvailableMessage, leaderBlockedMessage, leaderDueDigest, leaderMlaxMessage, noticeMessage, onMlaxMessage, reclaimedMessage, takenOverMessage, toLang } from './farm-defaults.messages';
+import { leadersOfFarmer } from './leaders';
 
 type Db = Prisma.TransactionClient | PrismaService;
 const OPEN = ['UNDER_AMCOS', 'MLAX_NOTICE', 'AT_MLAX'] as const;
@@ -95,6 +96,76 @@ export class FarmDefaultsService {
     }
   }
 
+  /** Tells the farmer's block and canal leaders the same thing, in each leader's own language. Never blocks the case if a text fails. */
+  private async tellLeaders(farmerId: string, make: (lang: ReturnType<typeof toLang>, blocks: string[], who: { farmer: string; member: string | null }) => Msg) {
+    try {
+      const [leaders, f] = await Promise.all([
+        leadersOfFarmer(this.prisma, farmerId),
+        this.prisma.farmer.findUnique({ where: { id: farmerId }, select: { firstName: true, lastName: true, controlNumber: true } }),
+      ]);
+      if (!f) return;
+      const who = { farmer: fullName(f), member: f.controlNumber };
+      for (const l of leaders) {
+        const m = make(toLang(l.language), l.blocks, who);
+        await this.notifications.create({ userId: l.userId, type: 'farm_default', title: m.title, body: m.body }).catch(() => undefined);
+        await this.sms.send(l.phone, m.body, 'farm_default');
+      }
+    } catch (e) {
+      this.logger.warn(`Could not notify the leaders of farmer ${farmerId}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  // ───────────────────────── 0. due-date reminders ─────────────────────────
+
+  /**
+   * On the day a payment is due: one text to the farmer, and one digest text to each of their leaders listing who is due.
+   * Only for AMCOS that switched the overdue-debt handling on. Each due is reminded once (a missed run catches up for 3 days).
+   */
+  async remindDue(now = new Date()) {
+    const today = dateOf(localDate(now));
+    const from = new Date(today.getTime() - 3 * 86_400_000);
+    const mamcoses = await this.prisma.amcosCharge.findMany({ where: { code: 'DEFAULT_PENALTY', isActive: true, amount: { gt: 0 } }, select: { mamcosId: true } });
+    let reminded = 0;
+    for (const { mamcosId } of mamcoses) {
+      const due = await this.prisma.farmerDue.findMany({
+        where: { mamcosId, status: 'ACTIVE', dueReminderSentAt: null, dueDate: { gte: from, lte: today } },
+        include: { payments: { where: { voidedAt: null }, select: { amount: true } }, farmer: { select: { id: true, firstName: true, lastName: true } } },
+      });
+      const perFarmer = new Map<string, { name: string; total: number; what: string[]; ids: string[] }>();
+      const settled: string[] = [];
+      for (const d of due) {
+        const balance = cents(num(d.amount) - num(d.waivedAmount) - d.payments.reduce((t, p) => t + num(p.amount), 0));
+        if (balance <= 0 || PENALTY_PREFIX.test(d.description)) { settled.push(d.id); continue; }
+        const row = perFarmer.get(d.farmerId) ?? { name: fullName(d.farmer), total: 0, what: [], ids: [] };
+        row.total = cents(row.total + balance); row.what.push(d.description); row.ids.push(d.id);
+        perFarmer.set(d.farmerId, row);
+      }
+      if (settled.length) await this.prisma.farmerDue.updateMany({ where: { id: { in: settled } }, data: { dueReminderSentAt: now } });
+      const digest = new Map<string, { userId: string; phone: string; language: string | null; names: string[]; blocks: Set<string> }>();
+      for (const [farmerId, row] of perFarmer) {
+        const claimed = await this.prisma.farmerDue.updateMany({ where: { id: { in: row.ids }, dueReminderSentAt: null }, data: { dueReminderSentAt: now } });
+        if (!claimed.count) continue;
+        reminded++;
+        await this.tell(farmerId, (lang) => dueTodayMessage(lang, { total: row.total, what: row.what.slice(0, 2).join(', ') + (row.what.length > 2 ? '…' : '') }));
+        for (const l of await leadersOfFarmer(this.prisma, farmerId)) {
+          const e = digest.get(l.farmerId) ?? { userId: l.userId, phone: l.phone, language: l.language, names: [], blocks: new Set<string>() };
+          e.names.push(row.name); l.blocks.forEach((b) => e.blocks.add(b));
+          digest.set(l.farmerId, e);
+        }
+      }
+      for (const e of digest.values()) {
+        try {
+          const m = leaderDueDigest(toLang(e.language), { names: e.names, blocks: [...e.blocks] });
+          await this.notifications.create({ userId: e.userId, type: 'farm_default', title: m.title, body: m.body }).catch(() => undefined);
+          await this.sms.send(e.phone, m.body, 'farm_default');
+        } catch (err) {
+          this.logger.warn(`Could not send the due-today digest to a leader: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+    }
+    return reminded;
+  }
+
   // ───────────────────────── 1. detect ─────────────────────────
 
   /** Opens a case for every farmer in this AMCOS whose debt is past the grace period. Safe to run any number of times. */
@@ -135,6 +206,7 @@ export class FarmDefaultsService {
       await this.event(tx, c.id, 'OPENED', `Debt ${debt.total} overdue; ${farms.length} farm(s) blocked; grace ${rate.graceDays} days, until ${endsOn.toISOString().slice(0, 10)}`, actorId);
     });
     await this.tell(farmerId, (lang) => blockedMessage(lang, { farms: farms.length, debt: debt.total, days: rate.graceDays, endsOn }));
+    await this.tellLeaders(farmerId, (lang, blocks, who) => leaderBlockedMessage(lang, { ...who, debt: debt.total, endsOn, blocks }));
     return true;
   }
 
@@ -199,19 +271,30 @@ export class FarmDefaultsService {
     const claimed = await this.prisma.farmDefaultCase.updateMany({ where: { id: c.id, status: 'UNDER_AMCOS' }, data: { status: 'MLAX_NOTICE', noticeSentAt: new Date() } });
     if (!claimed.count) return;
     await this.prisma.farm.updateMany({ where: { adminCaseId: c.id }, data: { adminStatus: 'MLAX_NOTICE' } });
-    await this.event(this.prisma, c.id, 'MLAX_NOTICE', 'Last warning sent: two days until the farms go to M-LAX', null);
+    // The penalty is added now, when the last two days begin, so the farmer is told the real total to pay.
+    const penalty = await this.ensurePenalty(this.prisma, c);
+    await this.event(this.prisma, c.id, 'MLAX_NOTICE', `Last warning sent: two days until the farms go to M-LAX${penalty ? `; penalty ${penalty} added` : ''}`, null);
     const debt = await this.outstanding(this.prisma, c.mamcosId, c.farmerId);
-    await this.tell(c.farmerId, (lang) => noticeMessage(lang, { debt: debt.total, endsOn: c.noticeDeadline ?? new Date() }));
+    await this.tell(c.farmerId, (lang) => noticeMessage(lang, { debt: debt.total, penalty, endsOn: c.noticeDeadline ?? new Date() }));
+  }
+
+  /** Charges the one-off penalty for a case (once only) and returns its amount, or 0 when the penalty is switched off. */
+  private async ensurePenalty(db: Db, c: { id: string; mamcosId: string; farmerId: string }) {
+    const rate = await this.charges.rate(c.mamcosId, 'DEFAULT_PENALTY', db);
+    if (!rate) return 0;
+    const due = await this.charges.chargeFarmer(db, { mamcosId: c.mamcosId, farmerId: c.farmerId, description: `Overdue-debt penalty · case ${c.id.slice(0, 8)}`, amount: rate.amount, createdById: null });
+    if (due) await db.farmDefaultCase.update({ where: { id: c.id }, data: { penaltyDueId: due.id } });
+    const existing = due ?? (await db.farmDefaultCase.findUnique({ where: { id: c.id }, select: { penaltyDueId: true } }))?.penaltyDueId;
+    if (!existing) return 0;
+    return num(due?.amount ?? (await db.farmerDue.findUnique({ where: { id: existing as string }, select: { amount: true } }))?.amount);
   }
 
   private async moveToMlax(c: { id: string; mamcosId: string; farmerId: string }) {
-    const rate = await this.charges.rate(c.mamcosId, 'DEFAULT_PENALTY');
     const result = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.farmDefaultCase.updateMany({ where: { id: c.id, status: 'MLAX_NOTICE' }, data: { status: 'AT_MLAX', atMlaxAt: new Date() } });
       if (!claimed.count) return null;
-      // The penalty is charged now, when the farms leave the AMCOS.
-      const penalty = rate ? await this.charges.chargeFarmer(tx, { mamcosId: c.mamcosId, farmerId: c.farmerId, description: `Overdue-debt penalty · case ${c.id.slice(0, 8)}`, amount: rate.amount, createdById: null }) : null;
-      if (penalty) await tx.farmDefaultCase.update({ where: { id: c.id }, data: { penaltyDueId: penalty.id } });
+      // Normally charged at the last warning; this covers a case that reached the notice stage before that rule.
+      const penalty = await this.ensurePenalty(tx, c);
       const debt = await this.outstanding(tx, c.mamcosId, c.farmerId);
       const farms = await tx.farm.findMany({ where: { adminCaseId: c.id }, select: { id: true, isLeased: true } });
       let listed = 0;
@@ -226,11 +309,12 @@ export class FarmDefaultsService {
         });
         listed++;
       }
-      await this.event(tx, c.id, 'AT_MLAX', `${listed} farm(s) listed on M-LAX; penalty ${penalty ? num(penalty.amount) : 0}; minimum price ${debt.total}`, null);
-      return { penalty: penalty ? num(penalty.amount) : 0 };
+      await this.event(tx, c.id, 'AT_MLAX', `${listed} farm(s) listed on M-LAX; penalty ${penalty}; minimum price ${debt.total}`, null);
+      return { penalty };
     });
     if (!result) return false;
     await this.tell(c.farmerId, (lang) => onMlaxMessage(lang, { penalty: result.penalty }));
+    await this.tellLeaders(c.farmerId, (lang, blocks, who) => leaderMlaxMessage(lang, { ...who, blocks }));
     try { await this.communications.sendSystem(c.mamcosId, farmAvailableMessage); } catch (e) { this.logger.warn(`Could not tell farmers about the M-LAX farm: ${e instanceof Error ? e.message : e}`); }
     return true;
   }

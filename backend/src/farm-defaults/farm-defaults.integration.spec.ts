@@ -18,6 +18,7 @@ import { PERMISSION_KEY } from '../auth/decorators/require-permission.decorator'
 import { FarmDefaultsController } from './farm-defaults.controller';
 import { FarmDefaultsService } from './farm-defaults.service';
 import { assertFarmNotBlocked } from './farm-block';
+import { DebtExposureService } from '../irrigation/debt-exposure.service';
 
 const BASE_URL = process.env.IRRIGATION_TEST_DATABASE_URL;
 const SCHEMA = 'irrigation_test';
@@ -30,14 +31,15 @@ describeDb('Farms of farmers with overdue debts (PostgreSQL)', () => {
   let adminA: RequestUser; let adminB: RequestUser; let mamcosA: string; let mamcosB: string;
   let owner: string; let payer: string; let other: string; let outsider: string; let late: string;
   let f1: string; let f2: string; let f3: string; let f4: string;
+  let blockLeader: string; let canalLeader: string; let blockId: string;
   const smsSent: { to: string; text: string }[] = [];
   const phoneOf: Record<string, string> = {};
 
-  const farmer = async (mamcosId: string, name: string) => {
+  const farmer = async (mamcosId: string, name: string, lastName = 'Mwakasege') => {
     const userId = randomUUID();
     const phone = `+2557${Math.floor(Math.random() * 1e8).toString().padStart(8, '0')}`;
     await prisma.user.create({ data: { id: userId, phone, passwordHash: 'x', role: UserRole.FARMER } });
-    const row = await prisma.farmer.create({ data: { userId, controlNumber: `FD-${randomUUID().slice(0, 6)}`, firstName: name, lastName: 'Mwakasege', mamcosId } });
+    const row = await prisma.farmer.create({ data: { userId, controlNumber: `FD-${randomUUID().slice(0, 6)}`, firstName: name, lastName, mamcosId } });
     phoneOf[row.id] = phone;
     return row.id;
   };
@@ -79,6 +81,18 @@ describeDb('Farms of farmers with overdue debts (PostgreSQL)', () => {
     outsider = await farmer(mamcosB, 'Outsider');
     f1 = await farm(owner, mamcosA, 'F1'); f2 = await farm(owner, mamcosA, 'F2'); f3 = await farm(other, mamcosA, 'F3'); f4 = await farm(other, mamcosA, 'F4');
     await prisma.farmingSeason.create({ data: { name: `Masika ${tag}`, mamcosId: mamcosA, startDate: new Date(iso(-10)), endDate: new Date(iso(120)), status: 'ACTIVE' } });
+    // The scheme: block 1.1R with a block leader and a canal leader; the owner farms hectare 1 and another member hectare 2.
+    [blockLeader, canalLeader] = [await farmer(mamcosA, 'Chairman', 'Block'), await farmer(mamcosA, 'Chairman', 'Canal')];
+    const scheme = await prisma.irrigationScheme.create({ data: { mamcosId: mamcosA, name: `Scheme ${tag}` } });
+    const canal = await prisma.irrigationCanal.create({ data: { schemeId: scheme.id, canalNumber: 1, code: `C1-${tag}`, name: 'Canal 1' } });
+    const block = await prisma.irrigationBlock.create({ data: { canalId: canal.id, blockNumber: 1, code: `1.1R`, side: 'RIGHT', areaHectares: 2, hectareCount: 2 } });
+    blockId = block.id;
+    const hectares = [] as string[];
+    for (const n of [1, 2]) hectares.push((await prisma.irrigationHectare.create({ data: { blockId: block.id, hectareNumber: n, code: `1.1R${n}`, areaHectares: 1 } })).id);
+    await prisma.irrigationHectareAllocation.create({ data: { hectareId: hectares[0], farmerId: owner, status: 'ACTIVE', allocatedOn: new Date(iso(-100)) } });
+    await prisma.irrigationHectareAllocation.create({ data: { hectareId: hectares[1], farmerId: other, status: 'ACTIVE', allocatedOn: new Date(iso(-100)) } });
+    await prisma.irrigationLeadership.create({ data: { position: 'BLOCK_LEADER', canalId: canal.id, blockId: block.id, farmerId: blockLeader, appointedOn: new Date(iso(-30)), termStart: new Date(iso(-30)) } });
+    await prisma.irrigationLeadership.create({ data: { position: 'CANAL_LEADER', canalId: canal.id, farmerId: canalLeader, appointedOn: new Date(iso(-30)), termStart: new Date(iso(-30)) } });
     await due(owner, mamcosA, 100_000, -3);    // three days past its due date
     await due(other, mamcosA, 40_000, 5);      // not due yet
   });
@@ -106,9 +120,14 @@ describeDb('Farms of farmers with overdue debts (PostgreSQL)', () => {
     const days = (c.noticeDeadline!.getTime() - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(29.9); expect(days).toBeLessThanOrEqual(30);
     expect(await prisma.farmerDue.count({ where: { farmerId: owner, description: { startsWith: 'Overdue-debt penalty' } } })).toBe(0); // no penalty yet
-    expect(smsSent).toHaveLength(1);
-    expect(smsSent[0].to).toBe(phoneOf[owner]);
-    expect(smsSent[0].text).toMatch(/Deni lako.*siku 30/);
+    const toOwner = smsSent.filter((m) => m.to === phoneOf[owner]);
+    expect(toOwner).toHaveLength(1);
+    expect(toOwner[0].text).toMatch(/Deni lako.*siku 30/);
+    // The block leader and the canal leader are told at the same time, and nobody else.
+    const toLeaders = smsSent.filter((m) => m.to === phoneOf[blockLeader] || m.to === phoneOf[canalLeader]);
+    expect(toLeaders.map((m) => m.to).sort()).toEqual([phoneOf[blockLeader], phoneOf[canalLeader]].sort());
+    expect(toLeaders.every((m) => /Owner Mwakasege/.test(m.text) && /1\.1R/.test(m.text))).toBe(true);
+    expect(smsSent).toHaveLength(3);
 
     expect(await fd.runCheck(mamcosA)).toMatchObject({ opened: 0 }); // running again changes nothing
     expect(await prisma.farmDefaultCase.count({ where: { farmerId: owner } })).toBe(1);
@@ -130,12 +149,36 @@ describeDb('Farms of farmers with overdue debts (PostgreSQL)', () => {
     expect(((await fd.forFarmer(adminA, other)) as any).case).toBeNull();
   });
 
+  it('shows what each block owes, split by farmer, and how much has been collected', async () => {
+    const exposure = new DebtExposureService(prisma as any);
+    const byBlock = await exposure.forBlocks([blockId]);
+    expect(byBlock.get(blockId)).toEqual({ outstanding: 140_000, overdue: 100_000, defaulters: 1 });
+    expect(await exposure.collection(mamcosA)).toMatchObject({ billed: 140_000, collected: 0, ratePct: 0, overdue: 100_000, farmersOverdue: 1 });
+  });
+
   it('gives the farms back as soon as the debt is paid during the grace period', async () => {
     smsSent.length = 0;
     await payAll(owner);
     await until(async () => (await openCase(owner)).status === 'RECLAIMED');
     expect((await farmsOf(owner)).every((f) => f.adminStatus === 'NORMAL' && f.adminCaseId === null)).toBe(true);
     await until(async () => smsSent.some((m) => /limerudi kama kawaida/.test(m.text)));
+  });
+
+  it('texts the farmer on the day a payment is due, and one digest to their leaders, only once', async () => {
+    await due(other, mamcosA, 25_000, 0, 'Water fee');
+    smsSent.length = 0;
+    expect(await fd.remindDue()).toBe(1);
+    expect(smsSent.filter((m) => m.to === phoneOf[other])).toHaveLength(1);
+    expect(smsSent.find((m) => m.to === phoneOf[other])!.text).toMatch(/Malipo yako ya TZS 25,000.*Water fee.*leo/);
+    for (const leader of [blockLeader, canalLeader]) {
+      const mine = smsSent.filter((m) => m.to === phoneOf[leader]);
+      expect(mine).toHaveLength(1);
+      expect(mine[0].text).toMatch(/Other Mwakasege/);
+    }
+    expect(smsSent.some((m) => m.to === phoneOf[owner] || m.to === phoneOf[payer])).toBe(false); // owner paid; payer owes nothing
+    smsSent.length = 0;
+    expect(await fd.remindDue()).toBe(0); // already reminded
+    expect(smsSent).toHaveLength(0);
   });
 
   it('warns two days before the grace ends, then gives the farms to M-LAX with the penalty', async () => {
@@ -152,8 +195,12 @@ describeDb('Farms of farmers with overdue debts (PostgreSQL)', () => {
     expect((await farmsOf(owner)).map((f) => f.adminStatus)).toEqual(['MLAX_NOTICE', 'MLAX_NOTICE']);
     expect(smsSent).toHaveLength(1);
     expect(smsSent[0].text).toMatch(/Siku mbili|Muda wako wa nyongeza unaisha/);
+    expect(smsSent[0].text).toMatch(/Faini ya TZS 50,000.*sasa ni TZS 130,000/); // the penalty is added at the warning
+    expect(await prisma.farmerDue.count({ where: { farmerId: owner, description: { startsWith: 'Overdue-debt penalty' } } })).toBe(1);
+    expect((await openCase(owner)).penaltyDueId).toBeTruthy();
     expect(await fd.advance()).toBe(0); // the warning is sent only once
     expect(smsSent).toHaveLength(1);
+    expect(await prisma.farmerDue.count({ where: { farmerId: owner, description: { startsWith: 'Overdue-debt penalty' } } })).toBe(1);
     expect(await prisma.landListing.count({ where: { defaultCaseId: c.id } })).toBe(0);
 
     await prisma.farmDefaultCase.update({ where: { id: c.id }, data: { noticeDeadline: new Date(Date.now() - 1000) } });
@@ -165,7 +212,8 @@ describeDb('Farms of farmers with overdue debts (PostgreSQL)', () => {
     const listings = await prisma.landListing.findMany({ where: { defaultCaseId: c.id } });
     expect(listings).toHaveLength(2);
     expect(listings.every((l) => l.minimumPrice === 130_000 && l.leaseStatus === 'DRAFT' && l.ownerId === owner)).toBe(true); // 80,000 debt + 50,000 penalty
-    await until(async () => new Set(smsSent.map((m) => m.to)).size >= 3);
+    await until(async () => new Set(smsSent.map((m) => m.to)).size >= 5); // owner, both leaders, the other farmers
+    expect(smsSent.filter((m) => m.to === phoneOf[blockLeader] && /Mashamba ya Owner/.test(m.text))).toHaveLength(1);
     expect(smsSent.find((m) => m.to === phoneOf[owner] && /Hutapata chochote/.test(m.text))).toBeTruthy();
     expect(smsSent.filter((m) => /M-LAX/.test(m.text) && m.to === phoneOf[payer])).toHaveLength(1);
     expect(smsSent.some((m) => m.to === phoneOf[outsider])).toBe(false);

@@ -85,8 +85,26 @@ export function HectareDetail({ id }: { id: string }) {
                     <Link href={`/dashboard/farmers/${holder.id}`} style={{ fontSize: 18, fontWeight: 700 }}>{holder.name}</Link>
                     <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>ID {holder.memberNumber}{h.allocatedOn ? ` · since ${fmtDate(h.allocatedOn)}` : ''}</div>
                     {h.guardian && <div style={{ fontSize: 12.5, marginTop: 4 }}>Guardian: <Link href={`/dashboard/farmers/${h.guardian.id}`}>{h.guardian.name}</Link></div>}
+                    {h.standing && (h.standing.overdue > 0
+                      ? <div style={{ marginTop: 6 }}><span className="badge badge-red">Overdue {tzs(h.standing.overdue)}</span></div>
+                      : <div style={{ marginTop: 6 }}><span className="badge badge-green">{h.standing.outstanding > 0 ? `Owes ${tzs(h.standing.outstanding)}, not yet due` : 'Nothing owed'}</span></div>)}
                   </>
                 ) : <div style={{ fontSize: 15, marginTop: 2 }}>Nobody yet</div>}
+              </div>
+              <div style={{ minWidth: 240 }}>
+                <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Leaders</div>
+                {([['Block leader', h.leaders?.block], ['Canal leader', h.leaders?.canal]] as const).map(([label, l]) => (
+                  <div key={label} style={{ marginTop: 4, fontSize: 13.5 }}>
+                    <span className="muted">{label}: </span>
+                    {l ? <>
+                      <strong>{l.name}</strong>
+                      {l.phone && <span style={{ marginLeft: 8, display: 'inline-flex', gap: 8 }}>
+                        <a href={`tel:${l.phone}`} aria-label={`Call ${l.name}`}>Call</a>
+                        <a href={`sms:${l.phone}`} aria-label={`Text ${l.name}`}>SMS</a>
+                      </span>}
+                    </> : <span className="muted">none appointed</span>}
+                  </div>
+                ))}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>

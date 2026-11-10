@@ -13,6 +13,7 @@ import { PERMISSION_KEY } from '../auth/decorators/require-permission.decorator'
 import { IrrigationController } from './irrigation.controller';
 import { IrrigationScopeService } from './irrigation-scope.service';
 import { SchemesService } from './schemes.service';
+import { DebtExposureService } from './debt-exposure.service';
 import { StructureService } from './structure.service';
 import { AllocationService } from './allocation.service';
 
@@ -61,7 +62,7 @@ describeDb('Hectare guardians (PostgreSQL)', () => {
     expect(current_schema).toBe(SCHEMA);
     const scope = new IrrigationScopeService(prisma as any);
     const schemes = new SchemesService(prisma as any, scope);
-    structure = new StructureService(prisma as any, scope, schemes);
+    structure = new StructureService(prisma as any, scope, schemes, new DebtExposureService(prisma as any));
     allocations = new AllocationService(prisma as any, scope, structure, { send: async () => undefined } as any, { create: async () => ({}) } as any);
     const tag = randomUUID().slice(0, 5);
     mamcosA = (await prisma.mamcos.create({ data: { name: `Madibira G ${tag}` } })).id;

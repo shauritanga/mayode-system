@@ -4,6 +4,7 @@ import type { RequestUser } from '../common/ownership.service';
 import { IrrigationScopeService } from './irrigation-scope.service';
 import { allocationState, StructureService } from './structure.service';
 import { fullName, num, today, userNames } from './irrigation-common';
+import { DebtExposureService, noExposure } from './debt-exposure.service';
 
 const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 1000) / 10 : 0);
 const EXPIRY_WINDOW_DAYS = 60;
@@ -14,6 +15,7 @@ export class DashboardService {
     private readonly prisma: PrismaService,
     private readonly scopeService: IrrigationScopeService,
     private readonly structure: StructureService,
+    private readonly debt: DebtExposureService,
   ) {}
 
   /** Picks the requested scheme, or the first one the caller may see. */
@@ -38,8 +40,13 @@ export class DashboardService {
     });
     const blocks = await this.structure.blockRows(scope, { canal: { schemeId }, archivedAt: null });
     const leaders = await this.structure.leaders({ canalId: { in: canals.map((c) => c.id) } });
+    const exposure = this.debt.canSee(scope) ? await this.debt.forBlocks(blocks.map((b) => b.id)) : null;
     const rows = canals.map((c) => {
       const mine = blocks.filter((b) => b.canalId === c.id);
+      const debt = exposure ? mine.reduce((t, b) => {
+        const e = exposure.get(b.id) ?? noExposure();
+        return { outstanding: t.outstanding + e.outstanding, overdue: t.overdue + e.overdue, defaulters: t.defaulters + e.defaulters };
+      }, noExposure()) : null;
       const units = mine.reduce((t, b) => t + b.stats.hectareUnits, 0);
       const allocated = mine.reduce((t, b) => t + b.stats.allocatedUnits, 0);
       return {
@@ -51,7 +58,7 @@ export class DashboardService {
         blocksFull: mine.filter((b) => b.allocationState === 'FULL').length,
         blocksPartial: mine.filter((b) => b.allocationState === 'PARTIAL').length,
         blocksEmpty: mine.filter((b) => b.allocationState === 'NONE').length,
-        leader: leaders.canal.get(c.id) ?? null,
+        leader: leaders.canal.get(c.id) ?? null, debt,
       };
     });
     return { canals, rows, blocks };
@@ -77,6 +84,10 @@ export class DashboardService {
     const membersWithoutHectare = amcosMembers == null ? null : Math.max(amcosMembers - farmers.length, 0);
     const blockLeaders = blocks.filter((b) => b.leader?.state === 'ASSIGNED').length;
     const canalLeaders = rows.filter((c) => c.leader?.state === 'ASSIGNED').length;
+
+    // Money: the AMCOS-wide collection rate is for staff who may see dues; a leader sees only the debt of their own canal or block (in the rows).
+    const collection = this.debt.canSee(scope) && !scope.restricted && scheme.mamcosId ? await this.debt.collection(scheme.mamcosId) : null;
+    const season = await this.currentSeason(scheme.mamcosId);
 
     const alerts: { severity: 'warning' | 'info'; message: string; href: string }[] = [];
     if (canals.length < scheme.plannedCanalCount)
@@ -109,6 +120,7 @@ export class DashboardService {
         unallocatedHectares: area - allocatedArea, pendingAllocations: pendingUnits, registeredFarmers: farmers.length, amcosMembers, membersWithoutHectare, pendingTransfers,
         completionPct: pct(allocatedArea, area), canalLeaders, blockLeaders,
       },
+      collection, season,
       canals: rows,
       blockDistribution: {
         full: blocks.filter((b) => b.allocationState === 'FULL').length,
@@ -118,6 +130,22 @@ export class DashboardService {
       alerts,
       recent: await this.recentActivity(blocks.map((b) => b.id), scheme.id),
     };
+  }
+
+  /** The season now running for this AMCOS, as four steps: land preparation, planting, irrigation, harvest. */
+  private async currentSeason(mamcosId: string | null) {
+    const season = await this.prisma.farmingSeason.findFirst({
+      where: { status: { in: ['REGISTRATION_OPEN', 'VERIFICATION_IN_PROGRESS', 'ACTIVE', 'HARVESTING'] }, OR: [{ mamcosId: mamcosId ?? undefined }, { mamcosId: null }] },
+      orderBy: { startDate: 'desc' },
+    });
+    if (!season) return null;
+    const total = +season.endDate - +season.startDate;
+    const timePct = total > 0 ? Math.min(100, Math.max(0, Math.round(((Date.now() - +season.startDate) / total) * 100))) : 0;
+    // Before the season starts it is land preparation; once active, the first third is planting and the rest irrigation.
+    const step = season.status === 'HARVESTING' ? 3
+      : season.status === 'ACTIVE' ? (timePct < 33 ? 1 : 2)
+      : 0;
+    return { id: season.id, name: season.name, status: season.status, startDate: season.startDate, endDate: season.endDate, progressPct: timePct, step, steps: ['Land preparation', 'Planting', 'Irrigation', 'Harvest'] };
   }
 
   private async recentActivity(blockIds: string[], schemeId: string) {
@@ -189,12 +217,13 @@ export class DashboardService {
       },
       orderBy: [{ position: 'asc' }, { termEnd: 'asc' }],
       include: {
-        farmer: { select: { id: true, firstName: true, lastName: true, controlNumber: true } },
+        farmer: { select: { id: true, firstName: true, lastName: true, controlNumber: true, user: { select: { phone: true } } } },
         canal: { select: { id: true, code: true, name: true } }, block: { select: { id: true, code: true } },
       },
     });
     const view = (l: (typeof active)[number]) => ({
-      id: l.id, position: l.position, leader: { id: l.farmer.id, name: fullName(l.farmer), memberNumber: l.farmer.controlNumber },
+      id: l.id, position: l.position, leader: { id: l.farmer.id, name: fullName(l.farmer), memberNumber: l.farmer.controlNumber, phone: l.farmer.user?.phone ?? null },
+      farmers: l.blockId ? (blocks.find((b) => b.id === l.blockId)?.stats.farmerCount ?? 0) : (rows.find((c) => c.id === l.canalId)?.farmerCount ?? 0),
       canal: l.canal, block: l.block, termStart: l.termStart, termEnd: l.termEnd,
       daysLeft: l.termEnd ? Math.round((+l.termEnd - +now) / 86_400_000) : null,
     });

@@ -7,6 +7,13 @@ export class FarmDefaultsScheduler {
   private readonly logger = new Logger(FarmDefaultsScheduler.name);
   constructor(private readonly defaults: FarmDefaultsService) {}
 
+  /** Every morning, before the overdue check: remind farmers (and a digest to their leaders) whose payment is due today. */
+  @Cron(process.env.FARM_DEFAULTS_REMIND_CRON || '0 5 * * *', { name: 'farm-defaults-due-reminders', timeZone: 'Africa/Dar_es_Salaam' })
+  async remind() {
+    try { const n = await this.defaults.remindDue(); if (n) this.logger.log(`Sent ${n} due-today reminder(s)`); }
+    catch (e) { this.logger.error(`Due-date reminders failed: ${e instanceof Error ? e.message : e}`); }
+  }
+
   /** Every morning: find farmers whose debt has gone past the grace period. */
   @Cron(process.env.FARM_DEFAULTS_CHECK_CRON || '0 6 * * *', { name: 'farm-defaults-check', timeZone: 'Africa/Dar_es_Salaam' })
   async check() {

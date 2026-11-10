@@ -3,10 +3,13 @@
 
 import Link from 'next/link';
 import { irrigationApi } from '@/lib/api';
+import { FarmFinder, SchemeTree } from './SchemeTree';
 import {
   BASE, CardsSkeleton, Empty, LoadError, PageHeader, Panel, ProgressBar, StatCard, StatusBadge, TableSkeleton,
   fmtDate, fmtHa, fmtNum, useApi, useIrrigation,
 } from './ui';
+
+const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 
 const ACTIONS: { label: string; href: string; resource: string; action: string }[] = [
   { label: 'Allocate a hectare', href: `${BASE}/allocation/allocate`, resource: 'irrigation_allocations', action: 'CREATE' },
@@ -57,6 +60,33 @@ export default function Overview({ bare = false }: { bare?: boolean } = {}) {
             <StatCard label="Unallocated hectares" value={fmtNum(t.unallocatedHectares)} />
           </div>
 
+          <Panel title="Find a farm"><FarmFinder schemeId={schemeId} /></Panel>
+
+          {(data.collection || data.season) && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
+              {data.collection && (
+                <div className="metric-grid" style={{ margin: 0, gridTemplateColumns: '1fr 1fr' }}>
+                  <StatCard label="Dues collected" value={data.collection.ratePct == null ? '—' : `${data.collection.ratePct}%`}
+                    hint={data.collection.billed ? `${tzs(data.collection.collected)} of ${tzs(data.collection.billed)}` : 'Nothing billed yet'} tone={data.collection.ratePct != null && data.collection.ratePct < 50 ? 'warn' : 'good'} />
+                  <StatCard label="Overdue debt" value={tzs(data.collection.overdue)}
+                    hint={`${data.collection.farmersOverdue} member${data.collection.farmersOverdue === 1 ? '' : 's'}`} tone={data.collection.overdue ? 'warn' : 'good'} />
+                </div>
+              )}
+              {data.season && (
+                <Panel title={`Season · ${data.season.name}`}>
+                  <ol style={{ display: 'flex', gap: 6, listStyle: 'none', margin: '0 0 10px', padding: 0, flexWrap: 'wrap' }} aria-label="Season stage">
+                    {data.season.steps.map((label: string, i: number) => (
+                      <li key={label} aria-current={i === data.season.step ? 'step' : undefined}
+                        className={`badge ${i === data.season.step ? 'badge-green' : i < data.season.step ? 'badge-blue' : 'badge-gray'}`}>{i + 1}. {label}</li>
+                    ))}
+                  </ol>
+                  <ProgressBar pct={data.season.progressPct} label="Season time elapsed" />
+                  <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>{fmtDate(data.season.startDate)} – {fmtDate(data.season.endDate)} · {data.season.progressPct}% of the season has passed</div>
+                </Panel>
+              )}
+            </div>
+          )}
+
           <Panel title="Overall allocation progress">
             <ProgressBar pct={t.completionPct} height={12} />
             <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>{fmtHa(t.allocatedHectares)} of {fmtHa(t.registeredHectares)} allocated</div>
@@ -75,20 +105,9 @@ export default function Overview({ bare = false }: { bare?: boolean } = {}) {
             </Panel>
           )}
 
-          <Panel title="Canal summary" pad={false}>
-            {!data.canals.length ? <Empty title="No canals yet" hint="Add the scheme's canals to begin." action={can('irrigation', 'CREATE') ? <Link className="btn-primary" href={`${BASE}/structure/canals?add=1`}>Add canal</Link> : undefined} /> : (
-              <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Canal</th><th className="num">Blocks</th><th className="num">Hectares</th><th className="num">Allocated</th><th style={{ minWidth: 140 }}>Progress</th><th>Canal leader</th><th className="num">Blocks with leader</th></tr></thead><tbody>
-                {data.canals.map((c: any) => (
-                  <tr key={c.id}>
-                    <td><Link href={`${BASE}/structure/canals/${c.id}`} style={{ fontWeight: 600 }}>{c.code} · {c.name}</Link></td>
-                    <td className="num">{c.blockCount}</td><td className="num">{fmtNum(c.area)}</td><td className="num">{fmtNum(c.allocatedUnits)}</td>
-                    <td><ProgressBar pct={c.completionPct} /><span className="muted" style={{ fontSize: 11 }}>{c.completionPct}%</span></td>
-                    <td>{c.leader ? <>{c.leader.name} {c.leader.state === 'TERM_EXPIRED' && <StatusBadge value="TERM_EXPIRED" label="Term expired" />}</> : <StatusBadge value="UNASSIGNED" label="No leader" />}</td>
-                    <td className="num">{c.blocksWithLeader} / {c.blockCount}</td>
-                  </tr>
-                ))}
-              </tbody></table></div>
-            )}
+          <Panel title="Scheme map" pad={false}>
+            <SchemeTree canals={data.canals} showDebt={data.canals.some((c: any) => c.debt)}
+              empty={<Empty title="No canals yet" hint="Add the scheme's canals to begin." action={can('irrigation', 'CREATE') ? <Link className="btn-primary" href={`${BASE}/structure/canals?add=1`}>Add canal</Link> : undefined} />} />
           </Panel>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>

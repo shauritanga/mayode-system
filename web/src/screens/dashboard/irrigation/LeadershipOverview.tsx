@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import Link from 'next/link';
+import { farmId } from '@/lib/farm-id';
 import { irrigationApi } from '@/lib/api';
 import {
   BASE, CardsSkeleton, Empty, LoadError, PageHeader, Panel, ProgressBar, StatCard, StatusBadge, fmtDate, fmtNum, titleCase, useApi, useIrrigation,
@@ -52,8 +53,8 @@ export default function LeadershipOverview({ bare = false }: { bare?: boolean } 
           </Panel>
           <Panel title="Current appointments" pad={false}>
             {!data.appointments.length ? <Empty title="No current appointments" hint="Appoint canal and block leaders from Leader Assignments." /> : (
-              <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Leader</th><th>Position</th><th>Canal / block</th><th>Term</th></tr></thead><tbody>
-                {data.appointments.map((a: any) => <tr key={a.id}><td><Link href={`${BASE}/allocation/farmers/${a.leader.id}`}>{a.leader.name}</Link> <span className="muted">· {a.leader.memberNumber}</span></td><td>{titleCase(a.position)}</td><td>{a.block?.code ?? a.canal.code}</td><td>{fmtDate(a.termStart)} – {a.termEnd ? fmtDate(a.termEnd) : 'open'}</td></tr>)}
+              <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Leader</th><th>Phone</th><th>Position</th><th>Canal / block</th><th className="num">Members</th><th>Term</th></tr></thead><tbody>
+                {data.appointments.map((a: any) => <tr key={a.id}><td><Link href={`${BASE}/allocation/farmers/${a.leader.id}`}>{a.leader.name}</Link> <span className="muted">· {a.leader.memberNumber}</span></td><td>{a.leader.phone ? <a href={`tel:${a.leader.phone}`}>{a.leader.phone}</a> : '—'}</td><td>{titleCase(a.position)}</td><td>{farmId(a.block?.code ?? a.canal.code)}</td><td className="num">{fmtNum(a.farmers)}</td><td>{fmtDate(a.termStart)} – {a.termEnd ? fmtDate(a.termEnd) : 'open'}</td></tr>)}
               </tbody></table></div>
             )}
           </Panel>

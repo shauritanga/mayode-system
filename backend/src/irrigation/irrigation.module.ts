@@ -9,12 +9,13 @@ import { DashboardService } from './dashboard.service';
 import { DocumentsService } from './documents.service';
 import { IrrigationSetupService } from './irrigation-roles';
 import { LeaderAccessService } from './leader-access.service';
+import { DebtExposureService } from './debt-exposure.service';
 
 @Module({
   controllers: [IrrigationController, MyTransfersController],
   providers: [
     IrrigationScopeService, SchemesService, StructureService, AllocationService,
-    LeadershipService, DashboardService, DocumentsService, IrrigationSetupService, LeaderAccessService,
+    LeadershipService, DashboardService, DocumentsService, IrrigationSetupService, LeaderAccessService, DebtExposureService,
   ],
   exports: [IrrigationScopeService, LeaderAccessService],
 })

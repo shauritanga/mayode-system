@@ -6,7 +6,8 @@ import { IrrigationScope, IrrigationScopeService } from './irrigation-scope.serv
 import { diffRecords, writeAudit } from './irrigation-audit';
 import { fullName, num, paged, paging, rethrowIntegrity, today, userNames, type Db } from './irrigation-common';
 import { SchemesService } from './schemes.service';
-import { blockCodeFor, hectareCodeFor, pad2, type BlockSide } from './irrigation-codes';
+import { DebtExposureService } from './debt-exposure.service';
+import { blockCodeFor, hectareCodeFor, normalizeFarmId, pad2, type BlockSide } from './irrigation-codes';
 import {
   CreateBlockDto, CreateCanalDto, CreateHectareDto, UpdateBlockDto, UpdateCanalDto,
 } from './dto/irrigation.dto';
@@ -40,6 +41,7 @@ export class StructureService {
     private readonly prisma: PrismaService,
     private readonly scopeService: IrrigationScopeService,
     private readonly schemes: SchemesService,
+    private readonly debt: DebtExposureService,
   ) {}
 
   // ───────────────────────── shared aggregates ─────────────────────────
@@ -284,7 +286,9 @@ export class StructureService {
     if (q.allocation) rows = rows.filter((r) => r.allocationState === q.allocation);
     if (q.leadership === 'ASSIGNED') rows = rows.filter((r) => r.leader?.state === 'ASSIGNED');
     if (q.leadership === 'UNASSIGNED') rows = rows.filter((r) => r.leader?.state !== 'ASSIGNED');
-    return paged(rows.slice(skip, skip + pageSize), rows.length, page, pageSize);
+    const slice = rows.slice(skip, skip + pageSize);
+    const exposure = this.debt.canSee(scope) ? await this.debt.forBlocks(slice.map((b) => b.id)) : null;
+    return paged(slice.map((b) => ({ ...b, debt: exposure?.get(b.id) ?? null })), rows.length, page, pageSize);
   }
 
   async getBlock(actor: RequestUser, id: string) {
@@ -448,6 +452,13 @@ export class StructureService {
     const scope = await this.scopeService.resolve(actor);
     const { page, pageSize, skip, take } = paging(q as any, 30);
     const open = { status: { in: ['ACTIVE', 'PENDING_APPROVAL'] as ('ACTIVE' | 'PENDING_APPROVAL')[] } };
+    // A farm id can be typed the way it is shown (1:1R-1) or the way it is stored (1.1R1).
+    if (q.q) q = { ...q, q: normalizeFarmId(q.q) };
+    // A whole farm id finds that one hectare; a block id finds the hectares of that block; anything else is a partial match.
+    const codeMatch: Prisma.IrrigationHectareWhereInput = !q.q ? {}
+      : /^\d+\.\d+[LR]\d+$/i.test(q.q) ? { code: { equals: q.q, mode: 'insensitive' } }
+      : /^\d+\.\d+[LR]$/i.test(q.q) ? { code: { startsWith: q.q, mode: 'insensitive' } }
+      : { code: { contains: q.q, mode: 'insensitive' } };
     const where: Prisma.IrrigationHectareWhereInput = {
       AND: [
         this.scopeService.hectareWhere(scope),
@@ -461,7 +472,7 @@ export class StructureService {
         q.q
           ? {
               OR: [
-                { code: { contains: q.q, mode: 'insensitive' } },
+                codeMatch,
                 { allocations: { some: { ...open, farmer: { OR: [
                   { firstName: { contains: q.q, mode: 'insensitive' } },
                   { lastName: { contains: q.q, mode: 'insensitive' } },
@@ -489,7 +500,10 @@ export class StructureService {
         },
       }),
     ]);
-    return paged(rows.map((h) => this.hectareView(h)), total, page, pageSize);
+    const views = rows.map((h) => this.hectareView(h));
+    // Standing of each holder, for the green / yellow / red tags: red when they owe money past its due date.
+    const standing = this.debt.canSee(scope) ? await this.debt.standing([...new Set(views.map((v) => v.farmer?.id).filter((id): id is string => !!id))]) : null;
+    return paged(views.map((v) => ({ ...v, overdue: standing && v.farmer ? (standing.get(v.farmer.id)?.overdue ?? 0) > 0 : null })), total, page, pageSize);
   }
 
   hectareView(h: any) {
@@ -526,8 +540,18 @@ export class StructureService {
     const farmerIds = [...new Set(transfers.flatMap((t) => [t.fromFarmerId, t.toFarmerId]))];
     const transferFarmers = new Map((await this.prisma.farmer.findMany({ where: { id: { in: farmerIds } }, select: { id: true, firstName: true, lastName: true } })).map((f) => [f.id, fullName(f)]));
     const view = this.hectareView({ ...hectare, allocations: allocations.filter((a) => ['ACTIVE', 'PENDING_APPROVAL'].includes(a.status)) });
+    const { block: blockLeaders, canal: canalLeaders } = await this.leaders({ OR: [{ blockId: hectare.blockId }, { canalId: hectare.block.canalId, blockId: null }] });
+    const phones = await this.prisma.farmer.findMany({
+      where: { id: { in: [blockLeaders.get(hectare.blockId)?.farmerId, canalLeaders.get(hectare.block.canalId)?.farmerId].filter(Boolean) } },
+      select: { id: true, user: { select: { phone: true } } },
+    });
+    const phoneOf = new Map(phones.map((p) => [p.id, p.user?.phone ?? null]));
+    const contact = (l: any) => (l ? { name: l.name, memberNumber: l.memberNumber, phone: phoneOf.get(l.farmerId) ?? null, state: l.state } : null);
+    const standing = view.farmer && this.debt.canSee(scope) ? (await this.debt.standing([view.farmer.id])).get(view.farmer.id) ?? { outstanding: 0, overdue: 0 } : null;
     return {
       ...view,
+      leaders: { block: contact(blockLeaders.get(hectare.blockId)), canal: contact(canalLeaders.get(hectare.block.canalId)) },
+      standing,
       block: { id: hectare.block.id, code: hectare.block.code, name: hectare.block.name, blockNumber: hectare.block.blockNumber, side: hectare.block.side },
       canal: { id: hectare.block.canal.id, code: hectare.block.canal.code, name: hectare.block.canal.name, canalNumber: hectare.block.canal.canalNumber },
       scheme: { id: hectare.block.canal.scheme.id, name: hectare.block.canal.scheme.name },

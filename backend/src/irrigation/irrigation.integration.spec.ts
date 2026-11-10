@@ -20,6 +20,7 @@ import { StaffService } from '../staff/staff.service';
 import { OwnershipService } from '../common/ownership.service';
 import { IrrigationScopeService } from './irrigation-scope.service';
 import { SchemesService } from './schemes.service';
+import { DebtExposureService } from './debt-exposure.service';
 import { StructureService } from './structure.service';
 import { AllocationService } from './allocation.service';
 import { LeadershipService } from './leadership.service';
@@ -65,6 +66,7 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
     isActive: true, isSystem: false,
     permissions: list.map(([resource, action]) => ({ action, resource: { key: resource } })),
   });
+  const grantsDues = false; // the manager role used below has no `dues` grant
   const MANAGER = grants([
     ['irrigation', 'VIEW'], ['irrigation', 'CREATE'], ['irrigation', 'EDIT'], ['irrigation', 'DELETE'],
     ['irrigation_allocations', 'VIEW'], ['irrigation_allocations', 'CREATE'], ['irrigation_allocations', 'EDIT'],
@@ -104,7 +106,7 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
 
     scope = new IrrigationScopeService(prisma as any);
     schemes = new SchemesService(prisma as any, scope);
-    structure = new StructureService(prisma as any, scope, schemes);
+    structure = new StructureService(prisma as any, scope, schemes, new DebtExposureService(prisma as any));
     allocations = new AllocationService(
       prisma as any, scope, structure,
       { send: async (to: string, message: string) => { smsSent.push({ to, message }); } } as any,
@@ -112,7 +114,7 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
     );
     access = new LeaderAccessService(prisma as any);
     leadership = new LeadershipService(prisma as any, scope, allocations, access);
-    dashboard = new DashboardService(prisma as any, scope, structure);
+    dashboard = new DashboardService(prisma as any, scope, structure, new DebtExposureService(prisma as any));
     documents = new DocumentsService(prisma as any, scope);
 
     mamcosId = (await prisma.mamcos.create({ data: { name: `Madibira Test ${randomUUID().slice(0, 6)}` } })).id;
@@ -269,6 +271,33 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
       const row = list.data.find((h: any) => h.hectareNumber === 1);
       expect(row).toMatchObject({ allocationStatus: 'ALLOCATED', farmer: { memberNumber: 'MBR-00001' } });
       expect(list.data.filter((h: any) => h.allocationStatus === 'AVAILABLE')).toHaveLength(29);
+    });
+
+    it('finds a hectare by its farm id typed as shown (1:1R-1), with dots, or as stored, and tells who the leaders are', async () => {
+      const hectareId = await hectareOf(blockIds[0][0], 1);
+      const code = (await prisma.irrigationHectare.findUniqueOrThrow({ where: { id: hectareId } })).code;
+      const m = /^(\d+)\.(\d+[LR])(\d+)$/.exec(code);
+      expect(m).toBeTruthy();
+      for (const typed of [`${m![1]}:${m![2]}-${m![3]}`, `${m![1]}.${m![2].toLowerCase()}-${m![3]}`, code]) {
+        const found: any = await structure.listHectares(admin, { q: typed });
+        expect(found.data.map((h: any) => h.id)).toEqual([hectareId]); // exactly that hectare, not 1.1R10…
+      }
+      const block: any = await structure.listHectares(admin, { q: `${m![1]}:${m![2]}`, pageSize: '60' });
+      expect(block.meta.total).toBe(30); // a block id finds the 30 hectares of that block
+      const detail: any = await structure.getHectare(admin, hectareId);
+      expect(detail.leaders).toEqual({ block: null, canal: null });
+      expect(detail.farmer.memberNumber).toBe('MBR-00001');
+    });
+
+    it('shows the running season as four steps with how much of it has passed, and no money to staff without the Dues permission', async () => {
+      const day = 86_400_000;
+      const season = await prisma.farmingSeason.create({ data: { name: `Masika ${randomUUID().slice(0, 6)}`, mamcosId, startDate: new Date(Date.now() - 10 * day), endDate: new Date(Date.now() + 90 * day), status: 'ACTIVE' } });
+      const overview: any = await dashboard.overview(admin, schemeId);
+      expect(overview.season).toMatchObject({ id: season.id, step: 1, progressPct: 10, steps: ['Land preparation', 'Planting', 'Irrigation', 'Harvest'] });
+      await prisma.farmingSeason.update({ where: { id: season.id }, data: { status: 'HARVESTING' } });
+      expect(((await dashboard.overview(admin, schemeId)) as any).season.step).toBe(3);
+      await prisma.farmingSeason.delete({ where: { id: season.id } });
+      if (!grantsDues) { expect(overview.collection).toBeNull(); expect(overview.canals[0].debt).toBeNull(); }
     });
 
     it('never allocates an occupied hectare — in the service or straight through SQL', async () => {
@@ -739,7 +768,7 @@ describeDb('Irrigation Scheme Management (PostgreSQL)', () => {
       for (const name of handlers) {
         const required = reflector.get(PERMISSION_KEY, proto[name]);
         expect({ name, required: !!required }).toEqual({ name, required: true });
-        expect(['irrigation', 'irrigation_allocations', 'irrigation_leadership', 'roles']).toContain(required.resource);
+        expect(['irrigation', 'irrigation_allocations', 'irrigation_leadership', 'irrigation_transfer_approval', 'roles']).toContain(required.resource);
       }
     });
 
