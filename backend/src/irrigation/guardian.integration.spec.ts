@@ -16,6 +16,7 @@ import { SchemesService } from './schemes.service';
 import { DebtExposureService } from './debt-exposure.service';
 import { StructureService } from './structure.service';
 import { AllocationService } from './allocation.service';
+import { EmancipationService } from './emancipation.service';
 
 const BASE_URL = process.env.IRRIGATION_TEST_DATABASE_URL;
 const SCHEMA = 'irrigation_test';
@@ -35,6 +36,10 @@ describeDb('Hectare guardians (PostgreSQL)', () => {
   let hectares: string[] = [];
   const f: Record<string, string> = {};
   const allocationOf: Record<string, string> = {};
+  const uid: Record<string, string> = {};
+  const asUser = (name: string) => ({ id: uid[name], role: UserRole.FARMER } as RequestUser);
+  const texts: { to: string; text: string }[] = [];
+  let emancipation: EmancipationService;
 
   const MANAGER = {
     isActive: true, isSystem: false,
@@ -50,6 +55,7 @@ describeDb('Hectare guardians (PostgreSQL)', () => {
   const farmer = async (mamcosId: string, name: string) => {
     const userId = randomUUID();
     await prisma.user.create({ data: { id: userId, phone: `+2556${Math.floor(Math.random() * 1e8).toString().padStart(8, '0')}`, passwordHash: 'x', role: UserRole.FARMER } });
+    uid[name] = userId;
     f[name] = (await prisma.farmer.create({ data: { userId, controlNumber: `G-${randomUUID().slice(0, 6)}`, firstName: name, lastName: 'Mbarali', mamcosId } })).id;
   };
   const detail = async (name: string) => (await allocations.farmerDetail(admin, f[name])) as any;
@@ -63,7 +69,10 @@ describeDb('Hectare guardians (PostgreSQL)', () => {
     const scope = new IrrigationScopeService(prisma as any);
     const schemes = new SchemesService(prisma as any, scope);
     structure = new StructureService(prisma as any, scope, schemes, new DebtExposureService(prisma as any));
-    allocations = new AllocationService(prisma as any, scope, structure, { send: async () => undefined } as any, { create: async () => ({}) } as any);
+    const sms: any = { send: async (to: string, text: string) => { texts.push({ to, text }); } };
+    const notifications: any = { create: async () => ({}) };
+    allocations = new AllocationService(prisma as any, scope, structure, sms, notifications);
+    emancipation = new EmancipationService(prisma as any, scope, sms, notifications);
     const tag = randomUUID().slice(0, 5);
     mamcosA = (await prisma.mamcos.create({ data: { name: `Madibira G ${tag}` } })).id;
     mamcosB = (await prisma.mamcos.create({ data: { name: `Ubaruku G ${tag}` } })).id;
@@ -132,7 +141,9 @@ describeDb('Hectare guardians (PostgreSQL)', () => {
 
   it('handing the hectare over completely ends the guardian\'s part', async () => {
     const requested: any = await allocations.createTransfer(admin, { hectareId: hectares[2], toFarmerId: f.Zawadi, reason: 'Neema gives the hectare to Zawadi' });
-    expect(requested.status).toBe('PENDING_APPROVAL');
+    expect(requested.status).toBe('AWAITING_RECIPIENT'); // the receiving member is always asked first
+    await expect(allocations.approveTransfer(approver, requested.id)).rejects.toThrow(/has not accepted/);
+    expect(((await allocations.respondToTransfer(asUser('Zawadi'), requested.id, true)) as any).status).toBe('PENDING_APPROVAL');
     const result: any = await allocations.approveTransfer(approver, requested.id);
     expect(result.status).toBe('COMPLETED');
     const juma = await detail('Juma');
@@ -158,6 +169,74 @@ describeDb('Hectare guardians (PostgreSQL)', () => {
     await expect(prisma.$executeRawUnsafe(`insert into irrigation_hectare_guardians (id, allocation_id, guardian_id, started_on) values ('${randomUUID()}', '${allocationId}', '${f.Juma}', current_date)`)).rejects.toThrow(); // Zawadi is current
     await expect(prisma.$executeRawUnsafe(`delete from irrigation_hectare_guardians`)).rejects.toThrow(/historical/);
     await expect(prisma.$executeRawUnsafe(`update irrigation_hectare_guardians set ended_on = current_date where ended_on is null and allocation_id = '${allocationId}'`)).rejects.toThrow(/end_consistent|check/);
+  });
+
+  it('lets a member start a transfer of their own hectare; the receiver is asked, and it can be withdrawn', async () => {
+    const me = asUser('Juma');
+    const before = (await allocations.myPlots(me)) as any;
+    expect(before.held.map((h: any) => h.hectare.code)).toEqual(['GH1']);
+    const hawaNumber = (await prisma.farmer.findUniqueOrThrow({ where: { id: f.Hawa } })).controlNumber;
+    await expect(allocations.requestMyTransfer(asUser('Asha'), { hectareId: hectares[0], toMember: hawaNumber, reason: 'x' })).rejects.toThrow(/registered to you/); // not theirs
+    await expect(allocations.requestMyTransfer(me, { hectareId: hectares[0], toMember: 'NOPE-1', reason: 'x' })).rejects.toThrow(/No member of your AMCOS/);
+    const outsiderNumber = (await prisma.farmer.findUniqueOrThrow({ where: { id: f.Outsider } })).controlNumber;
+    await expect(allocations.requestMyTransfer(me, { hectareId: hectares[0], toMember: outsiderNumber, reason: 'x' })).rejects.toThrow(/No member of your AMCOS/); // another AMCOS
+    texts.length = 0;
+    const t: any = await allocations.requestMyTransfer(me, { hectareId: hectares[0], toMember: hawaNumber, reason: 'Selling to Hawa' });
+    expect(t).toMatchObject({ status: 'AWAITING_RECIPIENT', fromFarmerId: f.Juma, toFarmerId: f.Hawa, requestedById: uid.Juma });
+    const hawaPhone = (await prisma.user.findUniqueOrThrow({ where: { id: uid.Hawa } })).phone;
+    expect(texts.some((m) => m.to === hawaPhone && /Open the MAYODE app to accept/.test(m.text))).toBe(true);
+    await expect(allocations.requestMyTransfer(me, { hectareId: hectares[0], toMember: hawaNumber, reason: 'again' })).rejects.toThrow(/already awaiting/);
+    expect(((await allocations.myPlots(me)) as any).outgoing).toHaveLength(1);
+    await expect(allocations.cancelMyTransfer(asUser('Asha'), t.id)).rejects.toBeInstanceOf(NotFoundException);
+    expect(await allocations.cancelMyTransfer(me, t.id)).toEqual({ status: 'CANCELLED' });
+    expect(((await allocations.myPlots(me)) as any).outgoing).toHaveLength(0);
+  });
+
+  it('emancipation: the guardian asks, the office approves, the guardianship ends and the member is independent', async () => {
+    // Asha is registered to a hectare guarded by Zawadi (changed earlier).
+    const allocationId = allocationOf.Asha;
+    await prisma.farmer.update({ where: { id: f.Asha }, data: { dateOfBirth: new Date(Date.now() - 16 * 365.25 * 86_400_000) } });
+    await expect(emancipation.requestMine(asUser('Zawadi'), { allocationId })).rejects.toThrow(/not yet 18/);
+    await prisma.farmer.update({ where: { id: f.Asha }, data: { dateOfBirth: new Date(Date.now() - 19 * 365.25 * 86_400_000) } });
+    await expect(emancipation.requestMine(asUser('Hawa'), { allocationId })).rejects.toThrow(/Only the guardian/); // a stranger cannot ask
+    await expect(emancipation.requestMine(asUser('Juma'), { allocationId })).rejects.toThrow(/Only the guardian/); // the earlier guardian no longer can
+    const req: any = await emancipation.requestMine(asUser('Zawadi'), { allocationId, note: 'Asha turned 19' });
+    expect(req).toMatchObject({ status: 'PENDING_APPROVAL', holderId: f.Asha, guardianId: f.Zawadi });
+    await expect(emancipation.requestMine(asUser('Asha'), { allocationId })).rejects.toBeInstanceOf(ConflictException); // one open request
+    expect(((await emancipation.list(admin, { status: 'PENDING_APPROVAL' })) as any).data[0]).toMatchObject({ holder: { name: 'Asha Mbarali', age: 19 }, guardian: { name: 'Zawadi Mbarali' } });
+    expect((await allocations.myPlots(asUser('Zawadi')) as any).guided.find((g: any) => g.allocationId === allocationId).emancipationRequested).toBe(true);
+
+    await expect(emancipation.approve(admin, req.id)).rejects.toThrow(/Manager or Accountant/); // no approval permission
+    texts.length = 0;
+    const done: any = await emancipation.approve(approver, req.id, 'Birth certificate seen');
+    expect(done.status).toBe('APPROVED');
+    expect((await detail('Asha')).current[0].guardian).toBeNull();
+    expect((await detail('Zawadi')).guided.history.some((g: any) => g.holder.name === 'Asha Mbarali' && g.endReason === 'EMANCIPATED')).toBe(true);
+    expect(texts.length).toBe(2); // Asha and Zawadi are both told
+    await expect(emancipation.approve(approver, req.id)).rejects.toBeInstanceOf(ConflictException);
+    await expect(emancipation.requestMine(asUser('Zawadi'), { allocationId })).rejects.toThrow(/no guardian/);
+  });
+
+  it('emancipation can be rejected with a reason, withdrawn, filed at the office, and stays inside one AMCOS', async () => {
+    await farmer(mamcosA, 'Baraka');
+    const allocationId = ((await allocations.allocate(admin, { hectareId: hectares[4], farmerId: f.Baraka, guardianId: f.Juma })) as any).id;
+    expect(((await allocations.myPlots(asUser('Juma'))) as any).guided.map((g: any) => g.holder.name)).toEqual(['Baraka Mbarali']);
+    const req: any = await emancipation.requestAtOffice(admin, { allocationId });
+    await expect(emancipation.approve(admin, req.id)).rejects.toThrow(/Manager or Accountant/);
+    await expect(emancipation.reject(approver, req.id, '  ')).rejects.toThrow(/Say why/);
+    expect(((await emancipation.reject(approver, req.id, 'Not yet 18 by the register')) as any).status).toBe('REJECTED');
+    expect((await detail('Baraka')).current[0].guardian).toMatchObject({ name: 'Juma Mbarali' }); // nothing changed
+    const again: any = await emancipation.requestMine(asUser('Juma'), { allocationId });
+    await expect(emancipation.cancelMine(asUser('Zawadi'), again.id)).rejects.toBeInstanceOf(NotFoundException);
+    expect(await emancipation.cancelMine(asUser('Juma'), again.id)).toEqual({ status: 'CANCELLED' });
+    await expect(emancipation.requestAtOffice(otherAdmin, { allocationId })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(emancipation.reject(otherAdmin, again.id, 'x')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('the new member routes and emancipation routes declare who may use them', () => {
+    const proto = IrrigationController.prototype as any;
+    expect(Reflect.getMetadata(PERMISSION_KEY, proto.approveEmancipation)).toEqual({ resource: 'irrigation_transfer_approval', action: 'EDIT' });
+    expect(Reflect.getMetadata(PERMISSION_KEY, proto.requestEmancipation)).toEqual({ resource: 'irrigation_allocations', action: 'CREATE' });
   });
 
   it('guardian routes need the allocation edit permission', () => {

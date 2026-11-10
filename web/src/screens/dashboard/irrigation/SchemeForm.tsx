@@ -15,7 +15,7 @@ const STATUSES = ['PLANNED', 'ACTIVE', 'UNDER_MAINTENANCE', 'INACTIVE'];
 const blank = {
   code: '', name: '', mamcosId: '', region: '', district: '', ward: '', village: '', waterSource: '', establishedOn: '', description: '',
   status: 'ACTIVE', plannedCanalCount: '6', minBlocksPerCanal: '15', maxBlocksPerCanal: '16', hectaresPerBlock: '30',
-  maxHectaresPerFarmer: '', requireAllocationApproval: false, requireRecipientAcceptance: false,
+  maxHectaresPerFarmer: '', requireAllocationApproval: false, requireRecipientAcceptance: true,
 };
 
 function SchemeEditor({ schemeId, existing }: { schemeId?: string; existing: ReturnType<typeof useApi<any>> }) {

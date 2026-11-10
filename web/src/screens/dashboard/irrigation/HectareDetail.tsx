@@ -16,6 +16,8 @@ const KIND_COLOR: Record<Event['kind'], string> = { Allocation: '#34D399', Guard
 export function HectareDetail({ id }: { id: string }) {
   const { can } = useIrrigation();
   const [tab, setTab] = useState<Tab>('activity');
+  const [emancipating, setEmancipating] = useState(false);
+  const [emancipationNote, setEmancipationNote] = useState('');
   const { data: h, loading, error, reload } = useApi<any>(() => irrigationApi.hectare(id), [id]);
   const holder = h?.farmer;
   // Charges belong to the farmer, not the hectare, so this is the current holder's account (a farmer holds one hectare here).
@@ -110,7 +112,16 @@ export function HectareDetail({ id }: { id: string }) {
             <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
               {h.allocationStatus === 'AVAILABLE' && can('irrigation_allocations', 'CREATE') && <Link className="btn-primary" href={`/dashboard/plot-allocation?tab=allocate&blockId=${h.block.id}&hectareId=${h.id}`}>Allocate</Link>}
               {h.allocationStatus === 'ALLOCATED' && can('irrigation_allocations', 'CREATE') && <Link className="btn-secondary" href={`/dashboard/plot-allocation?tab=transfers&add=1&hectareId=${h.id}`}>Transfer</Link>}
+              {h.allocationStatus === 'ALLOCATED' && h.guardian && can('irrigation_allocations', 'CREATE') && (
+                <button type="button" className="btn-secondary" disabled={emancipating} onClick={async () => {
+                  if (!window.confirm(`Ask for ${holder?.name} to be released from guardian ${h.guardian.name}? A Manager or Accountant must approve.`)) return;
+                  setEmancipating(true); setEmancipationNote('');
+                  try { await irrigationApi.requestEmancipation({ allocationId: h.allocationId }); setEmancipationNote('Request filed. It now waits for a Manager or Accountant under Plot allocation → Transfer history.'); }
+                  catch (e: any) { setEmancipationNote(e?.response?.data?.message ?? 'Could not file the request.'); } finally { setEmancipating(false); }
+                }}>Request release from guardian (coming of age)</button>
+              )}
             </div>
+            {emancipationNote && <div className="muted" role="status" style={{ fontSize: 13, marginTop: 10 }}>{emancipationNote}</div>}
           </section>
 
           {(rented || rentals.data?.history?.length) ? (

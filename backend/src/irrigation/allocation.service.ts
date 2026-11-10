@@ -280,6 +280,33 @@ export class AllocationService {
   async createTransfer(actor: RequestUser, dto: CreateTransferDto) {
     const scope = await this.scopeService.resolve(actor);
     const hectare = await this.scopeService.assertHectare(scope, dto.hectareId);
+    return this.createTransferCore(actor, hectare, dto, false);
+  }
+
+  /**
+   * A member starts the transfer of a hectare registered to them (from the app). The receiving member must always answer
+   * (never skipped), then the office signs off. The recipient is found by member number or phone number inside the same AMCOS.
+   */
+  async requestMyTransfer(actor: RequestUser, dto: { hectareId: string; toMember: string; reason: string; effectiveDate?: string }) {
+    const me = await this.prisma.farmer.findUnique({ where: { userId: actor.id }, select: { id: true, mamcosId: true } });
+    if (!me) throw new ForbiddenException('Only members can transfer a hectare');
+    const hectare = await this.prisma.irrigationHectare.findFirst({
+      where: { id: dto.hectareId, block: { canal: { scheme: { mamcosId: me.mamcosId } } } },
+      include: { block: { include: { canal: { include: { scheme: true } } } } },
+    });
+    const current = hectare ? await this.prisma.irrigationHectareAllocation.findFirst({ where: { hectareId: hectare.id, status: 'ACTIVE' } }) : null;
+    if (!hectare || !current || current.farmerId !== me.id) throw new ForbiddenException('You can only transfer a hectare that is registered to you');
+    const text = dto.toMember.trim();
+    if (!text) throw new BadRequestException('Enter the receiving member’s member number or phone number');
+    const target = await this.prisma.farmer.findFirst({
+      where: { mamcosId: me.mamcosId, OR: [{ controlNumber: { equals: text, mode: 'insensitive' } }, { user: { phone: text } }] },
+      select: { id: true },
+    });
+    if (!target) throw new NotFoundException('No member of your AMCOS has that member number or phone number');
+    return this.createTransferCore(actor, hectare, { hectareId: hectare.id, toFarmerId: target.id, reason: dto.reason, effectiveDate: dto.effectiveDate }, true);
+  }
+
+  private async createTransferCore(actor: RequestUser, hectare: any, dto: CreateTransferDto, forceAcceptance: boolean) {
     const scheme = hectare.block.canal.scheme;
     const current = await this.prisma.irrigationHectareAllocation.findFirst({ where: { hectareId: hectare.id, status: 'ACTIVE' } });
     if (!current) throw new ConflictException('This hectare has no active allocation to transfer');
@@ -297,7 +324,7 @@ export class AllocationService {
           data: {
             hectareId: hectare.id, fromAllocationId: current.id, fromFarmerId: current.farmerId, toFarmerId: dto.toFarmerId,
             transferDate, effectiveDate, reason: dto.reason.trim(), requestedById: actor.id,
-            status: scheme.requireRecipientAcceptance ? 'AWAITING_RECIPIENT' : 'PENDING_APPROVAL',
+            status: forceAcceptance || scheme.requireRecipientAcceptance ? 'AWAITING_RECIPIENT' : 'PENDING_APPROVAL',
           },
         });
         // A transfer never completes on its own: the receiving member (when required) and then a Manager or Accountant must sign off.
@@ -400,6 +427,55 @@ export class AllocationService {
     } catch {
       /* best-effort */
     }
+  }
+
+  /** The signed-in member's hectares, the ones they guard, and their open transfer and emancipation requests. */
+  async myPlots(actor: RequestUser) {
+    const me = await this.prisma.farmer.findUnique({ where: { userId: actor.id }, select: { id: true } });
+    if (!me) return { held: [], guided: [], outgoing: [] };
+    const place = { select: { id: true, code: true, areaHectares: true, block: { select: { code: true, canal: { select: { code: true } } } } } } as const;
+    const [held, guided, outgoing, emancipations] = await Promise.all([
+      this.prisma.irrigationHectareAllocation.findMany({
+        where: { farmerId: me.id, status: 'ACTIVE' }, orderBy: { allocatedOn: 'asc' },
+        include: { hectare: place, guardians: { where: { endedOn: null }, include: { guardian: { select: farmerSelect } } } },
+      }),
+      this.prisma.irrigationHectareGuardian.findMany({
+        where: { guardianId: me.id, endedOn: null, allocation: { status: 'ACTIVE' } },
+        include: { allocation: { include: { hectare: place, farmer: { select: farmerSelect } } } },
+      }),
+      this.prisma.irrigationAllocationTransfer.findMany({
+        where: { fromFarmerId: me.id, status: { in: ['AWAITING_RECIPIENT', 'PENDING_APPROVAL'] } }, orderBy: { createdAt: 'desc' },
+        include: { hectare: { select: { id: true, code: true } }, toFarmer: { select: farmerSelect } },
+      }),
+      this.prisma.irrigationEmancipationRequest.findMany({ where: { status: 'PENDING_APPROVAL', OR: [{ holderId: me.id }, { guardianId: me.id }] } }),
+    ]);
+    const pendingFor = (allocationId: string) => emancipations.find((e) => e.allocationId === allocationId) ?? null;
+    return {
+      held: held.map((a) => ({
+        allocationId: a.id, hectare: { id: a.hectare.id, code: a.hectare.code, area: num(a.hectare.areaHectares), block: a.hectare.block.code, canal: a.hectare.block.canal.code },
+        guardian: a.guardians[0] ? { id: a.guardians[0].guardian.id, name: fullName(a.guardians[0].guardian) } : null,
+        transfer: outgoing.find((t) => t.hectareId === a.hectareId) ? { id: outgoing.find((t) => t.hectareId === a.hectareId)!.id } : null,
+        emancipationRequested: !!pendingFor(a.id),
+      })),
+      guided: guided.map((g) => ({
+        allocationId: g.allocationId, hectare: { id: g.allocation.hectare.id, code: g.allocation.hectare.code, area: num(g.allocation.hectare.areaHectares), block: g.allocation.hectare.block.code, canal: g.allocation.hectare.block.canal.code },
+        holder: { id: g.allocation.farmer.id, name: fullName(g.allocation.farmer) }, emancipationRequested: !!pendingFor(g.allocationId),
+      })),
+      outgoing: outgoing.map((t) => ({ id: t.id, status: t.status, hectare: t.hectare, to: { name: fullName(t.toFarmer), memberNumber: t.toFarmer.controlNumber }, createdAt: t.createdAt })),
+    };
+  }
+
+  /** The member who asked for a transfer takes it back, while it is still waiting. */
+  async cancelMyTransfer(actor: RequestUser, id: string) {
+    const me = await this.prisma.farmer.findUnique({ where: { userId: actor.id }, select: { id: true } });
+    const t = me ? await this.prisma.irrigationAllocationTransfer.findFirst({ where: { id, fromFarmerId: me.id } }) : null;
+    if (!t) throw new NotFoundException('Transfer not found');
+    const claimed = await this.prisma.irrigationAllocationTransfer.updateMany({
+      where: { id, status: { in: ['AWAITING_RECIPIENT', 'PENDING_APPROVAL'] } },
+      data: { status: 'CANCELLED', rejectedReason: 'Withdrawn by the owner', processedById: actor.id, processedAt: new Date() },
+    });
+    if (!claimed.count) throw new ConflictException('This transfer can no longer be withdrawn');
+    return { status: 'CANCELLED' };
   }
 
   /** Transfers waiting for the signed-in member to accept or decline. */

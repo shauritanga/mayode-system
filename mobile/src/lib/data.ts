@@ -36,6 +36,7 @@ export const insuranceApi = impl.insuranceApi;
 export const assignmentsApi = impl.assignmentsApi;
 export const ownershipApi = impl.ownershipApi;
 export const plotTransfersApi = impl.plotTransfersApi;
+export const meetingsApi = impl.meetingsApi;
 export const alertsApi = impl.alertsApi;
 export const rewardsApi = impl.rewardsApi;
 export const registryApi = impl.registryApi;

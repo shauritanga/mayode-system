@@ -171,3 +171,20 @@ export class CreateDocumentDto {
 export class DeclineTransferDto {
   @IsString() @IsNotEmpty() @MaxLength(500) reason: string;
 }
+
+export class MyTransferRequestDto {
+  @IsUUID() hectareId: string;
+  /** The receiving member's member number or phone number. */
+  @IsString() @IsNotEmpty() @MaxLength(40) toMember: string;
+  @IsString() @IsNotEmpty() @MaxLength(1000) reason: string;
+  @IsOptional() @IsDateString() effectiveDate?: string;
+}
+
+export class EmancipationRequestDto {
+  @IsUUID() allocationId: string;
+  @IsOptional() @IsString() @MaxLength(1000) note?: string;
+}
+
+export class EmancipationDecisionDto {
+  @IsOptional() @IsString() @MaxLength(1000) note?: string;
+}

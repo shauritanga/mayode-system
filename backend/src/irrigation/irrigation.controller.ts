@@ -13,9 +13,10 @@ import { AllocationService } from './allocation.service';
 import { LeadershipService } from './leadership.service';
 import { DashboardService } from './dashboard.service';
 import { DocumentsService } from './documents.service';
+import { EmancipationService } from './emancipation.service';
 import { IrrigationSetupService } from './irrigation-roles';
 import {
-  AllocateHectareDto, AppointLeaderDto, SetGuardianDto, CreateBlockDto, CreateCanalDto, CreateDocumentDto, CreateHectareDto,
+  AllocateHectareDto, AppointLeaderDto, EmancipationDecisionDto, EmancipationRequestDto, MyTransferRequestDto, SetGuardianDto, CreateBlockDto, CreateCanalDto, CreateDocumentDto, CreateHectareDto,
   CreateSchemeDto, CreateTransferDto, DeclineTransferDto, EndLeadershipDto, ReasonDto, UpdateBlockDto, UpdateCanalDto, UpdateSchemeDto,
 } from './dto/irrigation.dto';
 
@@ -42,6 +43,7 @@ export class IrrigationController {
     private readonly dashboard: DashboardService,
     private readonly documents: DocumentsService,
     private readonly setup: IrrigationSetupService,
+    private readonly emancipation: EmancipationService,
   ) {}
 
   @Post('setup/roles') @RequirePermission('roles', 'CREATE')
@@ -134,6 +136,16 @@ export class IrrigationController {
   // Transfers
   @Get('transfers') @RequirePermission(ALLOC, 'VIEW')
   listTransfers(@CurrentUser() u: RequestUser, @Query() q: Q) { return this.allocations.listTransfers(u, q); }
+  // Emancipation: a dependent registered with a guardian becomes an independent member
+  @Get('emancipations') @RequirePermission(ALLOC, 'VIEW')
+  emancipations(@CurrentUser() u: RequestUser, @Query() q: Q) { return this.emancipation.list(u, q); }
+  @Post('emancipations') @RequirePermission(ALLOC, 'CREATE')
+  requestEmancipation(@CurrentUser() u: RequestUser, @Body() dto: EmancipationRequestDto) { return this.emancipation.requestAtOffice(u, dto); }
+  @Post('emancipations/:id/approve') @RequirePermission(TRANSFER_APPROVAL, 'EDIT')
+  approveEmancipation(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: EmancipationDecisionDto) { return this.emancipation.approve(u, id, dto.note); }
+  @Post('emancipations/:id/reject') @RequirePermission(TRANSFER_APPROVAL, 'EDIT')
+  rejectEmancipation(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: ReasonDto) { return this.emancipation.reject(u, id, dto.reason); }
+
   @Post('transfers') @RequirePermission(ALLOC, 'CREATE')
   createTransfer(@CurrentUser() u: RequestUser, @Body() dto: CreateTransferDto) { return this.allocations.createTransfer(u, dto); }
   @Post('transfers/:id/approve') @RequirePermission(TRANSFER_APPROVAL, 'EDIT')
@@ -179,4 +191,27 @@ export class MyTransfersController {
   accept(@CurrentUser() u: RequestUser, @Param('id') id: string) { return this.allocations.respondToTransfer(u, id, true); }
   @Post(':id/decline')
   decline(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: DeclineTransferDto) { return this.allocations.respondToTransfer(u, id, false, dto.reason); }
+}
+
+/**
+ * A member's own side: their hectares, starting a transfer, and asking for a dependent to be released as an independent member.
+ * Open to any signed-in member; the services only let someone act on hectares that are theirs.
+ */
+@ApiTags('irrigation')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('irrigation/my-plots')
+export class MyPlotsController {
+  constructor(private readonly allocations: AllocationService, private readonly emancipation: EmancipationService) {}
+
+  @Get()
+  mine(@CurrentUser() u: RequestUser) { return this.allocations.myPlots(u); }
+  @Post('transfers')
+  transfer(@CurrentUser() u: RequestUser, @Body() dto: MyTransferRequestDto) { return this.allocations.requestMyTransfer(u, dto); }
+  @Post('transfers/:id/cancel')
+  cancelTransfer(@CurrentUser() u: RequestUser, @Param('id') id: string) { return this.allocations.cancelMyTransfer(u, id); }
+  @Post('emancipations')
+  requestEmancipation(@CurrentUser() u: RequestUser, @Body() dto: EmancipationRequestDto) { return this.emancipation.requestMine(u, dto); }
+  @Post('emancipations/:id/cancel')
+  cancelEmancipation(@CurrentUser() u: RequestUser, @Param('id') id: string) { return this.emancipation.cancelMine(u, id); }
 }

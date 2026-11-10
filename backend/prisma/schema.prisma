@@ -226,6 +226,7 @@ model Farmer {
   irrigationTransfersTo     IrrigationAllocationTransfer[] @relation("TransferToFarmer")
   irrigationLeaderships     IrrigationLeadership[]
   boardSeats                BoardMember[]
+  meetingAttendances        MeetingAttendance[]
   farmDefaultCases          FarmDefaultCase[]
   joinRequests              AmcosJoinRequest[]
   communicationReceipts     CommunicationRecipient[]
@@ -287,6 +288,7 @@ model MamcosStaff {
 
 model Mamcos {
   id                  String   @id @default(uuid())
+  amcosMeetings       AmcosMeeting[]
   name                String   @unique
   /// Short code a farmer types on sign-up to ask to join this AMCOS (e.g. MDB-4F2A91).
   code                String?  @unique
@@ -388,7 +390,7 @@ model IrrigationScheme {
   maxHectaresPerFarmer       Int?             @map("max_hectares_per_farmer")
   requireAllocationApproval  Boolean          @default(false) @map("require_allocation_approval")
   /// Transfers wait for the receiving member to accept (SMS + app) before any approval or execution.
-  requireRecipientAcceptance Boolean          @default(false) @map("require_recipient_acceptance")
+  requireRecipientAcceptance Boolean          @default(true) @map("require_recipient_acceptance")
   createdById                String?          @map("created_by_id")
   updatedById                String?          @map("updated_by_id")
   updatedAt                  DateTime         @default(now()) @updatedAt @map("updated_at")
@@ -492,6 +494,7 @@ model IrrigationHectare {
   transfers     IrrigationAllocationTransfer[]
   landListings  LandListing[]
   rentalRecords AmcosRentalRecord[]
+  emancipations IrrigationEmancipationRequest[]
 
   @@unique([blockId, hectareNumber])
   @@map("irrigation_hectares")
@@ -6097,4 +6100,122 @@ model HarvestFeeRate {
   @@index([canalId])
   @@index([blockId])
   @@map("harvest_fee_rates")
+}
+
+// ============================================================
+// GOVERNANCE MEETINGS (board meetings and the General Meeting / Mkutano Mkuu)
+// ============================================================
+
+enum MeetingKind {
+  BOARD
+  AGM
+}
+
+/// SCHEDULED -> CHECK_IN (members check in) -> IN_SESSION (needs quorum) -> CLOSED (minutes locked); or CANCELLED.
+enum MeetingStatus {
+  SCHEDULED
+  CHECK_IN
+  IN_SESSION
+  CLOSED
+  CANCELLED
+}
+
+model AmcosMeeting {
+  id             String        @id @default(uuid())
+  mamcosId       String        @map("mamcos_id")
+  kind           MeetingKind
+  title          String
+  agenda         String
+  venue          String
+  scheduledAt    DateTime      @map("scheduled_at")
+  /// Share of the invited people who must check in before the meeting can start.
+  quorumPercent  Int           @map("quorum_percent")
+  /// How many people were invited when the meeting was scheduled (board members, or all members for a general meeting).
+  invitedCount   Int           @map("invited_count")
+  status         MeetingStatus @default(SCHEDULED)
+  startedAt      DateTime?     @map("started_at")
+  closedAt       DateTime?     @map("closed_at")
+  minutes        String?
+  cancelReason   String?       @map("cancel_reason")
+  reminderSentAt DateTime?     @map("reminder_sent_at")
+  createdById    String?       @map("created_by_id")
+  closedById     String?       @map("closed_by_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  mamcos      Mamcos              @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
+  attendances MeetingAttendance[]
+  resolutions MeetingResolution[]
+
+  @@index([mamcosId, scheduledAt])
+  @@map("amcos_meetings")
+}
+
+model MeetingAttendance {
+  id           String   @id @default(uuid())
+  meetingId    String   @map("meeting_id")
+  farmerId     String   @map("farmer_id")
+  checkedInAt  DateTime @default(now()) @map("checked_in_at")
+  /// SELF (the member checked in on their phone) or OFFICE (staff marked them present).
+  method       String
+  recordedById String?  @map("recorded_by_id")
+
+  meeting AmcosMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  farmer  Farmer       @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+
+  @@unique([meetingId, farmerId])
+  @@map("meeting_attendances")
+}
+
+/// A resolution passed at a meeting. Append-only: once logged it is never edited or deleted, so it locks in policy.
+model MeetingResolution {
+  id           String   @id @default(uuid())
+  meetingId    String   @map("meeting_id")
+  number       Int
+  title        String
+  text         String
+  outcome      String   @default("PASSED")
+  votesFor     Int?     @map("votes_for")
+  votesAgainst Int?     @map("votes_against")
+  recordedById String?  @map("recorded_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  meeting AmcosMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, number])
+  @@map("meeting_resolutions")
+}
+
+// ============================================================
+// EMANCIPATION: a dependent registered with a guardian becomes an independent member
+// ============================================================
+
+enum EmancipationStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model IrrigationEmancipationRequest {
+  id            String             @id @default(uuid())
+  allocationId  String             @map("allocation_id")
+  hectareId     String             @map("hectare_id")
+  /// The member the hectare is registered to (the dependent who is coming of age).
+  holderId      String             @map("holder_id")
+  guardianId    String             @map("guardian_id")
+  status        EmancipationStatus @default(PENDING_APPROVAL)
+  note          String?
+  requestedById String?            @map("requested_by_id")
+  decidedById   String?            @map("decided_by_id")
+  decidedAt     DateTime?          @map("decided_at")
+  decisionNote  String?            @map("decision_note")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  hectare IrrigationHectare @relation(fields: [hectareId], references: [id], onDelete: Restrict)
+
+  @@index([holderId])
+  @@index([guardianId])
+  @@map("irrigation_emancipation_requests")
 }

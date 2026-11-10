@@ -612,6 +612,17 @@ export const plotTransfersApi = {
   incoming: () => api.get('/irrigation/my-transfers'),
   accept: (id: string) => api.post(`/irrigation/my-transfers/${id}/accept`),
   decline: (id: string, reason: string) => api.post(`/irrigation/my-transfers/${id}/decline`, { reason }),
+  /** My hectares, the ones I guard, and my open requests. */
+  myPlots: () => api.get('/irrigation/my-plots'),
+  request: (data: { hectareId: string; toMember: string; reason: string }) => api.post('/irrigation/my-plots/transfers', data),
+  withdraw: (id: string) => api.post(`/irrigation/my-plots/transfers/${id}/cancel`),
+  requestEmancipation: (allocationId: string) => api.post('/irrigation/my-plots/emancipations', { allocationId }),
+};
+
+// ── Board meetings and the General Meeting: the member's side ──
+export const meetingsApi = {
+  mine: () => api.get('/meetings/mine'),
+  checkIn: (id: string) => api.post(`/meetings/${id}/check-in`),
 };
 
 // ── Farm-action alerts (free preview vs premium recommendation) ──

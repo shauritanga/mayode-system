@@ -6,6 +6,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { irrigationApi } from '@/lib/api';
+import { Emancipations } from './Emancipations';
 import Modal from '@/components/Modal';
 import {
   BASE, ConfirmDialog, DocumentsPanel, Empty, Field, Filters, FormGrid, LoadError, MemberPicker, Notice, PageHeader, Pager, TableSkeleton, StatusBadge,
@@ -122,6 +123,7 @@ export default function Transfers({ bare = false, adding: addingProp, onAddDone 
         )}
         <Pager meta={data?.meta} onPage={setPage} />
       </section>
+      <Emancipations />
       {adding && <NewTransferModal schemeId={schemeId} presetHectareId={search.get('hectareId') ?? undefined} onClose={closeAdd} onSaved={(m) => { closeAdd(); setMessage({ tone: 'success', text: m }); reload(); }} />}
       {docs && (
         <Modal title={`Documents · ${farmId(docs.hectare.code)}`} onClose={() => { setDocs(null); reload(); }} width="720px" footer={<button type="button" className="btn-secondary" onClick={() => { setDocs(null); reload(); }}>Close</button>}>

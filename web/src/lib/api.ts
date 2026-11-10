@@ -971,6 +971,10 @@ export const irrigationApi = {
   blockHistory: (id: string) => api.get(`/irrigation/blocks/${id}/history`),
   hectares: (params?: object) => api.get('/irrigation/hectares', { params }),
   hectare: (id: string) => api.get(`/irrigation/hectares/${id}`),
+  emancipations: (params?: object) => api.get('/irrigation/emancipations', { params }),
+  requestEmancipation: (data: object) => api.post('/irrigation/emancipations', data),
+  approveEmancipation: (id: string, data: object = {}) => api.post(`/irrigation/emancipations/${id}/approve`, data),
+  rejectEmancipation: (id: string, data: object) => api.post(`/irrigation/emancipations/${id}/reject`, data),
   allocations: (params?: object) => api.get('/irrigation/allocations', { params }),
   allocate: (data: object) => api.post('/irrigation/allocations', data),
   approveAllocation: (id: string) => api.post(`/irrigation/allocations/${id}/approve`),
@@ -1100,6 +1104,20 @@ export const boardApi = {
   add: (data: object) => api.post('/board-members', data),
   update: (id: string, data: object) => api.patch(`/board-members/${id}`, data),
   end: (id: string, data: object) => api.post(`/board-members/${id}/end`, data),
+};
+
+export const meetingsApi = {
+  list: (params?: object) => api.get('/meetings', { params }),
+  resolutions: (params?: object) => api.get('/meetings/resolutions', { params }),
+  create: (data: object) => api.post('/meetings', data),
+  get: (id: string) => api.get(`/meetings/${id}`),
+  update: (id: string, data: object) => api.patch(`/meetings/${id}`, data),
+  cancel: (id: string, data: object) => api.post(`/meetings/${id}/cancel`, data),
+  openCheckIn: (id: string) => api.post(`/meetings/${id}/open-check-in`),
+  markPresent: (id: string, farmerId: string) => api.post(`/meetings/${id}/attendance`, { farmerId }),
+  start: (id: string) => api.post(`/meetings/${id}/start`),
+  addResolution: (id: string, data: object) => api.post(`/meetings/${id}/resolutions`, data),
+  close: (id: string, data: object) => api.post(`/meetings/${id}/close`, data),
 };
 
 export const farmDefaultsApi = {

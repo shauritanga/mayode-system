@@ -49,6 +49,8 @@ export default function NotificationCenter() {
     else if (item.data?.registryId) router.push('/claim-farms');
     else if (item.data?.winnerId || item.data?.campaignId) router.push('/rewards');
     else if (item.data?.transferId) router.push('/plot-transfer-requests');
+    else if (item.type === 'meeting') router.push('/meetings');
+    else if (typeof item.type === 'string' && item.type.startsWith('irrigation.emancipation')) router.push('/my-plots');
     else if (item.data?.leaseId) router.push('/leases');
     else if (item.data?.membershipId) router.push('/membership');
     else if (item.data?.farmId) router.push({ pathname: '/farm/[id]', params: { id: item.data.farmId } });
