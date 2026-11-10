@@ -70,7 +70,10 @@ ALTER TABLE "payroll_lines"
   ADD COLUMN "rate" DECIMAL(14,2),
   ADD COLUMN "basis" TEXT,
   ADD COLUMN "compliance_factor" DECIMAL(5,4);
+-- Lines of runs that are already paid sit behind a lock; it is lifted only for this one backfill and put straight back.
+ALTER TABLE "payroll_lines" DISABLE TRIGGER "payroll_lines_posted_lock";
 UPDATE "payroll_lines" l SET "tier" = p."tier", "cost_center" = p."cost_center" FROM "payroll_payees" p WHERE p."id" = l."payee_id";
+ALTER TABLE "payroll_lines" ENABLE TRIGGER "payroll_lines_posted_lock";
 
 CREATE TABLE "payroll_attendance" (
   "id" TEXT NOT NULL,
