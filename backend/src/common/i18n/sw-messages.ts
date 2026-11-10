@@ -1396,4 +1396,8 @@ export const SW_MESSAGES: Record<string, string> = {
   "Choose a financial year, a month, or a start and end date": "Chagua mwaka wa fedha, mwezi, au tarehe ya kuanza na ya kuisha",
   "Dates must be written as YYYY-MM-DD": "Tarehe ziandikwe kama YYYY-MM-DD",
   "The start date is after the end date": "Tarehe ya kuanza iko baada ya tarehe ya kuisha",
+  "Enter the farmer’s phone number, or name a supervisor who can be reached": "Weka namba ya simu ya mkulima, au mtaje msimamizi anayeweza kupatikana",
+  "Enter the supervisor’s full name": "Weka jina kamili la msimamizi",
+  "Enter the supervisor’s phone number": "Weka namba ya simu ya msimamizi",
+  "Enter a valid phone number for the supervisor, for example +255712345678": "Weka namba sahihi ya simu ya msimamizi, mfano +255712345678",
 };

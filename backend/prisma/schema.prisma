@@ -150,6 +150,9 @@ model Farmer {
   educationLevel         EducationLevel? @map("education_level")
   farmingExperienceYears Int?            @map("farming_experience_years")
   dependents             Int?
+  /// A supervisor or guardian who is not a member of the AMCOS (a relative with their own number). Reached for SMS when the farmer has no phone of their own.
+  supervisorName         String?  @map("supervisor_name")
+  supervisorPhone        String?  @map("supervisor_phone")
 
   // Verification workflow
   verificationStatus VerificationStatus @default(PENDING) @map("verification_status")

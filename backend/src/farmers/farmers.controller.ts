@@ -66,14 +66,24 @@ export class FarmersController {
     summary: 'Register a new farmer (provisions login + profile)',
   })
   async create(@Body() dto: CreateFarmerDto, @CurrentUser() user: RequestUser) {
-    const phone = normalizeMsisdn(dto.phone);
+    const phone = dto.phone?.trim() ? normalizeMsisdn(dto.phone) : undefined;
+    if (dto.password) return this.farmersService.create({ ...dto, phone, password: dto.password }, user);
     // With no password given the farmer is registered with just their name and phone: a temporary password is generated,
     // texted to them, and they must replace it at first sign-in. They complete the rest of their profile themselves.
-    if (dto.password) return this.farmersService.create({ ...dto, phone, password: dto.password }, user);
+    // A farmer with no phone of their own (a supervisor answers for them) has nothing to sign in with by SMS: nothing is sent.
     const password = this.credentials.temporaryPassword();
     const farmer = await this.farmersService.create({ ...dto, phone, password }, user, { mustChangePassword: true });
+    if (!phone) return { ...farmer, credentialsSms: 'not-needed' };
     const sent = await this.credentials.send(phone, dto.firstName, 'sw', password);
     return { ...farmer, credentialsSms: sent ? 'sent' : 'failed', ...(sent ? {} : { temporaryPassword: password }) };
+  }
+
+  /** Is this phone number already registered? Answers the registration form while the number is being typed. */
+  @Get('phone-check')
+  @RequirePermission('farmers', 'CREATE')
+  @ApiOperation({ summary: 'Whether a phone number is already used, and by which member of your AMCOS' })
+  phoneCheck(@Query('phone') phone: string, @CurrentUser() user: RequestUser) {
+    return this.farmersService.checkPhone(phone, user);
   }
 
   @Get()

@@ -10,6 +10,7 @@ import {
   IsBoolean,
   IsUUID,
   MinLength,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -30,13 +31,25 @@ export class CreateFarmerDto {
   @IsUUID()
   guardianId?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '+255700000001',
-    description: 'Login phone number (unique)',
+    description: 'Login phone number (unique). May be left out only when a supervisor who can be reached is named (a member as guardian, or a name and phone below).',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  phone: string;
+  phone?: string;
+
+  @ApiPropertyOptional({ description: 'A supervisor or guardian who is not an AMCOS member (for example a relative with their own number). Needs supervisorPhone.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  supervisorName?: string;
+
+  @ApiPropertyOptional({ description: 'Phone of that supervisor; required when supervisorName is given.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  supervisorPhone?: string;
 
   @ApiPropertyOptional({
     example: 'ChangeMe123',

@@ -1,4 +1,5 @@
 import { leadersOfFarmer } from '../farm-defaults/leaders';
+import { supervisorsOfFarmer } from '../farmers/supervisors';
 import { ModuleRef } from '@nestjs/core';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DueCategory, Prisma } from '@prisma/client';
@@ -63,11 +64,13 @@ export class DuesService {
       const plots = ids.length ? ids.slice(0, 4).join(', ') + (ids.length > 4 ? ` +${ids.length - 4}` : '') : '';
       const amcos = (await this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { name: true } }))?.name ?? 'AMCOS';
       const en = farmer?.user?.language === 'en';
-      if (phone) {
+      {
         const text = en
           ? `Thank you. ${amcos} has received payment for ${plots ? `Farm ID ${plots}` : description}: ${tz(num(payment.amount))} (receipt ${payment.receiptNo}). ${left > 0 ? `Balance ${tz(left)}. ` : ''}We appreciate your continued commitment to fulfilling your contribution obligations. Thank you for your cooperation and continued support.`
           : `Asante. ${amcos} imepokea malipo ya ${plots ? `Shamba ${plots}` : description}: ${tz(num(payment.amount))} (stakabadhi ${payment.receiptNo}). ${left > 0 ? `Salio ${tz(left)}. ` : ''}Tunathamini kujitolea kwako kutimiza michango yako. Asante kwa ushirikiano na uungwaji mkono wako.`;
-        await sms.send(phone, text, 'due_receipt');
+        if (phone) await sms.send(phone, text, 'due_receipt');
+        // a supervisor or guardian answers for the farmer, and is the only contact when the farmer has no phone of their own
+        for (const sv of await supervisorsOfFarmer(this.prisma, farmerId)) if (sv.phone !== phone) await sms.send(sv.phone, text, 'due_receipt').catch(() => undefined);
       }
       // the block and canal leaders hear of every payment too
       const who = due ? await this.prisma.farmer.findUnique({ where: { id: farmerId }, select: { firstName: true, lastName: true } }) : null;

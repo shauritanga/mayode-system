@@ -10,6 +10,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { OwnershipService } from '../common/ownership.service';
 import { FarmersService } from './farmers.service';
+import { supervisorsOfFarmer } from './supervisors';
 
 const BASE_URL = process.env.IRRIGATION_TEST_DATABASE_URL;
 const SCHEMA = 'irrigation_test';
@@ -93,5 +94,39 @@ describeDb('Registering a farmer with a guardian (PostgreSQL)', () => {
     await expect(register(c, h.id, { guardianId: randomUUID() })).rejects.toBeInstanceOf(NotFoundException);
     expect(await prisma.farmer.count({ where: { mamcosId: c.mamcos.id } })).toBe(before);
     expect(await prisma.irrigationHectareAllocation.count({ where: { hectareId: h.id } })).toBe(0);
+  });
+
+  describe('phone check and supervisors', () => {
+    it('reports a number that is already used, naming the member only inside the caller’s own AMCOS', async () => {
+      const c = await coop();
+      const other = await coop();
+      const baraka = await c.member('Baraka');
+      const user = await prisma.user.findUniqueOrThrow({ where: { id: baraka.userId } });
+      expect(await farmers.checkPhone('+255700000000', c.actor)).toEqual({ taken: false });
+      const mine: any = await farmers.checkPhone(user.phone, c.actor);
+      expect(mine.taken).toBe(true);
+      expect(mine.member).toMatchObject({ id: baraka.id, name: 'Baraka Member', canBeSupervisor: true });
+      expect(await farmers.checkPhone(user.phone, other.actor)).toEqual({ taken: true, member: null });
+    });
+
+    it('registers a farmer with no phone of their own when a member is named as guardian, and texts the guardian instead', async () => {
+      const c = await coop();
+      const guardian = await c.member('Baraka');
+      const h = await c.hectare(5);
+      const created: any = await farmers.create({ password: 'Secret123', firstName: 'Mtoto', lastName: 'Joseph', hectareId: h.id, guardianId: guardian.id } as any, c.actor);
+      const user = await prisma.user.findUniqueOrThrow({ where: { id: created.userId } });
+      expect(user.phone.startsWith('+999')).toBe(true);
+      const gu = await prisma.user.findUniqueOrThrow({ where: { id: guardian.userId } });
+      expect((await supervisorsOfFarmer(prisma as any, created.id)).map((x) => x.phone)).toEqual([gu.phone]);
+    });
+
+    it('keeps a supervisor who is not a member (name and phone) and refuses a farmer nobody can reach', async () => {
+      const c = await coop();
+      const created: any = await farmers.create({ password: 'Secret123', firstName: 'Mtoto', lastName: 'Two', hectareId: (await c.hectare(6)).id, supervisorName: 'Mama Neema', supervisorPhone: '0712 345 678' } as any, c.actor);
+      expect(created.supervisorName).toBe('Mama Neema');
+      expect(created.supervisorPhone).toBe('+255712345678');
+      await expect(farmers.create({ password: 'Secret123', firstName: 'No', lastName: 'One', hectareId: (await c.hectare(7)).id } as any, c.actor)).rejects.toThrow(BadRequestException);
+      await expect(farmers.create({ phone: phone(), password: 'Secret123', firstName: 'No', lastName: 'Phone', hectareId: (await c.hectare(8)).id, supervisorName: 'Only Name' } as any, c.actor)).rejects.toThrow('phone number');
+    });
   });
 });

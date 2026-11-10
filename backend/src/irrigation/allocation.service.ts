@@ -1,3 +1,4 @@
+import { isPlaceholderPhone } from '../messaging/sms.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { hasGrant } from '../auth/role-access';
@@ -709,19 +710,21 @@ export class AllocationService {
       ? await this.scopeService.assertScheme(scope, q.schemeId)
       : null;
     const text = (q.q ?? '').trim();
-    if (text.length < 2) return [];
+    // an empty box lists the first members alphabetically, so the picker works as a drop-down; one letter is too little to search on
+    if (text.length === 1) return [];
     const mamcosId = scheme?.mamcosId ?? (scope.tenant.mamcosId ?? undefined);
+    if (!text && !mamcosId) return [];
     const farmers = await this.prisma.farmer.findMany({
       where: {
         isBlacklisted: false,
         ...(mamcosId ? { mamcosId } : {}),
-        OR: [
+        ...(text ? { OR: [
           { firstName: { contains: text, mode: 'insensitive' } },
           { lastName: { contains: text, mode: 'insensitive' } },
           { controlNumber: { contains: text, mode: 'insensitive' } },
           { idNumber: { contains: text, mode: 'insensitive' } },
           { user: { phone: { contains: text } } },
-        ],
+        ] } : {}),
       },
       select: { ...farmerSelect, village: true, user: { select: { phone: true } } },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
@@ -735,7 +738,7 @@ export class AllocationService {
       : [];
     const heldBy = new Map(held.map((h) => [h.farmerId, h._count._all]));
     return farmers.map((f) => ({
-      id: f.id, name: fullName(f), memberNumber: f.controlNumber, village: f.village, phone: f.user?.phone ?? null,
+      id: f.id, name: fullName(f), memberNumber: f.controlNumber, village: f.village, phone: isPlaceholderPhone(f.user?.phone) ? null : f.user?.phone ?? null,
       hectaresHeld: heldBy.get(f.id) ?? 0,
     }));
   }

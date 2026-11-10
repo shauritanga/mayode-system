@@ -21,6 +21,7 @@ import { MembershipsService } from '../memberships/memberships.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { DocumentsService } from '../uploads/documents.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
+import { normalizeMsisdn, placeholderPhone } from '../messaging/sms.service';
 import { writeAudit } from '../irrigation/irrigation-audit';
 import { deriveRegistrationTier } from './farmer-tier';
 import { idTypeFromDocument, normalizeIdentity, type FarmerIdentity } from './farmer-identity';
@@ -113,8 +114,15 @@ export class FarmersService {
   async create(dto: CreateFarmerDto & { password: string }, actor?: RequestUser, options: { mustChangePassword?: boolean } = {}) {
     const tenantId = actor ? this.ownership.resolveTenantMamcosId(actor) : null;
     if (tenantId) dto = { ...dto, mamcosId: tenantId };
+    // A farmer with no phone of their own (a child registered under a parent) needs someone who can be reached instead.
+    const supervisor = this.manualSupervisor(dto);
+    if (!dto.phone?.trim() && !dto.guardianId && !supervisor) {
+      throw new BadRequestException('Enter the farmer’s phone number, or name a supervisor who can be reached');
+    }
+    const ownPhone = dto.phone?.trim() ? normalizeMsisdn(dto.phone) : null;
+    const loginPhone = ownPhone ?? placeholderPhone();
     const existing = await this.prisma.user.findFirst({
-      where: { OR: [{ phone: dto.phone }, { email: dto.email || undefined }] },
+      where: { OR: [...(ownPhone ? [{ phone: ownPhone }] : []), { email: dto.email || undefined }] },
     });
     if (existing) {
       throw new ConflictException(
@@ -142,7 +150,7 @@ export class FarmersService {
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
-          phone: dto.phone,
+          phone: loginPhone,
           email: dto.email,
           passwordHash,
           firstName: dto.firstName,
@@ -173,6 +181,7 @@ export class FarmersService {
           farmingExperienceYears: dto.farmingExperienceYears,
           familySize: dto.familySize,
           dependents: dto.dependents,
+          ...(supervisor ? { supervisorName: supervisor.name, supervisorPhone: supervisor.phone } : {}),
           dataShareConsent: dto.dataShareConsent ?? false,
           consentedAt: dto.dataShareConsent ? new Date() : null,
           registeredByOfficerId: registeringOfficer?.id,
@@ -200,6 +209,33 @@ export class FarmersService {
       if (hectare && error?.code === 'P2002') throw new ConflictException('This hectare was just taken or its ID is already in use');
       throw error;
     });
+  }
+
+  /** A supervisor who is not a member: both name and phone, the phone in the same format as every other number. */
+  private manualSupervisor(dto: { supervisorName?: string; supervisorPhone?: string }) {
+    const name = dto.supervisorName?.trim();
+    const phone = dto.supervisorPhone?.trim();
+    if (!name && !phone) return null;
+    if (!name) throw new BadRequestException('Enter the supervisor’s full name');
+    if (!phone) throw new BadRequestException('Enter the supervisor’s phone number');
+    if (!/^\+?[0-9\s-]{9,15}$/.test(phone)) throw new BadRequestException('Enter a valid phone number for the supervisor, for example +255712345678');
+    return { name, phone: normalizeMsisdn(phone) };
+  }
+
+  /**
+   * Whether a phone number is already in use, for the registration form to answer on the spot. A member of the caller's own
+   * AMCOS is named (so they can be linked as the supervisor); anyone else is only reported as "taken".
+   */
+  async checkPhone(phoneRaw: string, actor: RequestUser) {
+    const phone = normalizeMsisdn(phoneRaw ?? '');
+    if (!/^\+\d{9,15}$/.test(phone)) return { taken: false };
+    const user = await this.prisma.user.findUnique({ where: { phone }, select: { id: true, farmer: { select: { id: true, firstName: true, lastName: true, controlNumber: true, village: true, mamcosId: true, isBlacklisted: true } } } });
+    if (!user) return { taken: false };
+    const tenantId = this.ownership.resolveTenantMamcosId(actor);
+    const f = user.farmer;
+    const mine = !!f && (!tenantId || f.mamcosId === tenantId);
+    if (!f || !mine) return { taken: true, member: null };
+    return { taken: true, member: { id: f.id, name: `${f.firstName} ${f.lastName}`.trim(), memberNumber: f.controlNumber, village: f.village, canBeSupervisor: !f.isBlacklisted } };
   }
 
   /** The guardian named at registration must be an existing member of the same AMCOS who is not blacklisted. */

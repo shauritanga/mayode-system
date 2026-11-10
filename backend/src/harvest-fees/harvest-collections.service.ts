@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { SmsService } from '../messaging/sms.service';
+import { supervisorsOfFarmer } from '../farmers/supervisors';
 import { IrrigationScopeService } from '../irrigation/irrigation-scope.service';
 import { farmIdDisplay, normalizeFarmId } from '../irrigation/irrigation-codes';
 import { CollectionQueryDto, CreateCollectionDto, CreateCombineDto, HarvestSettingDto, UpdateCombineDto } from './dto/harvest-collections.dto';
@@ -237,11 +238,13 @@ export class HarvestCollectionsService {
     ]);
     const farm = farmIdDisplay(hectare.code); const amcos = mamcos?.name ?? 'AMCOS'; const reg = row.combine.registrationNumber; const bags = thousandths(num(row.totalBags));
     const send = async (phone: string | null | undefined, body: string) => { if (phone) await this.sms.send(phone, body, 'harvest_collection').catch(() => undefined); };
-    if (farmer?.user?.phone) {
-      const en = farmer.user.language === 'en';
-      await send(farmer.user.phone, en
+    if (farmer) {
+      const en = farmer.user?.language === 'en';
+      const text = en
         ? `Thank you. ${amcos} has received the combine harvesting payment for Farm ID ${farm} (combine ${reg}, ${bags} bags), ${tzs(num(row.amount))}. Receipt ${row.receiptNo}. We appreciate your cooperation.`
-        : `Asante. ${amcos} imepokea malipo ya uvunaji wa kombaini kwa Shamba ${farm} (kombaini ${reg}, mifuko ${bags}), ${tzs(num(row.amount))}. Stakabadhi ${row.receiptNo}. Tunathamini ushirikiano wako.`);
+        : `Asante. ${amcos} imepokea malipo ya uvunaji wa kombaini kwa Shamba ${farm} (kombaini ${reg}, mifuko ${bags}), ${tzs(num(row.amount))}. Stakabadhi ${row.receiptNo}. Tunathamini ushirikiano wako.`;
+      if (farmer.user?.phone) await send(farmer.user.phone, text);
+      for (const sv of await supervisorsOfFarmer(this.prisma, farmer.id)) if (sv.phone !== farmer.user?.phone) await send(sv.phone, text);
     }
     for (const l of await this.leadersOfBlock(hectare.block)) {
       const en = l.language === 'en';

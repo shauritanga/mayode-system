@@ -126,6 +126,8 @@ export const rolesApi = {
 
 // ── Farmers ──
 export const farmersApi = {
+  /** Is this phone number already used, and by which member of the caller's AMCOS? */
+  phoneCheck: (phone: string) => api.get('/farmers/phone-check', { params: { phone } }),
   getAll: (params?: object) => api.get('/farmers', { params }),
   /** Unpaginated, minimal-field list for dashboard aggregation — use this, not getAll(), when you need every farmer. */
   getAllUnpaginated: () => api.get('/farmers/all'),

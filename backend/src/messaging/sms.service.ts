@@ -11,6 +11,11 @@ export function normalizeMsisdn(phone: string): string {
   return `+${digits}`;
 }
 
+/** A farmer registered with no phone of their own gets a stand-in login number (never a real subscriber); texts to it are skipped. */
+export const PLACEHOLDER_PREFIX = '+999';
+export const isPlaceholderPhone = (phone?: string | null) => !!phone && phone.startsWith(PLACEHOLDER_PREFIX);
+export const placeholderPhone = () => `${PLACEHOLDER_PREFIX}${String(Math.floor(Math.random() * 1e9)).padStart(9, '0')}`;
+
 /**
  * Outbound SMS via Beem (SMS_PROVIDER=beem) or Africa's Talking (default).
  *
@@ -92,6 +97,7 @@ export class SmsService {
   ): Promise<boolean> {
     const phone = normalizeMsisdn(to);
     const recorded = logMessage ?? message;
+    if (isPlaceholderPhone(phone)) return false; // a farmer with no phone of their own: nothing to send to
 
     if (!this.isConfigured()) {
       await this.log(phone, recorded, type, 'simulated');

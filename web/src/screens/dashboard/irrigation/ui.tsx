@@ -278,53 +278,67 @@ export function ConfirmDialog({ title, body, confirmLabel, danger, askReason, re
 
 export interface MemberLite { id: string; name: string; memberNumber: string; village?: string | null; phone?: string | null; hectaresHeld: number }
 
-/** Search the existing AMCOS member registry; nothing here can create a member. */
+/** A searchable drop-down over the existing AMCOS member registry: opens on click with the first members, narrows as you type; nothing here can create a member. */
 export function MemberPicker({ schemeId, value, onChange, purpose = 'allocation', label = 'Member' }: {
   schemeId: string; value: MemberLite | null; onChange: (m: MemberLite | null) => void; purpose?: 'allocation' | 'leadership'; label?: string;
 }) {
   const [text, setText] = useState('');
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
   const q = useDebounced(text.trim(), 250);
   const [results, setResults] = useState<MemberLite[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const searchable = q.length === 0 || q.length >= 2;
   useEffect(() => {
-    if (q.length < 2 || !schemeId) return;
+    if (!open || !searchable || !schemeId) return;
     let live = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- marks the search as in flight
     setBusy(true); setError('');
     (purpose === 'leadership' ? irrigationApi.leadershipMembers : irrigationApi.members)({ schemeId, q })
-      .then((res) => { if (live) setResults(res.data); })
+      .then((res) => { if (live) { setResults(res.data); setActive(0); } })
       .catch((e) => { if (live) setError(errMsg(e, 'Member search failed.')); })
       .finally(() => { if (live) setBusy(false); });
     return () => { live = false; };
-  }, [q, schemeId, purpose]);
+  }, [q, schemeId, purpose, open, searchable]);
+  const pick = (m: MemberLite) => { onChange(m); setOpen(false); setText(''); };
   if (value) {
     return (
       <Field label={label}>
         <div className="input-field" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <span><strong>{value.name}</strong> <span className="muted">· {value.memberNumber}</span></span>
+          <span><strong>{value.name}</strong> <span className="muted">· {value.memberNumber}{value.phone ? ` · ${value.phone}` : ''}</span></span>
           <button type="button" className="btn-secondary" onClick={() => { onChange(null); setText(''); }}>Change</button>
         </div>
       </Field>
     );
   }
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((i) => Math.min(i + 1, Math.max(results.length - 1, 0))); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter' && open && results[active]) { e.preventDefault(); pick(results[active]); }
+    else if (e.key === 'Escape') setOpen(false);
+  };
   return (
-    <Field label={label} hint="Type at least 2 letters of the name, member number or phone">
-      <input className="input-field" value={text} onChange={(e) => setText(e.target.value)} placeholder="Search members" autoComplete="off" />
-      {error && <span style={{ color: 'var(--red-400)', fontSize: 12 }}>{error}</span>}
-      {q.length >= 2 && schemeId && (
-        <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, maxHeight: 220, overflow: 'auto', marginTop: 4 }}>
-          {busy ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>Searching…</div>
-            : results.length === 0 ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>No matching members in this AMCOS.</div>
-            : results.map((m) => (
-              <button key={m.id} type="button" onClick={() => onChange(m)}
-                style={{ display: 'flex', width: '100%', justifyContent: 'space-between', gap: 8, padding: '8px 10px', background: 'none', border: 'none', borderBottom: '1px solid var(--border-subtle)', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: 'inherit' }}>
-                <span><strong>{m.name}</strong> <span className="muted">· {m.memberNumber}{m.village ? ` · ${m.village}` : ''}</span></span>
-                <span className="muted">{m.hectaresHeld} ha held</span>
-              </button>
-            ))}
-        </div>
-      )}
+    <Field label={label} hint="Click to see members, or type a name, member number or phone to narrow the list">
+      <div style={{ position: 'relative' }}>
+        <input className="input-field" role="combobox" aria-controls="member-picker-list" aria-expanded={open} aria-autocomplete="list" value={text} placeholder="Select or search a member"
+          onChange={(e) => { setText(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} onKeyDown={onKey} autoComplete="off" />
+        {error && <span style={{ color: 'var(--red-400)', fontSize: 12 }}>{error}</span>}
+        {open && schemeId && (
+          <div id="member-picker-list" role="listbox" style={{ position: 'absolute', zIndex: 30, left: 0, right: 0, top: '100%', marginTop: 4, background: 'var(--surface, #fff)', border: '1px solid var(--border-subtle)', borderRadius: 8, maxHeight: 260, overflow: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.18)' }}>
+            {!searchable ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>Type at least 2 letters to search.</div>
+              : busy ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>Searching…</div>
+              : results.length === 0 ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>No matching members in this AMCOS.</div>
+              : results.map((m, i) => (
+                <button key={m.id} type="button" role="option" aria-selected={i === active} onMouseDown={(e) => { e.preventDefault(); pick(m); }} onMouseEnter={() => setActive(i)}
+                  style={{ display: 'flex', width: '100%', justifyContent: 'space-between', gap: 8, padding: '8px 10px', background: i === active ? 'var(--surface-tint, rgba(0,0,0,.06))' : 'none', border: 'none', borderBottom: '1px solid var(--border-subtle)', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
+                  <span><strong>{m.name}</strong> <span className="muted">· {m.memberNumber}{m.village ? ` · ${m.village}` : ''}</span></span>
+                  <span className="muted">{m.phone ?? ''}</span>
+                </button>
+              ))}
+          </div>
+        )}
+      </div>
     </Field>
   );
 }
