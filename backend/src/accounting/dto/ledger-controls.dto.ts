@@ -120,6 +120,8 @@ export class CashTransferDto {
 export class PayDto {
   /** The money account the payment went through; leave out for the default account of that kind, or none. */
   @IsOptional() @IsString() cashAccountId?: string;
+  /** Part payment: how much is being settled now. Leave out to settle everything still owed. */
+  @IsOptional() @IsNumber() @Min(0.01) amount?: number;
 }
 
 export class FarmerPayoutDto {

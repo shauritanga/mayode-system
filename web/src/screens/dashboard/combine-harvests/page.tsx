@@ -1,11 +1,13 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Modal from '@/components/Modal';
-import { harvestCollectionsApi } from '@/lib/api';
+import { farmId } from '@/lib/farm-id';
+import { harvestCollectionsApi, irrigationApi, riceVarietiesApi } from '@/lib/api';
+import { useSchemeScope } from '@/screens/dashboard/irrigation/useSchemeScope';
 import { useAuthStore } from '@/store/auth.store';
-import { ConfirmDialog, Empty, Field, LoadError, Notice, PageHeader, StatCard, TableSkeleton, Tabs, errMsg, fmtDate, fmtNum, todayISO, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
+import { ConfirmDialog, Empty, Field, LoadError, Notice, PageHeader, StatCard, TableSkeleton, Tabs, errMsg, fmtDate, fmtNum, todayISO, useApi, useCan, useDebounced } from '@/screens/dashboard/irrigation/ui';
 
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 const POSITION: Record<string, string> = { BLOCK_LEADER: 'Block leader', CANAL_LEADER: 'Canal leader' };
@@ -19,7 +21,7 @@ function printReceipt(r: any) {
   const rows = [
     row('Farm ID', r.farmId), r.farmer ? row('Farmer', `${r.farmer.name} (${r.farmer.memberNumber})`) : '',
     row('Combine harvester', `${r.combine.registrationNumber}${r.combine.make ? ` · ${r.combine.make} ${r.combine.model ?? ''}` : ''}`), row('Owner', r.combine.ownerName), r.combine.operatorName ? row('Operator', r.combine.operatorName) : '',
-    row('Harvested on', String(r.harvestedOn)), row('Harvest', `${fmtNum(r.totalBags, 2)} bags${r.basketsCounted ? ` (${r.bagsCounted} bags + ${r.basketsCounted} baskets at ${r.basketsPerBag} baskets a bag)` : ''}${r.quantityKg ? `, ${r.quantityKg} kg` : ''}`),
+    r.riceType ? row('Rice type', r.riceType) : '', row('Harvested on', String(r.harvestedOn)), row('Harvest', `${fmtNum(r.totalBags, 2)} bags${r.basketsCounted ? ` (${r.bagsCounted} bags + ${r.basketsCounted} baskets at ${r.basketsPerBag} baskets a bag)` : ''}${r.quantityKg ? `, ${r.quantityKg} kg` : ''}`),
     row('Amount', tzs(r.amount)), row('Status', r.status === 'COLLECTED' ? 'Collected' : 'NOT COLLECTED YET'),
     r.status === 'COLLECTED' ? row('Collected by', `${r.collectedByName} (${POSITION[r.collectedByPosition] ?? ''}) on ${String(r.collectedAt).slice(0, 10)}`) : '',
   ].join('');
@@ -27,8 +29,69 @@ function printReceipt(r: any) {
   w.document.close();
 }
 
+
+interface Opt { id: string; label: string; sub?: string; raw: any }
+
+/** A searchable drop-down: opens on click with the first entries, narrows as you type, and works with the keyboard. */
+function Combo({ label, hint, placeholder, selected, onClear, onPick, load, deps }: {
+  label: string; hint?: string; placeholder: string; selected: string | null; onClear: () => void; onPick: (o: Opt) => void;
+  load: (q: string) => Promise<Opt[]>; deps?: unknown[];
+}) {
+  const [text, setText] = useState(''); const [open, setOpen] = useState(false); const [active, setActive] = useState(0);
+  const [list, setList] = useState<Opt[]>([]); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
+  const q = useDebounced(text.trim(), 250); const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- marks the search as in flight
+    setBusy(true); setErr('');
+    load(q).then((r) => { if (live) { setList(r); setActive(0); } }).catch((e) => { if (live) setErr(errMsg(e, 'Could not load the list.')); }).finally(() => { if (live) setBusy(false); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reloads when the search text or the caller's inputs change
+  }, [q, open, ...(deps ?? [])]);
+  useEffect(() => {
+    const away = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', away);
+    return () => document.removeEventListener('mousedown', away);
+  }, []);
+  const pick = (o: Opt) => { onPick(o); setOpen(false); setText(''); };
+  if (selected) {
+    return <Field label={label}><div className="input-field" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><strong>{selected}</strong><button type="button" className="btn-secondary" onClick={onClear}>Change</button></div></Field>;
+  }
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((i) => Math.min(i + 1, Math.max(list.length - 1, 0))); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter' && open && list[active]) { e.preventDefault(); pick(list[active]); }
+    else if (e.key === 'Escape') setOpen(false);
+  };
+  return (
+    <Field label={label} hint={hint}>
+      <div ref={box} style={{ position: 'relative' }}>
+        <input className="input-field" role="combobox" aria-controls={`combo-${label}`} aria-expanded={open} value={text} placeholder={placeholder} autoComplete="off"
+          onChange={(e) => { setText(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={onKey} />
+        {open && (
+          <div id={`combo-${label}`} role="listbox" style={{ position: 'absolute', zIndex: 30, left: 0, right: 0, top: '100%', marginTop: 4, background: 'var(--surface, #fff)', border: '1px solid var(--border-subtle)', borderRadius: 8, maxHeight: 240, overflow: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.18)' }}>
+            {err ? <div style={{ padding: 10, fontSize: 13, color: 'var(--red-400)' }}>{err}</div> : busy && !list.length ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>Searching…</div>
+              : !list.length ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>Nothing matches.</div>
+              : list.map((o, i) => (
+                <button key={o.id} type="button" role="option" aria-selected={i === active} onMouseDown={(e) => { e.preventDefault(); pick(o); }} onMouseEnter={() => setActive(i)}
+                  style={{ display: 'flex', width: '100%', justifyContent: 'space-between', gap: 8, padding: '8px 10px', background: i === active ? 'var(--surface-tint, rgba(0,0,0,.06))' : 'none', border: 'none', borderBottom: '1px solid var(--border-subtle)', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
+                  <strong>{o.label}</strong><span className="muted">{o.sub}</span>
+                </button>))}
+          </div>
+        )}
+      </div>
+    </Field>
+  );
+}
+
 function Record({ onDone }: { onDone: (m: string) => void }) {
   const settings = useApi<any>(() => harvestCollectionsApi.settings(), []);
+  const { schemeId } = useSchemeScope();
+  const rice = useApi<any>(() => riceVarietiesApi.list(), []);
+  const combines = useApi<any>(() => harvestCollectionsApi.combines(), []);
+  const [riceId, setRiceId] = useState('');
+  const riceList: any[] = (Array.isArray(rice.data) ? rice.data : rice.data?.data ?? []).filter((v: any) => v.isActive !== false);
   const [farmIdText, setFarmIdText] = useState(''); const [ctx, setCtx] = useState<any>(null); const [ctxError, setCtxError] = useState('');
   const [reg, setReg] = useState(''); const [combine, setCombine] = useState<any>(null); const [regError, setRegError] = useState('');
   const [bags, setBags] = useState(''); const [baskets, setBaskets] = useState(''); const [kg, setKg] = useState(''); const [amount, setAmount] = useState(''); const [day, setDay] = useState(todayISO());
@@ -36,12 +99,11 @@ function Record({ onDone }: { onDone: (m: string) => void }) {
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const per = settings.data?.basketsPerBag ?? 2;
   const totalBags = (Number(bags) || 0) + (Number(baskets) || 0) / per;
-  const lookupFarm = async () => { setCtx(null); setCtxError(''); if (!farmIdText.trim()) return; try { const r = await harvestCollectionsApi.context(farmIdText.trim()); setCtx(r.data); setCollector(''); } catch (e) { setCtxError(errMsg(e, 'Farm ID not found.')); } };
-  const lookupCombine = async () => { setCombine(null); setRegError(''); if (!reg.trim()) return; try { setCombine((await harvestCollectionsApi.lookupCombine(reg.trim())).data); } catch (e) { setRegError(errMsg(e, 'Not registered.')); } };
+  const lookupFarm = async (text = farmIdText) => { setCtx(null); setCtxError(''); if (!text.trim()) return; try { const r = await harvestCollectionsApi.context(text.trim()); setCtx(r.data); setCollector(''); } catch (e) { setCtxError(errMsg(e, 'Farm ID not found.')); } };
   const save = async () => {
     setBusy(true); setError('');
     try {
-      const r: any = await harvestCollectionsApi.create({ farmId: farmIdText.trim(), registrationNumber: reg.trim(), harvestedOn: day, bags: bags ? Number(bags) : undefined, baskets: baskets ? Number(baskets) : undefined, quantityKg: kg ? Number(kg) : undefined, amount: Number(amount), collected: received, collectorFarmerId: received && collector ? collector : undefined, note: note.trim() || undefined });
+      const r: any = await harvestCollectionsApi.create({ farmId: farmIdText.trim(), registrationNumber: reg.trim(), riceVarietyId: riceId || undefined, harvestedOn: day, bags: bags ? Number(bags) : undefined, baskets: baskets ? Number(baskets) : undefined, quantityKg: kg ? Number(kg) : undefined, amount: Number(amount), collected: received, collectorFarmerId: received && collector ? collector : undefined, note: note.trim() || undefined });
       printReceipt(r.data);
       setFarmIdText(''); setCtx(null); setBags(''); setBaskets(''); setKg(''); setAmount(''); setNote('');
       onDone(`${r.data.receiptNo} saved${r.data.status === 'COLLECTED' ? ': the farmer and both leaders were texted.' : '. It is pending until the leader records the money.'}`);
@@ -54,15 +116,24 @@ function Record({ onDone }: { onDone: (m: string) => void }) {
       {error && <Notice tone="error">{error}</Notice>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
-          <Field label="Farm ID" hint="For example 1:1R-1"><input className="input-field" value={farmIdText} onChange={(e) => setFarmIdText(e.target.value)} onBlur={lookupFarm} /></Field>
+          <Combo label="Farm ID" hint="Click to choose, or type a Farm ID such as 1:1R-1 or the farmer’s name" placeholder="Select or search a Farm ID" selected={ctx || farmIdText ? `${farmIdText}${ctx?.farmer?.name ? ` · ${ctx.farmer.name}` : ''}` : null}
+            onClear={() => { setFarmIdText(''); setCtx(null); setCtxError(''); }} deps={[schemeId]}
+            load={async (q) => (schemeId ? ((await irrigationApi.hectares({ schemeId, status: 'ALLOCATED', q: q || undefined, page: 1, pageSize: 20 })).data.data as any[]).map((h) => ({ id: h.id, label: farmId(h.code), sub: h.farmer?.name ?? '', raw: h })) : [])}
+            onPick={(o) => { const id = farmId(o.raw.code); setFarmIdText(id); void lookupFarm(id); }} />
           {ctxError && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 12.5 }}>{ctxError}</div>}
           {ctx && <div style={{ fontSize: 12.5, marginTop: 4 }}><strong>{ctx.farmer?.name ?? 'Nobody holds this hectare'}</strong>{ctx.farmer ? ` · ${ctx.farmer.memberNumber}` : ''}<div className="muted">{ctx.leaders.map((l: any) => `${POSITION[l.position]}: ${l.name}`).join(' · ') || 'No leaders appointed'}</div></div>}
         </div>
         <div>
-          <Field label="Combine registration number"><input className="input-field" value={reg} onChange={(e) => setReg(e.target.value)} onBlur={lookupCombine} /></Field>
+          <Combo label="Combine registration number" hint="Click to choose a registered combine, or type to search" placeholder="Select or search a combine" selected={reg ? `${reg}${combine?.make ? ` · ${combine.make} ${combine.model ?? ''}` : ''}` : null}
+            onClear={() => { setReg(''); setCombine(null); setRegError(''); }} deps={[combines.data]}
+            load={async (q) => ((combines.data?.data ?? []) as any[]).filter((c) => c.isActive !== false && (!q || `${c.registrationNumber} ${c.make ?? ''} ${c.model ?? ''} ${c.ownerName ?? ''}`.toLowerCase().includes(q.toLowerCase()))).map((c) => ({ id: c.id, label: c.registrationNumber, sub: `${c.make ?? ''} ${c.model ?? ''}`.trim() || c.ownerName || '', raw: c }))}
+            onPick={(o) => { setReg(o.raw.registrationNumber); setCombine(o.raw); setRegError(''); }} />
           {regError && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 12.5 }}>{regError} Register it on the Combines tab first.</div>}
           {combine && <div style={{ fontSize: 12.5, marginTop: 4 }}><strong>{combine.registrationNumber}</strong>{combine.make ? ` · ${combine.make} ${combine.model ?? ''}` : ''}<div className="muted">Owner {combine.ownerName}{combine.operatorName ? ` · operator ${combine.operatorName}` : ''}{!combine.isActive ? ' · NOT ACTIVE' : ''}</div></div>}
         </div>
+      </div>
+      <div style={{ marginTop: 12, maxWidth: 360 }}>
+        <Field label="Rice type"><select className="input-field" value={riceId} onChange={(e) => setRiceId(e.target.value)}><option value="">Choose the rice type…</option>{riceList.map((v: any) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></Field>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginTop: 12 }}>
         <Field label="Bags"><input type="number" min={0} className="input-field" value={bags} onChange={(e) => setBags(e.target.value)} /></Field>
@@ -80,7 +151,7 @@ function Record({ onDone }: { onDone: (m: string) => void }) {
         {received && ctx && <div style={{ marginTop: 8, maxWidth: 320 }}><Field label="Received by" hint="Leave as it is if you are the leader who received it."><select className="input-field" value={collector} onChange={(e) => setCollector(e.target.value)}><option value="">Me</option>{ctx.leaders.map((l: any) => <option key={l.farmerId} value={l.farmerId}>{l.name} · {POSITION[l.position]}</option>)}</select></Field></div>}
         {!received && <div className="muted" style={{ fontSize: 12.5 }}>It will wait in the pending list until a leader records that the money was received.</div>}
       </div>
-      <div style={{ marginTop: 14 }}><button type="button" className="btn-primary" disabled={busy || !farmIdText || !reg || amount === ''} onClick={save}>{busy ? 'Saving…' : 'Save and print the receipt'}</button></div>
+      <div style={{ marginTop: 14 }}><button type="button" className="btn-primary" disabled={busy || !farmIdText || !reg || !riceId || amount === ''} onClick={save}>{busy ? 'Saving…' : 'Save and print the receipt'}</button></div>
     </section>
   );
 }
@@ -100,7 +171,7 @@ function Payments({ canEdit }: { canEdit: boolean }) {
           {rows.map((r) => (
             <tr key={r.id}>
               <td>{r.receiptNo}<div className="muted" style={{ fontSize: 11 }}>{fmtDate(r.harvestedOn)}</div></td>
-              <td>{r.farmId}<div className="muted" style={{ fontSize: 11 }}>{r.farmer?.name}</div></td><td>{r.combine.registrationNumber}</td><td className="num">{fmtNum(r.totalBags, 1)}</td><td className="num">{tzs(r.amount)}</td>
+              <td>{r.farmId}<div className="muted" style={{ fontSize: 11 }}>{r.farmer?.name}</div></td><td>{r.combine.registrationNumber}</td><td className="num">{fmtNum(r.totalBags, 1)}{r.riceType && <div className="muted" style={{ fontSize: 11 }}>{r.riceType}</div>}</td><td className="num">{tzs(r.amount)}</td>
               <td>{r.status === 'COLLECTED' ? <>{r.collectedByName}<div className="muted" style={{ fontSize: 11 }}>{POSITION[r.collectedByPosition]} · {fmtDate(r.collectedAt)}</div></> : <span className="badge badge-gold">Waiting{r.daysWaiting ? ` · ${r.daysWaiting} d` : ''}</span>}</td>
               <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                 <button type="button" className="btn-secondary" style={{ marginRight: 6 }} onClick={async () => { try { printReceipt((await harvestCollectionsApi.receipt(r.id)).data); } catch (e) { setMsg(errMsg(e, 'Could not open the receipt.')); } }}>Print</button>

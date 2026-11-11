@@ -577,10 +577,10 @@ export class SalesService {
           credit: settled.totalRevenue + (settled.fairtradePremium ?? 0),
         },
       ], this.accounting.mamcosOfSale(id));
-    await this.prisma.invoice.updateMany({
-      where: { saleId: id, status: 'OPEN' },
-      data: { status: 'PAID', paidAt: settled.paymentDate },
-    });
+    const saleInvoice = await this.prisma.invoice.findFirst({ where: { saleId: id, status: { in: ['OPEN', 'OVERDUE'] } } });
+    if (saleInvoice) {
+      await this.prisma.invoice.update({ where: { id: saleInvoice.id }, data: { status: 'PAID', paidAt: settled.paymentDate, amountPaid: saleInvoice.amount } });
+    }
     return settled;
   }
 

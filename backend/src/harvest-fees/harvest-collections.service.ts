@@ -160,6 +160,8 @@ export class HarvestCollectionsService {
     const combine = await this.prisma.combineHarvester.findUnique({ where: { mamcosId_registrationNumber: { mamcosId, registrationNumber: normReg(dto.registrationNumber) } } });
     if (!combine) throw new NotFoundException('No combine harvester is registered with this number');
     if (!combine.isActive) throw new BadRequestException('This combine harvester is no longer active');
+    const rice = dto.riceVarietyId ? await this.prisma.riceVariety.findUnique({ where: { id: dto.riceVarietyId }, select: { id: true, name: true, isActive: true } }) : null;
+    if (dto.riceVarietyId && (!rice || !rice.isActive)) throw new BadRequestException('Choose a rice type from the list');
     const harvestedOn = dto.harvestedOn ? new Date(`${dto.harvestedOn.slice(0, 10)}T00:00:00.000Z`) : todayUtc();
     if (harvestedOn > todayUtc()) throw new BadRequestException('The harvest date cannot be in the future');
     const bags = dto.bags ?? 0; const baskets = dto.baskets ?? 0;
@@ -181,7 +183,7 @@ export class HarvestCollectionsService {
       try {
         const row = await this.prisma.harvestCollection.create({
           data: {
-            mamcosId, receiptNo: await this.receiptNo(mamcosId, attempt), hectareId: hectare.id, blockId: hectare.block.id, farmerId: farmer?.id ?? null, combineId: combine.id, harvestedOn,
+            mamcosId, receiptNo: await this.receiptNo(mamcosId, attempt), hectareId: hectare.id, blockId: hectare.block.id, farmerId: farmer?.id ?? null, combineId: combine.id, riceVarietyId: rice?.id ?? null, riceVarietyName: rice?.name ?? null, harvestedOn,
             quantityKg: dto.quantityKg ?? null, bagsCounted: bags, basketsCounted: baskets, basketsPerBag: settings.basketsPerBag, totalBags, pricePerBag: settings.pricePerBag, amount: dto.amount,
             status: collected ? 'COLLECTED' : 'PENDING', collectedAt: collected ? new Date() : null, collectedByFarmerId: collector?.farmerId ?? null, collectedByName: collector?.name ?? null, collectedByPosition: collector?.position ?? null,
             note: dto.note?.trim() || null, recordedById: actor.id,
@@ -263,7 +265,7 @@ export class HarvestCollectionsService {
     return rows.map((r) => ({
       id: r.id, receiptNo: r.receiptNo, farmId: farmIdDisplay(h.get(r.hectareId)), hectareId: r.hectareId, farmer: r.farmerId && f.get(r.farmerId) ? { id: r.farmerId, name: fullName(f.get(r.farmerId)!), memberNumber: f.get(r.farmerId)!.controlNumber } : null,
       combine: { id: r.combine.id, registrationNumber: r.combine.registrationNumber, make: r.combine.make, model: r.combine.model, ownerName: r.combine.ownerName, operatorName: r.combine.operatorName },
-      harvestedOn: ymd(r.harvestedOn), quantityKg: r.quantityKg == null ? null : num(r.quantityKg), bagsCounted: r.bagsCounted, basketsCounted: num(r.basketsCounted), basketsPerBag: num(r.basketsPerBag), totalBags: num(r.totalBags),
+      riceType: r.riceVarietyName ?? null, harvestedOn: ymd(r.harvestedOn), quantityKg: r.quantityKg == null ? null : num(r.quantityKg), bagsCounted: r.bagsCounted, basketsCounted: num(r.basketsCounted), basketsPerBag: num(r.basketsPerBag), totalBags: num(r.totalBags),
       income: r.pricePerBag == null ? null : cents(num(r.totalBags) * num(r.pricePerBag)), amount: num(r.amount), status: r.status, collectedAt: r.collectedAt, collectedByName: r.collectedByName, collectedByPosition: r.collectedByPosition,
       note: r.note, createdAt: r.createdAt, voidedAt: r.voidedAt, voidReason: r.voidReason,
       daysWaiting: r.status === 'PENDING' && !r.voidedAt ? Math.floor((Date.now() - +r.createdAt) / 86_400_000) : null,

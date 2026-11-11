@@ -14,6 +14,7 @@ import { BankReconciliationView, DocumentsView, PeriodCloseView, VatReturnView }
 import MoneyInput from '@/components/MoneyInput';
 import { ReportExportView } from './exports';
 import { CashTransactionsView } from './expenses';
+import { DepreciationView, EquipmentRegisterView } from './assets-views';
 
 const MENU = [
   ['Farmers', 'farmer-accounts', ['Owed to Farmers', 'Payouts', 'Farmer Statements']],
@@ -383,6 +384,12 @@ export default function AccountingPage() {
     : customKey === 'expenses-income/other-income' ? <CashTransactionsView kind="INCOME" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} canApprove={false} />
     : customKey === 'financial-reports/export-archive' ? <ReportExportView />
     : customKey === 'tax-compliance/vat-return' ? <VatReturnView canCreate={!!canCreateAccounting} />
+    : customKey === 'assets-loans/equipment-register' ? <EquipmentRegisterView />
+    : customKey === 'assets-loans/depreciation' ? <DepreciationView />
+    : customKey === 'rice-sales-receivables/customer-receipts' ? <DocumentsView kind="invoice" canCreate={false} canEdit={false} view="paid" />
+    : customKey === 'rice-sales-receivables/credit-sales' ? <DocumentsView kind="invoice" canCreate={false} canEdit={!!canEditAccounting} view="unpaid" />
+    : customKey === 'purchases-suppliers/supplier-payments' ? <DocumentsView kind="bill" canCreate={false} canEdit={false} view="paid" />
+    : customKey === 'purchases-suppliers/outstanding-balances' ? <DocumentsView kind="bill" canCreate={false} canEdit={!!canEditAccounting} view="unpaid" />
     : customKey === 'rice-sales-receivables/customer-debtors' ? <DocumentsView kind="invoice" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
     : customKey === 'purchases-suppliers/supplier-bills' ? <DocumentsView kind="bill" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
     : null;

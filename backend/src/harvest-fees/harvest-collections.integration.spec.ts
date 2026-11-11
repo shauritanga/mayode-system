@@ -96,13 +96,17 @@ describeDb('Combine harvest payments (PostgreSQL)', () => {
 
   let firstId: string;
   it('shows who farms the Farm ID and who the leaders are, then records the payment with a receipt and texts all three', async () => {
+    const riceName = `Super ${randomUUID().slice(0, 5)}`;
+    const riceId = (await prisma.riceVariety.create({ data: { name: riceName } })).id;
     const ctx: any = await svc.context(blockLeader, '1:1R-1');
     expect(ctx.farmer.name).toContain('Asha');
     expect(ctx.leaders.map((l: any) => l.position).sort()).toEqual(['BLOCK_LEADER', 'CANAL_LEADER']);
-    const r: any = await svc.create(blockLeader, { farmId: '1:1R-1', registrationNumber: 't123abc', bags: 10, baskets: 6, amount: 150_000, quantityKg: 1100 } as any);
+    const r: any = await svc.create(blockLeader, { farmId: '1:1R-1', registrationNumber: 't123abc', bags: 10, baskets: 6, amount: 150_000, quantityKg: 1100, riceVarietyId: riceId } as any);
     firstId = r.id;
     expect(r).toMatchObject({ receiptNo: expect.stringMatching(/^HC-\d{4}-0001$/), farmId: '1:1R-1', totalBags: 12, income: 1_080_000, status: 'COLLECTED', collectedByName: expect.stringContaining('BlockLeader') });
     expect(r.combine.registrationNumber).toBe('T123ABC');
+    expect(r.riceType).toBe(riceName);
+    await expect(svc.create(blockLeader, { farmId: '1:1R-1', registrationNumber: 't123abc', bags: 1, amount: 1, riceVarietyId: randomUUID() } as any)).rejects.toThrow(/rice type/);
     expect(r.amcos).toContain('Madibira');
     const asha = sentTo((global as any).__asha)[0].text; const canal = sentTo((global as any).__cl)[0].text; const block = sentTo((global as any).__bl)[0].text;
     expect(asha).toMatch(/Asante\. Madibira.* imepokea malipo ya uvunaji.*Shamba 1:1R-1.*T123ABC/);

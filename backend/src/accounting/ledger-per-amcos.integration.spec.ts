@@ -129,7 +129,7 @@ describeDb('Per-AMCOS ledger (PostgreSQL)', () => {
       await expect(svc.payBill(bill.id, svc.scopeFor(adminB))).rejects.toBeInstanceOf(NotFoundException);
       const paid: any = await svc.payBill(bill.id, svc.scopeFor(adminA));
       expect(paid.status).toBe('PAID');
-      expect(await prisma.ledgerEntry.count({ where: { sourceType: 'BillPayment', sourceId: bill.id, mamcosId: mamcosA } })).toBe(2);
+      expect(await prisma.ledgerEntry.count({ where: { sourceType: 'BillPayment', sourceId: `${bill.id}:1`, mamcosId: mamcosA } })).toBe(2);
       const inv: any = await svc.createInvoice({ invoiceNumber: `I-${randomUUID().slice(0, 6)}`, amount: 90, dueDate: D(5).toISOString() } as any, svc.scopeFor(adminB));
       expect(inv.mamcosId).toBe(mamcosB);
       expect((await svc.receivables(svc.scopeFor(adminA))).map((r: any) => r.id)).not.toContain(inv.id);

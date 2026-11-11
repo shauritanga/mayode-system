@@ -330,9 +330,11 @@ export const accountingApi = {
   createReserveAllocation: (data: object) => api.post('/accounting/reserves', data),
   createInvoice: (data: object) => api.post('/accounting/invoices', data),
   createBill: (data: object) => api.post('/accounting/bills', data),
-  payBill: (id: string, cashAccountId?: string) => api.post(`/accounting/bills/${id}/pay`, { cashAccountId }),
+  invoices: (params?: object) => api.get('/accounting/invoices', { params }),
+  bills: (params?: object) => api.get('/accounting/bills', { params }),
+  payBill: (id: string, cashAccountId?: string, amount?: number) => api.post(`/accounting/bills/${id}/pay`, { cashAccountId, amount }),
   voidBill: (id: string) => api.post(`/accounting/bills/${id}/void`),
-  payInvoice: (id: string, cashAccountId?: string) => api.post(`/accounting/invoices/${id}/pay`, { cashAccountId }),
+  payInvoice: (id: string, cashAccountId?: string, amount?: number) => api.post(`/accounting/invoices/${id}/pay`, { cashAccountId, amount }),
   voidInvoice: (id: string) => api.post(`/accounting/invoices/${id}/void`),
   // Closing the books
   periodLock: () => api.get('/accounting/period-lock'),

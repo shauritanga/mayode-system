@@ -33,6 +33,8 @@ export class CreateCollectionDto {
   /** The hectare, typed as shown (1:1R-1). */
   @IsString() @IsNotEmpty() farmId: string;
   @IsString() @IsNotEmpty() registrationNumber: string;
+  /** The rice type harvested (from the rice varieties list). */
+  @IsOptional() @IsUUID() riceVarietyId?: string;
   @IsOptional() @IsDateString() harvestedOn?: string;
   @IsOptional() @Type(() => Number) @IsNumber(money) @Min(0) quantityKg?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) bags?: number;

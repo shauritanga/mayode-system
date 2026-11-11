@@ -359,9 +359,12 @@ export function VatReturnView({ canCreate }: { canCreate: boolean }) {
 }
 
 // ───────────────────────── Customer invoices and supplier bills ─────────────────────────
-export function DocumentsView({ kind, canCreate, canEdit }: { kind: 'invoice' | 'bill'; canCreate: boolean; canEdit: boolean }) {
+export function DocumentsView({ kind, canCreate, canEdit, view = 'all' }: { kind: 'invoice' | 'bill'; canCreate: boolean; canEdit: boolean; view?: 'all' | 'unpaid' | 'paid' }) {
   const isBill = kind === 'bill';
-  const list = useLoad<any[]>(() => (isBill ? accountingApi.payables() : accountingApi.receivables()), [kind]);
+  // unpaid = what is still owed (with the balance), paid = what has been settled and how, void = cancelled
+  const [tab, setTab] = useState<'unpaid' | 'PAID' | 'VOID'>(view === 'paid' ? 'PAID' : 'unpaid');
+  const list = useLoad<any[]>(() => (tab === 'unpaid' ? (isBill ? accountingApi.payables() : accountingApi.receivables()) : isBill ? accountingApi.bills({ status: tab }) : accountingApi.invoices({ status: tab })), [kind, tab]);
+  const [payAmount, setPayAmount] = useState('');
   const tax = useLoad<any>(() => accountingApi.taxSettings(), []);
   const accounts = useLoad<any[]>(() => accountingApi.accounts(), []);
   const suppliers = useLoad<any[]>(() => (isBill ? suppliersApi.getAll() : Promise.resolve({ data: [] })), [kind]);
@@ -396,23 +399,28 @@ export function DocumentsView({ kind, canCreate, canEdit }: { kind: 'invoice' | 
   return <div>
     <Head action={canCreate && <button type="button" className="btn-primary" onClick={() => { setErr(''); setOpen(true); }}>{isBill ? 'Record bill' : 'Record invoice'}</button>} />
     <ErrorBanner message={list.error || err} onDismiss={() => { list.setError(''); setErr(''); }} />
-    <section className="table-panel"><div className="section-toolbar"><strong>Unpaid</strong><span className="muted">{rows.length}</span></div>
-      {list.loading ? <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div> : !rows.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>{isBill ? 'No unpaid bills.' : 'No unpaid invoices.'}</div> :
-        <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Number</th><th>{isBill ? 'Supplier' : 'Customer'}</th><th>Due</th>{showVat && <th className="num">VAT</th>}{showWht && <th className="num">Withheld</th>}<th className="num">Total</th><th>Status</th><th /></tr></thead><tbody>
+    <section className="table-panel"><div className="section-toolbar" style={{ gap: 8, flexWrap: 'wrap' }}>
+      {view === 'all' ? <>{([['unpaid', 'Unpaid'], ['PAID', isBill ? 'Paid' : 'Received'], ['VOID', 'Cancelled']] as const).map(([k, label]) => <button key={k} type="button" className={tab === k ? 'btn-primary' : 'btn-secondary'} onClick={() => setTab(k)}>{label}</button>)}</> : <strong>{view === 'paid' ? (isBill ? 'Payments made' : 'Payments received') : 'Unpaid'}</strong>}
+      <span className="muted" style={{ marginLeft: 'auto' }}>{rows.length}</span></div>
+      {list.loading ? <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div> : !rows.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>{tab === 'unpaid' ? (isBill ? 'No unpaid bills.' : 'No unpaid invoices.') : tab === 'PAID' ? (isBill ? 'No bills have been paid yet.' : 'No payments received yet.') : 'Nothing has been cancelled.'}</div> :
+        <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Number</th><th>{isBill ? 'Supplier' : 'Customer'}</th><th>Due</th>{showVat && <th className="num">VAT</th>}{showWht && <th className="num">Withheld</th>}<th className="num">Total</th><th className="num">{tab === 'unpaid' ? 'Balance' : 'Settled'}</th><th>Status</th><th /></tr></thead><tbody>
           {rows.map((x: any) => <tr key={x.id}><td>{isBill ? x.billNumber : x.invoiceNumber}</td><td>{isBill ? x.supplier : x.buyer?.companyName ?? x.buyer?.name ?? '—'}</td><td>{shortDate(x.dueDate)}</td>
-            {showVat && <td className="num">{x.vatAmount ? tzs(x.vatAmount) : '—'}</td>}{showWht && <td className="num">{x.withholdingAmount ? tzs(x.withholdingAmount) : '—'}</td>}<td className="num">{tzs(x.amount)}</td>
-            <td>{x.status === 'OVERDUE' ? <Badge tone="bad">Overdue</Badge> : <Badge tone="muted">Open</Badge>}</td>
-            <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{x.source === 'ORDERS' ? <a className="btn-secondary" href="/dashboard/ops-orders">Take payment in Orders &amp; Sales</a> : canEdit && <>
-              <button type="button" className="btn-secondary" onClick={() => setPaying(x)}>{isBill ? 'Mark paid' : 'Mark received'}</button>{' '}
-              <button type="button" className="btn-secondary" style={{ color: 'var(--red-400)' }} onClick={() => setVoiding(x)}>Void</button></>}</td></tr>)}
+            {showVat && <td className="num">{x.vatAmount ? tzs(x.vatAmount) : '—'}</td>}{showWht && <td className="num">{x.withholdingAmount ? tzs(x.withholdingAmount) : '—'}</td>}<td className="num">{tzs(x.total ?? x.amount)}</td>
+            <td className="num">{tab === 'unpaid' ? <strong>{tzs(x.balance ?? x.amount)}</strong> : tzs(x.amountPaid ?? 0)}
+              {tab !== 'unpaid' && x.payments?.length > 0 && <div className="muted" style={{ fontSize: 12 }}>{x.payments.map((p: any) => `${shortDate(p.paidAt)}: ${tzs(p.cash)}`).join(' · ')}</div>}</td>
+            <td>{x.status === 'PAID' ? <Badge tone="good">{isBill ? 'Paid' : 'Received'}</Badge> : x.status === 'VOID' ? <Badge tone="muted">Cancelled</Badge> : x.status === 'OVERDUE' ? <Badge tone="bad">Overdue</Badge> : x.amountPaid > 0 ? <Badge tone="warn">Part paid</Badge> : <Badge tone="muted">Open</Badge>}</td>
+            <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{x.source === 'ORDERS' ? <a className="btn-secondary" href="/dashboard/ops-orders">Take payment in Orders &amp; Sales</a> : canEdit && tab === 'unpaid' && <>
+              <button type="button" className="btn-secondary" onClick={() => { setPayAmount(''); setPaying(x); }}>{isBill ? 'Mark paid' : 'Mark received'}</button>{' '}
+              {!(x.amountPaid > 0) && <button type="button" className="btn-secondary" style={{ color: 'var(--red-400)' }} onClick={() => setVoiding(x)}>Void</button>}</>}</td></tr>)}
         </tbody></table></div>}
     </section>
     {voiding && <Modal title={`Void ${isBill ? voiding.billNumber : voiding.invoiceNumber}?`} subtitle={`${tzs(voiding.amount)}${isBill ? ` · ${voiding.supplier}` : ''}`} onClose={() => setVoiding(null)} width="460px"
       footer={<><button type="button" className="btn-secondary" onClick={() => setVoiding(null)}>Keep it</button><button type="button" className="btn-primary" style={{ background: 'var(--red-500, #dc2626)' }} onClick={() => { const target = voiding; setVoiding(null); void run(() => (isBill ? accountingApi.voidBill(target.id) : accountingApi.voidInvoice(target.id))); }}>Void {isBill ? 'bill' : 'invoice'}</button></>}>
       <p style={{ margin: 0, fontSize: 14 }}>The {isBill ? 'bill' : 'invoice'} is cancelled and no longer counts as {isBill ? 'owed to the supplier' : 'owed to you'}. Its entries in the books are offset by opposite entries, not deleted, so the history stays.</p>
     </Modal>}
-    {paying && <Modal title={isBill ? `Pay ${paying.billNumber}` : `Receive payment for ${paying.invoiceNumber}`} subtitle={`${tzs(paying.amount)}${isBill ? ` to ${paying.supplier}` : ''}`} onClose={() => setPaying(null)} width="480px"
-      footer={<><button type="button" className="btn-secondary" onClick={() => setPaying(null)}>Cancel</button><button type="button" className="btn-primary" onClick={() => { const target = paying; setPaying(null); void run(() => (isBill ? accountingApi.payBill(target.id, payAccount || undefined) : accountingApi.payInvoice(target.id, payAccount || undefined))); }}>{isBill ? 'Mark as paid' : 'Mark as received'}</button></>}>
+    {paying && <Modal title={isBill ? `Pay ${paying.billNumber}` : `Receive payment for ${paying.invoiceNumber}`} subtitle={`${tzs(paying.balance ?? paying.amount)} still ${isBill ? 'owed' : 'to receive'}${isBill ? ` to ${paying.supplier}` : ''}`} onClose={() => setPaying(null)} width="480px"
+      footer={<><button type="button" className="btn-secondary" onClick={() => setPaying(null)}>Cancel</button><button type="button" className="btn-primary" onClick={() => { const target = paying; setPaying(null); void run(() => (isBill ? accountingApi.payBill(target.id, payAccount || undefined, payAmount ? Number(payAmount) : undefined) : accountingApi.payInvoice(target.id, payAccount || undefined, payAmount ? Number(payAmount) : undefined))); }}>{payAmount && Number(payAmount) < (paying.balance ?? paying.amount) ? (isBill ? 'Record part payment' : 'Record part receipt') : isBill ? 'Mark as paid' : 'Mark as received'}</button></>}>
+      <label className="form-label">Amount {isBill ? 'paying' : 'settled'} now (TZS)<MoneyInput className="input-field" min="0.01" step="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder={`Leave empty for all (${tzs(paying.balance ?? paying.amount)})`} /></label>
       <MoneyAccountSelect label={isBill ? 'Paid from' : 'Received into'} value={payAccount} onChange={setPayAccount} defaultKind="BANK" />
     </Modal>}
     {open && <Modal title={isBill ? 'Record supplier bill' : 'Record customer invoice'} onClose={() => !busy && setOpen(false)} width="600px" footer={<Actions label="Save" form="doc-form" busy={busy} onCancel={() => setOpen(false)} />}>

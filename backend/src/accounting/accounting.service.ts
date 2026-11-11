@@ -672,8 +672,8 @@ export class AccountingService {
       trialBalance,
       ratios,
       workingCapital: balanceSheet.assets - balanceSheet.liabilities,
-      receivablesTotal: receivables.reduce((sum, item) => sum + item.amount, 0),
-      payablesTotal: payables.reduce((sum, item) => sum + item.amount, 0),
+      receivablesTotal: receivables.reduce((sum, item) => sum + item.balance, 0),
+      payablesTotal: payables.reduce((sum, item) => sum + item.balance, 0),
     };
   }
   /** Tax settings of the cooperative whose books these are (a platform-level document is never VAT-registered). */
@@ -702,52 +702,81 @@ export class AccountingService {
     const tax = computeTax({ net: dto.amount, ...(await this.taxSettings(mamcosId)), vatApplies: dto.vatApplies, withholdingPercent: dto.withholdingPercent });
     const revenue = await this.revenueOrExpenseAccount(dto.revenueAccountCode, [AccountType.INCOME], '4000');
     const invoiceNumber = await this.documentNumber(dto.invoiceNumber, mamcosId, 'INV', 'INV');
-    let invoice;
     try {
-      invoice = await this.prisma.invoice.create({
-        data: {
-          invoiceNumber, saleId: dto.saleId, buyerId: dto.buyerId, description: dto.description?.trim() || null,
-          amount: tax.total, subtotal: tax.subtotal, vatAmount: tax.vatAmount, withholdingAmount: tax.withholdingAmount,
-          dueDate: new Date(dto.dueDate), mamcosId,
-        },
+      // the invoice and its journal are saved together, or not at all
+      return await this.prisma.$transaction(async (tx) => {
+        const invoice = await tx.invoice.create({
+          data: {
+            invoiceNumber, saleId: dto.saleId, buyerId: dto.buyerId, description: dto.description?.trim() || null,
+            amount: tax.total, subtotal: tax.subtotal, vatAmount: tax.vatAmount, withholdingAmount: tax.withholdingAmount,
+            dueDate: new Date(dto.dueDate), mamcosId,
+          },
+        });
+        await this.postToLedger('Invoice', invoice.id, invoice.createdAt, `Invoice ${invoice.invoiceNumber}`, [
+          { code: '1100', debit: tax.total },
+          { code: revenue, credit: tax.subtotal },
+          ...(tax.vatAmount ? [{ code: '2400', credit: tax.vatAmount }] : []),
+        ], mamcosId, actorId, tx);
+        return invoice;
       });
     } catch (e: any) {
       if (e?.code === 'P2002') throw new ConflictException(`Invoice number ${invoiceNumber} is already used`);
       throw e;
     }
-    await this.postToLedger('Invoice', invoice.id, invoice.createdAt, `Invoice ${invoice.invoiceNumber}`, [
-      { code: '1100', debit: tax.total },
-      { code: revenue, credit: tax.subtotal },
-      ...(tax.vatAmount ? [{ code: '2400', credit: tax.vatAmount }] : []),
-    ], mamcosId, actorId);
-    return invoice;
   }
-  /** The customer pays: cash in (less any tax they withheld), receivable cleared. */
-  async payInvoice(id: string, scope: LedgerScope, actorId?: string | null, cashAccountId?: string | null) {
+
+  /**
+   * A customer pays all or part of an invoice: cash in (less the tax they withhold, in proportion), receivable cleared.
+   * Several payments may settle one invoice; it is PAID when they add up to its amount. `amount` defaults to what is left.
+   */
+  async payInvoice(id: string, scope: LedgerScope, actorId?: string | null, cashAccountId?: string | null, amount?: number) {
     const existing = await this.prisma.invoice.findFirst({ where: { id, ...scope } });
     if (!existing) throw new NotFoundException('Invoice not found');
     if (existing.status === 'PAID') throw new ConflictException('This invoice is already paid');
     if (existing.status === 'VOID') throw new BadRequestException('A void invoice cannot be paid');
+    const left = round2(existing.amount - existing.amountPaid);
+    const pay = amount == null ? left : round2(amount);
+    if (!Number.isFinite(pay) || pay <= 0) throw new BadRequestException('Enter an amount greater than zero.');
+    if (pay > left + 0.005) throw new BadRequestException(`Only ${left.toLocaleString('en-US')} is still owed on this invoice.`);
     const wallet = await resolveCashAccount(this.prisma, existing.mamcosId, { cashAccountId });
-    const invoice = await this.prisma.invoice.update({ where: { id }, data: { status: 'PAID', paidAt: new Date(), cashAccountId: wallet } });
-    if (invoice.postedToLedger) {
-      await this.postToLedger('InvoicePayment', invoice.id, invoice.paidAt!, `Payment of invoice ${invoice.invoiceNumber}`, [
-        { code: '1000', debit: round2(invoice.amount - invoice.withholdingAmount), cashAccountId: wallet },
-        ...(invoice.withholdingAmount ? [{ code: '1410', debit: invoice.withholdingAmount }] : []),
-        { code: '1100', credit: invoice.amount },
-      ], invoice.mamcosId, actorId);
-    }
-    return invoice;
+    const settled = round2(existing.amountPaid + pay);
+    const full = existing.amount - settled < 0.005;
+    // the withheld tax is taken in step with the money settled; the last payment takes whatever is left of it
+    const whtSoFar = round2((existing.withholdingAmount * existing.amountPaid) / existing.amount);
+    const whtNow = full ? round2(existing.withholdingAmount - whtSoFar) : round2((existing.withholdingAmount * settled) / existing.amount - whtSoFar);
+    const cash = round2(pay - whtNow);
+    const paidAt = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.invoice.updateMany({
+        where: { id, amountPaid: existing.amountPaid, status: { in: ['OPEN', 'OVERDUE'] } },
+        data: { amountPaid: full ? existing.amount : settled, cashAccountId: wallet, ...(full ? { status: 'PAID', paidAt } : {}) },
+      });
+      if (claimed.count !== 1) throw new ConflictException('This invoice was just changed by someone else. Reload and try again.');
+      const seq = (await tx.documentPayment.count({ where: { kind: 'INVOICE', documentId: id } })) + 1;
+      await tx.documentPayment.create({ data: { kind: 'INVOICE', documentId: id, mamcosId: existing.mamcosId, amount: pay, withholding: whtNow, cash, cashAccountId: wallet, paidAt, createdById: actorId ?? null } });
+      if (existing.postedToLedger) {
+        await this.postToLedger('InvoicePayment', `${id}:${seq}`, paidAt, `Payment of invoice ${existing.invoiceNumber}${full && seq > 1 ? ' (final)' : ''}`, [
+          { code: '1000', debit: cash, cashAccountId: wallet },
+          ...(whtNow ? [{ code: '1410', debit: whtNow }] : []),
+          { code: '1100', credit: pay },
+        ], existing.mamcosId, actorId, tx);
+      }
+      return tx.invoice.findUniqueOrThrow({ where: { id } });
+    });
   }
   /** Cancels an unpaid invoice and its ledger postings (the postings are offset, not deleted). */
   async voidInvoice(id: string, scope: LedgerScope, actorId?: string | null) {
     const existing = await this.prisma.invoice.findFirst({ where: { id, ...scope } });
     if (!existing) throw new NotFoundException('Invoice not found');
-    if (existing.status === 'PAID') throw new BadRequestException('A paid invoice cannot be voided');
+    if (existing.status === 'PAID' || existing.amountPaid > 0) throw new BadRequestException('A paid or part-paid invoice cannot be voided');
     if (existing.status === 'VOID') return existing;
-    const invoice = await this.prisma.invoice.update({ where: { id }, data: { status: 'VOID' } });
-    if (invoice.postedToLedger) await this.postToLedger('Invoice', invoice.id, new Date(), `Void invoice ${invoice.invoiceNumber}`, [], invoice.mamcosId, actorId);
-    return invoice;
+    return this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.invoice.updateMany({ where: { id, amountPaid: 0, status: { in: ['OPEN', 'OVERDUE'] } }, data: { status: 'VOID' } });
+      if (claimed.count !== 1) throw new ConflictException('This invoice was just changed by someone else. Reload and try again.');
+      const invoice = await tx.invoice.findUniqueOrThrow({ where: { id } });
+      if (invoice.postedToLedger) await this.postToLedger('Invoice', invoice.id, new Date(), `Void invoice ${invoice.invoiceNumber}`, [], invoice.mamcosId, actorId, tx);
+      return invoice;
+    });
   }
 
   /** Records a supplier bill and books it: cost, input VAT (when recoverable) and what we owe the supplier. */
@@ -766,58 +795,97 @@ export class AccountingService {
     const tax = computeTax({ net: dto.amount, ...(await this.taxSettings(mamcosId)), vatApplies: dto.vatApplies, withholdingPercent: dto.withholdingPercent });
     const expense = await this.revenueOrExpenseAccount(dto.expenseAccountCode, [AccountType.EXPENSE, AccountType.ASSET], '5000');
     const billNumber = await this.documentNumber(dto.billNumber, mamcosId, 'BILL', 'BILL');
-    let bill;
     try {
-      bill = await this.prisma.bill.create({
-        data: {
-          billNumber, supplier: supplierName, supplierId: dto.supplierId, description: dto.description,
-          amount: tax.total, subtotal: tax.subtotal, vatAmount: tax.vatAmount, withholdingAmount: tax.withholdingAmount,
-          expenseAccountCode: expense, dueDate: new Date(dto.dueDate), mamcosId,
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        const bill = await tx.bill.create({
+          data: {
+            billNumber, supplier: supplierName, supplierId: dto.supplierId, description: dto.description,
+            amount: tax.total, subtotal: tax.subtotal, vatAmount: tax.vatAmount, withholdingAmount: tax.withholdingAmount,
+            expenseAccountCode: expense, dueDate: new Date(dto.dueDate), mamcosId,
+          },
+        });
+        await this.postToLedger('Bill', bill.id, bill.createdAt, `Supplier bill: ${bill.supplier}`, [
+          { code: expense, debit: tax.subtotal },
+          ...(tax.vatAmount ? [{ code: '1400', debit: tax.vatAmount }] : []),
+          { code: '2100', credit: tax.payable },
+          ...(tax.withholdingAmount ? [{ code: '2410', credit: tax.withholdingAmount }] : []),
+        ], mamcosId, actorId, tx);
+        return bill;
       });
     } catch (e: any) {
       if (e?.code === 'P2002') throw new ConflictException(`Bill number ${billNumber} is already used`);
       throw e;
     }
-    await this.postToLedger('Bill', bill.id, bill.createdAt, `Supplier bill: ${bill.supplier}`, [
-      { code: expense, debit: tax.subtotal },
-      ...(tax.vatAmount ? [{ code: '1400', debit: tax.vatAmount }] : []),
-      { code: '2100', credit: tax.payable },
-      ...(tax.withholdingAmount ? [{ code: '2410', credit: tax.withholdingAmount }] : []),
-    ], mamcosId, actorId);
-    return bill;
   }
-  async payBill(id: string, scope: LedgerScope, actorId?: string | null, cashAccountId?: string | null) {
+  /** Pays all or part of what is owed to the supplier (the bill less the tax we hold back). `amount` defaults to what is left. */
+  async payBill(id: string, scope: LedgerScope, actorId?: string | null, cashAccountId?: string | null, amount?: number) {
     const existing = await this.prisma.bill.findFirst({ where: { id, ...scope } });
     if (!existing) throw new NotFoundException('Bill not found');
     if (existing.status === 'PAID') throw new ConflictException('This bill is already paid');
     if (existing.status === 'VOID') throw new BadRequestException('A void bill cannot be paid');
+    const owed = round2(existing.amount - existing.withholdingAmount);
+    const left = round2(owed - existing.amountPaid);
+    const pay = amount == null ? left : round2(amount);
+    if (!Number.isFinite(pay) || pay <= 0) throw new BadRequestException('Enter an amount greater than zero.');
+    if (pay > left + 0.005) throw new BadRequestException(`Only ${left.toLocaleString('en-US')} is still owed on this bill.`);
     const wallet = await resolveCashAccount(this.prisma, existing.mamcosId, { cashAccountId });
-    const bill = await this.prisma.bill.update({
-      where: { id },
-      data: { status: 'PAID', paidAt: new Date(), cashAccountId: wallet },
+    const settled = round2(existing.amountPaid + pay);
+    const full = owed - settled < 0.005;
+    const paidAt = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.bill.updateMany({
+        where: { id, amountPaid: existing.amountPaid, status: { in: ['OPEN', 'OVERDUE'] } },
+        data: { amountPaid: full ? owed : settled, cashAccountId: wallet, ...(full ? { status: 'PAID', paidAt } : {}) },
+      });
+      if (claimed.count !== 1) throw new ConflictException('This bill was just changed by someone else. Reload and try again.');
+      const seq = (await tx.documentPayment.count({ where: { kind: 'BILL', documentId: id } })) + 1;
+      await tx.documentPayment.create({ data: { kind: 'BILL', documentId: id, mamcosId: existing.mamcosId, amount: pay, withholding: 0, cash: pay, cashAccountId: wallet, paidAt, createdById: actorId ?? null } });
+      await this.postToLedger('BillPayment', `${id}:${seq}`, paidAt, `Supplier bill payment: ${existing.billNumber}${full && seq > 1 ? ' (final)' : ''}`, [
+        { code: '2100', debit: pay },
+        { code: '1000', credit: pay, cashAccountId: wallet },
+      ], existing.mamcosId, actorId, tx);
+      return tx.bill.findUniqueOrThrow({ where: { id } });
     });
-    const payable = round2(bill.amount - bill.withholdingAmount);
-    await this.postToLedger('BillPayment', bill.id, bill.paidAt!, `Supplier bill payment: ${bill.billNumber}`, [
-      { code: '2100', debit: payable },
-      { code: '1000', credit: payable, cashAccountId: wallet },
-    ], bill.mamcosId, actorId);
-    return bill;
   }
   async voidBill(id: string, scope: LedgerScope, actorId?: string | null) {
     const existing = await this.prisma.bill.findFirst({ where: { id, ...scope } });
     if (!existing) throw new NotFoundException('Bill not found');
-    if (existing.status === 'PAID') throw new BadRequestException('A paid bill cannot be voided');
+    if (existing.status === 'PAID' || existing.amountPaid > 0) throw new BadRequestException('A paid or part-paid bill cannot be voided');
     if (existing.status === 'VOID') return existing;
-    const bill = await this.prisma.bill.update({ where: { id }, data: { status: 'VOID' } });
-    await this.postToLedger('Bill', bill.id, new Date(), `Void supplier bill: ${bill.supplier}`, [], bill.mamcosId, actorId);
-    return bill;
+    return this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.bill.updateMany({ where: { id, amountPaid: 0, status: { in: ['OPEN', 'OVERDUE'] } }, data: { status: 'VOID' } });
+      if (claimed.count !== 1) throw new ConflictException('This bill was just changed by someone else. Reload and try again.');
+      const bill = await tx.bill.findUniqueOrThrow({ where: { id } });
+      await this.postToLedger('Bill', bill.id, new Date(), `Void supplier bill: ${bill.supplier}`, [], bill.mamcosId, actorId, tx);
+      return bill;
+    });
   }
+
+  /** Every invoice or bill of the books, of any status (the unpaid ones are in receivables / payables), with the payments made against it. */
+  async documents(kind: 'INVOICE' | 'BILL', scope: LedgerScope, status?: string) {
+    const statuses = ['OPEN', 'OVERDUE', 'PAID', 'VOID'];
+    const where = { ...scope, ...(status && statuses.includes(status) ? { status: status as any } : {}) };
+    const rows: any[] = kind === 'INVOICE'
+      ? await this.prisma.invoice.findMany({ where, include: { buyer: true }, orderBy: [{ createdAt: 'desc' }], take: 500 })
+      : await this.prisma.bill.findMany({ where, include: { supplierRef: true }, orderBy: [{ createdAt: 'desc' }], take: 500 });
+    const pays = await this.prisma.documentPayment.findMany({ where: { kind, documentId: { in: rows.map((r) => r.id) } }, orderBy: { paidAt: 'asc' } });
+    return rows.map((r) => ({
+      ...r,
+      balance: this.balanceOf(kind, r),
+      payments: pays.filter((p) => p.documentId === r.id).map((p) => ({ id: p.id, paidAt: p.paidAt, amount: p.amount, withholding: p.withholding, cash: p.cash })),
+    }));
+  }
+  /** What is still outstanding on a document: the invoice less what was settled, or the cash still owed to the supplier. */
+  private balanceOf(kind: 'INVOICE' | 'BILL', r: { amount: number; amountPaid: number; withholdingAmount: number; status: string }) {
+    if (r.status === 'VOID' || r.status === 'PAID') return 0;
+    return kind === 'INVOICE' ? round2(r.amount - r.amountPaid) : round2(r.amount - r.withholdingAmount - r.amountPaid);
+  }
+
   async receivables(scope: LedgerScope) {
     // Due today is not overdue until today is over (Tanzania time).
     const now = new Date(`${localDate(new Date())}T00:00:00+03:00`);
     await this.prisma.invoice.updateMany({
-      where: { status: 'OPEN', dueDate: { lt: now } },
+      where: { ...scope, status: 'OPEN', dueDate: { lt: now } },
       data: { status: 'OVERDUE' },
     });
     const [invoices, orderInvoices] = await Promise.all([
@@ -841,6 +909,7 @@ export class AccountingService {
         buyer: { name: i.customerName },
         dueDate: i.dueDate,
         amount: Math.round((i.total - i.amountPaid) * 100) / 100,
+        balance: Math.round((i.total - i.amountPaid) * 100) / 100,
         total: i.total,
         amountPaid: i.amountPaid,
         vatAmount: null,
@@ -849,19 +918,21 @@ export class AccountingService {
       }))
       .filter((i) => i.amount > 0);
     const time = (d: Date | null) => (d ? d.getTime() : Number.MAX_SAFE_INTEGER);
-    return [...invoices.map((i) => ({ ...i, source: 'ACCOUNTING' as const })), ...fromOrders].sort((a, b) => time(a.dueDate) - time(b.dueDate));
+    const own = invoices.map((i) => ({ ...i, source: 'ACCOUNTING' as const, total: i.amount, balance: this.balanceOf('INVOICE', i) }));
+    return [...own, ...fromOrders].sort((a, b) => time(a.dueDate) - time(b.dueDate));
   }
   async payables(scope: LedgerScope) {
     const now = new Date(`${localDate(new Date())}T00:00:00+03:00`);
     await this.prisma.bill.updateMany({
-      where: { status: 'OPEN', dueDate: { lt: now } },
+      where: { ...scope, status: 'OPEN', dueDate: { lt: now } },
       data: { status: 'OVERDUE' },
     });
-    return this.prisma.bill.findMany({
+    const bills = await this.prisma.bill.findMany({
       where: { ...scope, status: { in: ['OPEN', 'OVERDUE'] } },
       include: { supplierRef: true },
       orderBy: { dueDate: 'asc' },
     });
+    return bills.map((b) => ({ ...b, balance: this.balanceOf('BILL', b) }));
   }
   async listAccounts() {
     return this.accounts();
@@ -903,32 +974,40 @@ export class AccountingService {
     if (!farmer) throw new NotFoundException('Farmer not found in your cooperative.');
     if (!farmer.mamcosId) throw new BadRequestException('Member contributions require a cooperative member.');
     const contributionDate = new Date(dto.contributionDate);
-    const contribution = await this.prisma.memberContribution.create({
-      data: {
-        mamcosId: farmer.mamcosId,
-        farmerId: farmer.id,
-        amount: dto.amount,
+    if (Number.isNaN(+contributionDate)) throw new BadRequestException('Choose a date.');
+    if (localDate(contributionDate) > localDate(new Date())) throw new BadRequestException('The date cannot be in the future.');
+    const wallet = await resolveCashAccount(this.prisma, farmer.mamcosId, { method: dto.paymentMethod });
+    // the contribution and its journal are saved together
+    return this.prisma.$transaction(async (tx) => {
+      const contribution = await tx.memberContribution.create({
+        data: {
+          mamcosId: farmer.mamcosId!,
+          farmerId: farmer.id,
+          amount: round2(dto.amount),
+          contributionDate,
+          paymentMethod: dto.paymentMethod,
+          reference: dto.reference,
+          description: dto.description,
+        },
+        include: {
+          farmer: { select: { firstName: true, lastName: true, controlNumber: true } },
+        },
+      });
+      await this.postToLedger(
+        'MemberContribution',
+        contribution.id,
         contributionDate,
-        paymentMethod: dto.paymentMethod,
-        reference: dto.reference,
-        description: dto.description,
-      },
-      include: {
-        farmer: { select: { firstName: true, lastName: true, controlNumber: true } },
-      },
+        contribution.description || 'Member contribution',
+        [
+          { code: '1000', debit: contribution.amount, cashAccountId: wallet },
+          { code: '3000', credit: contribution.amount },
+        ],
+        contribution.mamcosId,
+        user.id,
+        tx,
+      );
+      return contribution;
     });
-    await this.postToLedger(
-      'MemberContribution',
-      contribution.id,
-      contributionDate,
-      contribution.description || 'Member contribution',
-      [
-        { code: '1000', debit: contribution.amount },
-        { code: '3000', credit: contribution.amount },
-      ],
-      contribution.mamcosId,
-    );
-    return contribution;
   }
   async reserveAllocations(user: RequestUser) {
     const mamcosId = this.ownership.resolveTenantMamcosId(user);
@@ -953,27 +1032,33 @@ export class AccountingService {
     const cooperative = await this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { id: true } });
     if (!cooperative) throw new NotFoundException('Cooperative not found.');
     const allocationDate = new Date(dto.allocationDate);
-    const allocation = await this.prisma.reserveAllocation.create({
-      data: {
-        mamcosId,
-        amount: dto.amount,
+    if (Number.isNaN(+allocationDate)) throw new BadRequestException('Choose a date.');
+    if (localDate(allocationDate) > localDate(new Date())) throw new BadRequestException('The date cannot be in the future.');
+    return this.prisma.$transaction(async (tx) => {
+      const allocation = await tx.reserveAllocation.create({
+        data: {
+          mamcosId,
+          amount: round2(dto.amount),
+          allocationDate,
+          description: dto.description,
+        },
+        include: { mamcos: { select: { name: true } } },
+      });
+      await this.postToLedger(
+        'ReserveAllocation',
+        allocation.id,
         allocationDate,
-        description: dto.description,
-      },
-      include: { mamcos: { select: { name: true } } },
+        dto.description || `Reserve allocation · ${allocation.mamcos.name}`,
+        [
+          { code: '3200', debit: allocation.amount },
+          { code: '3100', credit: allocation.amount },
+        ],
+        allocation.mamcosId,
+        user.id,
+        tx,
+      );
+      return allocation;
     });
-    await this.postToLedger(
-      'ReserveAllocation',
-      allocation.id,
-      allocationDate,
-      dto.description || `Reserve allocation · ${allocation.mamcos.name}`,
-      [
-        { code: '3200', debit: allocation.amount },
-        { code: '3100', credit: allocation.amount },
-      ],
-      allocation.mamcosId,
-    );
-    return allocation;
   }
   async farmerLiabilities(user: RequestUser) {
     const mamcosId = this.ownership.resolveTenantMamcosId(user);
@@ -1045,17 +1130,20 @@ export class AccountingService {
       orderBy: { startDate: 'desc' },
     });
   }
-  findBudget(id: string, user: RequestUser) {
-    return this.prisma.budget.findFirstOrThrow({
+  async findBudget(id: string, user: RequestUser) {
+    const budget = await this.prisma.budget.findFirst({
       where: { id, ...this.budgetScope(user) },
       include: { lines: { include: { account: true } } },
     });
+    if (!budget) throw new NotFoundException('Budget not found');
+    return budget;
   }
   async approveBudget(id: string, user: RequestUser) {
-    const budget = await this.prisma.budget.findFirstOrThrow({
+    const budget = await this.prisma.budget.findFirst({
       where: { id, ...this.budgetScope(user) },
       select: { id: true, status: true },
     });
+    if (!budget) throw new NotFoundException('Budget not found');
     if (budget.status !== BudgetStatus.DRAFT) {
       throw new ConflictException('Only draft budgets can be approved.');
     }
@@ -1105,6 +1193,13 @@ export class AccountingService {
     }
     const cooperative = await this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { id: true } });
     if (!cooperative) throw new BadRequestException('Selected cooperative was not found.');
+    const start = new Date(dto.startDate), end = new Date(dto.endDate);
+    if (Number.isNaN(+start) || Number.isNaN(+end) || end < start) throw new BadRequestException('The budget must end on or after the day it starts.');
+    if (!dto.lines?.length) throw new BadRequestException('Add at least one account to the budget.');
+    if (new Set(dto.lines.map((l) => l.accountId)).size !== dto.lines.length) throw new BadRequestException('Each account can appear only once in a budget.');
+    if (dto.lines.some((l) => !(l.amount > 0))) throw new BadRequestException('Every budget line needs an amount greater than zero.');
+    const known = await this.prisma.account.count({ where: { id: { in: dto.lines.map((l) => l.accountId) } } });
+    if (known !== dto.lines.length) throw new BadRequestException('One of the budget accounts does not exist.');
     return this.prisma.budget.create({
       data: {
         mamcosId,
@@ -1118,27 +1213,32 @@ export class AccountingService {
       include: { lines: { include: { account: true } } },
     });
   }
+  /**
+   * Budget against what the books actually show for the budget's own cooperative and dates. Expenses and assets count on the
+   * debit side, income, liabilities and equity on the credit side; the variance is favourable (positive) when spending is under
+   * budget or income is over it.
+   */
   async budgetActual(id: string, user: RequestUser) {
-    const budget = await this.prisma.budget.findFirstOrThrow({
+    const budget = await this.prisma.budget.findFirst({
       where: { id, ...this.budgetScope(user) },
       include: { lines: { include: { account: true } } },
     });
+    if (!budget) throw new NotFoundException('Budget not found');
     const entries = await this.prisma.ledgerEntry.findMany({
-      where: { entryDate: { gte: budget.startDate, lte: budget.endDate } },
+      where: {
+        mamcosId: budget.mamcosId,
+        accountId: { in: budget.lines.map((l) => l.accountId) },
+        entryDate: { gte: dayStart(budget.startDate.toISOString().slice(0, 10)), lte: dayEnd(budget.endDate.toISOString().slice(0, 10)) },
+      },
+      select: { accountId: true, debit: true, credit: true },
     });
     return {
       ...budget,
-      lines: budget.lines.map((line) => ({
-        ...line,
-        actual: entries
-          .filter((e) => e.accountId === line.accountId)
-          .reduce((sum, e) => sum + e.debit - e.credit, 0),
-        variance:
-          line.amount -
-          entries
-            .filter((e) => e.accountId === line.accountId)
-            .reduce((sum, e) => sum + e.debit - e.credit, 0),
-      })),
+      lines: budget.lines.map((line) => {
+        const debitSide = line.account.type === AccountType.EXPENSE || line.account.type === AccountType.ASSET;
+        const actual = round2(entries.filter((e) => e.accountId === line.accountId).reduce((sum, e) => sum + (debitSide ? e.debit - e.credit : e.credit - e.debit), 0));
+        return { ...line, actual, variance: round2(debitSide ? line.amount - actual : actual - line.amount) };
+      }),
     };
   }
 

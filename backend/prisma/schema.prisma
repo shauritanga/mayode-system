@@ -1767,6 +1767,8 @@ model Invoice {
   mamcosId          String?       @map("mamcos_id")
   status            InvoiceStatus @default(OPEN)
   paidAt            DateTime?     @map("paid_at")
+  /// How much of `amount` has been settled so far (VAT and withheld tax included); PAID when it reaches `amount`.
+  amountPaid        Float         @default(0) @map("amount_paid")
   lastReminderAt    DateTime?     @map("last_reminder_at")
   reminderCount     Int           @default(0) @map("reminder_count")
   createdAt         DateTime      @default(now()) @map("created_at")
@@ -1801,6 +1803,8 @@ model Bill {
   mamcosId           String?       @map("mamcos_id")
   status             InvoiceStatus @default(OPEN)
   paidAt             DateTime?     @map("paid_at")
+  /// Cash paid to the supplier so far; the bill is PAID when it reaches amount minus the tax withheld.
+  amountPaid         Float         @default(0) @map("amount_paid")
   description        String?
   createdAt          DateTime      @default(now()) @map("created_at")
 
@@ -6997,6 +7001,9 @@ model HarvestCollection {
   blockId           String                  @map("block_id")
   farmerId          String?                 @map("farmer_id")
   combineId         String                  @map("combine_id")
+  /// The rice type harvested, and its name as it was when the payment was recorded.
+  riceVarietyId     String?                 @map("rice_variety_id")
+  riceVarietyName   String?                 @map("rice_variety_name")
   harvestedOn       DateTime                @map("harvested_on") @db.Date
   quantityKg        Decimal?                @map("quantity_kg") @db.Decimal(12, 2)
   bagsCounted       Int                     @default(0) @map("bags_counted")
@@ -7051,4 +7058,26 @@ model AccountingReportArchive {
 
   @@index([mamcosId, generatedAt])
   @@map("accounting_report_archive")
+}
+
+/// One payment against a customer invoice or a supplier bill (a document can be settled in parts).
+model DocumentPayment {
+  id            String   @id @default(uuid())
+  /// INVOICE | BILL
+  kind          String
+  documentId    String   @map("document_id")
+  mamcosId      String?  @map("mamcos_id")
+  /// What this payment settles: of the invoice amount (tax withheld included), or of the cash owed on a bill.
+  amount        Float
+  /// Tax withheld by the customer with this payment (invoices only).
+  withholding   Float    @default(0)
+  /// Money that actually moved.
+  cash          Float
+  cashAccountId String?  @map("cash_account_id")
+  paidAt        DateTime @default(now()) @map("paid_at")
+  createdById   String?  @map("created_by_id")
+
+  @@index([kind, documentId])
+  @@index([mamcosId, paidAt])
+  @@map("document_payments")
 }

@@ -149,6 +149,16 @@ export class AccountingController {
   ) {
     return this.accounting.ratios(this.accounting.scopeFor(user, mamcosId), from, to);
   }
+  @Get('invoices')
+  @RequirePermission('accounting', 'VIEW')
+  invoiceList(@CurrentUser() user: RequestUser, @Query('status') status?: string, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.documents('INVOICE', this.accounting.scopeFor(user, mamcosId), status);
+  }
+  @Get('bills')
+  @RequirePermission('accounting', 'VIEW')
+  billList(@CurrentUser() user: RequestUser, @Query('status') status?: string, @Query('mamcosId') mamcosId?: string) {
+    return this.accounting.documents('BILL', this.accounting.scopeFor(user, mamcosId), status);
+  }
   @Post('invoices')
   @RequirePermission('accounting', 'CREATE')
   invoice(@Body() dto: CreateInvoiceDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
@@ -157,7 +167,7 @@ export class AccountingController {
   @Post('invoices/:id/pay')
   @RequirePermission('accounting', 'EDIT')
   payInvoice(@Param('id') id: string, @Body() dto: PayDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
-    return this.accounting.payInvoice(id, this.accounting.scopeFor(user, mamcosId), user.id, dto?.cashAccountId);
+    return this.accounting.payInvoice(id, this.accounting.scopeFor(user, mamcosId), user.id, dto?.cashAccountId, dto?.amount);
   }
   @Post('invoices/:id/void')
   @RequirePermission('accounting', 'EDIT')
@@ -172,7 +182,7 @@ export class AccountingController {
   @Post('bills/:id/pay')
   @RequirePermission('accounting', 'EDIT')
   payBill(@Param('id') id: string, @Body() dto: PayDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
-    return this.accounting.payBill(id, this.accounting.scopeFor(user, mamcosId), user.id, dto?.cashAccountId);
+    return this.accounting.payBill(id, this.accounting.scopeFor(user, mamcosId), user.id, dto?.cashAccountId, dto?.amount);
   }
   @Post('bills/:id/void')
   @RequirePermission('accounting', 'EDIT')

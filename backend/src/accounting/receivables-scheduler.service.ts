@@ -73,8 +73,8 @@ export class ReceivablesSchedulerService {
       if (!phone) continue;
       const overdue = invoice.dueDate < now;
       const message = overdue
-        ? `MAYODE: Invoice ${invoice.invoiceNumber} for TZS ${invoice.amount.toLocaleString()} is overdue (was due ${invoice.dueDate.toLocaleDateString()}). Please settle at your earliest convenience.`
-        : `MAYODE: Invoice ${invoice.invoiceNumber} for TZS ${invoice.amount.toLocaleString()} is due ${invoice.dueDate.toLocaleDateString()}. Thank you.`;
+        ? `MAYODE: Invoice ${invoice.invoiceNumber} for TZS ${Math.round(invoice.amount - invoice.amountPaid).toLocaleString()} is overdue (was due ${invoice.dueDate.toLocaleDateString()}). Please settle at your earliest convenience.`
+        : `MAYODE: Invoice ${invoice.invoiceNumber} for TZS ${Math.round(invoice.amount - invoice.amountPaid).toLocaleString()} is due ${invoice.dueDate.toLocaleDateString()}. Thank you.`;
       await this.sms.send(phone, message, 'invoice_reminder');
       await this.prisma.invoice.update({
         where: { id: invoice.id },
@@ -99,7 +99,7 @@ export class ReceivablesSchedulerService {
     });
     if (due.length === 0) return 0;
 
-    const totalDue = due.reduce((sum, bill) => sum + bill.amount, 0);
+    const totalDue = due.reduce((sum, bill) => sum + (bill.amount - bill.withholdingAmount - bill.amountPaid), 0);
     await this.notifications.createForRoles([UserRole.SUPER_ADMIN, UserRole.ADMIN], {
       title: 'Bills due soon',
       body: `${due.length} bill(s) totalling TZS ${totalDue.toLocaleString()} are due within ${REMINDER_WINDOW_DAYS} days or overdue.`,

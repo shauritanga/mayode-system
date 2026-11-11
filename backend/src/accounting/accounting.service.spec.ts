@@ -214,6 +214,7 @@ describe('AccountingService', () => {
     const prisma = {
       farmer: { findFirst: jest.fn().mockResolvedValue({ id: 'farmer-1', mamcosId: 'coop-1' }) },
       memberContribution: { create: jest.fn().mockResolvedValue(contribution) },
+      $transaction: jest.fn(async (fn: any) => fn(prisma)),
     } as any;
     const ownership = { resolveTenantMamcosId: jest.fn().mockReturnValue('coop-1') } as any;
     const service = new AccountingService(prisma, ownership);
@@ -221,14 +222,15 @@ describe('AccountingService', () => {
     await service.createMemberContribution({ farmerId: 'farmer-1', amount: 250, contributionDate: '2026-02-03', description: 'Member share' }, { id: 'user-1', role: 'MAMCOS_SECRETARY', mamcosId: 'coop-1' } as any);
     expect(prisma.farmer.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'farmer-1', mamcosId: 'coop-1' } }));
     expect(post).toHaveBeenCalledWith('MemberContribution', 'contribution-1', expect.any(Date), 'Member share', [
-      { code: '1000', debit: 250 }, { code: '3000', credit: 250 },
-    ], 'coop-1');
+      { code: '1000', debit: 250, cashAccountId: null }, { code: '3000', credit: 250 },
+    ], 'coop-1', 'user-1', prisma);
   });
   it('records cooperative reserve appropriations as an equity-to-equity journal', async () => {
     const allocation = { id: 'reserve-1', mamcosId: 'coop-1', amount: 500, allocationDate: new Date('2026-03-01'), mamcos: { name: 'Coop One' } };
     const prisma = {
       mamcos: { findUnique: jest.fn().mockResolvedValue({ id: 'coop-1' }) },
       reserveAllocation: { create: jest.fn().mockResolvedValue(allocation) },
+      $transaction: jest.fn(async (fn: any) => fn(prisma)),
     } as any;
     const ownership = { resolveTenantMamcosId: jest.fn().mockReturnValue('coop-1') } as any;
     const service = new AccountingService(prisma, ownership);
@@ -237,19 +239,19 @@ describe('AccountingService', () => {
     expect(prisma.reserveAllocation.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ mamcosId: 'coop-1', amount: 500 }) }));
     expect(post).toHaveBeenCalledWith('ReserveAllocation', 'reserve-1', expect.any(Date), 'General reserve', [
       { code: '3200', debit: 500 }, { code: '3100', credit: 500 },
-    ], 'coop-1');
+    ], 'coop-1', 'user-1', prisma);
   });
   it('requires draft budgets to be approved and scopes the approval to the cooperative', async () => {
     const prisma = {
       budget: {
-        findFirstOrThrow: jest.fn().mockResolvedValue({ id: 'budget-1', status: 'DRAFT' }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'budget-1', status: 'DRAFT' }),
         update: jest.fn().mockResolvedValue({ id: 'budget-1', status: 'APPROVED' }),
       },
     } as any;
     const ownership = { resolveTenantMamcosId: jest.fn().mockReturnValue('coop-1') } as any;
     const service = new AccountingService(prisma, ownership);
     await service.approveBudget('budget-1', { id: 'approver-1', role: 'MAMCOS_SECRETARY', mamcosId: 'coop-1' } as any);
-    expect(prisma.budget.findFirstOrThrow).toHaveBeenCalledWith({ where: { id: 'budget-1', mamcosId: 'coop-1' }, select: { id: true, status: true } });
+    expect(prisma.budget.findFirst).toHaveBeenCalledWith({ where: { id: 'budget-1', mamcosId: 'coop-1' }, select: { id: true, status: true } });
     expect(prisma.budget.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'budget-1' },
       data: expect.objectContaining({ status: 'APPROVED', approvedByUserId: 'approver-1' }),
