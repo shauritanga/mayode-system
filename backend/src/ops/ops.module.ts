@@ -3,6 +3,7 @@ import { PaymentsModule } from '../payments/payments.module';
 import { SettingsModule } from '../settings/settings.module';
 import { AccountingModule } from '../accounting/accounting.module';
 import { ChargesModule } from '../charges/charges.module';
+import { InputStockModule } from '../input-stock/input-stock.module';
 import { OpsNotifyService } from './ops-common';
 import { CatalogService } from './catalog.service';
 import { StockService } from './stock.service';
@@ -25,7 +26,7 @@ import {
 } from './ops.controllers';
 
 @Module({
-  imports: [forwardRef(() => PaymentsModule), SettingsModule, AccountingModule, ChargesModule],
+  imports: [forwardRef(() => PaymentsModule), SettingsModule, AccountingModule, ChargesModule, InputStockModule],
   controllers: [OpsCatalogController, OpsWarehouseController, OpsSalesController, OpsBillingController, OpsPublicController, OpsDispatchController, OpsFarmController, OpsReportsController, OpsSetupController],
   providers: [
     OpsNotifyService, CatalogService, StockService, StockAccountingService, ReceivingService, ProcessingService, TraceabilityService, SalesOpsService, BillingService, DispatchService, DocumentsService,

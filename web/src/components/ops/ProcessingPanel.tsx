@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Modal from '@/components/Modal';
-import { opsApi } from '@/lib/api';
+import { inputStockApi, opsApi } from '@/lib/api';
 import { dateTime, kg, label } from '@/lib/ops';
 import { DataTable, ErrorNote, Facts, Field, FormGrid, Loading, Status, Toolbar, useAction, useLoad } from './ui';
 
@@ -77,6 +77,10 @@ function NewRunModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   const [machine, setMachine] = useState('');
   const [operator, setOperator] = useState('');
   const [lossNote, setLossNote] = useState('');
+  const [bagsItemId, setBagsItemId] = useState('');
+  const [bagsUsed, setBagsUsed] = useState('');
+  const { data: stockLists } = useLoad<any>(() => inputStockApi.overview({ stockClass: 'PACKAGING' }));
+  const bagItems: any[] = (() => { const m = new Map<string, any>(); for (const r of stockLists?.data ?? []) if (r.isActive) m.set(r.itemId, { ...r, balance: (m.get(r.itemId)?.balance ?? 0) + r.balance }); return [...m.values()]; })();
   const { busy, error, run } = useAction();
 
   const wantCategory = kind === 'MILLING' ? 'PADDY' : 'PROCESSED';
@@ -90,6 +94,7 @@ function NewRunModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   const submit = async () => {
     const body = {
       kind, warehouseId, machine: machine || undefined, operatorName: operator || undefined, lossNote: lossNote || undefined,
+      ...(kind === 'PACKAGING' && bagsItemId && Number(bagsUsed) > 0 ? { bagsItemId, bagsUsed: Number(bagsUsed) } : {}),
       inputs: inputs.map((i) => ({ batchId: i.batchId, quantityKg: Number(i.quantityKg) })),
       outputs: outputs.map((o) => ({ kind: o.kind, productId: o.productId || undefined, quantityKg: Number(o.quantityKg) })),
     };
@@ -133,6 +138,17 @@ function NewRunModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
       <div className={`alert-box ${lossKg < 0 ? 'alert-danger' : ''}`} style={{ marginTop: 12, fontSize: 13 }}>
         In {kg(inKg)} · Out {kg(outKg)} · {lossKg < 0 ? 'More came out than went in. Recheck the weights.' : `Loss ${kg(lossKg)}${inKg ? ` (${Math.round((lossKg / inKg) * 10000) / 100}%)` : ''}`}
       </div>
+      {kind === 'PACKAGING' && (
+        <div style={{ marginTop: 12 }}>
+          <h4 style={{ margin: '0 0 6px', fontSize: 13 }}>Bags used</h4>
+          {bagItems.length === 0 ? <div className="muted" style={{ fontSize: 13 }}>No packaging bags are set up. Add them in Settings → Farm inputs (type “Packaging bags”) and receive some into the warehouse; then they are taken off automatically here.</div> : (
+            <FormGrid>
+              <Field label="Bags"><select className="input-field" value={bagsItemId} onChange={(e) => setBagsItemId(e.target.value)}><option value="">Not recorded</option>{bagItems.map((b) => <option key={b.itemId} value={b.itemId}>{b.name} · {b.balance} {b.unit} in stock</option>)}</select></Field>
+              <Field label="How many bags used"><input className="input-field" type="number" min={0} step="any" value={bagsUsed} onChange={(e) => setBagsUsed(e.target.value)} /></Field>
+            </FormGrid>
+          )}
+        </div>
+      )}
       <div style={{ marginTop: 10 }}><Field label="Explain any loss" wide><input className="input-field" value={lossNote} onChange={(e) => setLossNote(e.target.value)} /></Field></div>
     </Modal>
   );

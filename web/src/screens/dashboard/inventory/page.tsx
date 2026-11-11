@@ -771,7 +771,7 @@ export default function InventoryPage() {
               { label: 'Available in stock', value: kgs(summary.inStockKg), hint: 'Received, stored or batched', color: 'var(--gold-400)' },
               { label: 'Shipped, awaiting sale', value: kgs(summary.shippedKg), hint: 'Left the warehouse', color: 'var(--neutral-400)' },
               { label: 'Rice sold', value: kgs(summary.soldKg), hint: 'Sales completed', color: 'var(--purple-500)' },
-              { label: 'Warehouse balance', value: kgs(summary.currentBalanceKg), hint: 'Physically held now', color: 'var(--accent)' },
+              { label: 'Delivered and not yet sold', value: kgs(summary.currentBalanceKg), hint: 'Counted from farmer delivery records. The live warehouse stock is on Warehouse → Stock.', color: 'var(--accent)' },
               { label: 'Purchase value', value: tzs(summary.purchaseValue), hint: summary.unpricedKg ? `${kgs(summary.unpricedKg)} not priced yet` : 'All deliveries priced', color: 'var(--green-500)' },
               { label: 'Paid to farmers', value: tzs(summary.paidToFarmers), hint: `${tzs(summary.owedToFarmers)} still owed`, color: 'var(--green-500)' },
             ].map((s) => (
@@ -792,7 +792,7 @@ export default function InventoryPage() {
             <ChartCard title="Rice by collection centre" subtitle="Where farmers brought it.">
               <HorizontalBarChart data={summary.byCentre.map((row) => ({ name: row.name, value: row.weightKg }))} color="var(--green-500)" />
             </ChartCard>
-            <ChartCard title="Warehouse balance by status" subtitle="Received, in storage, batched, shipped, sold.">
+            <ChartCard title="Delivered stock by status (records)" subtitle="Received, in storage, batched, shipped, sold.">
               <HorizontalBarChart data={summary.byStatus.map((row) => ({ name: row.name.replace('_', ' '), value: row.weightKg }))} color="var(--gold-400)" />
             </ChartCard>
             <ChartCard title="Farmer payment status" subtitle="Weight by whether the farmer has been paid.">

@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the rest of the settings screens */
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import Modal from '@/components/Modal';
 import MoneyInput from '@/components/MoneyInput';
@@ -87,7 +88,7 @@ export function RiceTypesPanel({ canEdit, onChanged }: { canEdit: boolean; onCha
 // ───────────────────────── farm inputs ─────────────────────────
 function InputModal({ item, types, onClose, onSaved }: { item?: any; types: any[]; onClose: () => void; onSaved: (m: string) => void }) {
   const editing = !!item;
-  const [f, setF] = useState({ name: item?.name ?? '', inputTypeId: item?.inputTypeId ?? '', unit: item?.unit ?? 'kg', unitCost: item?.unitCost != null ? String(item.unitCost) : '', reorderLevel: item?.reorderLevel != null ? String(item.reorderLevel) : '' });
+  const [f, setF] = useState({ name: item?.name ?? '', inputTypeId: item?.inputTypeId ?? '', unit: item?.unit ?? 'kg', unitCost: item?.unitCost != null ? String(item.unitCost) : '', reorderLevel: item?.reorderLevel != null ? String(item.reorderLevel) : '', packagingKg: item?.packagingKg != null ? String(item.packagingKg) : '' });
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [tried, setTried] = useState(false);
   const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }));
   const problems: Record<string, string> = {};
@@ -98,7 +99,7 @@ function InputModal({ item, types, onClose, onSaved }: { item?: any; types: any[
     setTried(true);
     if (Object.keys(problems).length) return;
     setBusy(true); setError('');
-    const body = { name: f.name.trim(), inputTypeId: f.inputTypeId, unit: f.unit.trim() || 'kg', unitCost: f.unitCost === '' ? null : Number(f.unitCost), reorderLevel: f.reorderLevel === '' ? null : Number(f.reorderLevel) };
+    const body = { name: f.name.trim(), inputTypeId: f.inputTypeId, unit: f.unit.trim() || 'kg', unitCost: f.unitCost === '' ? null : Number(f.unitCost), reorderLevel: f.reorderLevel === '' ? null : Number(f.reorderLevel), packagingKg: f.packagingKg === '' ? null : Number(f.packagingKg) };
     try { if (editing) await inputSetupApi.updateItem(item.id, body); else await inputSetupApi.createItem(body); onSaved(editing ? `${f.name.trim()} updated.` : `${f.name.trim()} added. Add stock to start giving it to farmers.`); }
     catch (e) { setError(errMsg(e, 'Could not save the input.')); setBusy(false); }
   };
@@ -112,28 +113,9 @@ function InputModal({ item, types, onClose, onSaved }: { item?: any; types: any[
           <Field label="Type of input *" error={show('inputTypeId')}><select className="input-field" value={f.inputTypeId} onChange={(e) => set('inputTypeId', e.target.value)}><option value="">Choose…</option>{types.filter((t) => t.isActive || t.id === item?.inputTypeId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></Field>
           <Field label="Unit" hint="How it is counted: kg, litre, bag…"><input className="input-field" value={f.unit} onChange={(e) => set('unit', e.target.value)} /></Field>
           <Field label="Price per unit (TZS)" hint="What a farmer is charged; can be changed when giving"><MoneyInput className="input-field" min="0" value={f.unitCost} onChange={(e) => set('unitCost', e.target.value)} /></Field>
+          {/bag|packag/i.test(types.find((t) => t.id === f.inputTypeId)?.name ?? '') && <Field label="Kilograms of rice per bag" hint="Optional, for packaging"><input type="number" min={0} step="any" className="input-field" value={f.packagingKg} onChange={(e) => set('packagingKg', e.target.value)} /></Field>}
           <Field label="Warn when stock is at or below" hint="Optional"><input type="number" min={0} step="any" className="input-field" value={f.reorderLevel} onChange={(e) => set('reorderLevel', e.target.value)} /></Field>
         </div>
-      </form>
-    </Modal>
-  );
-}
-
-function StockModal({ item, onClose, onSaved }: { item: any; onClose: () => void; onSaved: (m: string) => void }) {
-  const [qty, setQty] = useState(''); const [note, setNote] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
-  const save = async () => {
-    setBusy(true); setError('');
-    try { await inputSetupApi.addStock(item.id, { quantity: Number(qty), note: note.trim() || undefined }); onSaved(`${qty} ${item.unit} of ${item.name} added to stock.`); }
-    catch (e) { setError(errMsg(e, 'Could not add the stock.')); setBusy(false); }
-  };
-  return (
-    <Modal title={`Add stock · ${item.name}`} subtitle={`In stock now: ${item.balance} ${item.unit}`} width="460px" onClose={() => !busy && onClose()}
-      footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button><button type="submit" form="stock-form" className="btn-primary" disabled={busy || !(Number(qty) > 0)}>{busy ? 'Saving…' : 'Add stock'}</button></>}>
-      <form id="stock-form" noValidate onSubmit={(e) => { e.preventDefault(); if (Number(qty) > 0) void save(); }} style={{ display: 'grid', gap: 12 }}>
-        {error && <div role="alert" className="alert-box alert-danger">{error}</div>}
-        <Field label={`Quantity received (${item.unit}) *`}><input type="number" min={0} step="any" autoFocus className="input-field" value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
-        <Field label="Note" hint="Optional: supplier, delivery note…"><input className="input-field" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-        {Number(qty) > 0 && <div className="muted" style={{ fontSize: 13 }}>After this: <strong>{Math.round((item.balance + Number(qty)) * 1000) / 1000} {item.unit}</strong> in stock</div>}
       </form>
     </Modal>
   );
@@ -144,7 +126,6 @@ export function FarmInputsPanel({ canEdit, onChanged }: { canEdit: boolean; onCh
   const items = useApi<any>(() => inputSetupApi.items(), []);
   const asked = useSearchParams()?.get('add') === '1'; // the Give Inputs dialog links here to add the first input
   const [modal, setModal] = useState<null | { item?: any }>(null);
-  const [stock, setStock] = useState<any>(null);
   const [dismissed, setDismissed] = useState(false);
   const shown = modal ?? (asked && canEdit && !dismissed && types.data ? {} : null);
   const typeRows: NameRow[] = (types.data?.data ?? []).map((t: any) => ({ id: t.id, name: t.name, isActive: t.isActive, count: t.inputs }));
@@ -155,13 +136,13 @@ export function FarmInputsPanel({ canEdit, onChanged }: { canEdit: boolean; onCh
       <LoadError message={types.error || items.error} onRetry={() => { types.reload(); items.reload(); }} />
       <section className="table-panel">
         <div className="section-toolbar" style={{ gap: 12, flexWrap: 'wrap' }}>
-          <div><strong>Inputs you give farmers</strong><div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>The actual items, such as Urea or a seed variety, with price and stock. These are what you choose in “Give Inputs” on the Input Distribution page.</div></div>
+          <div><strong>Inputs you give farmers</strong><div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>The actual items, such as Urea or a seed variety, with price. Stock is received and counted in the Warehouse. These are what you choose in “Give Inputs” on the Input Distribution page.</div></div>
           {canEdit && <button type="button" className="btn-primary" style={{ marginLeft: 'auto' }} onClick={() => setModal({})}>Add an input</button>}
         </div>
         {items.loading && !items.data ? <div style={{ padding: 24, textAlign: 'center' }}>Loading…</div> : list.length === 0 ? (
           <div style={{ padding: '32px 20px', textAlign: 'center' }}>
             <strong>No inputs yet</strong>
-            <p className="muted" style={{ margin: '8px 0 14px' }}>The types below (Seed, Fertiliser…) are only groups. Add the actual items you give farmers, such as Urea under Fertiliser, then add stock. Until then nothing can be chosen on the Input Distribution page.</p>
+            <p className="muted" style={{ margin: '8px 0 14px' }}>The types below (Seed, Fertiliser…) are only groups. Add the actual items you give farmers, such as Urea under Fertiliser, then receive them into a warehouse (Warehouse → Receive). Until then nothing can be chosen on the Input Distribution page.</p>
             {canEdit && <button type="button" className="btn-primary" onClick={() => setModal({})}>Add the first input</button>}
           </div>
         ) : (
@@ -174,7 +155,7 @@ export function FarmInputsPanel({ canEdit, onChanged }: { canEdit: boolean; onCh
                 <td className="num" style={{ color: i.low ? 'var(--gold-400)' : undefined }}>{i.balance} {i.unit}{i.low && <div style={{ fontSize: 11 }}>Running low</div>}</td>
                 <td>{i.isActive ? <span className="badge badge-green">In use</span> : <span className="badge badge-gray">Switched off</span>}</td>
                 <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{canEdit && <>
-                  <button type="button" className="btn-secondary" onClick={() => setStock(i)}>Add stock</button>{' '}
+                  <Link href="/dashboard/ops-warehouse/receive" className="btn-secondary">Receive stock</Link>{' '}
                   <button type="button" className="btn-secondary" onClick={() => setModal({ item: i })}>Edit</button>{' '}
                   <button type="button" className="btn-secondary" onClick={async () => { try { await inputSetupApi.updateItem(i.id, { isActive: !i.isActive }); after(i.isActive ? `${i.name} switched off.` : `${i.name} switched on.`); } catch (e) { onChanged(errMsg(e, 'Could not change it.')); } }}>{i.isActive ? 'Switch off' : 'Switch on'}</button></>}</td>
               </tr>
@@ -190,7 +171,6 @@ export function FarmInputsPanel({ canEdit, onChanged }: { canEdit: boolean; onCh
         onToggle={async (r) => { await inputSetupApi.updateType(r.id, { isActive: !r.isActive }); after(r.isActive ? `${r.name} switched off.` : `${r.name} switched on.`); }} />
 
       {shown && <InputModal item={shown.item} types={types.data?.data ?? []} onClose={() => { setModal(null); setDismissed(true); }} onSaved={(m) => { setModal(null); setDismissed(true); after(m); }} />}
-      {stock && <StockModal item={stock} onClose={() => setStock(null)} onSaved={(m) => { setStock(null); after(m); }} />}
     </>
   );
 }

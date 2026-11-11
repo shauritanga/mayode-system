@@ -65,7 +65,7 @@ describeDb('AMCOS charges (PostgreSQL)', () => {
     charges = new ChargesService(prisma as any, ownership);
     const books = new StockAccountingService(prisma as any, accounting);
     receiving = new ReceivingService(prisma as any, notify, books);
-    processing = new ProcessingService(prisma as any, notify, books, charges);
+    processing = new ProcessingService(prisma as any, notify, books, charges, {} as any);
     sales = new SalesOpsService(prisma as any, new CatalogService(prisma as any), notify, charges);
     billing = new BillingService(prisma as any, {} as any, {} as any, notify, accounting);
     await accounting.listAccounts();

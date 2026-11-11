@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import Modal from '@/components/Modal';
-import { purchaseOrdersApi, suppliersApi } from '@/lib/api';
+import { inputStockApi, purchaseOrdersApi, suppliersApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { ConfirmDialog, Empty, Field, LoadError, Notice, PageHeader, TableSkeleton, errMsg, fmtDate, todayISO, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 
@@ -57,19 +57,23 @@ function NewOrder({ onClose, onDone }: { onClose: () => void; onDone: (m: string
 }
 
 function Receive({ po, onClose, onDone }: { po: any; onClose: () => void; onDone: (m: string) => void }) {
+  const wh = useApi<any>(() => inputStockApi.overview(), []);
+  const [warehouseId, setWarehouseId] = useState('');
+  const warehouses: any[] = wh.data?.warehouses ?? [];
   const [qty, setQty] = useState<Record<string, string>>({}); const [note, setNote] = useState(''); const [dn, setDn] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const save = async () => {
     const lines = po.lines.filter((l: any) => Number(qty[l.id]) > 0).map((l: any) => ({ lineId: l.id, quantity: Number(qty[l.id]) }));
     if (!lines.length) { setError('Enter how much arrived on at least one line.'); return; }
     setBusy(true); setError('');
-    try { const r: any = await purchaseOrdersApi.receive(po.id, { lines, note: note.trim() || undefined, deliveryNote: dn.trim() || undefined }); onDone(`Delivery recorded as ${r.data.receipts[r.data.receipts.length - 1].number}.`); }
+    try { const r: any = await purchaseOrdersApi.receive(po.id, { warehouseId: warehouseId || undefined, lines, note: note.trim() || undefined, deliveryNote: dn.trim() || undefined }); onDone(`Delivery recorded as ${r.data.receipts[r.data.receipts.length - 1].number}.`); }
     catch (e) { setError(errMsg(e, 'Could not record the delivery.')); setBusy(false); }
   };
   return (
-    <Modal title={`Receive goods · ${po.number}`} subtitle="Enter what actually arrived. Farm inputs go into stock." onClose={() => !busy && onClose()} width="640px"
+    <Modal title={`Receive goods · ${po.number}`} subtitle="Enter what actually arrived. Farm inputs go into the warehouse you choose." onClose={() => !busy && onClose()} width="640px"
       footer={<><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button type="button" className="btn-primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Record delivery'}</button></>}>
       <div style={{ display: 'grid', gap: 12 }}>
         {error && <Notice tone="error">{error}</Notice>}
+        {warehouses.length > 0 && <Field label="Put the goods into warehouse" hint="Farm inputs on this order are added to this warehouse's stock"><select className="input-field" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}><option value="">{warehouses.find((w) => w.isDefault)?.name ?? 'Main store'} (main)</option>{warehouses.filter((w) => !w.isDefault).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>}
         <table className="data-table"><thead><tr><th>Item</th><th className="num">Ordered</th><th className="num">Already in</th><th className="num">Arrived now</th></tr></thead><tbody>
           {po.lines.map((l: any) => <tr key={l.id}><td>{l.itemName}</td><td className="num">{l.quantity} {l.unit}</td><td className="num">{l.received}</td>
             <td className="num"><input type="number" min={0} max={l.outstanding} step="any" className="input-field" style={{ width: 100 }} disabled={l.outstanding <= 0} value={qty[l.id] ?? ''} onChange={(e) => setQty((p) => ({ ...p, [l.id]: e.target.value }))} /></td></tr>)}

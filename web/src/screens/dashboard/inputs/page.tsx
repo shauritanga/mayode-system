@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Modal from '@/components/Modal';
-import { inputDistributionApi } from '@/lib/api';
+import { inputDistributionApi, inputStockApi } from '@/lib/api';
 import { farmId } from '@/lib/farm-id';
 import { useAuthStore } from '@/store/auth.store';
 import { FarmerPicker } from '@/screens/dashboard/dues/page';
@@ -21,6 +21,9 @@ const pill = (tone: 'good' | 'warn' | 'bad'): React.CSSProperties => ({ backgrou
 function IssueModal({ items, onClose, onDone, canSetup }: { items: any[]; onClose: () => void; onDone: (m: string) => void; canSetup: boolean }) {
   const [farmer, setFarmer] = useState<any>(null); const [itemId, setItemId] = useState(''); const [qty, setQty] = useState(''); const [price, setPrice] = useState('');
   const [dueDate, setDueDate] = useState(''); const [note, setNote] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const [fromWh, setFromWh] = useState('');
+  const whs = useApi<any>(() => inputStockApi.overview({ stockClass: 'INPUT' }), []);
+  const warehouses: any[] = whs.data?.warehouses ?? [];
   const item = items.find((i) => i.id === itemId);
   const unitPrice = Number(price) || item?.unitCost || 0;
   const amount = (Number(qty) || 0) * unitPrice;
@@ -31,13 +34,13 @@ function IssueModal({ items, onClose, onDone, canSetup }: { items: any[]; onClos
   const save = async () => {
     setBusy(true); setError('');
     try {
-      const r: any = await inputDistributionApi.issue({ farmerId: farmer.id, itemId, quantity: Number(qty), unitPrice: price ? Number(price) : undefined, dueDate: dueDate || undefined, note: note.trim() || undefined });
+      const r: any = await inputDistributionApi.issue({ farmerId: farmer.id, itemId, quantity: Number(qty), unitPrice: price ? Number(price) : undefined, dueDate: dueDate || undefined, note: note.trim() || undefined, warehouseId: fromWh || undefined });
       onDone(`${r.data.reference} issued${r.data.farmIds?.length ? ` for Farm ID ${r.data.farmIds.map(farmId).join(', ')}` : ''}. A code was texted to the farmer: ask them for it to confirm they received the goods.`);
       onClose();
     } catch (e) { setError(errMsg(e, 'Could not issue.')); setBusy(false); }
   };
   return (
-    <Modal title="Give Inputs" subtitle="Stock goes down, the cost is charged to the farmer, and they confirm with a code on their phone." width="600px" onClose={() => !busy && onClose()}
+    <Modal title="Give Inputs" subtitle="Stock goes down in the warehouse, the cost is charged to the farmer, and they confirm with a code on their phone." width="600px" onClose={() => !busy && onClose()}
       footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
         <button type="submit" form="issue-form" className="btn-primary" disabled={!canSave}>{busy ? 'Processing…' : 'Confirm & Send Code'}</button></>}>
       <form id="issue-form" onSubmit={(e) => { e.preventDefault(); if (canSave) void save(); }} noValidate>
@@ -66,6 +69,7 @@ function IssueModal({ items, onClose, onDone, canSetup }: { items: any[]; onClos
         <div style={{ ...row2, marginTop: 14 }}>
           <Field label={`Quantity${item ? ` (${item.unit})` : ''} *`}><input type="number" min={0} step="any" className="input-field" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="Enter quantity" /></Field>
           <Field label="Price per unit (TZS)" hint={item?.unitCost ? `Leave empty for ${tzs(item.unitCost)}` : item ? 'Required: this input has no set price' : undefined}><input type="number" min={0} className="input-field" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
+          {warehouses.length > 1 && <Field label="Take from warehouse" hint="Leave as it is to use the main store first"><select className="input-field" value={fromWh} onChange={(e) => setFromWh(e.target.value)}><option value="">Main store first</option>{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>}
           <Field label="Pay by" hint="Optional."><input type="date" className="input-field" min={todayISO()} value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
           <Field label="Note"><input className="input-field" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" /></Field>
         </div>

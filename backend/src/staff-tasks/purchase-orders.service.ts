@@ -3,6 +3,7 @@ import { Prisma, PurchaseOrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { CreateOrderDto, ReceiveOrderDto } from './dto/staff-tasks.dto';
+import { InputStockService } from '../input-stock/input-stock.service';
 import { cents, day, num, tenantOf, today } from './common';
 
 const OPEN: PurchaseOrderStatus[] = ['APPROVED', 'PARTIALLY_RECEIVED'];
@@ -13,7 +14,7 @@ const OPEN: PurchaseOrderStatus[] = ['APPROVED', 'PARTIALLY_RECEIVED'];
  */
 @Injectable()
 export class PurchaseOrdersService {
-  constructor(private readonly prisma: PrismaService, private readonly ownership: OwnershipService) {}
+  constructor(private readonly prisma: PrismaService, private readonly ownership: OwnershipService, private readonly stock: InputStockService) {}
 
   private async next(mamcosId: string, kind: 'PO' | 'DR') {
     const year = new Date().getUTCFullYear();
@@ -106,6 +107,9 @@ export class PurchaseOrdersService {
     if (receivedOn > today()) throw new BadRequestException('The delivery date cannot be in the future');
     const ids = dto.lines.map((l) => l.lineId);
     if (new Set(ids).size !== ids.length) throw new BadRequestException('Each line can appear once per delivery');
+    const warehouseId = dto.warehouseId ?? null;
+    if (warehouseId && !(await this.prisma.warehouse.findFirst({ where: { id: warehouseId, mamcosId, isActive: true }, select: { id: true } }))) throw new BadRequestException('Choose one of your own warehouses');
+    const supplierName = (await this.prisma.supplier.findUnique({ where: { id: po.supplierId }, select: { name: true } }))?.name ?? null;
     for (const l of dto.lines) {
       const line = po.lines.find((x) => x.id === l.lineId);
       if (!line) throw new BadRequestException('A line does not belong to this order');
@@ -125,7 +129,8 @@ export class PurchaseOrdersService {
         if (cents(num(fresh.received) + l.quantity) > num(fresh.quantity) + 0.0001) throw new ConflictException(`${line.itemName} was just received by someone else. Reload and try again`);
         await tx.deliveryReceiptLine.create({ data: { receiptId: receipt.id, orderLineId: line.id, quantity: l.quantity } });
         await tx.purchaseOrderLine.update({ where: { id: line.id }, data: { received: { increment: l.quantity } } });
-        if (line.inputItemId) await tx.farmInputMovement.create({ data: { itemId: line.inputItemId, type: 'IN', quantity: l.quantity, note: `Delivery ${receipt.number} for ${po.number}`, createdByUserId: actor.id } });
+        // delivered inputs go into the chosen warehouse (the default store when none is named), tied to this delivery
+        if (line.inputItemId) await this.stock.receiveWithin(tx, { itemId: line.inputItemId, quantity: l.quantity, userId: actor.id, refType: 'PURCHASE', refId: receipt.id, warehouseId, supplierName, unitCost: num(line.unitPrice) || null, note: `Delivery ${receipt.number} for ${po.number}` });
       }
       const after = await tx.purchaseOrderLine.findMany({ where: { orderId: id } });
       const complete = after.every((x) => num(x.received) >= num(x.quantity) - 0.0001);

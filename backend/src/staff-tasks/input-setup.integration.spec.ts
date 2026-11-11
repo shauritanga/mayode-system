@@ -7,6 +7,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { OwnershipService } from '../common/ownership.service';
 import { RiceVarietiesService } from '../rice-varieties/rice-varieties.service';
+import { InputStockService } from '../input-stock/input-stock.service';
 import { InputSetupService } from './input-setup.service';
 
 const BASE_URL = process.env.IRRIGATION_TEST_DATABASE_URL;
@@ -18,7 +19,8 @@ const BASE_URL = process.env.IRRIGATION_TEST_DATABASE_URL;
     const url = `${BASE_URL!.split('?')[0]}?options=${encodeURIComponent('-c search_path=irrigation_test')}`;
     pool = new Pool({ connectionString: url, max: 3 });
     prisma = new PrismaClient({ adapter: new PrismaPg(pool, { schema: 'irrigation_test' }) });
-    inputs = new InputSetupService(prisma as any, new OwnershipService(prisma as any));
+    const own = new OwnershipService(prisma as any);
+    inputs = new InputSetupService(prisma as any, own, new InputStockService(prisma as any, own));
     rice = new RiceVarietiesService(prisma as any);
     const tag = randomUUID().slice(0, 5);
     a = (await prisma.mamcos.create({ data: { name: `Set A ${tag}` } })).id;
@@ -30,7 +32,7 @@ const BASE_URL = process.env.IRRIGATION_TEST_DATABASE_URL;
 
   it('starts with the usual input types, lets the cooperative add its own, and keeps them apart', async () => {
     const first: any = await inputs.types(adminA);
-    expect(first.data.map((t: any) => t.name)).toEqual(['Fertiliser', 'Herbicide', 'Other', 'Pesticide', 'Seed', 'Fuel'].sort());
+    expect(first.data.map((t: any) => t.name)).toEqual(['Fertiliser', 'Herbicide', 'Other', 'Pesticide', 'Seed', 'Fuel', 'Packaging bags'].sort());
     const added = await inputs.createType(adminA, 'Soil conditioner');
     await expect(inputs.createType(adminA, 'soil CONDITIONER')).rejects.toBeInstanceOf(ConflictException);
     await expect(inputs.createType(adminA, '  ')).rejects.toBeInstanceOf(BadRequestException);

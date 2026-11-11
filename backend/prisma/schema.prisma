@@ -3950,6 +3950,9 @@ enum DeliveryStatus {
 
 model Warehouse {
   id         String   @id @default(uuid())
+  /// Where farm inputs, fuel and bags go when nobody picks a warehouse.
+  isDefaultForInputs Boolean @default(false) @map("is_default_for_inputs")
+  farmInputMovements FarmInputMovement[] @relation("FarmInputMovementWarehouse")
   /// Owning cooperative; null = platform warehouse (Super Admin's own stock).
   mamcosId   String?  @map("mamcos_id")
   name       String
@@ -4285,6 +4288,17 @@ enum InputMovementType {
   IN
   OUT
   ADJUSTMENT
+  TRANSFER_OUT
+  TRANSFER_IN
+  WRITE_OFF
+  COUNT_ADJUSTMENT
+}
+
+/// What kind of stock an item is, so fuel and bags are not offered to farmers as inputs.
+enum InputStockClass {
+  INPUT
+  FUEL
+  PACKAGING
 }
 
 enum HarvestStatus {
@@ -5065,6 +5079,9 @@ model FarmInputItem {
   createdAt    DateTime      @default(now()) @map("created_at")
   /// The cooperative's own category for this input (set up in its settings); `type` stays as the broad group.
   inputTypeId  String?       @map("input_type_id")
+  stockClass   InputStockClass @default(INPUT) @map("stock_class")
+  /// For packaging bags: how many kilograms of rice one bag holds.
+  packagingKg  Float?        @map("packaging_kg")
 
   movements FarmInputMovement[]
   inputType InputType?        @relation(fields: [inputTypeId], references: [id], onDelete: SetNull)
@@ -5087,11 +5104,26 @@ model FarmInputMovement {
   note            String?
   createdByUserId String            @map("created_by_user_id")
   createdAt       DateTime          @default(now()) @map("created_at")
+  /// The warehouse this stock sits in (null only on rows older than warehouses for inputs; those count as the default store).
+  warehouseId     String?           @map("warehouse_id")
+  /// What caused the movement: PURCHASE | DIRECT | DONATION | OPENING | DISTRIBUTION | FIELD_WORK | PROCESSING | TRANSFER | ADJUSTMENT | REVERSAL | LEGACY, and the record it came from.
+  refType         String?           @map("ref_type")
+  refId           String?           @map("ref_id")
+  reason          String?
+  supplierName    String?           @map("supplier_name")
+  unitCost        Float?            @map("unit_cost")
+  /// The two halves of one transfer share this.
+  groupId         String?           @map("group_id")
+  /// Set on a movement that cancels another one.
+  reversalOfId    String?           @unique @map("reversal_of_id")
 
-  item FarmInputItem @relation(fields: [itemId], references: [id])
-  task FarmTask?     @relation(fields: [taskId], references: [id])
+  item      FarmInputItem @relation(fields: [itemId], references: [id])
+  task      FarmTask?     @relation(fields: [taskId], references: [id])
+  warehouse Warehouse?    @relation("FarmInputMovementWarehouse", fields: [warehouseId], references: [id])
 
   @@index([itemId])
+  @@index([warehouseId, itemId])
+  @@index([refType, refId])
   @@index([taskId])
   @@index([plotId, cropCycleId])
   @@map("farm_input_movements")

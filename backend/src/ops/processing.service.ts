@@ -6,6 +6,7 @@ import { outputsExceedInput, r3, runBalance } from './ops-rules';
 import { CreateRunDto } from './dto/warehouse.dto';
 import { StockAccountingService } from './stock-accounting.service';
 import { ChargesService } from '../charges/charges.service';
+import { InputStockService } from '../input-stock/input-stock.service';
 
 type User = Actor & { id: string };
 /** Runs losing more than this share of what went in are flagged for management. */
@@ -20,6 +21,7 @@ export class ProcessingService {
     private readonly notify: OpsNotifyService,
     private readonly stockBooks: StockAccountingService,
     private readonly charges: ChargesService,
+    private readonly inputStock: InputStockService,
   ) {}
 
   /** Records a run and moves the stock in one transaction: inputs leave, outputs arrive, the difference is the recorded loss. */
@@ -105,7 +107,19 @@ export class ProcessingService {
           await this.charges.chargeFarmer(tx, { mamcosId: run.mamcosId, farmerId: ownerFarmerId, description: `Milling · ${run.reference}`, amount: millingFee, createdById: actor.id });
         }
       }
-      return { run, balance, millingFee };
+      // Packaging uses bags: they leave the warehouse with the run. A shortfall is reported, never a reason to stop the work.
+      let bagsWarning: string | null = null;
+      if (dto.kind === 'PACKAGING' && dto.bagsItemId && dto.bagsUsed && dto.bagsUsed > 0) {
+        const bags = await tx.farmInputItem.findFirst({ where: { id: dto.bagsItemId, mamcosId: run.mamcosId, stockClass: 'PACKAGING' }, select: { id: true, name: true } });
+        if (!bags) throw new BadRequestException('Choose the packaging bags from your list');
+        try {
+          await this.inputStock.drawOut(tx, { itemId: bags.id, quantity: dto.bagsUsed, userId: actor.id, refType: 'PROCESSING', refId: run.id, note: `Used in ${run.reference}`, warehouseId: dto.warehouseId });
+        } catch (e) {
+          if (!(e instanceof ConflictException)) throw e;
+          bagsWarning = `${e.message}. The run was recorded; correct the bag stock when you can.`;
+        }
+      }
+      return { run, balance, millingFee, bagsWarning };
     });
 
     const flagged = run.balance.lossPct > LOSS_ALERT_PCT || (dto.kind === 'MILLING' && run.balance.milledYieldPct < LOW_YIELD_PCT);
@@ -115,7 +129,7 @@ export class ProcessingService {
         body: `${run.run.reference}: ${run.balance.lossPct}% unaccounted${dto.kind === 'MILLING' ? `, ${run.balance.milledYieldPct}% milled rice yield` : ''}.`, data: { runId: run.run.id },
       });
     }
-    return { ...(await this.detail(run.run.id, actor)), millingFee: run.millingFee };
+    return { ...(await this.detail(run.run.id, actor)), millingFee: run.millingFee, bagsWarning: run.bagsWarning };
   }
 
   async detail(id: string, actor: Actor) {

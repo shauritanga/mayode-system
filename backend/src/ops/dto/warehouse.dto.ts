@@ -87,6 +87,9 @@ export class CreateRunDto {
   @IsOptional() @IsString() machine?: string;
   @IsOptional() @IsString() operatorName?: string;
   @IsOptional() @IsString() lossNote?: string;
+  /** Packaging only: the bags used (an input of class PACKAGING) and how many; taken out of the warehouse stock. */
+  @IsOptional() @IsString() bagsItemId?: string;
+  @IsOptional() @IsNumber() @IsPositive() bagsUsed?: number;
   @IsArray() @ValidateNested({ each: true }) @Type(() => RunInputDto) inputs: RunInputDto[];
   @IsArray() @ValidateNested({ each: true }) @Type(() => RunOutputDto) outputs: RunOutputDto[];
 }

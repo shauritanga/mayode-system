@@ -569,6 +569,15 @@ export const creditApi = {
   loans: () => api.get('/credit/loans'),
   schedule: (loanId: string) => api.get(`/credit/loans/${loanId}/schedule`),
 };
+/** Warehouse stock of farm inputs, fuel and packaging bags. */
+export const inputStockApi = {
+  overview: (params?: object) => api.get('/ops/warehouse/inputs/overview', { params }),
+  movements: (params?: object) => api.get('/ops/warehouse/inputs/movements', { params }),
+  receive: (data: object) => api.post('/ops/warehouse/inputs/receive', data),
+  adjust: (data: object) => api.post('/ops/warehouse/inputs/adjust', data),
+  transfer: (data: object) => api.post('/ops/warehouse/inputs/transfer', data),
+  reverse: (id: string, reason: string) => api.post(`/ops/warehouse/inputs/movements/${id}/reverse`, { reason }),
+};
 export const opsApi = {
   // catalogue and customers
   products: (params?: object) => api.get('/ops/products', { params }),

@@ -25,6 +25,8 @@ export class IssueInputDto {
   @IsOptional() @Type(() => Number) @IsNumber(money) @Min(0) unitPrice?: number;
   @IsOptional() @IsDateString() dueDate?: string;
   @IsOptional() @IsString() @MaxLength(300) note?: string;
+  /** Take the goods from this warehouse; leave out to use the default store (and any other that holds it). */
+  @IsOptional() @IsUUID() warehouseId?: string;
 }
 export class AcknowledgeDto { @IsString() @Length(6, 6) code: string; }
 export class IssueQueryDto {
@@ -48,6 +50,8 @@ export class CreateOrderDto {
 }
 export class ReceiveLineDto { @IsUUID() lineId: string; @Type(() => Number) @IsNumber(money) @Min(0.01) quantity: number; }
 export class ReceiveOrderDto {
+  /** The warehouse the delivered inputs are put into; the default store when left out. */
+  @IsOptional() @IsUUID() warehouseId?: string;
   @IsOptional() @IsDateString() receivedOn?: string;
   @IsOptional() @IsString() @MaxLength(60) deliveryNote?: string;
   @IsOptional() @IsString() @MaxLength(500) note?: string;
@@ -92,6 +96,8 @@ export class InputItemDto {
   @IsOptional() @IsString() @MaxLength(20) unit?: string;
   @IsOptional() @Type(() => Number) @IsNumber(money) @Min(0) unitCost?: number | null;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) reorderLevel?: number | null;
+  /** Packaging bags: kilograms of rice one bag holds. */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) packagingKg?: number | null;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
 export class InputStockDto {

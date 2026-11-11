@@ -18,6 +18,7 @@ import DispatchPanel from '@/components/ops/DispatchPanel';
 import TracePanel from '@/components/ops/TracePanel';
 import ProductsPanel from '@/components/ops/ProductsPanel';
 import ReportsRunner from '@/components/ops/ReportsRunner';
+import { AllStockPanel, GiveOutHub, HowItWorks, InputReceivePanel } from '@/components/ops/InputStockPanels';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type WarehousePage = 'overview' | 'receive' | 'mill' | 'sendout' | 'stock' | 'setup';
@@ -26,10 +27,10 @@ type Can = (resource: string, action?: 'VIEW' | 'CREATE' | 'EDIT' | 'DELETE') =>
 /** Six places, named for what the person is doing, in the order the work happens. */
 const WAREHOUSE_PAGES: { id: WarehousePage; slug: string; label: string; description: string; icon: typeof Warehouse; allowed: (can: Can) => boolean }[] = [
   { id: 'overview', slug: 'overview', label: 'Overview', description: 'What we have, what needs doing, and whether the books agree.', icon: LayoutDashboard, allowed: (can) => can('ops_reports') },
-  { id: 'receive', slug: 'receive', label: 'Receive paddy', description: 'Record paddy as it arrives. Stock, and what we owe the farmer, are added when you confirm.', icon: ArrowDownToLine, allowed: (can) => can('ops_receiving') },
+  { id: 'receive', slug: 'receive', label: 'Receive', description: 'Record everything that arrives: paddy from a farmer, or inputs, fuel and bags from a supplier. It is added to the warehouse stock when you save.', icon: ArrowDownToLine, allowed: (can) => can('ops_receiving') },
   { id: 'mill', slug: 'mill', label: 'Mill paddy', description: 'Turn paddy into rice, broken rice and by-products. The cost of the paddy moves onto the rice.', icon: Factory, allowed: (can) => can('ops_processing') },
-  { id: 'sendout', slug: 'send-out', label: 'Send out rice', description: 'Pick stock for paid orders, load the truck and hand over the goods.', icon: Truck, allowed: (can) => can('ops_dispatch') || can('warehouse_desk') },
-  { id: 'stock', slug: 'stock', label: 'Stock', description: 'Everything in the warehouses: how much, where it came from, and what it is worth.', icon: Package, allowed: (can) => can('ops_stock') },
+  { id: 'sendout', slug: 'send-out', label: 'Give out / Send out', description: 'Hand stock out: inputs to farmers or field work, and rice to buyers. Stock goes down and the record is kept.', icon: Truck, allowed: (can) => can('ops_dispatch') || can('warehouse_desk') },
+  { id: 'stock', slug: 'stock', label: 'Stock', description: 'Everything in the warehouses, rice and inputs together: how much, where, what is running low, and every movement.', icon: Package, allowed: (can) => can('ops_stock') },
   { id: 'setup', slug: 'setup', label: 'Setup & reports', description: 'Warehouses, the products we handle, and printable reports.', icon: Settings2, allowed: (can) => can('warehouses') || can('warehouse_desk') || can('ops_catalog') || can('ops_reports') },
 ];
 
@@ -39,7 +40,7 @@ const OLD_ADDRESSES: Record<string, WarehousePage> = {
   'quality-loss-control': 'mill', 'milling-production-stock': 'mill', 'dispatch-returns': 'sendout', 'inventory-reports': 'setup',
 };
 
-type StockTab = 'position' | 'batches' | 'ledger' | 'transfers' | 'counts' | 'trace';
+type StockTab = 'all' | 'position' | 'batches' | 'ledger' | 'transfers' | 'counts' | 'trace';
 /** Lets a shortcut on the overview open the Stock page on a particular tab. */
 const TAB_KEY = 'warehouse-stock-tab';
 
@@ -72,7 +73,7 @@ export default function OpsWarehousePage() {
     <main>
       {!selected ? <ErrorNote message="Your role does not include warehouse access." /> : <div className="warehouse-layout">
         <aside className="warehouse-subsidebar" aria-label="Warehouse and Inventory sections">
-          <div className="warehouse-subsidebar-heading">Warehouse &amp; Inventory</div>
+          <div className="warehouse-subsidebar-heading">Warehouse</div>
           <nav aria-label="Warehouse sections">{pages.map((page) => {
             const Icon = page.icon;
             const href = `/dashboard/ops-warehouse/${page.slug}`;
@@ -84,11 +85,11 @@ export default function OpsWarehousePage() {
           {selected.id !== 'overview' && <header className="warehouse-section-heading"><span className="warehouse-section-icon"><selected.icon size={21} /></span><div><span className="warehouse-section-kicker">Warehouse &amp; Inventory</span><h2>{selected.label}</h2><p>{selected.description}</p></div></header>}
           <TablePageSizeContext.Provider value={10}><div className={`warehouse-section-content section-${selected.id}`} data-path={pathname}>
             {selected.id === 'overview' && <Overview goto={goto} can={can} />}
-            {selected.id === 'receive' && <ReceivingPanel canCreate={can('ops_receiving', 'CREATE')} canConfirm={can('ops_receiving', 'EDIT')} canCancel={can('ops_receiving', 'DELETE')} />}
+            {selected.id === 'receive' && <ReceiveHub can={can} />}
             {selected.id === 'mill' && <ProcessingPanel canCreate={can('ops_processing', 'CREATE')} canReverse={can('ops_processing', 'DELETE')} />}
-            {selected.id === 'sendout' && (can('ops_dispatch')
+            {selected.id === 'sendout' && <GiveOutHub can={can}>{can('ops_dispatch')
               ? <DispatchPanel canAllocate={can('ops_dispatch', 'CREATE')} canRelease={can('ops_dispatch', 'EDIT')} canCancel={can('ops_dispatch', 'DELETE')} />
-              : <WarehouseView embedded />)}
+              : <WarehouseView embedded />}</GiveOutHub>}
             {selected.id === 'stock' && <StockWorkspace can={can} />}
             {selected.id === 'setup' && <SetupWorkspace can={can} />}
           </div></TablePageSizeContext.Provider>
@@ -98,18 +99,42 @@ export default function OpsWarehousePage() {
   );
 }
 
+/** The first question of receiving: what is arriving? */
+function ReceiveHub({ can }: { can: Can }) {
+  const [what, setWhat] = useState<'rice' | 'inputs' | null>(null);
+  if (what === 'rice') return <><button type="button" className="btn-secondary" onClick={() => setWhat(null)} style={{ marginBottom: 12 }}>← What is arriving?</button><ReceivingPanel canCreate={can('ops_receiving', 'CREATE')} canConfirm={can('ops_receiving', 'EDIT')} canCancel={can('ops_receiving', 'DELETE')} /></>;
+  if (what === 'inputs') return <><button type="button" className="btn-secondary" onClick={() => setWhat(null)} style={{ marginBottom: 12 }}>← What is arriving?</button><InputReceivePanel canReceive={can('ops_receiving', 'CREATE')} /></>;
+  const tile = (key: 'rice' | 'inputs', title: string, text: string) => (
+    <button key={key} type="button" onClick={() => setWhat(key)} style={{ textAlign: 'left', background: 'var(--bg-elevated, rgba(127,127,127,.08))', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '16px 18px', color: 'inherit', cursor: 'pointer' }}>
+      <strong style={{ fontSize: 15 }}>{title}</strong><div className="muted" style={{ fontSize: 13, marginTop: 6 }}>{text}</div>
+    </button>
+  );
+  return (
+    <>
+      <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>What is arriving?</h3>
+      <p className="muted" style={{ marginTop: 0 }}>Choose one. Either way it is put into a warehouse and shows up in Stock.</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+        {tile('rice', 'Rice or paddy', 'From a farmer or a farm. Record weight, quality and what you pay.')}
+        {tile('inputs', 'Farm inputs, fuel or bags', 'Fertiliser, seed, chemicals, diesel, empty bags: from a supplier or a delivery.')}
+      </div>
+      <p className="muted" style={{ fontSize: 12.5, marginTop: 14 }}>Receiving a purchase order? Open <Link href="/dashboard/purchase-orders">Purchase Orders</Link> and use “Receive goods”, then pick the warehouse.</p>
+    </>
+  );
+}
+
 function StockWorkspace({ can }: { can: Can }) {
   const [tab, setTab] = useState<StockTab>(() => {
-    if (typeof window === 'undefined') return 'position';
+    if (typeof window === 'undefined') return 'all';
     const t = window.sessionStorage.getItem(TAB_KEY) as StockTab | null;
     window.sessionStorage.removeItem(TAB_KEY);
-    return t ?? 'position';
+    return t ?? 'all';
   });
   return <>
     <Tabs tabs={[
-      { id: 'position' as StockTab, label: 'What we have' }, { id: 'batches' as StockTab, label: 'Batches' }, { id: 'ledger' as StockTab, label: 'History' },
+      { id: 'all' as StockTab, label: 'Everything' }, { id: 'position' as StockTab, label: 'Rice & paddy' }, { id: 'batches' as StockTab, label: 'Batches' }, { id: 'ledger' as StockTab, label: 'History' },
       { id: 'transfers' as StockTab, label: 'Transfers' }, { id: 'counts' as StockTab, label: 'Count stock' }, { id: 'trace' as StockTab, label: 'Trace a batch' },
     ]} value={tab} onChange={setTab} />
+    {tab === 'all' && <AllStockPanel canRice={can('ops_stock')} canInputs={can('ops_stock')} canAdjust={can('ops_stock', 'EDIT')} />}
     {(tab === 'position' || tab === 'batches' || tab === 'ledger' || tab === 'transfers') && <StockPanel key={tab} hideTabs initialTab={tab} canAdjust={can('ops_stock', 'EDIT')} canTransfer={can('ops_stock', 'EDIT')} canManageQuality={can('ops_quality', 'EDIT')} />}
     {tab === 'counts' && <StockCountsPanel canStart={can('ops_stock', 'CREATE')} canApprove={can('ops_stock', 'EDIT')} />}
     {tab === 'trace' && <TracePanel />}
@@ -194,6 +219,7 @@ function Overview({ goto, can }: { goto: (t: WarehousePage, tab?: StockTab) => v
   ].filter((q) => q.allowed);
 
   return <section className="warehouse-overview" aria-label="Warehouse overview">
+    <HowItWorks can={can} goto={(page) => goto(page === 'giveout' ? 'sendout' : page)} />
     <div className="warehouse-overview-head">
       <div className="warehouse-overview-title"><span className="warehouse-overview-icon"><Boxes size={26} /></span><div><h2>Warehouse &amp; Inventory</h2><p>What we have, what needs doing, and whether the books agree.</p></div></div>
       <div className="warehouse-overview-actions"><button type="button" className="btn-secondary" onClick={() => void reload()}><RefreshCw size={15} /> Refresh</button></div>

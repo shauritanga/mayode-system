@@ -3,6 +3,7 @@ import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { AccountingService } from '../accounting/accounting.service';
+import { InputStockService } from '../input-stock/input-stock.service';
 import { SmsService } from '../messaging/sms.service';
 import { farmIdDisplay } from '../irrigation/irrigation-codes';
 import { IssueInputDto } from './dto/staff-tasks.dto';
@@ -23,12 +24,13 @@ export class InputDistributionService {
     private readonly ownership: OwnershipService,
     private readonly accounting: AccountingService,
     private readonly sms: SmsService,
+    private readonly stock: InputStockService,
   ) {}
 
   /** The inputs in stock, with what is left. */
   async items(actor: RequestUser, mamcosIdParam?: string) {
     const mamcosId = tenantOf(this.ownership, actor, mamcosIdParam);
-    const items = await this.prisma.farmInputItem.findMany({ where: { mamcosId, isActive: true }, include: { inputType: { select: { name: true } } }, orderBy: [{ type: 'asc' }, { name: 'asc' }] });
+    const items = await this.prisma.farmInputItem.findMany({ where: { mamcosId, isActive: true, stockClass: 'INPUT' }, include: { inputType: { select: { name: true } } }, orderBy: [{ type: 'asc' }, { name: 'asc' }] });
     const sums = await this.prisma.farmInputMovement.groupBy({ by: ['itemId'], where: { itemId: { in: items.map((i) => i.id) } }, _sum: { quantity: true } });
     return { data: items.map((i) => ({ id: i.id, name: i.name, type: i.type, typeName: i.inputType?.name ?? i.type.charAt(0) + i.type.slice(1).toLowerCase(), unit: i.unit, unitCost: i.unitCost, balance: Math.round((sums.find((s) => s.itemId === i.id)?._sum.quantity ?? 0) * 1000) / 1000 })) };
   }
@@ -60,7 +62,7 @@ export class InputDistributionService {
     const farmer = await this.prisma.farmer.findFirst({ where: { id: dto.farmerId, mamcosId }, select: { id: true, firstName: true, lastName: true, isBlacklisted: true, user: { select: { phone: true, language: true } } } });
     if (!farmer) throw new NotFoundException('Farmer not found');
     if (farmer.isBlacklisted) throw new BadRequestException('This farmer is blacklisted and cannot be given inputs on credit');
-    const item = await this.prisma.farmInputItem.findFirst({ where: { id: dto.itemId, mamcosId, isActive: true } });
+    const item = await this.prisma.farmInputItem.findFirst({ where: { id: dto.itemId, mamcosId, isActive: true, stockClass: 'INPUT' } });
     if (!item) throw new NotFoundException('Input not found');
     const unitPrice = dto.unitPrice ?? item.unitCost ?? 0;
     if (!(unitPrice > 0)) throw new BadRequestException('This input has no price: enter the price per unit');
@@ -72,15 +74,13 @@ export class InputDistributionService {
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
 
     const issue = await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM farm_input_items WHERE id = ${item.id} FOR UPDATE`;
-      const bal = (await tx.farmInputMovement.aggregate({ where: { itemId: item.id }, _sum: { quantity: true } }))._sum.quantity ?? 0;
-      if (dto.quantity > bal + 0.0005) throw new ConflictException(`Only ${Math.round(bal * 1000) / 1000} ${item.unit} of ${item.name} is in stock`);
       const reference = await this.nextReference(mamcosId);
       const issued = await tx.inputIssue.create({
         data: { mamcosId, reference, farmerId: farmer.id, itemId: item.id, itemName: item.name, quantity: dto.quantity, unit: item.unit, unitPrice, amount, farmIds: plots, dueDate, ackCodeHash: 'pending', note: dto.note?.trim() || null, issuedById: actor.id },
       });
       await tx.inputIssue.update({ where: { id: issued.id }, data: { ackCodeHash: hash(issued.id, code) } });
-      await tx.farmInputMovement.create({ data: { itemId: item.id, type: 'OUT', quantity: -dto.quantity, note: `Issued to ${farmer.firstName} ${farmer.lastName} (${reference})`, createdByUserId: actor.id } });
+      // the stock leaves under a lock, from the warehouse chosen (or the default store, then any other that holds it)
+      await this.stock.drawOut(tx, { itemId: item.id, quantity: dto.quantity, userId: actor.id, refType: 'DISTRIBUTION', refId: issued.id, note: `Issued to ${farmer.firstName} ${farmer.lastName} (${reference})`, warehouseId: dto.warehouseId ?? null, strict: !!dto.warehouseId, shortMessage: (left, it) => `Only ${left} ${it.unit} of ${it.name} is in stock` });
       const due = await tx.farmerDue.create({
         data: { mamcosId, farmerId: farmer.id, category: 'FERTILISER', description: `${item.name} · ${dto.quantity} ${item.unit} (${reference})`, itemName: item.name, quantity: dto.quantity, unit: item.unit, unitPrice, amount, issuedOn: today(), dueDate, createdById: actor.id },
       });
@@ -92,11 +92,11 @@ export class InputDistributionService {
       await this.prisma.farmerDue.update({ where: { id: issue.dueId }, data: { postedIssue: true } });
     } catch (e) {
       // no issue without its entry: put the stock back and remove the charge
-      await this.prisma.$transaction([
-        this.prisma.farmInputMovement.create({ data: { itemId: item.id, type: 'ADJUSTMENT', quantity: dto.quantity, note: `Reversed ${issue.reference}: could not be booked`, createdByUserId: actor.id } }),
-        this.prisma.farmerDue.delete({ where: { id: issue.dueId } }),
-        this.prisma.inputIssue.delete({ where: { id: issue.id } }),
-      ]);
+      await this.prisma.$transaction(async (tx) => {
+        await this.stock.receiveWithin(tx, { itemId: item.id, quantity: dto.quantity, userId: actor.id, refType: 'REVERSAL', refId: issue.id, note: `Reversed ${issue.reference}: could not be booked` });
+        await tx.farmerDue.delete({ where: { id: issue.dueId } });
+        await tx.inputIssue.delete({ where: { id: issue.id } });
+      });
       throw e;
     }
     const texted = await this.text(farmer.user.phone, farmer.user.language, { reference: issue.reference, item: item.name, qty: dto.quantity, unit: item.unit, amount, plots, due: dueDate, code });

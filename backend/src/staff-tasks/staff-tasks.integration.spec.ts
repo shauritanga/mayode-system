@@ -13,6 +13,7 @@ import { PERMISSION_KEY } from '../auth/decorators/require-permission.decorator'
 import { AccountingService } from '../accounting/accounting.service';
 import { LoansService } from '../loans/loans.service';
 import { CashDrawerService } from './cash-drawer.service';
+import { InputStockService } from '../input-stock/input-stock.service';
 import { InputDistributionService } from './input-distribution.service';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { MaintenanceService } from './maintenance.service';
@@ -43,8 +44,9 @@ describeDb('Staff task tools (PostgreSQL)', () => {
     const accounting = new AccountingService(prisma as any, ownership);
     const sms: any = { send: async (to: string, text: string) => { texts.push({ to, text }); } };
     drawer = new CashDrawerService(prisma as any, ownership);
-    inputs = new InputDistributionService(prisma as any, ownership, accounting, sms);
-    orders = new PurchaseOrdersService(prisma as any, ownership);
+    const stock = new InputStockService(prisma as any, ownership);
+    inputs = new InputDistributionService(prisma as any, ownership, accounting, sms, stock);
+    orders = new PurchaseOrdersService(prisma as any, ownership, stock);
     maint = new MaintenanceService(prisma as any, ownership);
     compliance = new ComplianceReportService(prisma as any, ownership);
     tag = randomUUID().slice(0, 5);
