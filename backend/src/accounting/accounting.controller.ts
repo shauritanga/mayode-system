@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -29,7 +30,7 @@ import {
 } from './dto/accounting.dto';
 import {
   AdjustLineDto, CloseBooksDto, CreateStatementDto, MatchLineDto, ReopenBooksDto,
-  CreateCashAccountDto, CashTransferDto, FarmerPayoutDto, PayDto, UpdateCashAccountDto, CreateCashTransactionDto, TaxSettingsDto, VatSettlementDto, VoidCashTransactionDto, WithholdingRemittanceDto,
+  CashSettingsDto, CorrectCashTransactionDto, RejectCashTransactionDto, UpdateCashTransactionDto, CreateCashAccountDto, CashTransferDto, FarmerPayoutDto, PayDto, UpdateCashAccountDto, CreateCashTransactionDto, TaxSettingsDto, VatSettlementDto, VoidCashTransactionDto, WithholdingRemittanceDto,
 } from './dto/ledger-controls.dto';
 import { CashTransactionsService } from './cash-transactions.service';
 import { CashAccountsService } from './cash-accounts.service';
@@ -277,6 +278,36 @@ export class AccountingController {
   @RequirePermission('accounting', 'CREATE')
   cashCreate(@Body() dto: CreateCashTransactionDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
     return this.cash.create(dto, this.accounting.scopeFor(user, mamcosId), user.id);
+  }
+  @Patch('cash-transactions/:id')
+  @RequirePermission('accounting', 'EDIT')
+  cashUpdate(@Param('id') id: string, @Body() dto: UpdateCashTransactionDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.cash.update(id, dto, this.accounting.scopeFor(user, mamcosId));
+  }
+  @Post('cash-transactions/:id/correct')
+  @RequirePermission('accounting', 'EDIT')
+  cashCorrect(@Param('id') id: string, @Body() dto: CorrectCashTransactionDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.cash.correct(id, dto, this.accounting.scopeFor(user, mamcosId), user.id);
+  }
+  @Post('cash-transactions/:id/approve')
+  @RequirePermission('expense_approval', 'EDIT')
+  cashApprove(@Param('id') id: string, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.cash.approve(id, this.accounting.scopeFor(user, mamcosId), user.id);
+  }
+  @Post('cash-transactions/:id/reject')
+  @RequirePermission('expense_approval', 'EDIT')
+  cashReject(@Param('id') id: string, @Body() dto: RejectCashTransactionDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.cash.reject(id, dto.reason, this.accounting.scopeFor(user, mamcosId), user.id);
+  }
+  @Get('cash-settings')
+  @RequirePermission('accounting', 'VIEW')
+  cashSettings(@CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.cash.settings(this.accounting.scopeFor(user, mamcosId));
+  }
+  @Put('cash-settings')
+  @RequirePermission('accounting', 'EDIT')
+  saveCashSettings(@Body() dto: CashSettingsDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
+    return this.cash.saveSettings(this.accounting.scopeFor(user, mamcosId), dto);
   }
   @Post('cash-transactions/:id/void')
   @RequirePermission('accounting', 'EDIT')

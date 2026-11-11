@@ -298,14 +298,19 @@ export const loansApi = {
     remove: (id: string) => api.delete(`/lenders/${id}`),
   },
 };
+/** Super Admin has no cooperative of their own: the one they pick on the accounting pages is sent along with those calls. */
+let accountingMamcosId = '';
+export const setAccountingMamcos = (id: string) => { accountingMamcosId = id; };
+const forAmcos = (params: object = {}) => (accountingMamcosId ? { ...params, mamcosId: accountingMamcosId } : params);
+
 export const accountingApi = {
   statements: (params?: object) => api.get('/accounting/statements', { params }),
   generateReport: (data: object) => api.post('/accounting/report-exports', data),
   reportArchive: (params?: object) => api.get('/accounting/report-exports', { params }),
   downloadReport: (id: string) => api.get(`/accounting/report-exports/${id}/download`, { responseType: 'blob' }),
-  profitLoss: (params?: object) => api.get('/accounting/profit-loss', { params }),
-  balanceSheet: (params?: object) => api.get('/accounting/balance-sheet', { params }),
-  cashFlow: (params?: object) => api.get('/accounting/cash-flow', { params }),
+  profitLoss: (params?: object) => api.get('/accounting/profit-loss', { params: forAmcos(params) }),
+  balanceSheet: (params?: object) => api.get('/accounting/balance-sheet', { params: forAmcos(params) }),
+  cashFlow: (params?: object) => api.get('/accounting/cash-flow', { params: forAmcos(params) }),
   trialBalance: (params?: object) => api.get('/accounting/trial-balance', { params }),
   accountBalances: (params?: object) => api.get('/accounting/account-balances', { params }),
   journalEntries: (params?: object) => api.get('/accounting/journal-entries', { params }),
@@ -354,11 +359,16 @@ export const accountingApi = {
   createCashTransfer: (data: object) => api.post('/accounting/cash-accounts/transfers', data),
   cancelCashTransfer: (id: string, reason: string) => api.post(`/accounting/cash-accounts/transfers/${id}/cancel`, { reason }),
   cashBook: (params?: object) => api.get('/accounting/cash-book', { params }),
-  cashTransactions: (params?: object) => api.get('/accounting/cash-transactions', { params }),
+  cashTransactions: (params?: object) => api.get('/accounting/cash-transactions', { params: forAmcos(params) }),
   cashCategories: (kind: 'EXPENSE' | 'INCOME') => api.get('/accounting/cash-transactions/categories', { params: { kind } }),
-  createCashTransaction: (data: object) => api.post('/accounting/cash-transactions', data),
-  voidCashTransaction: (id: string, reason: string) => api.post(`/accounting/cash-transactions/${id}/void`, { reason }),
-  // VAT and withholding tax
+  createCashTransaction: (data: object) => api.post('/accounting/cash-transactions', data, { params: forAmcos() }),
+  voidCashTransaction: (id: string, reason: string) => api.post(`/accounting/cash-transactions/${id}/void`, { reason }, { params: forAmcos() }),
+  updateCashTransaction: (id: string, data: object) => api.patch(`/accounting/cash-transactions/${id}`, data, { params: forAmcos() }),
+  correctCashTransaction: (id: string, data: object) => api.post(`/accounting/cash-transactions/${id}/correct`, data, { params: forAmcos() }),
+  approveCashTransaction: (id: string) => api.post(`/accounting/cash-transactions/${id}/approve`, {}, { params: forAmcos() }),
+  rejectCashTransaction: (id: string, reason: string) => api.post(`/accounting/cash-transactions/${id}/reject`, { reason }, { params: forAmcos() }),
+  cashSettings: () => api.get('/accounting/cash-settings', { params: forAmcos() }),
+  saveCashSettings: (data: object) => api.put('/accounting/cash-settings', data, { params: forAmcos() }),
   taxSettings: () => api.get('/accounting/tax/settings'),
   updateTaxSettings: (data: object) => api.patch('/accounting/tax/settings', data),
   vatReturn: (from: string, to: string) => api.get('/accounting/tax/vat-return', { params: { from, to } }),

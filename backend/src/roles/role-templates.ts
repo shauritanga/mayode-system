@@ -131,7 +131,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       suppliers: V, inventory: V, warehouses: V, reports: V, audit_logs: V, irrigation_transfer_approval: ['EDIT'],
       harvest_fees: V, harvest_fee_approval: ['EDIT'], harvest_clearance: V, harvest_passes: V,
       farm_administration: V, farm_leases: V,
-      payroll_approval: ['EDIT'], water: V, water_schedules: V,
+      payroll_approval: ['EDIT'], expense_approval: ['EDIT'], water: V, water_schedules: V,
       cash_drawer: V, input_distribution: V, purchase_orders: V, purchase_order_approval: ['EDIT'], maintenance_schedule: V,
       users: VCE, roles: VCE, combine_harvesters: VCE, harvest_collections: V,
     },

@@ -307,6 +307,8 @@ model Mamcos {
   tin                 String?
   vrn                 String?
   vatRegistered       Boolean  @default(false) @map("vat_registered")
+  /// An expense of this amount or more needs a second person's approval before it is booked. Null = no approval needed.
+  expenseApprovalThreshold Decimal? @map("expense_approval_threshold") @db.Decimal(14, 2)
   /// Standard VAT rate in percent (Tanzania: 18).
   vatRate             Decimal  @default(18) @map("vat_rate") @db.Decimal(5, 2)
   toolRegistrationFee Decimal? @map("tool_registration_fee") @db.Decimal(12, 2)
@@ -1649,6 +1651,9 @@ enum CashTransactionKind {
 enum CashTransactionStatus {
   POSTED
   VOID
+  /// A large expense waiting for a second person; nothing is booked until it is approved.
+  PENDING_APPROVAL
+  REJECTED
 }
 
 /// A simple money-out or money-in the AMCOS records without bookkeeping knowledge; each one posts a journal to the ledger.
@@ -1675,6 +1680,13 @@ model CashTransaction {
   voidReason      String?               @map("void_reason")
   createdById     String?               @map("created_by_id")
   createdAt       DateTime              @default(now()) @map("created_at")
+  /// Receipts and other files (URLs from the upload service).
+  attachments     String[]
+  approvedById    String?               @map("approved_by_id")
+  approvedAt      DateTime?             @map("approved_at")
+  rejectedReason  String?               @map("rejected_reason")
+  /// Set on a record that corrects (replaces) an earlier one.
+  replacesId      String?               @map("replaces_id")
 
   mamcos        Mamcos       @relation(fields: [mamcosId], references: [id], onDelete: Restrict)
   /// The money account this moved through; null = not assigned to one.

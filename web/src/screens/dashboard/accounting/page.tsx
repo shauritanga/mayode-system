@@ -10,9 +10,10 @@ import Modal from '@/components/Modal';
 import { useAuthStore } from '@/store/auth.store';
 import { CashBookView, MoneyAccountsView } from './money';
 import { FarmerAccountsView, PayoutsView } from './farmers';
-import { BankReconciliationView, CashTransactionsView, DocumentsView, PeriodCloseView, VatReturnView } from './controls';
+import { BankReconciliationView, DocumentsView, PeriodCloseView, VatReturnView } from './controls';
 import MoneyInput from '@/components/MoneyInput';
 import { ReportExportView } from './exports';
+import { CashTransactionsView } from './expenses';
 
 const MENU = [
   ['Farmers', 'farmer-accounts', ['Owed to Farmers', 'Payouts', 'Farmer Statements']],
@@ -82,6 +83,9 @@ export default function AccountingPage() {
   const [journalFrom, setJournalFrom] = useState('');
   const [journalTo, setJournalTo] = useState('');
   const [journalOrigin, setJournalOrigin] = useState('');
+  // the reporting period of the income statement, balance sheet and cash flow statement; empty = everything to date
+  const [stFrom, setStFrom] = useState('');
+  const [stTo, setStTo] = useState('');
 
   useEffect(() => {
     if (path[0]) setOpenGroup(groupOf(path[0]));
@@ -121,9 +125,9 @@ export default function AccountingPage() {
       'budgets-cooperative-funds/member-contributions': () => accountingApi.memberContributions(),
       'budgets-cooperative-funds/reserves': () => accountingApi.reserves(),
       'budgets-cooperative-funds/approved-allocations': () => accountingApi.approvedAllocations(),
-      'financial-reports/income-statement': () => accountingApi.profitLoss(),
-      'financial-reports/balance-sheet': () => accountingApi.balanceSheet(),
-      'financial-reports/cash-flow-statement': () => accountingApi.cashFlow(),
+      'financial-reports/income-statement': () => accountingApi.profitLoss({ from: stFrom || undefined, to: stTo || undefined }),
+      'financial-reports/balance-sheet': () => accountingApi.balanceSheet({ to: stTo || undefined }),
+      'financial-reports/cash-flow-statement': () => accountingApi.cashFlow({ from: stFrom || undefined, to: stTo || undefined }),
       'financial-reports/farmer-liabilities': () => accountingApi.farmerLiabilities(),
       'general-ledger/period-close': () => Promise.resolve({ data: [] }),
       'expenses-income/expenses': () => Promise.resolve({ data: [] }),
@@ -131,7 +135,7 @@ export default function AccountingPage() {
       'tax-compliance/vat-return': () => Promise.resolve({ data: [] }),
     };
     return calls[key] ?? (() => accountingApi.statements());
-  }, [path[0], path[1], selectedCategory, submenu, trialBalanceAsOf, accountBalancesAsOf, journalSearch, journalFrom, journalTo, journalOrigin]);
+  }, [path[0], path[1], selectedCategory, submenu, trialBalanceAsOf, accountBalancesAsOf, journalSearch, journalFrom, journalTo, journalOrigin, stFrom, stTo]);
 
   useEffect(() => {
     let active = true;
@@ -352,6 +356,7 @@ export default function AccountingPage() {
   });
   const canEditAccounting = currentUser?.role === 'SUPER_ADMIN' || currentUser?.permissions?.some((permission) => permission.resource === 'accounting' && permission.action === 'EDIT');
   const canDeleteAccounting = currentUser?.role === 'SUPER_ADMIN' || currentUser?.permissions?.some((permission) => permission.resource === 'accounting' && permission.action === 'DELETE');
+  const canApproveExpenses = currentUser?.role === 'SUPER_ADMIN' || currentUser?.permissions?.some((permission) => permission.resource === 'expense_approval' && permission.action === 'EDIT');
   const canCreateAccounting = currentUser?.role === 'SUPER_ADMIN' || currentUser?.permissions?.some((permission) => permission.resource === 'accounting' && permission.action === 'CREATE');
   const reportDate = (value?: string | null) => {
     if (!value) return null;
@@ -374,8 +379,8 @@ export default function AccountingPage() {
     : customKey === 'cash-banking/mobile-money' ? <CashBookView kind="MOBILE_MONEY" />
     : customKey === 'cash-banking/bank-reconciliation' ? <BankReconciliationView canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} canDelete={!!canDeleteAccounting} />
     : customKey === 'general-ledger/period-close' ? <PeriodCloseView canClose={!!canEditAccounting} canReopen={!!canDeleteAccounting} />
-    : customKey === 'expenses-income/expenses' ? <CashTransactionsView kind="EXPENSE" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
-    : customKey === 'expenses-income/other-income' ? <CashTransactionsView kind="INCOME" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
+    : customKey === 'expenses-income/expenses' ? <CashTransactionsView kind="EXPENSE" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} canApprove={!!canApproveExpenses} />
+    : customKey === 'expenses-income/other-income' ? <CashTransactionsView kind="INCOME" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} canApprove={false} />
     : customKey === 'financial-reports/export-archive' ? <ReportExportView />
     : customKey === 'tax-compliance/vat-return' ? <VatReturnView canCreate={!!canCreateAccounting} />
     : customKey === 'rice-sales-receivables/customer-debtors' ? <DocumentsView kind="invoice" canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
@@ -416,6 +421,14 @@ export default function AccountingPage() {
       </aside>
       <div className="accounting-workspace">
       <>
+      {['financial-reports/income-statement', 'financial-reports/balance-sheet', 'financial-reports/cash-flow-statement'].includes(customKey) && (
+        <section className="glass-card" style={{ padding: 14, marginBottom: 14, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          {customKey !== 'financial-reports/balance-sheet' && <label className="form-label" style={{ margin: 0 }}>From<input className="input-field" type="date" value={stFrom} max={stTo || undefined} onChange={(e) => setStFrom(e.target.value)} /></label>}
+          <label className="form-label" style={{ margin: 0 }}>{customKey === 'financial-reports/balance-sheet' ? 'As at' : 'To'}<input className="input-field" type="date" value={stTo} min={customKey === 'financial-reports/balance-sheet' ? undefined : stFrom || undefined} onChange={(e) => setStTo(e.target.value)} /></label>
+          <button type="button" className="btn-secondary" onClick={() => { setStFrom(''); setStTo(''); }} disabled={!stFrom && !stTo}>All dates</button>
+          <Link href="/dashboard/accounting/financial-reports/export-archive" className="btn-secondary">Download as PDF, Word or Excel</Link>
+        </section>
+      )}
       {customView ? customView : approvedAllocationReport ? <div className="approved-allocation-report">
         <section className="glass-card" style={{ padding: 20, marginBottom: 16 }}><h2 style={{ margin: 0, fontSize: 20 }}>Approved Allocations</h2><p className="muted" style={{ margin: '6px 0 0' }}>Account allocations from budgets approved by an accounting editor.</p></section>
         <div className="metric-grid" style={{ marginBottom: 16 }}>

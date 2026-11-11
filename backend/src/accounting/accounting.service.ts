@@ -75,6 +75,11 @@ const CHART = [
  */
 export type LedgerScope = { mamcosId?: string | null };
 
+/** A plain date (YYYY-MM-DD) means the whole Tanzanian day: from its first moment, or up to its last. Anything else is used as given. */
+const DAY_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+export const dayStart = (v: string) => new Date(DAY_ONLY.test(v) ? `${v}T00:00:00+03:00` : v);
+export const dayEnd = (v: string) => new Date(DAY_ONLY.test(v) ? `${v}T23:59:59.999+03:00` : v);
+
 @Injectable()
 export class AccountingService {
   constructor(
@@ -239,8 +244,8 @@ export class AccountingService {
       where: {
         ...scope,
         entryDate: {
-          ...(from ? { gte: new Date(from) } : {}),
-          ...(to ? { lte: new Date(to) } : {}),
+          ...(from ? { gte: dayStart(from) } : {}),
+          ...(to ? { lte: dayEnd(to) } : {}),
         },
       },
       include: { account: true },
@@ -261,7 +266,7 @@ export class AccountingService {
   }
   async balanceSheet(scope: LedgerScope, to?: string) {
     await this.accounts();
-    const asOf = to ? new Date(to) : undefined;
+    const asOf = to ? dayEnd(to) : undefined;
     const entries = await this.prisma.ledgerEntry.findMany({
       where: { ...scope, ...(asOf ? { entryDate: { lte: asOf } } : {}) },
       include: { account: true },
@@ -299,7 +304,7 @@ export class AccountingService {
       where: {
         ...scope,
         entryDate: {
-          ...(to ? { lte: new Date(to) } : {}),
+          ...(to ? { lte: dayEnd(to) } : {}),
         },
       },
       include: { account: true },
@@ -308,7 +313,7 @@ export class AccountingService {
     const allCashEntries = entries.filter(
       (entry) => entry.account.code === '1000',
     );
-    const startDate = from ? new Date(from) : undefined;
+    const startDate = from ? dayStart(from) : undefined;
     const cashEntries = allCashEntries.filter((entry) =>
       !startDate || entry.entryDate >= startDate,
     );

@@ -1400,4 +1400,8 @@ export const SW_MESSAGES: Record<string, string> = {
   "Enter the supervisor’s full name": "Weka jina kamili la msimamizi",
   "Enter the supervisor’s phone number": "Weka namba ya simu ya msimamizi",
   "Enter a valid phone number for the supervisor, for example +255712345678": "Weka namba sahihi ya simu ya msimamizi, mfano +255712345678",
+  "Another person must approve this expense": "Mtu mwingine lazima aidhinishe matumizi haya",
+  "This record is not waiting for approval": "Rekodi hii haisubiri idhini",
+  "A cancelled record cannot be changed": "Rekodi iliyobatilishwa haiwezi kubadilishwa",
+  "A correction keeps the same kind: expense or income.": "Marekebisho yanabaki na aina ileile: matumizi au mapato.",
 };

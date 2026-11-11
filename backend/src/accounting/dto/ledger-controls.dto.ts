@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class CloseBooksDto {
   /** Last day of the month to close through (YYYY-MM-DD). */
@@ -66,6 +66,25 @@ export class CreateCashTransactionDto {
   @IsOptional() @IsString() reference?: string;
   @IsOptional() @IsString() note?: string;
   @IsOptional() @IsBoolean() includesVat?: boolean;
+  /** Receipt photos or files already uploaded (their URLs). */
+  @IsOptional() @IsArray() @ArrayMaxSize(5) @IsString({ each: true }) attachments?: string[];
+}
+/** What may be changed on a record without touching the books. */
+export class UpdateCashTransactionDto {
+  @IsOptional() @IsString() @MaxLength(120) party?: string;
+  @IsOptional() @IsString() @MaxLength(120) reference?: string;
+  @IsOptional() @IsString() @MaxLength(500) note?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(5) @IsString({ each: true }) attachments?: string[];
+}
+export class CorrectCashTransactionDto extends CreateCashTransactionDto {
+  @IsString() @IsNotEmpty() reason: string;
+}
+export class RejectCashTransactionDto {
+  @IsString() @IsNotEmpty() reason: string;
+}
+export class CashSettingsDto {
+  /** Expenses of this amount or more need approval; null or 0 switches approval off. */
+  @IsOptional() @IsNumber() @Min(0) approvalThreshold?: number | null;
 }
 export class VoidCashTransactionDto {
   @IsString() @IsNotEmpty() reason: string;
