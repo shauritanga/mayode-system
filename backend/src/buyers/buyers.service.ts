@@ -26,12 +26,18 @@ export class BuyersService {
       orderBy: { name: 'asc' },
     });
     if (!buyers.length) return [];
-    const ids = buyers.map((b) => b.id);
+    const stats = await this.statsFor(buyers.map((b) => b.id));
+    return buyers.map((b) => ({ ...b, stats: stats.get(b.id) }));
+  }
+
+  /** What each buyer has bought, still owes, and has asked for, in one pass. */
+  private async statsFor(ids: string[]) {
     const [sales, unpaid, orders, agreements] = await Promise.all([
       this.prisma.sale.groupBy({
         by: ['buyerId'],
         where: { buyerId: { in: ids } },
         _sum: { quantityKg: true, totalRevenue: true },
+        _count: { _all: true },
       }),
       this.prisma.sale.groupBy({
         by: ['buyerId'],
@@ -52,17 +58,25 @@ export class BuyersService {
     ]);
     const by = <T extends { buyerId: string }>(rows: T[]) => new Map(rows.map((r) => [r.buyerId, r]));
     const s = by(sales), u = by(unpaid), o = by(orders), a = by(agreements);
-    return buyers.map((b) => ({
-      ...b,
-      stats: {
-        soldKg: s.get(b.id)?._sum.quantityKg ?? 0,
-        soldValue: s.get(b.id)?._sum.totalRevenue ?? 0,
-        outstanding: u.get(b.id)?._sum.totalRevenue ?? 0,
-        openOrders: o.get(b.id)?._count._all ?? 0,
-        requiredKg: o.get(b.id)?._sum.quantityRequiredKg ?? 0,
-        activeAgreements: a.get(b.id)?._count._all ?? 0,
-      },
-    }));
+    return new Map(ids.map((id) => [id, {
+      sales: s.get(id)?._count._all ?? 0,
+      soldKg: s.get(id)?._sum.quantityKg ?? 0,
+      soldValue: s.get(id)?._sum.totalRevenue ?? 0,
+      outstanding: u.get(id)?._sum.totalRevenue ?? 0,
+      openOrders: o.get(id)?._count._all ?? 0,
+      requiredKg: o.get(id)?._sum.quantityRequiredKg ?? 0,
+      activeAgreements: a.get(id)?._count._all ?? 0,
+    }]));
+  }
+
+  /** One buyer with the trading record and the latest sales, for the details panel. */
+  async detail(id: string, actor: TenantActor) {
+    const buyer = await this.findOne(id, actor);
+    const [stats, recentSales] = await Promise.all([
+      this.statsFor([id]),
+      this.prisma.sale.findMany({ where: { buyerId: id }, orderBy: { saleDate: 'desc' }, take: 8, select: { id: true, saleDate: true, quantityKg: true, pricePerKg: true, totalRevenue: true, paymentReceived: true } }),
+    ]);
+    return { ...buyer, stats: stats.get(id), recentSales };
   }
 
   /** Last 9 digits — matches TZ MSISDN regardless of +255 / 0 prefix. */

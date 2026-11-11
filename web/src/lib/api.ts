@@ -533,6 +533,7 @@ export const auditLogsApi = {
 };
 export const buyersApi = {
   list: () => api.get('/buyers'),
+  getOne: (id: string) => api.get(`/buyers/${id}`),
   create: (data: object) => api.post('/buyers', data),
   update: (id: string, data: object) => api.patch(`/buyers/${id}`, data),
   remove: (id: string) => api.delete(`/buyers/${id}`),

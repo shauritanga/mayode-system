@@ -85,7 +85,11 @@ function Combo({ label, hint, placeholder, selected, onClear, onPick, load, deps
   );
 }
 
-function Record({ onDone }: { onDone: (m: string) => void }) {
+const card: React.CSSProperties = { background: 'var(--bg-elevated, rgba(127,127,127,.08))', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '12px 14px' };
+const row2: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px 16px', alignItems: 'start' };
+
+/** The "Record Payment" dialog: pick the farm, rice type and combine, enter the harvest and the money, and see what it adds up to before confirming. */
+function RecordModal({ onClose, onDone }: { onClose: () => void; onDone: (m: string) => void }) {
   const settings = useApi<any>(() => harvestCollectionsApi.settings(), []);
   const { schemeId } = useSchemeScope();
   const rice = useApi<any>(() => riceVarietiesApi.list(), []);
@@ -93,95 +97,159 @@ function Record({ onDone }: { onDone: (m: string) => void }) {
   const [riceId, setRiceId] = useState('');
   const riceList: any[] = (Array.isArray(rice.data) ? rice.data : rice.data?.data ?? []).filter((v: any) => v.isActive !== false);
   const [farmIdText, setFarmIdText] = useState(''); const [ctx, setCtx] = useState<any>(null); const [ctxError, setCtxError] = useState('');
-  const [reg, setReg] = useState(''); const [combine, setCombine] = useState<any>(null); const [regError, setRegError] = useState('');
+  const [reg, setReg] = useState(''); const [combine, setCombine] = useState<any>(null);
   const [bags, setBags] = useState(''); const [baskets, setBaskets] = useState(''); const [kg, setKg] = useState(''); const [amount, setAmount] = useState(''); const [day, setDay] = useState(todayISO());
   const [received, setReceived] = useState(true); const [collector, setCollector] = useState(''); const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [confirmClose, setConfirmClose] = useState(false);
   const per = settings.data?.basketsPerBag ?? 2;
   const totalBags = (Number(bags) || 0) + (Number(baskets) || 0) / per;
-  const lookupFarm = async (text = farmIdText) => { setCtx(null); setCtxError(''); if (!text.trim()) return; try { const r = await harvestCollectionsApi.context(text.trim()); setCtx(r.data); setCollector(''); } catch (e) { setCtxError(errMsg(e, 'Farm ID not found.')); } };
+  const worth = settings.data?.pricePerBag ? totalBags * settings.data.pricePerBag : null;
+  const dirty = !!(farmIdText || reg || riceId || bags || baskets || kg || amount || note);
+  const canSave = !!farmIdText && !!reg && !!riceId && amount !== '' && (totalBags > 0 || Number(kg) > 0) && !busy;
+  // closing by a click outside or Escape asks first when something has been typed; Cancel and ✕ close at once
+  const askClose = () => { if (busy) return; if (dirty) setConfirmClose(true); else onClose(); };
+  const lookupFarm = async (text: string) => { setCtx(null); setCtxError(''); if (!text.trim()) return; try { const r = await harvestCollectionsApi.context(text.trim()); setCtx(r.data); setCollector(''); } catch (e) { setCtxError(errMsg(e, 'Farm ID not found.')); } };
   const save = async () => {
     setBusy(true); setError('');
     try {
       const r: any = await harvestCollectionsApi.create({ farmId: farmIdText.trim(), registrationNumber: reg.trim(), riceVarietyId: riceId || undefined, harvestedOn: day, bags: bags ? Number(bags) : undefined, baskets: baskets ? Number(baskets) : undefined, quantityKg: kg ? Number(kg) : undefined, amount: Number(amount), collected: received, collectorFarmerId: received && collector ? collector : undefined, note: note.trim() || undefined });
       printReceipt(r.data);
-      setFarmIdText(''); setCtx(null); setBags(''); setBaskets(''); setKg(''); setAmount(''); setNote('');
       onDone(`${r.data.receiptNo} saved${r.data.status === 'COLLECTED' ? ': the farmer and both leaders were texted.' : '. It is pending until the leader records the money.'}`);
-    } catch (e) { setError(errMsg(e, 'Could not save the payment.')); } finally { setBusy(false); }
+      onClose();
+    } catch (e) { setError(errMsg(e, 'Could not save the payment.')); setBusy(false); }
   };
   return (
-    <section className="table-panel" style={{ padding: 16, maxWidth: 760 }}>
-      <strong>Record a harvest payment</strong>
-      <div className="muted" style={{ fontSize: 12.5, margin: '2px 0 12px' }}>Enter the Farm ID and the combine’s registration number: the farmer and the machine’s details come up. A receipt is made when you save.</div>
-      {error && <Notice tone="error">{error}</Notice>}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div>
-          <Combo label="Farm ID" hint="Click to choose, or type a Farm ID such as 1:1R-1 or the farmer’s name" placeholder="Select or search a Farm ID" selected={ctx || farmIdText ? `${farmIdText}${ctx?.farmer?.name ? ` · ${ctx.farmer.name}` : ''}` : null}
-            onClear={() => { setFarmIdText(''); setCtx(null); setCtxError(''); }} deps={[schemeId]}
-            load={async (q) => (schemeId ? ((await irrigationApi.hectares({ schemeId, status: 'ALLOCATED', q: q || undefined, page: 1, pageSize: 20 })).data.data as any[]).map((h) => ({ id: h.id, label: farmId(h.code), sub: h.farmer?.name ?? '', raw: h })) : [])}
-            onPick={(o) => { const id = farmId(o.raw.code); setFarmIdText(id); void lookupFarm(id); }} />
-          {ctxError && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 12.5 }}>{ctxError}</div>}
-          {ctx && <div style={{ fontSize: 12.5, marginTop: 4 }}><strong>{ctx.farmer?.name ?? 'Nobody holds this hectare'}</strong>{ctx.farmer ? ` · ${ctx.farmer.memberNumber}` : ''}<div className="muted">{ctx.leaders.map((l: any) => `${POSITION[l.position]}: ${l.name}`).join(' · ') || 'No leaders appointed'}</div></div>}
-        </div>
-        <div>
-          <Combo label="Combine registration number" hint="Click to choose a registered combine, or type to search" placeholder="Select or search a combine" selected={reg ? `${reg}${combine?.make ? ` · ${combine.make} ${combine.model ?? ''}` : ''}` : null}
-            onClear={() => { setReg(''); setCombine(null); setRegError(''); }} deps={[combines.data]}
-            load={async (q) => ((combines.data?.data ?? []) as any[]).filter((c) => c.isActive !== false && (!q || `${c.registrationNumber} ${c.make ?? ''} ${c.model ?? ''} ${c.ownerName ?? ''}`.toLowerCase().includes(q.toLowerCase()))).map((c) => ({ id: c.id, label: c.registrationNumber, sub: `${c.make ?? ''} ${c.model ?? ''}`.trim() || c.ownerName || '', raw: c }))}
-            onPick={(o) => { setReg(o.raw.registrationNumber); setCombine(o.raw); setRegError(''); }} />
-          {regError && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 12.5 }}>{regError} Register it on the Combines tab first.</div>}
-          {combine && <div style={{ fontSize: 12.5, marginTop: 4 }}><strong>{combine.registrationNumber}</strong>{combine.make ? ` · ${combine.make} ${combine.model ?? ''}` : ''}<div className="muted">Owner {combine.ownerName}{combine.operatorName ? ` · operator ${combine.operatorName}` : ''}{!combine.isActive ? ' · NOT ACTIVE' : ''}</div></div>}
-        </div>
-      </div>
-      <div style={{ marginTop: 12, maxWidth: 360 }}>
-        <Field label="Rice type"><select className="input-field" value={riceId} onChange={(e) => setRiceId(e.target.value)}><option value="">Choose the rice type…</option>{riceList.map((v: any) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></Field>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginTop: 12 }}>
-        <Field label="Bags"><input type="number" min={0} className="input-field" value={bags} onChange={(e) => setBags(e.target.value)} /></Field>
-        <Field label="Baskets" hint={`${per} baskets = 1 bag`}><input type="number" min={0} step="any" className="input-field" value={baskets} onChange={(e) => setBaskets(e.target.value)} /></Field>
-        <Field label="Kilograms (optional)"><input type="number" min={0} className="input-field" value={kg} onChange={(e) => setKg(e.target.value)} /></Field>
-        <Field label="Harvested on"><input type="date" className="input-field" max={todayISO()} value={day} onChange={(e) => setDay(e.target.value)} /></Field>
-      </div>
-      {totalBags > 0 && <div style={{ fontSize: 13, marginTop: 6 }}>Total <strong>{fmtNum(totalBags, 2)} bags</strong>{settings.data?.pricePerBag ? <> · worth {tzs(totalBags * settings.data.pricePerBag)}</> : null}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-        <Field label="Amount paid (TZS)"><input type="number" min={0} className="input-field" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
-        <Field label="Note"><input className="input-field" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-      </div>
-      <div style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 13.5 }}><input type="checkbox" checked={received} onChange={(e) => setReceived(e.target.checked)} /> The money has been received</label>
-        {received && ctx && <div style={{ marginTop: 8, maxWidth: 320 }}><Field label="Received by" hint="Leave as it is if you are the leader who received it."><select className="input-field" value={collector} onChange={(e) => setCollector(e.target.value)}><option value="">Me</option>{ctx.leaders.map((l: any) => <option key={l.farmerId} value={l.farmerId}>{l.name} · {POSITION[l.position]}</option>)}</select></Field></div>}
-        {!received && <div className="muted" style={{ fontSize: 12.5 }}>It will wait in the pending list until a leader records that the money was received.</div>}
-      </div>
-      <div style={{ marginTop: 14 }}><button type="button" className="btn-primary" disabled={busy || !farmIdText || !reg || !riceId || amount === ''} onClick={save}>{busy ? 'Saving…' : 'Save and print the receipt'}</button></div>
-    </section>
+    <>
+      <Modal title="Record Payment" subtitle="The farmer and the machine’s details come up as you choose them. A receipt is made when you confirm." width="620px" onClose={askClose}
+        footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
+          <button type="submit" form="record-payment-form" className="btn-primary" disabled={!canSave}>{busy ? 'Processing…' : received ? 'Confirm Payment' : 'Save as pending'}</button></>}>
+        <form id="record-payment-form" onSubmit={(e) => { e.preventDefault(); if (canSave) void save(); }} noValidate>
+          {error && <div role="alert" style={{ marginBottom: 12, background: 'rgba(248,113,113,.12)', border: '1px solid var(--red-400, #f87171)', color: 'var(--red-400, #f87171)', borderRadius: 9, padding: '9px 11px', fontSize: 13, fontWeight: 600 }}>{error}</div>}
+          <div style={row2}>
+            <Combo label="Farm ID *" hint="Choose a farm, or type a Farm ID such as 1:1R-1 or the farmer’s name" placeholder="Select or search a Farm ID" selected={ctx || farmIdText ? `${farmIdText}${ctx?.farmer?.name ? ` · ${ctx.farmer.name}` : ''}` : null}
+              onClear={() => { setFarmIdText(''); setCtx(null); setCtxError(''); }} deps={[schemeId]}
+              load={async (q) => (schemeId ? ((await irrigationApi.hectares({ schemeId, status: 'ALLOCATED', q: q || undefined, page: 1, pageSize: 20 })).data.data as any[]).map((h) => ({ id: h.id, label: farmId(h.code), sub: h.farmer?.name ?? '', raw: h })) : [])}
+              onPick={(o) => { const id = farmId(o.raw.code); setFarmIdText(id); void lookupFarm(id); }} />
+            <Combo label="Combine registration number *" hint="Choose a registered combine, or type to search" placeholder="Select or search a combine" selected={reg ? `${reg}${combine?.make ? ` · ${combine.make} ${combine.model ?? ''}` : ''}` : null}
+              onClear={() => { setReg(''); setCombine(null); }} deps={[combines.data]}
+              load={async (q) => ((combines.data?.data ?? []) as any[]).filter((c) => c.isActive !== false && (!q || `${c.registrationNumber} ${c.make ?? ''} ${c.model ?? ''} ${c.ownerName ?? ''}`.toLowerCase().includes(q.toLowerCase()))).map((c) => ({ id: c.id, label: c.registrationNumber, sub: `${c.make ?? ''} ${c.model ?? ''}`.trim() || c.ownerName || '', raw: c }))}
+              onPick={(o) => { setReg(o.raw.registrationNumber); setCombine(o.raw); }} />
+          </div>
+          {ctxError && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 12.5, marginTop: 4 }}>{ctxError}</div>}
+          {(ctx || combine) && (
+            <div style={{ ...card, marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, fontSize: 13 }}>
+              {ctx && <div><div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Farm {farmIdText}</div><div style={{ fontWeight: 700, marginTop: 2 }}>{ctx.farmer?.name ?? 'Nobody holds this hectare'}{ctx.farmer ? <span className="muted" style={{ fontWeight: 400 }}> · {ctx.farmer.memberNumber}</span> : null}</div>
+                <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{ctx.leaders.map((l: any) => `${POSITION[l.position]}: ${l.name}`).join(' · ') || 'No leaders appointed'}</div></div>}
+              {combine && <div><div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Combine</div><div style={{ fontWeight: 700, marginTop: 2 }}>{combine.registrationNumber}{combine.make ? <span className="muted" style={{ fontWeight: 400 }}> · {combine.make} {combine.model ?? ''}</span> : null}</div>
+                <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>Owner {combine.ownerName}{combine.operatorName ? ` · operator ${combine.operatorName}` : ''}</div></div>}
+            </div>
+          )}
+          <div style={{ ...row2, marginTop: 14 }}>
+            <Field label="Rice type *"><select className="input-field" value={riceId} onChange={(e) => setRiceId(e.target.value)}><option value="">Choose the rice type…</option>{riceList.map((v: any) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></Field>
+            <Field label="Harvested on *"><input type="date" className="input-field" max={todayISO()} value={day} onChange={(e) => setDay(e.target.value)} /></Field>
+            <Field label="Bags"><input type="number" min={0} className="input-field" value={bags} onChange={(e) => setBags(e.target.value)} /></Field>
+            <Field label="Baskets" hint={`${per} baskets = 1 bag`}><input type="number" min={0} step="any" className="input-field" value={baskets} onChange={(e) => setBaskets(e.target.value)} /></Field>
+            <Field label="Kilograms (optional)"><input type="number" min={0} className="input-field" value={kg} onChange={(e) => setKg(e.target.value)} /></Field>
+            <Field label="Amount paid (TZS) *"><input type="number" min={0} className="input-field" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Enter amount" /></Field>
+          </div>
+          <div style={{ marginTop: 14 }}><Field label="Note"><input className="input-field" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" /></Field></div>
+          <div style={{ ...card, marginTop: 14 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600 }}><input type="checkbox" checked={received} onChange={(e) => setReceived(e.target.checked)} /> The money has been received</label>
+            {received && ctx && <div style={{ marginTop: 10, maxWidth: 340 }}><Field label="Received by" hint="Leave as it is if you are the leader who received it."><select className="input-field" value={collector} onChange={(e) => setCollector(e.target.value)}><option value="">Me</option>{ctx.leaders.map((l: any) => <option key={l.farmerId} value={l.farmerId}>{l.name} · {POSITION[l.position]}</option>)}</select></Field></div>}
+            {!received && <div className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>It will wait in the pending list until a leader records that the money was received.</div>}
+          </div>
+          {(totalBags > 0 || amount !== '') && (
+            <div style={{ ...card, marginTop: 14 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="muted">Total harvest</span><strong>{fmtNum(totalBags, 2)} bags</strong></div>
+                {worth != null && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="muted">Worth at {tzs(settings.data.pricePerBag)} a bag</span><span>{tzs(worth)}</span></div>}
+                {amount !== '' && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="muted">Amount paid</span><span>{tzs(Number(amount))}</span></div>}
+              </div>
+              <div style={{ marginTop: 10, borderRadius: 8, padding: '9px 12px', fontSize: 13, fontWeight: 600, background: received ? 'rgba(74,222,128,.12)' : 'rgba(251,191,36,.12)', color: received ? 'var(--green-400, #4ade80)' : '#fbbf24' }}>
+                {received ? '✓ Confirming records the payment, prints the receipt, and texts the farmer and both leaders' : 'This will be saved as pending until the money is received'}
+              </div>
+            </div>
+          )}
+        </form>
+      </Modal>
+      {confirmClose && (
+        <Modal title="Close without saving?" width="400px" onClose={() => setConfirmClose(false)}
+          footer={<><button type="button" className="btn-secondary" onClick={onClose}>Discard</button><button type="button" className="btn-primary" autoFocus onClick={() => setConfirmClose(false)}>Keep editing</button></>}>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>What you have entered will be lost. Do you want to keep editing?</p>
+        </Modal>
+      )}
+    </>
   );
 }
 
-function Payments({ canEdit }: { canEdit: boolean }) {
-  const [status, setStatus] = useState('ALL'); const [refresh, setRefresh] = useState(0); const [msg, setMsg] = useState(''); const [voiding, setVoiding] = useState<any>(null);
-  const { data, loading, error, reload } = useApi<any>(() => harvestCollectionsApi.list({ status }), [status, refresh]);
-  const rows: any[] = data?.data ?? [];
+function Payments({ canEdit, canRecord }: { canEdit: boolean; canRecord: boolean }) {
+  const [filter, setFilter] = useState<'ALL' | 'COLLECTED' | 'PENDING'>('ALL'); const [search, setSearch] = useState(''); const [refresh, setRefresh] = useState(0);
+  const [msg, setMsg] = useState(''); const [voiding, setVoiding] = useState<any>(null); const [recording, setRecording] = useState(false);
+  const { data, loading, error, reload } = useApi<any>(() => harvestCollectionsApi.list({ status: 'ALL' }), [refresh]);
+  const all: any[] = (data?.data ?? []).filter((r: any) => !r.voidedAt);
+  const count = (k: string) => (k === 'ALL' ? all.length : all.filter((r) => r.status === k).length);
+  const q = search.trim().toLowerCase();
+  const rows = all.filter((r) => (filter === 'ALL' || r.status === filter) && (!q || `${r.receiptNo} ${r.farmId} ${r.farmer?.name ?? ''} ${r.combine.registrationNumber} ${r.riceType ?? ''}`.toLowerCase().includes(q)));
+  const sum = (list: any[], f: (r: any) => number) => list.reduce((n, r) => n + f(r), 0);
   const collect = async (r: any) => { try { await harvestCollectionsApi.collect(r.id); setMsg('Recorded as collected. The farmer and the leaders were texted.'); setRefresh((n) => n + 1); } catch (e) { setMsg(errMsg(e, 'Could not record it.')); } };
+  const pill = (active: boolean): React.CSSProperties => ({ border: `1px solid ${active ? 'var(--accent, #34d399)' : 'var(--border-subtle)'}`, background: active ? 'var(--accent-dim, rgba(52,211,153,.14))' : 'transparent', color: 'inherit', borderRadius: 999, padding: '5px 12px', fontSize: 13, cursor: 'pointer', fontWeight: active ? 600 : 500 });
+  const initials = (n?: string) => (n ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase();
+  const th: React.CSSProperties = { textAlign: 'left', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--text-muted, #94a3b8)', padding: '8px 14px', whiteSpace: 'nowrap' };
   return (
     <div>
       {msg && <Notice tone="success" onDismiss={() => setMsg('')}>{msg}</Notice>}
       <LoadError message={error} onRetry={reload} />
-      <div style={{ marginBottom: 10 }}><select className="input-field" style={{ width: 230 }} aria-label="Show" value={status} onChange={(e) => setStatus(e.target.value)}><option value="ALL">All payments</option><option value="PENDING">Waiting to be collected</option><option value="COLLECTED">Collected</option></select></div>
-      {loading && !data ? <TableSkeleton cols={6} /> : !rows.length ? <Empty title="No harvest payments" /> : (
-        <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Receipt</th><th>Farm ID</th><th>Combine</th><th className="num">Bags</th><th className="num">Amount</th><th>Collected</th><th /></tr></thead><tbody>
-          {rows.map((r) => (
-            <tr key={r.id}>
-              <td>{r.receiptNo}<div className="muted" style={{ fontSize: 11 }}>{fmtDate(r.harvestedOn)}</div></td>
-              <td>{r.farmId}<div className="muted" style={{ fontSize: 11 }}>{r.farmer?.name}</div></td><td>{r.combine.registrationNumber}</td><td className="num">{fmtNum(r.totalBags, 1)}{r.riceType && <div className="muted" style={{ fontSize: 11 }}>{r.riceType}</div>}</td><td className="num">{tzs(r.amount)}</td>
-              <td>{r.status === 'COLLECTED' ? <>{r.collectedByName}<div className="muted" style={{ fontSize: 11 }}>{POSITION[r.collectedByPosition]} · {fmtDate(r.collectedAt)}</div></> : <span className="badge badge-gold">Waiting{r.daysWaiting ? ` · ${r.daysWaiting} d` : ''}</span>}</td>
-              <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                <button type="button" className="btn-secondary" style={{ marginRight: 6 }} onClick={async () => { try { printReceipt((await harvestCollectionsApi.receipt(r.id)).data); } catch (e) { setMsg(errMsg(e, 'Could not open the receipt.')); } }}>Print</button>
-                {canEdit && r.status === 'PENDING' && <button type="button" className="btn-primary" style={{ marginRight: 6 }} onClick={() => collect(r)}>Mark collected</button>}
-                {canEdit && <button type="button" className="btn-secondary" onClick={() => setVoiding(r)}>Void</button>}
-              </td>
-            </tr>
-          ))}
-        </tbody></table></div>
-      )}
+      <div className="metric-grid" style={{ marginBottom: 14 }}>
+        <StatCard label="Payments" value={String(all.length)} />
+        <StatCard label="Bags harvested" value={fmtNum(sum(all, (r) => r.totalBags), 1)} />
+        <StatCard label="Collected" value={tzs(sum(all.filter((r) => r.status === 'COLLECTED'), (r) => r.amount))} tone="good" />
+        <StatCard label="Not collected yet" value={tzs(sum(all.filter((r) => r.status === 'PENDING'), (r) => r.amount))} tone={count('PENDING') ? 'warn' : 'good'} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {([['ALL', 'All'], ['COLLECTED', 'Collected'], ['PENDING', 'Pending']] as const).map(([k, label]) => (
+            <button key={k} type="button" style={pill(filter === k)} onClick={() => setFilter(k)}>{label} <span className="muted" style={{ marginLeft: 4 }}>{count(k)}</span></button>))}
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input className="input-field" style={{ width: 220 }} placeholder="Search payments…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          {canRecord && <button type="button" className="btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={() => setRecording(true)}>+ Record Payment</button>}
+        </div>
+      </div>
+      <div className="table-panel" style={{ overflow: 'hidden' }}>
+        {loading && !data ? <TableSkeleton cols={7} /> : !rows.length ? <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>{all.length ? 'No payments match.' : 'No harvest payments yet.'}{canRecord && !all.length ? <div style={{ marginTop: 12 }}><button type="button" className="btn-primary" onClick={() => setRecording(true)}>+ Record the first payment</button></div> : null}</div> : (
+          <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr style={{ borderBottom: '1px solid var(--border-subtle)' }}><th style={{ ...th, paddingLeft: 20 }}>Farmer</th><th style={th}>Farm ID</th><th style={th}>Combine</th><th style={th}>Rice type</th><th style={{ ...th, textAlign: 'right' }}>Bags</th><th style={{ ...th, textAlign: 'right' }}>Amount</th><th style={th}>Status</th><th style={th} /></tr></thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                  <td style={{ padding: '11px 14px', paddingLeft: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                      <div aria-hidden style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(52,211,153,.18)', color: 'var(--accent, #34d399)', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>{initials(r.farmer?.name)}</div>
+                      <div><div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.farmer?.name ?? '—'}</div><div className="muted" style={{ fontSize: 11.5 }}>{r.receiptNo} · {fmtDate(r.harvestedOn)}</div></div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '11px 14px', fontWeight: 600, fontSize: 13.5 }}>{r.farmId}</td>
+                  <td style={{ padding: '11px 14px', fontSize: 13.5 }}>{r.combine.registrationNumber}</td>
+                  <td style={{ padding: '11px 14px', fontSize: 13 }}>{r.riceType ?? '—'}</td>
+                  <td style={{ padding: '11px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtNum(r.totalBags, 1)}</td>
+                  <td style={{ padding: '11px 14px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{tzs(r.amount)}</td>
+                  <td style={{ padding: '11px 14px' }}>
+                    {r.status === 'COLLECTED'
+                      ? <><span style={{ background: 'rgba(74,222,128,.14)', color: 'var(--green-400, #4ade80)', padding: '2px 9px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>Collected</span><div className="muted" style={{ fontSize: 11.5, marginTop: 3 }}>{r.collectedByName} · {POSITION[r.collectedByPosition]} · {fmtDate(r.collectedAt)}</div></>
+                      : <span style={{ background: 'rgba(251,191,36,.14)', color: '#fbbf24', padding: '2px 9px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>Waiting{r.daysWaiting ? ` · ${r.daysWaiting} d` : ''}</span>}
+                  </td>
+                  <td style={{ padding: '11px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <button type="button" className="btn-secondary" style={{ marginRight: 6 }} onClick={async () => { try { printReceipt((await harvestCollectionsApi.receipt(r.id)).data); } catch (e) { setMsg(errMsg(e, 'Could not open the receipt.')); } }}>Print</button>
+                    {canEdit && r.status === 'PENDING' && <button type="button" className="btn-primary" style={{ marginRight: 6 }} onClick={() => collect(r)}>Mark collected</button>}
+                    {canEdit && <button type="button" className="btn-secondary" onClick={() => setVoiding(r)}>Void</button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        )}
+      </div>
+      {recording && <RecordModal onClose={() => setRecording(false)} onDone={(m) => { setMsg(m); setRefresh((n) => n + 1); }} />}
       {voiding && <ConfirmDialog title={`Void ${voiding.receiptNo}`} danger askReason reasonLabel="Why is it voided?" confirmLabel="Void payment" body={<>It stops counting in the totals. The record stays.</>}
         onConfirm={async (reason) => { await harvestCollectionsApi.void(voiding.id, reason); setMsg('Voided.'); setRefresh((n) => n + 1); }} onClose={() => setVoiding(null)} />}
     </div>
@@ -258,23 +326,21 @@ function Combines() {
   );
 }
 
-type Tab = 'record' | 'payments' | 'report' | 'combines';
+type Tab = 'payments' | 'report' | 'combines';
 
 /** Combine harvest payments: who harvested which hectare, how many bags, what was paid, and which leader collected it. */
 export default function CombineHarvestsPage() {
   const user = useAuthStore((s) => s.user); const can = useCan();
   const canRecord = can('harvest_collections', 'CREATE');
-  const [tab, setTab] = useState<Tab>(canRecord ? 'record' : 'payments'); const [msg, setMsg] = useState(''); const [bump, setBump] = useState(0);
+  const [tab, setTab] = useState<Tab>('payments');
   if (!can('harvest_collections', 'VIEW')) return <Empty title="You do not have access to this section" hint="Ask an administrator to grant the combine harvest payments permission." />;
   if (!user?.mamcosId) return <><PageHeader title="Combine Harvests" /><Empty title="This belongs to an AMCOS" hint="Sign in with an AMCOS account." /></>;
   return (
     <div>
       <PageHeader title="Combine Harvests" subtitle="Payments for combine harvesting, tied to the Farm ID and the machine’s registration number, with the leader who collected each one." />
-      {msg && <Notice tone="success" onDismiss={() => setMsg('')}>{msg}</Notice>}
-      <Tabs tabs={[...(canRecord ? [{ id: 'record' as Tab, label: 'Record a payment' }] : []), { id: 'payments' as Tab, label: 'Payments' }, { id: 'report' as Tab, label: 'By combine' }, ...(can('combine_harvesters', 'VIEW') ? [{ id: 'combines' as Tab, label: 'Combines & settings' }] : [])]} active={tab} onChange={setTab} />
-      <div style={{ marginTop: 14 }} key={`${tab}-${bump}`}>
-        {tab === 'record' && <Record onDone={(m) => { setMsg(m); setBump((n) => n + 1); }} />}
-        {tab === 'payments' && <Payments canEdit={can('harvest_collections', 'EDIT')} />}
+      <Tabs tabs={[{ id: 'payments' as Tab, label: 'Payments' }, { id: 'report' as Tab, label: 'By combine' }, ...(can('combine_harvesters', 'VIEW') ? [{ id: 'combines' as Tab, label: 'Combines & settings' }] : [])]} active={tab} onChange={setTab} />
+      <div style={{ marginTop: 14 }} key={tab}>
+        {tab === 'payments' && <Payments canEdit={can('harvest_collections', 'EDIT')} canRecord={canRecord} />}
         {tab === 'report' && <Report />}
         {tab === 'combines' && <Combines />}
       </div>

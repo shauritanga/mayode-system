@@ -59,7 +59,7 @@ export class BuyersController {
   )
   @RequirePermission('buyers', 'VIEW')
   findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
-    return this.buyers.findOne(id, user);
+    return this.buyers.detail(id, user);
   }
 
   @Patch(':id')

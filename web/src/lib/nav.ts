@@ -313,6 +313,7 @@ export const navGroups: NavGroup[] = [
       { href: '/dashboard/collection-centres', label: 'Collection Centres', icon: Building05Icon, roles: ['MAMCOS_SECRETARY'], resource: 'inventory' },
       { href: '/dashboard/traceability', label: 'Traceability', icon: MapsSearchIcon, roles: ['MAMCOS_SECRETARY', 'AUDITOR'], resource: 'sales' },
       { href: '/dashboard/suppliers', label: 'Suppliers', icon: Package01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'suppliers' },
+      { href: '/dashboard/buyers', label: 'Buyers', icon: UserGroupIcon, roles: ['MAMCOS_SECRETARY'], resource: 'buyers' },
       { href: '/dashboard/finance', label: 'Finance and Accounting', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'finance' },
       { href: '/dashboard/credit', label: 'Credit & Loans', icon: Wallet01Icon, roles: ['MAMCOS_SECRETARY'], resource: 'loans' },
       { href: '/dashboard/marketplace', label: 'M-LAX Marketplace', icon: ShoppingCart02Icon, roles: ['MAMCOS_SECRETARY'], resource: 'marketplace' },
