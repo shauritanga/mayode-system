@@ -44,15 +44,15 @@ function IssueModal({ items, onClose, onDone, canSetup }: { items: any[]; onClos
         {error && <div role="alert" style={{ marginBottom: 12, background: 'rgba(248,113,113,.12)', border: '1px solid var(--red-400, #f87171)', color: 'var(--red-400, #f87171)', borderRadius: 9, padding: '9px 11px', fontSize: 13, fontWeight: 600 }}>{error}</div>}
         {items.length === 0 && (
           <div style={{ ...card, marginBottom: 14, borderColor: '#fbbf24' }}>
-            <strong>No inputs are set up yet.</strong>
-            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{canSetup ? <>Add the inputs you give farmers, and their stock, in <Link href="/dashboard/amcos-settings/farm-inputs">Settings → Farm inputs</Link>.</> : 'Ask an administrator to add them in Settings → Farm inputs.'}</div>
+            <strong>You have not added any inputs yet.</strong>
+            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>Types such as Seed or Fertiliser are only groups. Add the actual items you give farmers, for example Urea under Fertiliser, and then their stock. {canSetup ? <Link href="/dashboard/amcos-settings/farm-inputs?add=1">Add the first input →</Link> : 'Ask an administrator to add them in Settings → Farm inputs.'}</div>
           </div>
         )}
         <div style={row2}>
           <Field label="Farmer *"><FarmerPicker value={farmer} onChange={setFarmer} /></Field>
           <Field label="Input *" hint={items.length ? 'Grouped by type, with what is in stock' : undefined}>
             <select className="input-field" value={itemId} onChange={(e) => setItemId(e.target.value)} disabled={!items.length}>
-              <option value="">{items.length ? 'Choose the input…' : 'No inputs set up'}</option>
+              <option value="">{items.length ? 'Choose the input…' : 'No inputs added yet'}</option>
               {Object.entries(groups).map(([type, list]) => <optgroup key={type} label={type}>{list.map((i) => <option key={i.id} value={i.id}>{i.name} · {i.balance} {i.unit} in stock</option>)}</optgroup>)}
             </select>
           </Field>
@@ -169,8 +169,8 @@ function Stock({ canSetup }: { canSetup: boolean }) {
       <div className="table-panel" style={{ overflow: 'hidden' }}>
         {stock.loading && !stock.data ? <TableSkeleton cols={5} /> : !list.length ? (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>
-            No inputs are set up yet.
-            <div style={{ marginTop: 6 }}>{canSetup ? <Link href="/dashboard/amcos-settings/farm-inputs">Add inputs and stock in Settings → Farm inputs</Link> : 'Ask an administrator to add them in Settings → Farm inputs.'}</div>
+            No inputs have been added yet.
+            <div style={{ marginTop: 6 }}>{canSetup ? <Link href="/dashboard/amcos-settings/farm-inputs?add=1">Add the first input in Settings → Farm inputs</Link> : 'Ask an administrator to add them in Settings → Farm inputs.'}</div>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
