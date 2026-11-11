@@ -11,6 +11,7 @@ import DeliveryDetailModal from '@/components/DeliveryDetailModal';
 import { PAYMENT_BADGE, PAYMENT_LABELS, deliveryBuyers, deliveryVariety, kgs, tzs, type DeliveryRow } from '@/lib/aggregation';
 import { MetricTile, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 import MoneyInput from '@/components/MoneyInput';
+import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 interface Slice { name: string; weightKg: number; count: number; value: number }
 interface DashboardSummary {
@@ -528,12 +529,7 @@ export default function InventoryPage() {
             </label>
             <label className="form-label">
               Rice variety<span style={{ fontWeight: 400, color: 'var(--neutral-500)' }}> (defaults to the crop variety)</span>
-              <input
-                className="input-field"
-                placeholder={selectedCycle?.riceVariety || 'e.g. SARO 5'}
-                value={form.riceVariety}
-                onChange={(event) => setForm((current) => ({ ...current, riceVariety: event.target.value }))}
-              />
+              <RiceTypeSelect value={form.riceVariety} placeholder={selectedCycle?.riceVariety ? `Same as the crop (${selectedCycle.riceVariety})` : 'Choose the rice type…'} onChange={(name) => setForm((current) => ({ ...current, riceVariety: name }))} />
             </label>
             <label className="form-label">
               Bags<span style={{ fontWeight: 400, color: 'var(--neutral-500)' }}> (optional)</span>
@@ -685,12 +681,7 @@ export default function InventoryPage() {
           </label>
           <label className="form-label">
             Rice variety
-            <input
-              className="input-field"
-              placeholder="SARO 5"
-              value={lotForm.riceVariety}
-              onChange={(e) => setLotForm((c) => ({ ...c, riceVariety: e.target.value }))}
-            />
+            <RiceTypeSelect value={lotForm.riceVariety} onChange={(name) => setLotForm((c) => ({ ...c, riceVariety: name }))} />
           </label>
           <label className="form-label">
             Grade (only if the receipts are ungraded)

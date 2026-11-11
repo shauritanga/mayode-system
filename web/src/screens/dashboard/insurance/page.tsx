@@ -11,6 +11,7 @@ import ProductGuide from '@/components/insurance/ProductGuide';
 import ClaimInspectModal from '@/components/insurance/ClaimInspectModal';
 import { MetricTile, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 import MoneyInput from '@/components/MoneyInput';
+import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 interface Provider { id: string; name: string; contactPerson?: string; phone?: string; email?: string; _count?: { policies: number } }
 interface Policy {
@@ -433,7 +434,7 @@ function PoliciesAndClaims() {
               <option value="INPUT_INSURANCE">Input insurance</option>
               <option value="CREDIT_LINKED">Credit-linked crop insurance</option>
             </select>
-            <input className="input-field" placeholder="Rice variety" value={policyForm.riceVariety} onChange={(e) => setPolicyForm({ ...policyForm, riceVariety: e.target.value })} />
+            <RiceTypeSelect placeholder="Rice type" value={policyForm.riceVariety} onChange={(name) => setPolicyForm({ ...policyForm, riceVariety: name })} />
             <input className="input-field" type="number" step="0.1" placeholder="Insured area (hectares)" required value={policyForm.insuredAreaHectares} onChange={(e) => setPolicyForm({ ...policyForm, insuredAreaHectares: e.target.value })} />
             <MoneyInput className="input-field" placeholder="Sum insured (TZS)" required value={policyForm.sumInsured} onChange={(e) => setPolicyForm({ ...policyForm, sumInsured: e.target.value })} />
             <MoneyInput className="input-field" placeholder="Premium amount (TZS)" required value={policyForm.premiumAmount} onChange={(e) => setPolicyForm({ ...policyForm, premiumAmount: e.target.value })} />

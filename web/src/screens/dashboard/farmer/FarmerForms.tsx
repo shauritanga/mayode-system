@@ -9,6 +9,7 @@ import {
 import { suppliersApi } from '@/lib/api';
 import { today, toIso, splitUrls } from './FarmerDataContext';
 import MoneyInput from '@/components/MoneyInput';
+import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 export function SelectFarm({ farms, value, onChange }: { farms: any[]; value: string; onChange: (value: string) => void }) {
   return <label className="form-label">Farm<select className="input-field" value={value} onChange={(e) => onChange(e.target.value)}><option value="">Select farm</option>{farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.farmCode} · {farm.name}</option>)}</select></label>;
@@ -56,7 +57,7 @@ export function CropCycleForm({ farms, onSubmit }: { farms: any[]; onSubmit: (pa
     <form className="form-grid" onSubmit={(event) => { event.preventDefault(); onSubmit({ farmId, season, riceVariety: variety || undefined, plantingDate: toIso(plantingDate), expectedHarvest: toIso(expectedHarvest) }); }}>
       <SelectFarm farms={farms} value={farmId} onChange={setFarmId} />
       <label className="form-label">Season<input className="input-field" required placeholder="2026/2027 Masika" value={season} onChange={(e) => setSeason(e.target.value)} /></label>
-      <label className="form-label">Rice variety<input className="input-field" value={variety} onChange={(e) => setVariety(e.target.value)} /></label>
+      <label className="form-label">Rice type<RiceTypeSelect value={variety} onChange={setVariety} /></label>
       <label className="form-label">Planting date<input className="input-field" type="date" value={plantingDate} onChange={(e) => setPlantingDate(e.target.value)} /></label>
       <label className="form-label">Expected harvest<input className="input-field" type="date" value={expectedHarvest} onChange={(e) => setExpectedHarvest(e.target.value)} /></label>
       <button className="btn-primary" type="submit" disabled={!farmId}>Create cycle</button>

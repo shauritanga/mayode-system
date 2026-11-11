@@ -23,6 +23,7 @@ import { reportsApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 import StandardReports from '@/components/reports/StandardReports';
 import ReportPreviewTable, { type ReportColumn } from '@/components/reports/ReportPreviewTable';
+import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 // ── Types ──
 interface BuilderRelation {
@@ -617,7 +618,7 @@ export default function ReportsPage() {
                       <label className="form-label">Season<input className="input-field" value={filters.season} onChange={(e) => setFilter('season', e.target.value)} /></label>
                     )}
                     {(entityKey === 'crop-cycles' || entityKey === 'sales') && (
-                      <label className="form-label">Rice variety<input className="input-field" value={filters.riceVariety} onChange={(e) => setFilter('riceVariety', e.target.value)} /></label>
+                      <label className="form-label">Rice type<RiceTypeSelect placeholder="All rice types" value={filters.riceVariety} onChange={(name) => setFilter('riceVariety', name)} /></label>
                     )}
                     <label className="form-label">Gender
                       <select className="input-field" value={filters.gender} onChange={(e) => setFilter('gender', e.target.value)}>

@@ -10,6 +10,7 @@ import ErrorBanner from '@/components/ErrorBanner';
 import OrderDetail from '../sale-orders/OrderDetail';
 import WarehouseDispatchPanel from '../inventory/WarehouseDispatchPanel';
 import Link from 'next/link';
+import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 interface Keeper { user: { id: string; firstName?: string; lastName?: string } }
 interface Warehouse {
@@ -223,7 +224,7 @@ function MakeLot({ warehouse, onClose, onDone }: { warehouse: Warehouse; onClose
         <div className="ua-field"><label className="ua-label" htmlFor="ml-no">Lot number</label><input id="ml-no" className="input-field" required minLength={3} placeholder="e.g. LOT-2026-001" value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} /></div>
         <div className="ua-field"><label className="ua-label" htmlFor="ml-grade">Grade</label><input id="ml-grade" className="input-field" required placeholder="e.g. Grade 1" value={grade} onChange={(e) => setGrade(e.target.value)} /><span className="ua-hint">A lot holds one grade. Buyers are sold exactly this grade.</span></div>
         <div className="ua-row">
-          <div className="ua-field"><label className="ua-label" htmlFor="ml-var">Rice variety<span className="ua-opt">optional</span></label><input id="ml-var" className="input-field" placeholder="e.g. Super" value={variety} onChange={(e) => setVariety(e.target.value)} /></div>
+          <div className="ua-field"><label className="ua-label" htmlFor="ml-var">Rice variety<span className="ua-opt">optional</span></label><RiceTypeSelect id="ml-var" value={variety} onChange={setVariety} /></div>
           <div className="ua-field"><label className="ua-label" htmlFor="ml-qty">Weight (kg)</label><input id="ml-qty" className="input-field" type="number" min={1} max={free} step="any" required value={qty} onChange={(e) => setQty(e.target.value)} /></div>
         </div>
         <span className="ua-hint">This is your own rice, with no source farmers, so selling it produces an invoice but no farmer payouts.</span>

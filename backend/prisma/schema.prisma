@@ -291,6 +291,8 @@ model MamcosStaff {
 
 model Mamcos {
   id                  String   @id @default(uuid())
+  riceVarieties       RiceVariety[]
+  inputTypes          InputType[]
   amcosMeetings       AmcosMeeting[]
   tenders             Tender[]
   payrollJobTitles    PayrollJobTitle[]
@@ -925,7 +927,9 @@ model ActivityLog {
 /// each can have its own calendar (a platform RiceProtocol with this varietyId).
 model RiceVariety {
   id           String   @id @default(uuid())
-  name         String   @unique
+  /// Null = a platform-wide type everyone sees; otherwise the cooperative that added it in its settings.
+  mamcosId     String?  @map("mamcos_id")
+  name         String
   code         String?
   /// Days from planting to harvest; used to work out the harvest date when the farmer gives only a planting date.
   maturityDays Int?     @map("maturity_days")
@@ -936,7 +940,9 @@ model RiceVariety {
 
   protocols  RiceProtocol[]
   cropCycles CropCycle[]
+  mamcos     Mamcos?  @relation(fields: [mamcosId], references: [id], onDelete: Cascade)
 
+  @@unique([mamcosId, name])
   @@map("rice_varieties")
 }
 
@@ -5057,8 +5063,11 @@ model FarmInputItem {
   reorderLevel Float?        @map("reorder_level")
   isActive     Boolean       @default(true) @map("is_active")
   createdAt    DateTime      @default(now()) @map("created_at")
+  /// The cooperative's own category for this input (set up in its settings); `type` stays as the broad group.
+  inputTypeId  String?       @map("input_type_id")
 
   movements FarmInputMovement[]
+  inputType InputType?        @relation(fields: [inputTypeId], references: [id], onDelete: SetNull)
 
   @@unique([mamcosId, name])
   @@map("farm_input_items")
@@ -7080,4 +7089,19 @@ model DocumentPayment {
   @@index([kind, documentId])
   @@index([mamcosId, paidAt])
   @@map("document_payments")
+}
+
+/// A category of farm input (Seed, Fertiliser, Herbicide …) a cooperative sets up for itself.
+model InputType {
+  id        String   @id @default(uuid())
+  mamcosId  String   @map("mamcos_id")
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  mamcos Mamcos          @relation(fields: [mamcosId], references: [id], onDelete: Cascade)
+  items  FarmInputItem[]
+
+  @@unique([mamcosId, name])
+  @@map("input_types")
 }

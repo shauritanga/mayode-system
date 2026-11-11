@@ -28,9 +28,9 @@ export class InputDistributionService {
   /** The inputs in stock, with what is left. */
   async items(actor: RequestUser, mamcosIdParam?: string) {
     const mamcosId = tenantOf(this.ownership, actor, mamcosIdParam);
-    const items = await this.prisma.farmInputItem.findMany({ where: { mamcosId, isActive: true }, orderBy: [{ type: 'asc' }, { name: 'asc' }] });
+    const items = await this.prisma.farmInputItem.findMany({ where: { mamcosId, isActive: true }, include: { inputType: { select: { name: true } } }, orderBy: [{ type: 'asc' }, { name: 'asc' }] });
     const sums = await this.prisma.farmInputMovement.groupBy({ by: ['itemId'], where: { itemId: { in: items.map((i) => i.id) } }, _sum: { quantity: true } });
-    return { data: items.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, unitCost: i.unitCost, balance: Math.round((sums.find((s) => s.itemId === i.id)?._sum.quantity ?? 0) * 1000) / 1000 })) };
+    return { data: items.map((i) => ({ id: i.id, name: i.name, type: i.type, typeName: i.inputType?.name ?? i.type.charAt(0) + i.type.slice(1).toLowerCase(), unit: i.unit, unitCost: i.unitCost, balance: Math.round((sums.find((s) => s.itemId === i.id)?._sum.quantity ?? 0) * 1000) / 1000 })) };
   }
 
   private async farmIdsOf(farmerId: string) {

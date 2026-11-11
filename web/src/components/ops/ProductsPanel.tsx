@@ -5,6 +5,7 @@ import { opsApi } from '@/lib/api';
 import { kg, label, tzs } from '@/lib/ops';
 import { DataTable, ErrorNote, Field, FormGrid, Loading, Toolbar, useAction, useLoad } from './ui';
 import MoneyInput from '@/components/MoneyInput';
+import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function ProductsPanel({ canCreate, canEdit }: { canCreate: boolean; canEdit: boolean }) {
@@ -47,7 +48,7 @@ function ProductModal({ product, onClose, onSaved }: { product: any; onClose: ()
         <Field label="Code" hint="Leave blank to generate one"><input className="input-field" value={f.code} onChange={(e) => set('code', e.target.value)} /></Field>
         <Field label="Kind"><select className="input-field" value={f.category} onChange={(e) => set('category', e.target.value)}><option value="PADDY">Paddy</option><option value="PROCESSED">Processed rice</option><option value="BROKEN">Broken rice</option><option value="BYPRODUCT">By-product (bran, husk)</option></select></Field>
         <Field label="Brand"><input className="input-field" value={f.brand} onChange={(e) => set('brand', e.target.value)} /></Field>
-        <Field label="Rice variety"><input className="input-field" value={f.riceVariety} onChange={(e) => set('riceVariety', e.target.value)} /></Field>
+        <Field label="Rice type"><RiceTypeSelect value={f.riceVariety} onChange={(name) => set('riceVariety', name)} /></Field>
         <Field label="Grade"><input className="input-field" value={f.grade} onChange={(e) => set('grade', e.target.value)} /></Field>
         <Field label="Pack size (kg)" hint="For bagged rice, e.g. 5, 10, 25, 50"><input className="input-field" type="number" value={f.packSizeKg} onChange={(e) => set('packSizeKg', e.target.value)} /></Field>
         <Field label="Sold by"><select className="input-field" value={f.unit} onChange={(e) => set('unit', e.target.value)}><option value="kg">Kilogram</option><option value="bag">Bag</option></select></Field>

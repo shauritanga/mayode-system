@@ -100,14 +100,13 @@ function RecordModal({ onClose, onDone }: { onClose: () => void; onDone: (m: str
   const [reg, setReg] = useState(''); const [combine, setCombine] = useState<any>(null);
   const [bags, setBags] = useState(''); const [baskets, setBaskets] = useState(''); const [kg, setKg] = useState(''); const [amount, setAmount] = useState(''); const [day, setDay] = useState(todayISO());
   const [received, setReceived] = useState(true); const [collector, setCollector] = useState(''); const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [confirmClose, setConfirmClose] = useState(false);
+  const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const per = settings.data?.basketsPerBag ?? 2;
   const totalBags = (Number(bags) || 0) + (Number(baskets) || 0) / per;
   const worth = settings.data?.pricePerBag ? totalBags * settings.data.pricePerBag : null;
-  const dirty = !!(farmIdText || reg || riceId || bags || baskets || kg || amount || note);
   const canSave = !!farmIdText && !!reg && !!riceId && amount !== '' && (totalBags > 0 || Number(kg) > 0) && !busy;
-  // closing by a click outside or Escape asks first when something has been typed; Cancel and ✕ close at once
-  const askClose = () => { if (busy) return; if (dirty) setConfirmClose(true); else onClose(); };
+  // a click outside or Escape asks "Close without saving?" once something has been typed (the shared Modal does this)
+  const askClose = () => { if (!busy) onClose(); };
   const lookupFarm = async (text: string) => { setCtx(null); setCtxError(''); if (!text.trim()) return; try { const r = await harvestCollectionsApi.context(text.trim()); setCtx(r.data); setCollector(''); } catch (e) { setCtxError(errMsg(e, 'Farm ID not found.')); } };
   const save = async () => {
     setBusy(true); setError('');
@@ -172,12 +171,6 @@ function RecordModal({ onClose, onDone }: { onClose: () => void; onDone: (m: str
           )}
         </form>
       </Modal>
-      {confirmClose && (
-        <Modal title="Close without saving?" width="400px" onClose={() => setConfirmClose(false)}
-          footer={<><button type="button" className="btn-secondary" onClick={onClose}>Discard</button><button type="button" className="btn-primary" autoFocus onClick={() => setConfirmClose(false)}>Keep editing</button></>}>
-          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>What you have entered will be lost. Do you want to keep editing?</p>
-        </Modal>
-      )}
     </>
   );
 }

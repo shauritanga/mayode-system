@@ -41,7 +41,6 @@ function BuyerModal({ buyer, onClose, onSaved }: { buyer?: Buyer; onClose: () =>
   });
   const [certified, setCertified] = useState(!!buyer?.isCertified);
   const [items, setItems] = useState<string[]>(buyer?.preferredVarieties ?? []);
-  const [itemText, setItemText] = useState('');
   const rice = useApi<any>(() => riceVarietiesApi.list(), []);
   const common: string[] = (Array.isArray(rice.data) ? rice.data : rice.data?.data ?? []).filter((v: any) => v.isActive !== false).map((v: any) => v.name);
   const [busy, setBusy] = useState(false);
@@ -52,7 +51,6 @@ function BuyerModal({ buyer, onClose, onSaved }: { buyer?: Buyer; onClose: () =>
   const addItem = (raw: string) => {
     const v = raw.trim();
     if (v && !items.some((i) => i.toLowerCase() === v.toLowerCase())) setItems((x) => [...x, v]);
-    setItemText('');
   };
   const problems: Record<string, string> = {};
   if (f.name.trim().length < 2) problems.name = 'Enter the buyer’s or business name';
@@ -65,8 +63,7 @@ function BuyerModal({ buyer, onClose, onSaved }: { buyer?: Buyer; onClose: () =>
     setTried(true);
     if (Object.keys(problems).length) return;
     setBusy(true); setError('');
-    const pending = itemText.trim();
-    const preferredVarieties = pending && !items.some((i) => i.toLowerCase() === pending.toLowerCase()) ? [...items, pending] : items;
+    const preferredVarieties = items;
     const body: Record<string, unknown> = {
       name: f.name.trim(), contactPerson: f.contactPerson.trim(), contactPhone: f.phone.trim(), contactEmail: f.email.trim() || undefined,
       businessType: f.businessType || undefined, region: f.region.trim() || undefined, district: f.district.trim() || undefined, location: f.location.trim() || undefined,
@@ -130,16 +127,13 @@ function BuyerModal({ buyer, onClose, onSaved }: { buyer?: Buyer; onClose: () =>
               {items.map((i) => <span key={i} className="badge badge-blue" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>{i}<button type="button" aria-label={`Remove ${i}`} onClick={() => setItems((x) => x.filter((y) => y !== i))} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>×</button></span>)}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input className="input-field" value={itemText} placeholder="Type a variety and press Enter" onChange={(e) => setItemText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addItem(itemText); } }} />
-            <button type="button" className="btn-secondary" onClick={() => addItem(itemText)} disabled={!itemText.trim()}>Add</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select className="input-field" style={{ maxWidth: 280 }} value="" aria-label="Add a rice type" disabled={!common.filter((c) => !items.some((i) => i.toLowerCase() === c.toLowerCase())).length} onChange={(e) => { if (e.target.value) addItem(e.target.value); }}>
+              <option value="">{common.length ? 'Add a rice type…' : 'No rice types set up'}</option>
+              {common.filter((c) => !items.some((i) => i.toLowerCase() === c.toLowerCase())).map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {!common.length && <span className="muted" style={{ fontSize: 12 }}>Add them in Settings → Rice types.</span>}
           </div>
-          {common.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
-              <span className="muted" style={{ fontSize: 12 }}>Common:</span>
-              {common.filter((c) => !items.some((i) => i.toLowerCase() === c.toLowerCase())).map((c) => <button key={c} type="button" className="btn-secondary" style={{ padding: '2px 10px', fontSize: 12 }} onClick={() => addItem(c)}>+ {c}</button>)}
-            </div>
-          )}
         </div>
 
         <Field label="Notes" hint="Optional: prices agreed, payment terms, anything worth remembering"><textarea className="input-field" rows={2} value={f.notes} onChange={(e) => set('notes', e.target.value)} /></Field>

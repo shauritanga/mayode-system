@@ -4,22 +4,25 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import { Clock, LayoutList, Percent, Tractor, Users, Warehouse } from 'lucide-react';
+import { Clock, LayoutList, Package, Percent, Sprout, Tractor, Users, Warehouse } from 'lucide-react';
 import Modal from '@/components/Modal';
 import MoneyInput from '@/components/MoneyInput';
 import { accountingApi, chargesApi, duesApi, machineryApi } from '@/lib/api';
+import { FarmInputsPanel, RiceTypesPanel } from './farm-setup';
 import { Field, LoadError, Notice, TableSkeleton, errMsg, titleCase, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 const KIND_WORDS: Record<string, string> = { LEVY: 'Levy', MEMBERSHIP_FEE: 'Membership fee', CANAL_CLEANING: 'Canal cleaning / water', OTHER: 'Other' };
 
-type Section = 'overview' | 'levies' | 'tools' | 'warehouse' | 'penalties' | 'tax';
+type Section = 'overview' | 'levies' | 'tools' | 'warehouse' | 'penalties' | 'tax' | 'rice' | 'inputs';
 const SECTIONS: { id: Section; slug: string; label: string; description: string; icon: typeof Users }[] = [
   { id: 'overview', slug: 'overview', label: 'Price list', description: 'Every amount your AMCOS charges, on one page.', icon: LayoutList },
   { id: 'levies', slug: 'membership-levies', label: 'Membership & levies', description: 'What farmers pay the AMCOS: membership fee, levies and canal cleaning.', icon: Users },
   { id: 'tools', slug: 'tools-machines', label: 'Tools & machines', description: 'The machines your AMCOS has, and what tools pay to be registered and to work.', icon: Tractor },
   { id: 'warehouse', slug: 'warehouse-milling', label: 'Warehouse & milling', description: 'Fees for milling, storing and delivering rice.', icon: Warehouse },
   { id: 'penalties', slug: 'late-payments', label: 'Late payments', description: 'What happens when a farmer pays late.', icon: Clock },
+  { id: 'rice', slug: 'rice-types', label: 'Rice types', description: 'The rice your farmers grow and sell. Every screen that asks for a rice type offers this list.', icon: Sprout },
+  { id: 'inputs', slug: 'farm-inputs', label: 'Farm inputs', description: 'The kinds of input you give farmers, the inputs under each, and the stock you hold.', icon: Package },
   { id: 'tax', slug: 'vat', label: 'VAT & tax numbers', description: 'VAT registration and rate, and the AMCOS’s tax numbers.', icon: Percent },
 ];
 
@@ -306,6 +309,8 @@ export default function AmcosSettingsPage() {
     warehouse: `${warehouseRows.filter((r) => r.on).length} on`,
     penalties: penaltyRows[0]?.on ? 'On' : 'Off',
     tax: taxRows[0] ? (tax.data?.vatRegistered ? taxRows[0].amount : 'Not on VAT') : '',
+    rice: '',
+    inputs: '',
   };
 
   return (
@@ -365,6 +370,8 @@ export default function AmcosSettingsPage() {
                 </>
               )}
 
+              {selected.id === 'rice' && <RiceTypesPanel canEdit={canCharges} onChanged={done} />}
+              {selected.id === 'inputs' && <FarmInputsPanel canEdit={canCharges} onChanged={done} />}
               {selected.id === 'warehouse' && <ChargeTable rows={warehouseRows} empty="Not available." />}
               {selected.id === 'penalties' && (
                 <>

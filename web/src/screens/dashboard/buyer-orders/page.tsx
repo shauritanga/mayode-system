@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { buyerOrdersApi, buyersApi } from '@/lib/api';
 import { PAYMENT_BADGE, ProgressBar, day, kg, tzs } from '../market/format';
 import MoneyInput from '@/components/MoneyInput';
+import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 interface Buyer { id: string; name: string; isCertified: boolean; deliveryLocation?: string | null; preferredVarieties?: string[] }
 interface BuyerOrder {
@@ -113,7 +114,7 @@ export default function BuyerOrdersPage({ embedded = false }: { embedded?: boole
             <option value="">Select buyer</option>
             {buyers.map((b) => <option key={b.id} value={b.id}>{b.name}{b.isCertified ? ' (Fairtrade certified)' : ''}</option>)}
           </select></label>
-          <label className="form-label">Preferred variety<input className="input-field" value={form.riceVariety} onChange={(e) => setForm((c) => ({ ...c, riceVariety: e.target.value }))} /></label>
+          <label className="form-label">Preferred rice type<RiceTypeSelect value={form.riceVariety} onChange={(name) => setForm((c) => ({ ...c, riceVariety: name }))} /></label>
           <label className="form-label">Quantity required (kg)<input className="input-field" required type="number" min="0.01" step="0.01" value={form.quantityRequiredKg} onChange={(e) => setForm((c) => ({ ...c, quantityRequiredKg: e.target.value }))} /></label>
           <label className="form-label">Offered price (TZS per kg)<MoneyInput className="input-field" min="0" value={form.offeredPricePerKg} onChange={(e) => setForm((c) => ({ ...c, offeredPricePerKg: e.target.value }))} /></label>
           <label className="form-label">Quality grade<input className="input-field" placeholder="e.g. A" value={form.qualityGrade} onChange={(e) => setForm((c) => ({ ...c, qualityGrade: e.target.value }))} /></label>

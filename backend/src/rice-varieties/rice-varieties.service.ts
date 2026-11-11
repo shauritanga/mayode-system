@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -13,10 +14,16 @@ import {
 export class RiceVarietiesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** What a farmer can choose when starting a crop cycle. Staff may also list the hidden ones. */
-  async list(includeInactive = false) {
+  /**
+   * The rice types a person can choose: the platform-wide ones plus those their own cooperative added in its settings.
+   * `tenant` undefined = no limit (Super Admin sees every cooperative's); null = platform-wide only.
+   */
+  async list(includeInactive = false, tenant?: string | null) {
     const varieties = await this.prisma.riceVariety.findMany({
-      where: includeInactive ? {} : { isActive: true },
+      where: {
+        ...(includeInactive ? {} : { isActive: true }),
+        ...(tenant === undefined ? {} : { OR: [{ mamcosId: null }, ...(tenant ? [{ mamcosId: tenant }] : [])] }),
+      },
       orderBy: { name: 'asc' },
       include: {
         protocols: {
@@ -44,10 +51,12 @@ export class RiceVarietiesService {
     return variety;
   }
 
-  private async assertNameFree(name: string, exceptId?: string) {
+  /** A name must be free among what the owner can see: the platform-wide types and its own. */
+  private async assertNameFree(name: string, mamcosId: string | null, exceptId?: string) {
     const clash = await this.prisma.riceVariety.findFirst({
       where: {
         name: { equals: name, mode: 'insensitive' },
+        OR: [{ mamcosId: null }, ...(mamcosId ? [{ mamcosId }] : [])],
         ...(exceptId ? { id: { not: exceptId } } : {}),
       },
       select: { id: true },
@@ -58,11 +67,12 @@ export class RiceVarietiesService {
       );
   }
 
-  async create(dto: CreateRiceVarietyDto) {
+  async create(dto: CreateRiceVarietyDto, mamcosId: string | null = null) {
     const name = dto.name.trim();
-    await this.assertNameFree(name);
+    await this.assertNameFree(name, mamcosId);
     return this.prisma.riceVariety.create({
       data: {
+        mamcosId,
         name,
         code: dto.code?.trim() || null,
         maturityDays: dto.maturityDays,
@@ -71,14 +81,19 @@ export class RiceVarietiesService {
     });
   }
 
-  async update(id: string, dto: UpdateRiceVarietyDto) {
+  /** `tenant`: the caller's cooperative; undefined = Super Admin (may change any). A cooperative changes only its own types. */
+  async update(id: string, dto: UpdateRiceVarietyDto, tenant?: string | null) {
     const existing = await this.prisma.riceVariety.findUnique({
       where: { id },
     });
     if (!existing) throw new NotFoundException('Rice variety not found');
+    if (tenant !== undefined && existing.mamcosId !== tenant) {
+      if (!existing.mamcosId) throw new ForbiddenException('This rice type is set by the platform; ask the platform administrator to change it');
+      throw new NotFoundException('Rice variety not found');
+    }
     const name = dto.name?.trim();
     if (name && name.toLowerCase() !== existing.name.toLowerCase())
-      await this.assertNameFree(name, id);
+      await this.assertNameFree(name, existing.mamcosId, id);
     const updated = await this.prisma.riceVariety.update({
       where: { id },
       data: {

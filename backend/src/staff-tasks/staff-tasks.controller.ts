@@ -11,9 +11,10 @@ import { InputDistributionService } from './input-distribution.service';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { MaintenanceService } from './maintenance.service';
 import { ComplianceReportService } from './compliance-report.service';
+import { InputSetupService } from './input-setup.service';
 import {
   AcknowledgeDto, CloseDrawerDto, CreateOrderDto, CreateScheduleDto, DoneDto, DrawerQueryDto, IssueInputDto, IssueQueryDto,
-  OrderQueryDto, ReasonDto, ReceiveDrawerDto, ReceiveOrderDto, UpdateScheduleDto,
+  InputItemDto, InputStockDto, InputTypeDto, OrderQueryDto, ReasonDto, ReceiveDrawerDto, ReceiveOrderDto, UpdateScheduleDto,
 } from './dto/staff-tasks.dto';
 
 const guards = [JwtAuthGuard, RolesGuard, PermissionsGuard];
@@ -83,4 +84,24 @@ export class ComplianceReportController {
   constructor(private readonly svc: ComplianceReportService) {}
   @Get() @RequirePermission('governance', 'VIEW')
   report(@CurrentUser() u: RequestUser, @Query('mamcosId') m?: string) { return this.svc.report(u, m); }
+}
+
+/** Settings: the kinds of input, the inputs under each, and the stock that comes in. */
+@ApiTags('input-setup') @ApiBearerAuth() @UseGuards(...guards) @Controller('input-setup')
+export class InputSetupController {
+  constructor(private readonly svc: InputSetupService) {}
+  @Get('types') @RequirePermission('amcos_settings', 'VIEW')
+  types(@CurrentUser() u: RequestUser, @Query('mamcosId') m?: string) { return this.svc.types(u, m); }
+  @Post('types') @RequirePermission('amcos_settings', 'EDIT')
+  createType(@CurrentUser() u: RequestUser, @Body() dto: InputTypeDto, @Query('mamcosId') m?: string) { return this.svc.createType(u, dto.name ?? '', m); }
+  @Patch('types/:id') @RequirePermission('amcos_settings', 'EDIT')
+  updateType(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: InputTypeDto, @Query('mamcosId') m?: string) { return this.svc.updateType(u, id, dto, m); }
+  @Get('items') @RequirePermission('amcos_settings', 'VIEW')
+  items(@CurrentUser() u: RequestUser, @Query('mamcosId') m?: string) { return this.svc.items(u, m); }
+  @Post('items') @RequirePermission('amcos_settings', 'EDIT')
+  createItem(@CurrentUser() u: RequestUser, @Body() dto: InputItemDto, @Query('mamcosId') m?: string) { return this.svc.createItem(u, dto as any, m); }
+  @Patch('items/:id') @RequirePermission('amcos_settings', 'EDIT')
+  updateItem(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: InputItemDto, @Query('mamcosId') m?: string) { return this.svc.updateItem(u, id, dto, m); }
+  @Post('items/:id/stock') @RequirePermission('amcos_settings', 'EDIT')
+  addStock(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: InputStockDto, @Query('mamcosId') m?: string) { return this.svc.addStock(u, id, dto, m); }
 }

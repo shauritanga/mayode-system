@@ -5,6 +5,7 @@ import { opsApi } from '@/lib/api';
 import { dateTime, day, kg, label, tzs } from '@/lib/ops';
 import { DataTable, ErrorNote, Facts, Field, FormGrid, Loading, Status, Toolbar, useAction, useLoad } from './ui';
 import MoneyInput from '@/components/MoneyInput';
+import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function ReceivingPanel({ canCreate, canConfirm, canCancel, initialStatus = '' }: { canCreate: boolean; canConfirm: boolean; canCancel: boolean; initialStatus?: string }) {
@@ -168,7 +169,7 @@ function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean
         <Field label="Bags"><input className="input-field" type="number" value={f.bags} onChange={(e) => set('bags', e.target.value)} /></Field>
         <Field label="Weight per bag (kg)"><input className="input-field" type="number" value={f.bagWeightKg} onChange={(e) => set('bagWeightKg', e.target.value)} /></Field>
         <Field label="Moisture (%)"><input className="input-field" type="number" value={f.moisturePct} onChange={(e) => set('moisturePct', e.target.value)} /></Field>
-        <Field label="Rice variety"><input className="input-field" value={f.riceVariety} onChange={(e) => set('riceVariety', e.target.value)} /></Field>
+        <Field label="Rice type"><RiceTypeSelect value={f.riceVariety} onChange={(name) => set('riceVariety', name)} /></Field>
         <Field label="Quality grade"><input className="input-field" value={f.qualityGrade} onChange={(e) => set('qualityGrade', e.target.value)} /></Field>
         <Field label="Inspection"><select className="input-field" value={f.inspection} onChange={(e) => set('inspection', e.target.value)}><option value="NOT_REQUIRED">Not needed</option><option value="PASSED">Passed</option><option value="PARTIAL">Partly accepted</option><option value="FAILED">Failed, all rejected</option></select></Field>
         <Field label="Rejected (kg)"><input className="input-field" type="number" value={f.rejectedKg} onChange={(e) => set('rejectedKg', e.target.value)} /></Field>

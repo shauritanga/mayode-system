@@ -3,6 +3,7 @@ import { MetricTile, TableSkeleton, toneFromColor } from '@/components/role-dash
 
 import { FormEvent, useEffect, useState } from 'react';
 import { buyerPortalApi } from '@/lib/api';
+import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 function money(n: number) {
   return `TZS ${Math.round(n || 0).toLocaleString()}`;
@@ -189,14 +190,11 @@ export default function BuyerPage() {
                 onSubmit={submitOrder}
                 style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}
               >
-                <input
-                  className="input-field"
-                  placeholder="Preferred variety"
+                <RiceTypeSelect
+                  placeholder="Preferred rice type"
                   value={orderForm.riceVariety}
-                  onChange={(e) =>
-                    setOrderForm((c) => ({ ...c, riceVariety: e.target.value }))
-                  }
-                  style={{ width: 160 }}
+                  onChange={(name) => setOrderForm((c) => ({ ...c, riceVariety: name }))}
+                  style={{ width: 200 }}
                 />
                 <input
                   className="input-field"

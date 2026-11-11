@@ -7,6 +7,7 @@ import { day, label } from '@/lib/ops';
 import { DataTable, ErrorNote, Facts, Field, FormGrid, Loading, Status, Tabs, Toolbar, useAction, useLoad } from './ui';
 import { areaHectares, centroid, fromPolygon, toPolygon, type Corner } from './BoundaryPicker';
 import { hasFarmCenterPin, isFarmBoundaryMapped } from '@/lib/farm-geo';
+import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 // Leaflet needs the browser, so the map pieces load on demand.
 /** Leaflet gives its layers very high z-indexes; isolating them keeps maps from drawing over windows and menus. */
@@ -124,7 +125,7 @@ function FarmModal({ id, canEdit, onClose, onChanged }: { id: string; canEdit: b
       {cycle && <div className="glass-card" style={{ padding: 12, marginTop: 8 }}><FormGrid>
         <Field label="Plot"><select className="input-field" value={cycle.plotId} onChange={(e) => setCycle({ ...cycle, plotId: e.target.value })}>{f.plots.map((p: any) => <option key={p.id} value={p.id}>{p.name ?? p.plotCode}</option>)}</select></Field>
         <Field label="Season" hint="For example 2026 Masika"><input className="input-field" value={cycle.season} onChange={(e) => setCycle({ ...cycle, season: e.target.value })} /></Field>
-        <Field label="Rice variety"><input className="input-field" value={cycle.riceVariety} onChange={(e) => setCycle({ ...cycle, riceVariety: e.target.value })} /></Field>
+        <Field label="Rice type"><RiceTypeSelect value={cycle.riceVariety} onChange={(name) => setCycle({ ...cycle, riceVariety: name })} /></Field>
         <Field label="Planting date"><input className="input-field" type="date" value={cycle.plantingDate} onChange={(e) => setCycle({ ...cycle, plantingDate: e.target.value })} /></Field>
         <Field label="Expected harvest"><input className="input-field" type="date" value={cycle.expectedHarvest} onChange={(e) => setCycle({ ...cycle, expectedHarvest: e.target.value })} /></Field>
         <Field label="Expected yield (kg)"><input className="input-field" type="number" value={cycle.estimatedYieldKg} onChange={(e) => setCycle({ ...cycle, estimatedYieldKg: e.target.value })} /></Field></FormGrid>

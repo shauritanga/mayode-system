@@ -80,3 +80,21 @@ export class UpdateScheduleDto {
   @IsOptional() @IsDateString() nextDueOn?: string;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
+
+// ───────────── Settings: the inputs a cooperative gives farmers ─────────────
+export class InputTypeDto {
+  @IsOptional() @IsString() @MaxLength(60) name?: string;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+}
+export class InputItemDto {
+  @IsOptional() @IsString() @MaxLength(100) name?: string;
+  @IsOptional() @IsUUID() inputTypeId?: string;
+  @IsOptional() @IsString() @MaxLength(20) unit?: string;
+  @IsOptional() @Type(() => Number) @IsNumber(money) @Min(0) unitCost?: number | null;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) reorderLevel?: number | null;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+}
+export class InputStockDto {
+  @Type(() => Number) @IsNumber({ maxDecimalPlaces: 3 }) @Min(0.001) quantity: number;
+  @IsOptional() @IsString() @MaxLength(200) note?: string;
+}

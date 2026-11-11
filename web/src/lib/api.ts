@@ -1119,6 +1119,15 @@ export const cashDrawerApi = {
   list: (params?: object) => api.get('/cash-drawer', { params }),
   receive: (id: string, note?: string) => api.post(`/cash-drawer/${id}/receive`, { note }),
 };
+export const inputSetupApi = {
+  types: () => api.get('/input-setup/types'),
+  createType: (name: string) => api.post('/input-setup/types', { name }),
+  updateType: (id: string, data: object) => api.patch(`/input-setup/types/${id}`, data),
+  items: () => api.get('/input-setup/items'),
+  createItem: (data: object) => api.post('/input-setup/items', data),
+  updateItem: (id: string, data: object) => api.patch(`/input-setup/items/${id}`, data),
+  addStock: (id: string, data: object) => api.post(`/input-setup/items/${id}/stock`, data),
+};
 export const inputDistributionApi = {
   items: () => api.get('/input-distribution/items'),
   list: (params?: object) => api.get('/input-distribution', { params }),

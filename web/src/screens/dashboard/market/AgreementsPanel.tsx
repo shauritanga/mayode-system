@@ -7,6 +7,7 @@ import { hasPermission } from '@/lib/nav';
 import Modal from '@/components/Modal';
 import { downloadCsv } from '@/lib/download';
 import { PAYMENT_BADGE, ProgressBar, day, kg, tzs } from './format';
+import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 interface Progress { deliveredKg: number; deliveredValue: number; paidValue: number; outstandingValue: number; progressPct: number; paymentStatus: string }
 interface Agreement {
@@ -225,7 +226,7 @@ export default function AgreementsPanel() {
               </select></label>
             {field('quantityKg', 'Quantity (kg)', 'number', locked)}
             {field('pricePerKg', 'Agreed price per kg (TZS)', 'number', locked)}
-            {field('riceVariety', 'Rice variety', 'text', locked)}
+            <label className="form-label">Rice type<RiceTypeSelect disabled={locked} value={form.riceVariety} onChange={(name) => setForm({ ...form, riceVariety: name })} /></label>
             {field('deliveryLocation', 'Delivery location')}
             {field('startDate', 'Starts', 'date', locked)}
             {field('endDate', 'Ends', 'date')}

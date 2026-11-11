@@ -1417,4 +1417,13 @@ export const SW_MESSAGES: Record<string, string> = {
   "Only {0} is still owed on this invoice.": "Kiasi kilichobaki kwenye ankara hii ni {0} tu.",
   "Only {0} is still owed on this bill.": "Kiasi kilichobaki kwenye bili hii ni {0} tu.",
   "Choose a rice type from the list": "Chagua aina ya mchele kutoka kwenye orodha",
+  "Enter the name of the input type": "Weka jina la aina ya pembejeo",
+  "This input type already exists": "Aina hii ya pembejeo tayari ipo",
+  "Input type not found": "Aina ya pembejeo haijapatikana",
+  "Choose an input type from your list": "Chagua aina ya pembejeo kutoka kwenye orodha yako",
+  "“{0}” is switched off": "“{0}” imezimwa",
+  "Enter the name of the input": "Weka jina la pembejeo",
+  "Enter a quantity greater than zero": "Weka kiasi kikubwa kuliko sifuri",
+  "Rice types belong to a cooperative": "Aina za mchele ni za chama cha ushirika",
+  "This rice type is set by the platform; ask the platform administrator to change it": "Aina hii ya mchele imewekwa na jukwaa; muombe msimamizi wa jukwaa aibadilishe",
 };

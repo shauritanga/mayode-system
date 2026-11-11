@@ -464,7 +464,7 @@ const COOPERATIVE_PORTAL_HIDDEN_HREFS = new Set([
  */
 const COOPERATIVE_MENU_ORDER = [
   '/dashboard', '/dashboard/farmers', '/dashboard/irrigation', '/dashboard/scheme-structure', '/dashboard/plot-allocation', '/dashboard/dues', '/dashboard/cash-drawer', '/dashboard/combine-harvests', '/dashboard/inputs', '/dashboard/purchase-orders', '/dashboard/harvest', '/dashboard/farm-administration', '/dashboard/rentals', '/dashboard/ops-orders', '/dashboard/task-management',
-  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/payroll', '/dashboard/ops-warehouse', '/dashboard/staff', '/dashboard/board', '/dashboard/meetings', '/dashboard/tenders', '/dashboard/water', '/dashboard/maintenance', '/dashboard/compliance-report', '/dashboard/leadership', '/dashboard/suppliers', '/dashboard/sales',
+  '/dashboard/communication', '/dashboard/accounting', '/dashboard/assets', '/dashboard/payroll', '/dashboard/ops-warehouse', '/dashboard/staff', '/dashboard/board', '/dashboard/meetings', '/dashboard/tenders', '/dashboard/water', '/dashboard/maintenance', '/dashboard/compliance-report', '/dashboard/leadership', '/dashboard/suppliers', '/dashboard/buyers', '/dashboard/sales',
   '/dashboard/reports', '/dashboard/credit', '/dashboard/traceability', '/dashboard/disputes', '/dashboard/governance', '/dashboard/ai',
   '/dashboard/audit-log', '/dashboard/roles', '/dashboard/amcos-settings', '/dashboard/settings',
 ];

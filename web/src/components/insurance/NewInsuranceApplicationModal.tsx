@@ -8,6 +8,7 @@ import type { RiskInfo } from '@/lib/insurance';
 import ProductGuide from './ProductGuide';
 import RiskPanel from './RiskPanel';
 import MoneyInput from '@/components/MoneyInput';
+import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 interface FarmerOption { id: string; firstName: string; lastName: string; controlNumber: string }
 
@@ -90,7 +91,7 @@ export default function NewInsuranceApplicationModal({ forStaff, onClose, onCrea
             {insurers.length === 0 && <span style={{ fontSize: 11, color: 'var(--neutral-500)' }}>No insurance companies are set up yet.</span>}
           </label>
           <label className="form-label">Area to insure (hectares)<input className="input-field" type="number" min={0.01} step="0.1" value={form.insuredAreaHectares} onChange={(e) => setForm({ ...form, insuredAreaHectares: e.target.value })} /></label>
-          <label className="form-label">Rice variety<input className="input-field" value={form.riceVariety} onChange={(e) => setForm({ ...form, riceVariety: e.target.value })} /></label>
+          <label className="form-label">Rice type<RiceTypeSelect value={form.riceVariety} onChange={(name) => setForm({ ...form, riceVariety: name })} /></label>
           <label className="form-label">Cover you would like (TZS)
             <MoneyInput className="input-field" min={0} value={form.requestedSumInsured} onChange={(e) => setForm({ ...form, requestedSumInsured: e.target.value })} />
             {hint?.suggestedSumInsured != null && (
