@@ -3668,3 +3668,26 @@ a.farmers-name { display: block; cursor: pointer; }
 .whl-kpis span { font-size: 0.75rem; color: var(--text-2); }
 .whl-kpis .is-low b { color: var(--red-400); }
 .whl-bar-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+
+/* ── Give out / Send out ── */
+.gv-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.gv-card { display: grid; gap: 8px; align-content: space-between; padding: 18px 20px; background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
+.gv-card strong { font-size: 0.9375rem; }
+.gv-card p { margin: 0 0 6px; font-size: 0.8125rem; color: var(--text-2); line-height: 1.5; }
+.gv-card .btn-secondary { justify-self: start; }
+.sd-step { border: 1px solid var(--border-subtle); border-radius: var(--r-lg); background: var(--surface-1); margin-bottom: 12px; overflow: hidden; }
+.sd-step > header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+.sd-step > header strong { display: block; font-size: 0.9375rem; }
+.sd-step > header small { display: block; font-size: 0.75rem; color: var(--text-2); margin-top: 2px; }
+.sd-num { display: inline-grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; border-radius: 9999px; font-size: 0.8125rem; font-weight: 700; background: var(--accent); color: #fff; }
+.sd-step.is-done .sd-num { background: var(--amcos-green, var(--green-500)); }
+.sd-body:empty { display: none; }
+.sd-body { padding: 0 16px 16px; border-top: 1px solid var(--border-subtle); padding-top: 14px; }
+.sd-line { padding: 10px 0; border-top: 1px solid var(--border-subtle); }
+.sd-line:first-of-type { border-top: 0; padding-top: 0; }
+.sd-line-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; font-size: 0.8125rem; }
+.sd-line-head span { color: var(--text-2); }
+.sd-alloc { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 0.8125rem; margin-top: 8px; }
+.sd-pick { display: flex; gap: 8px; margin-top: 8px; }
+.sd-problems { margin-top: 16px; font-size: 0.8125rem; }
+.sd-problems > summary { cursor: pointer; font-weight: 600; color: var(--text-2); }

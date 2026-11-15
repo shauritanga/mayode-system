@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Modal from '@/components/Modal';
 import { opsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
@@ -8,6 +8,14 @@ import { dateTime, day, downloadBlob, kg, label, openBlob } from '@/lib/ops';
 import { DataTable, ErrorNote, Facts, Field, FormGrid, Loading, Status, Tabs, useAction, useLoad } from './ui';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/** Where an order stands in plain words, and the one thing to do next. */
+function stage(o: any): { text: string; action: string } {
+  if (o.fulfilState === 'SHORTAGE') return { text: 'Not enough stock. Accounts have been told.', action: 'Open' };
+  if (o.fulfilState === 'ALLOCATED') return { text: 'Stock chosen. Add the vehicle and release.', action: 'Continue' };
+  if (o.fulfilState === 'PARTIALLY_DISPATCHED') return { text: `Part sent. ${kg(o.outstandingKg)} still to send.`, action: 'Continue' };
+  return { text: 'New. Choose the stock to send.', action: 'Start' };
+}
+
 export default function DispatchPanel({ canAllocate, canRelease, canCancel }: { canAllocate: boolean; canRelease: boolean; canCancel: boolean }) {
   const [sub, setSub] = useState<'queue' | 'dispatches'>('queue');
   const [order, setOrder] = useState<string | null>(null);
@@ -17,22 +25,23 @@ export default function DispatchPanel({ canAllocate, canRelease, canCancel }: { 
   const reload = () => { queue.reload(); list.reload(); };
   return (
     <>
-      <Tabs tabs={[{ id: 'queue', label: 'Ready for the warehouse' }, { id: 'dispatches', label: 'Dispatches and release notes' }]} value={sub} onChange={setSub} />
+      <Tabs tabs={[{ id: 'queue', label: `Orders to send${queue.data?.length ? ` (${queue.data.length})` : ''}` }, { id: 'dispatches', label: 'Already sent' }]} value={sub} onChange={setSub} />
       {sub === 'queue' ? (
         <>
           <ErrorNote message={queue.error} />
           {queue.loading && !queue.data ? <Loading /> : (
-            <DataTable rows={queue.data ?? []} rowKey={(o) => o.id} onRow={(o) => setOrder(o.id)} empty="No paid orders are waiting for the warehouse."
-              columns={[{ header: 'Order', render: (o) => <strong>{o.reference}</strong> }, { header: 'Customer', render: (o) => o.customer.name }, { header: 'Released', render: (o) => day(o.authorizedAt) },
-                { header: 'Collection', render: (o) => label(o.deliveryMode) }, { header: 'Needed', align: 'right', render: (o) => kg(o.requiredKg) }, { header: 'Sent', align: 'right', render: (o) => kg(o.dispatchedKg) },
-                { header: 'Still to send', align: 'right', render: (o) => kg(o.outstandingKg) }, { header: 'Stage', render: (o) => <Status value={o.fulfilState} /> }]} />
+            <DataTable rows={queue.data ?? []} rowKey={(o) => o.id} onRow={(o) => setOrder(o.id)} empty="No orders are waiting. When accounts confirm a payment, the order appears here."
+              columns={[{ header: 'Order', render: (o) => <strong>{o.reference}</strong> }, { header: 'Customer', render: (o) => o.customer.name },
+                { header: 'Collection', render: (o) => label(o.deliveryMode) }, { header: 'Still to send', align: 'right', render: (o) => <strong>{kg(o.outstandingKg)}</strong> },
+                { header: 'Where it is', render: (o) => stage(o).text },
+                { header: '', align: 'right', render: (o) => <button type="button" className="btn-primary" onClick={(e) => { e.stopPropagation(); setOrder(o.id); }}>{stage(o).action}</button> }]} />
           )}
         </>
       ) : (
         <>
           <ErrorNote message={list.error} />
           {list.loading && !list.data ? <Loading /> : (
-            <DataTable rows={list.data ?? []} rowKey={(d) => d.id} onRow={(d) => setDispatch(d.id)} empty="No dispatches yet."
+            <DataTable rows={list.data ?? []} rowKey={(d) => d.id} onRow={(d) => setDispatch(d.id)} empty="Nothing has been sent yet."
               columns={[{ header: 'Dispatch', render: (d) => <strong>{d.reference}</strong> }, { header: 'Release note', render: (d) => d.releaseNoteNumber ?? '—' }, { header: 'Order', render: (d) => d.order?.reference ?? '—' },
                 { header: 'Customer', render: (d) => d.order?.customer?.name ?? '—' }, { header: 'Vehicle', render: (d) => d.vehiclePlate }, { header: 'Driver', render: (d) => d.driverName }, { header: 'Released', render: (d) => dateTime(d.releasedAt) },
                 { header: 'Status', render: (d) => <Status value={d.status} /> }, { header: 'Delivery', render: (d) => <Status value={d.deliveryState} /> }]} />
@@ -53,7 +62,6 @@ function PrepareModal({ orderId, canAllocate, onClose, onChanged, onOpenDispatch
   const [shortage, setShortage] = useState('');
   const [closing, setClosing] = useState('');
   const [trip, setTrip] = useState({ vehiclePlate: '', driverName: '', driverPhone: '', transporter: '', destination: '', supervisorName: '', notes: '' });
-  const [showTrip, setShowTrip] = useState(false);
   const user = useAuthStore((st) => st.user);
   const canClose = hasPermission(user, 'ops_payments', 'EDIT');
   const { busy, error, run } = useAction();
@@ -72,82 +80,105 @@ function PrepareModal({ orderId, canAllocate, onClose, onChanged, onOpenDispatch
       return { orderLineId: a.line.id, batchId: a.batchId, quantityKg: Math.round((a.quantityKg - a.dispatchedKg - a.releasedKg - used) * 1000) / 1000 };
     }).filter((l) => l.quantityKg > 0);
     const r = await opsApi.prepareDispatch(orderId, { warehouseId: liveAllocs[0]?.warehouseId ?? wh, ...trip, driverPhone: trip.driverPhone || undefined, transporter: trip.transporter || undefined, destination: trip.destination || undefined, supervisorName: trip.supervisorName || undefined, notes: trip.notes || undefined, lines });
-    setShowTrip(false);
     return r;
   });
 
+  const covered = (v.lines as any[]).every((l) => l.unallocatedKg <= 0);
+  const stepCard = (n: number, title: string, done: boolean, hint: string, body: ReactNode) => (
+    <section className={`sd-step${done ? ' is-done' : ''}`}>
+      <header><span className="sd-num">{done ? '✓' : n}</span><div><strong>{title}</strong><small>{hint}</small></div></header>
+      <div className="sd-body">{body}</div>
+    </section>
+  );
+
   return (
-    <Modal title={`Prepare ${v.reference}`} subtitle={`${v.customer.name} · ${label(v.deliveryMode)}${v.deliveryNote ? ` · ${v.deliveryNote}` : ''}`} width="900px" onClose={onClose}
-      footer={<><button className="btn-secondary" onClick={onClose}>Close</button>
-        {canClose && outstanding > 0 && <button className="btn-secondary" disabled={busy} onClick={() => setClosing(closing === '' ? ' ' : '')}>Close short…</button>}</>}>
+    <Modal title={`Send order ${v.reference}`} subtitle={`${v.customer.name} · ${label(v.deliveryMode)}${v.deliveryNote ? ` · ${v.deliveryNote}` : ''}`} width="760px" onClose={onClose}
+      footer={<button className="btn-secondary" onClick={onClose}>Close</button>}>
       <ErrorNote message={error} />
-      {v.fulfilState === 'SHORTAGE' && <div className="alert-box alert-danger" style={{ marginBottom: 12 }}><strong>Shortage reported:</strong> {v.shortageNote}</div>}
-      {closing !== '' && <div className="glass-card" style={{ padding: 12, marginBottom: 12 }}>
-        <Field label="Why is the order being closed with less than ordered?" wide><input className="input-field" value={closing.trim() === '' ? '' : closing} onChange={(e) => setClosing(e.target.value || ' ')} /></Field>
-        <button className="btn-primary" style={{ marginTop: 8 }} disabled={busy || !closing.trim()} onClick={() => done(() => opsApi.closeShort(orderId, closing.trim()))}>Close the order short</button>
-      </div>}
-      {canAllocate && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 12, flexWrap: 'wrap' }}>
-          <Field label="Take stock from"><select className="input-field" value={wh} onChange={(e) => setWarehouseId(e.target.value)}>{lookups?.warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
-          <button className="btn-primary" disabled={busy || !wh || outstanding <= 0} onClick={allocateAuto}>Set aside oldest stock first</button>
-        </div>
-      )}
-      {(v.lines as any[]).map((l) => (
-        <div key={l.id} className="glass-card" style={{ padding: 12, marginBottom: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
-            <strong>{l.product.name}{l.product.brand ? ` · ${l.product.brand}` : ''}</strong>
-            <span style={{ fontSize: 12 }}>Needed {kg(l.requiredKg)} · Sent {kg(l.dispatchedKg)} · Set aside {kg(l.allocatedKg)} · Not yet covered {kg(l.unallocatedKg)}</span>
-          </div>
-          {(l.allocations as any[]).filter((a) => a.quantityKg - a.dispatchedKg - a.releasedKg > 0).map((a) => (
-            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 6 }}>
-              <span>Batch {a.batch.reference}{a.batch.riceVariety ? ` · ${a.batch.riceVariety}` : ''} · {kg(a.quantityKg - a.dispatchedKg - a.releasedKg)}</span>
-              {canAllocate && <button className="btn-secondary" disabled={busy} onClick={() => done(() => opsApi.releaseAllocation(a.id))}>Return to stock</button>}
+      {v.fulfilState === 'SHORTAGE' && <div className="alert-box alert-danger" style={{ marginBottom: 12 }}><strong>Not enough stock:</strong> {v.shortageNote}</div>}
+
+      {stepCard(1, 'Choose the stock to send', covered, covered ? 'Enough stock is chosen for this order.' : `Still to choose: ${kg((v.lines as any[]).reduce((t, l) => t + l.unallocatedKg, 0))}`, (
+        <>
+          {canAllocate && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 12, flexWrap: 'wrap' }}>
+              <Field label="Take stock from"><select className="input-field" value={wh} onChange={(e) => setWarehouseId(e.target.value)}>{lookups?.warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
+              <button className="btn-primary" disabled={busy || !wh || outstanding <= 0 || covered} onClick={allocateAuto}>Choose the stock for me</button>
+            </div>
+          )}
+          {(v.lines as any[]).map((l) => (
+            <div key={l.id} className="sd-line">
+              <div className="sd-line-head"><strong>{l.product.name}{l.product.brand ? ` · ${l.product.brand}` : ''}</strong><span>Needed {kg(l.requiredKg)} · Chosen {kg(l.allocatedKg)} · Sent {kg(l.dispatchedKg)}</span></div>
+              {(l.allocations as any[]).filter((a) => a.quantityKg - a.dispatchedKg - a.releasedKg > 0).map((a) => (
+                <div key={a.id} className="sd-alloc">
+                  <span>Batch {a.batch.reference}{a.batch.riceVariety ? ` · ${a.batch.riceVariety}` : ''} · {kg(a.quantityKg - a.dispatchedKg - a.releasedKg)}</span>
+                  {canAllocate && <button className="btn-secondary" disabled={busy} onClick={() => done(() => opsApi.releaseAllocation(a.id))}>Put back in stock</button>}
+                </div>
+              ))}
+              {canAllocate && l.unallocatedKg > 0 && l.candidates.length > 0 && (
+                <div className="sd-pick">
+                  <select className="input-field" style={{ flex: 2 }} value={picks[l.id]?.batchId ?? ''} onChange={(e) => setPicks((p) => ({ ...p, [l.id]: { batchId: e.target.value, qty: p[l.id]?.qty ?? String(l.unallocatedKg) } }))}>
+                    <option value="">Or choose a batch yourself…</option>{(l.candidates as any[]).map((b) => <option key={b.id} value={b.id}>{b.reference} · {day(b.createdAt)} · {kg(b.availableKg)} free</option>)}</select>
+                  <input className="input-field" style={{ flex: 1 }} type="number" placeholder="kg" value={picks[l.id]?.qty ?? ''} onChange={(e) => setPicks((p) => ({ ...p, [l.id]: { batchId: p[l.id]?.batchId ?? '', qty: e.target.value } }))} />
+                </div>
+              )}
+              {l.unallocatedKg > 0 && l.candidates.length === 0 && <p style={{ fontSize: 12, color: 'var(--red-500)', margin: '6px 0 0' }}>No free stock of this product.</p>}
             </div>
           ))}
-          {canAllocate && l.unallocatedKg > 0 && l.candidates.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <select className="input-field" style={{ flex: 2 }} value={picks[l.id]?.batchId ?? ''} onChange={(e) => setPicks((p) => ({ ...p, [l.id]: { batchId: e.target.value, qty: p[l.id]?.qty ?? String(l.unallocatedKg) } }))}>
-                <option value="">Pick a batch yourself…</option>{(l.candidates as any[]).map((b) => <option key={b.id} value={b.id}>{b.reference} · {day(b.createdAt)} · {kg(b.availableKg)} free</option>)}</select>
-              <input className="input-field" style={{ flex: 1 }} type="number" value={picks[l.id]?.qty ?? ''} onChange={(e) => setPicks((p) => ({ ...p, [l.id]: { batchId: p[l.id]?.batchId ?? '', qty: e.target.value } }))} />
-            </div>
-          )}
-          {l.unallocatedKg > 0 && l.candidates.length === 0 && <p style={{ fontSize: 12, color: 'var(--red-500)', margin: '6px 0 0' }}>No free stock of this product.</p>}
-        </div>
+          {canAllocate && Object.values(picks).some((p) => p.batchId && Number(p.qty) > 0) && <button className="btn-secondary" disabled={busy} onClick={allocateManual}>Use the batches I chose</button>}
+        </>
       ))}
-      {canAllocate && Object.values(picks).some((p) => p.batchId && Number(p.qty) > 0) && <button className="btn-secondary" disabled={busy} onClick={allocateManual}>Set aside the batches I picked</button>}
-      {canAllocate && v.fulfilState !== 'SHORTAGE' && outstanding > 0 && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <input className="input-field" style={{ flex: 1 }} placeholder="Tell accounts what is missing" value={shortage} onChange={(e) => setShortage(e.target.value)} />
-          <button className="btn-secondary" disabled={busy || !shortage.trim()} onClick={() => done(async () => { const r = await opsApi.reportShortage(orderId, shortage); setShortage(''); return r; })}>Report shortage</button>
-        </div>
+
+      {stepCard(2, 'Add the vehicle and driver', prepared.length > 0, prepared.length > 0 ? 'Done. The goods are ready to be released.' : liveAllocs.length ? 'Who is taking the goods, and in what.' : 'Choose the stock first.', (
+        canAllocate && liveAllocs.length > 0 && prepared.length === 0 ? (
+          <>
+            <FormGrid>
+              <Field label="Vehicle plate *"><input className="input-field" value={trip.vehiclePlate} onChange={(e) => setTrip({ ...trip, vehiclePlate: e.target.value })} /></Field>
+              <Field label="Driver *"><input className="input-field" value={trip.driverName} onChange={(e) => setTrip({ ...trip, driverName: e.target.value })} /></Field>
+              <Field label="Driver’s phone"><input className="input-field" value={trip.driverPhone} onChange={(e) => setTrip({ ...trip, driverPhone: e.target.value })} /></Field>
+              <Field label="Transporter"><input className="input-field" value={trip.transporter} onChange={(e) => setTrip({ ...trip, transporter: e.target.value })} /></Field>
+              <Field label="Destination"><input className="input-field" value={trip.destination} onChange={(e) => setTrip({ ...trip, destination: e.target.value })} /></Field>
+              <Field label="Supervisor"><input className="input-field" value={trip.supervisorName} onChange={(e) => setTrip({ ...trip, supervisorName: e.target.value })} /></Field>
+            </FormGrid>
+            <button className="btn-primary" style={{ marginTop: 12 }} disabled={busy || !trip.vehiclePlate.trim() || !trip.driverName.trim()} onClick={prepareTrip}>Save vehicle and driver</button>
+          </>
+        ) : null
+      ))}
+
+      {stepCard(3, 'Release the goods', false, prepared.length ? 'Release when the vehicle is loaded. This makes the release note.' : 'Add the vehicle first.', (
+        prepared.length > 0 ? (
+          <div style={{ display: 'grid', gap: 8 }}>
+            {prepared.map((d: any) => (
+              <div key={d.id} className="sd-alloc"><span>{d.reference} · {d.vehiclePlate} · {d.driverName}</span><button className="btn-primary" onClick={() => onOpenDispatch(d.id)}>Release goods</button></div>
+            ))}
+          </div>
+        ) : null
+      ))}
+
+      {(v.dispatches as any[]).filter((d: any) => d.status !== 'PREPARED').length > 0 && (
+        <>
+          <h4 style={{ margin: '18px 0 6px', fontSize: 13 }}>Already sent for this order</h4>
+          <DataTable rows={(v.dispatches as any[]).filter((d: any) => d.status !== 'PREPARED')} rowKey={(d: any) => d.id} onRow={(d: any) => onOpenDispatch(d.id)} columns={[{ header: 'Sent on', render: (d: any) => dateTime(d.releasedAt) }, { header: 'Release note', render: (d: any) => d.releaseNoteNumber ?? '—' }, { header: 'Vehicle', render: (d: any) => d.vehiclePlate }, { header: 'Status', render: (d: any) => <Status value={d.status} /> }, { header: 'Delivery', render: (d: any) => <Status value={d.deliveryState} /> }]} />
+        </>
       )}
 
-      {canAllocate && liveAllocs.length > 0 && (
-        <div style={{ marginTop: 16 }}>
-          {!showTrip ? <button className="btn-primary" onClick={() => setShowTrip(true)}>Prepare dispatch with vehicle and driver…</button> : (
-            <div className="glass-card" style={{ padding: 12 }}>
-              <strong style={{ fontSize: 13 }}>Vehicle and driver</strong>
-              <div style={{ marginTop: 8 }}><FormGrid>
-                <Field label="Vehicle plate"><input className="input-field" value={trip.vehiclePlate} onChange={(e) => setTrip({ ...trip, vehiclePlate: e.target.value })} /></Field>
-                <Field label="Driver"><input className="input-field" value={trip.driverName} onChange={(e) => setTrip({ ...trip, driverName: e.target.value })} /></Field>
-                <Field label="Driver’s phone"><input className="input-field" value={trip.driverPhone} onChange={(e) => setTrip({ ...trip, driverPhone: e.target.value })} /></Field>
-                <Field label="Transporter"><input className="input-field" value={trip.transporter} onChange={(e) => setTrip({ ...trip, transporter: e.target.value })} /></Field>
-                <Field label="Destination"><input className="input-field" value={trip.destination} onChange={(e) => setTrip({ ...trip, destination: e.target.value })} /></Field>
-                <Field label="Supervisor"><input className="input-field" value={trip.supervisorName} onChange={(e) => setTrip({ ...trip, supervisorName: e.target.value })} /></Field>
-              </FormGrid></div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                <button className="btn-primary" disabled={busy || !trip.vehiclePlate.trim() || !trip.driverName.trim()} onClick={prepareTrip}>Prepare dispatch</button>
-                <button className="btn-secondary" onClick={() => setShowTrip(false)}>Back</button>
+      {canAllocate && outstanding > 0 && (
+        <details className="sd-problems">
+          <summary>Something wrong with this order?</summary>
+          <div style={{ display: 'grid', gap: 12, marginTop: 10 }}>
+            {v.fulfilState !== 'SHORTAGE' && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input className="input-field" style={{ flex: 1 }} placeholder="We do not have enough. Tell accounts what is missing" value={shortage} onChange={(e) => setShortage(e.target.value)} />
+                <button className="btn-secondary" disabled={busy || !shortage.trim()} onClick={() => done(async () => { const r = await opsApi.reportShortage(orderId, shortage); setShortage(''); return r; })}>Tell accounts</button>
               </div>
-            </div>
-          )}
-        </div>
-      )}
-      {(v.dispatches as any[]).length > 0 && (
-        <>
-          <h4 style={{ margin: '16px 0 6px', fontSize: 13 }}>Dispatches for this order</h4>
-          <DataTable rows={v.dispatches} rowKey={(d: any) => d.id} onRow={(d: any) => onOpenDispatch(d.id)} columns={[{ header: 'Dispatch', render: (d: any) => d.reference }, { header: 'Release note', render: (d: any) => d.releaseNoteNumber ?? '—' }, { header: 'Vehicle', render: (d: any) => d.vehiclePlate }, { header: 'Status', render: (d: any) => <Status value={d.status} /> }]} />
-        </>
+            )}
+            {canClose && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input className="input-field" style={{ flex: 1 }} placeholder="Why is the order being closed with less than ordered?" value={closing.trim() === '' ? '' : closing} onChange={(e) => setClosing(e.target.value || ' ')} />
+                <button className="btn-secondary" disabled={busy || !closing.trim()} onClick={() => done(() => opsApi.closeShort(orderId, closing.trim()))}>Close with less</button>
+              </div>
+            )}
+          </div>
+        </details>
       )}
     </Modal>
   );

@@ -120,7 +120,7 @@ export function WarehouseDetail({ id, can, goto }: { id: string; can: Can; goto:
 
       <div className="whl-bar-actions">
         {can('ops_receiving', 'CREATE') && <button type="button" className="btn-primary" onClick={() => setDialog('add')}>+ Add stock</button>}
-        {can('ops_dispatch') && <button type="button" className="btn-secondary" onClick={() => goto('sendout')}>Give out or send out</button>}
+        {can('ops_dispatch') && <button type="button" className="btn-secondary" onClick={() => goto('sendout')}>Give out stock</button>}
         {can('ops_stock', 'CREATE') && <button type="button" className="btn-secondary" onClick={() => goto('stock')}>Count stock</button>}
       </div>
 

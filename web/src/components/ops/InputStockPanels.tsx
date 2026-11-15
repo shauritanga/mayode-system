@@ -222,25 +222,34 @@ export function HowItWorks({ goto, can }: { goto: (page: 'receive' | 'stock' | '
   );
 }
 
-export function GiveOutHub({ children, can }: { children?: React.ReactNode; can: (r: string) => boolean }) {
-  const tiles: { title: string; text: string; href?: string; show: boolean }[] = [
-    { title: 'Give inputs to a farmer', text: 'Fertiliser, seed and chemicals on credit. Stock goes down and the farmer confirms with a code.', href: '/dashboard/inputs', show: can('input_distribution') },
-    { title: 'Used in field work', text: 'Inputs used on a farm task leave the warehouse automatically when the task report is approved.', show: true },
-    { title: 'Fuel used, damaged, expired or lost', text: 'Take it off with a reason: open Stock, then “Correct / move” on the item and choose Used, Damaged, Expired or Lost.', show: can('ops_stock') },
+/**
+ * Giving stock out starts with one question: who is it going to? Each answer is one card with one button.
+ * Rice for a buyer's order is handled right below, because that is the daily job.
+ */
+export function GiveOutHub({ children, can, goto }: { children?: React.ReactNode; can: (r: string) => boolean; goto?: (page: 'stock') => void }) {
+  const cards: { title: string; text: string; button: string; href?: string; onClick?: () => void; show: boolean }[] = [
+    { title: 'To a farmer', text: 'Fertiliser, seed or chemicals given on credit. The farmer confirms with a code sent to their phone.', button: 'Give inputs to a farmer', href: '/dashboard/inputs', show: can('input_distribution') },
+    { title: 'To a buyer', text: 'Rice sold to a customer. The orders waiting for you are listed just below.', button: 'See the orders', onClick: () => document.getElementById('orders-to-send')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), show: !!children },
+    { title: 'Used, damaged or lost', text: 'Fuel that was used, or stock that spoiled, expired or went missing. Take it off with a reason.', button: 'Open stock', onClick: () => goto?.('stock'), show: can('ops_stock') && !!goto },
   ];
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginBottom: 18 }}>
-        {tiles.filter((t) => t.show).map((t) => (
-          <div key={t.title} style={card}>
-            <strong>{t.title}</strong>
-            <div className="muted" style={{ fontSize: 13, margin: '6px 0 10px' }}>{t.text}</div>
-            {t.href && <Link href={t.href} className="btn-secondary">Open</Link>}
+      <h3 className="wo-title" style={{ marginBottom: 12 }}>Who is the stock going to?</h3>
+      <div className="gv-cards">
+        {cards.filter((c) => c.show).map((c) => (
+          <div key={c.title} className="gv-card">
+            <strong>{c.title}</strong>
+            <p>{c.text}</p>
+            {c.href ? <Link href={c.href} className="btn-secondary">{c.button}</Link> : <button type="button" className="btn-secondary" onClick={c.onClick}>{c.button}</button>}
           </div>
         ))}
       </div>
-      <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>Send out rice</h3>
-      {children}
+      <p className="muted" style={{ fontSize: 12.5, margin: '12px 0 0' }}>Inputs used on a farm job leave the warehouse by themselves when the job report is approved. You do nothing.</p>
+      {children && <section id="orders-to-send" style={{ marginTop: 28, scrollMarginTop: 16 }}>
+        <h3 className="wo-title" style={{ marginBottom: 4 }}>Orders waiting to be sent to buyers</h3>
+        <p className="muted" style={{ margin: '0 0 14px', fontSize: 13 }}>Open an order and follow the three steps: choose the stock, add the vehicle, release the goods.</p>
+        {children}
+      </section>}
     </>
   );
 }

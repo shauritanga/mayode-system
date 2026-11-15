@@ -29,7 +29,7 @@ const WAREHOUSE_PAGES: { id: WarehousePage; slug: string; label: string; descrip
   { id: 'warehouses', slug: 'warehouses', label: 'Warehouses', description: 'Your warehouses. Open one to see what is in it and to add stock.', icon: Warehouse, allowed: (can) => can('warehouses') || can('warehouse_desk') },
   { id: 'receive', slug: 'receive', label: 'Receive', description: 'Record everything that arrives: paddy from a farmer, or inputs, fuel and bags from a supplier. It is added to the warehouse stock when you save.', icon: ArrowDownToLine, allowed: (can) => can('ops_receiving') },
   { id: 'mill', slug: 'mill', label: 'Mill paddy', description: 'Turn paddy into rice, broken rice and by-products. The cost of the paddy moves onto the rice.', icon: Factory, allowed: (can) => can('ops_processing') },
-  { id: 'sendout', slug: 'send-out', label: 'Give out / Send out', description: 'Hand stock out: inputs to farmers or field work, and rice to buyers. Stock goes down and the record is kept.', icon: Truck, allowed: (can) => can('ops_dispatch') || can('warehouse_desk') },
+  { id: 'sendout', slug: 'send-out', label: 'Give out', description: 'Hand stock to a farmer, or send rice to a buyer. Stock goes down and the record is kept.', icon: Truck, allowed: (can) => can('ops_dispatch') || can('warehouse_desk') },
   { id: 'stock', slug: 'stock', label: 'Stock', description: 'Everything in the warehouses, rice and inputs together: how much, where, what is running low, and every movement.', icon: Package, allowed: (can) => can('ops_stock') },
   { id: 'overview', slug: 'overview', label: 'Summary', description: 'What is in store across all warehouses, and what needs your attention.', icon: LayoutDashboard, allowed: (can) => can('ops_reports') },
 ];
@@ -85,7 +85,7 @@ export default function OpsWarehousePage() {
           {selected.id === 'overview' && <Overview goto={goto} can={can} />}
           {selected.id === 'receive' && <ReceiveHub can={can} />}
           {selected.id === 'mill' && <ProcessingPanel canCreate={can('ops_processing', 'CREATE')} canReverse={can('ops_processing', 'DELETE')} />}
-          {selected.id === 'sendout' && <GiveOutHub can={can}>{can('ops_dispatch')
+          {selected.id === 'sendout' && <GiveOutHub can={can} goto={() => goto('stock', 'ledger')}>{can('ops_dispatch')
             ? <DispatchPanel canAllocate={can('ops_dispatch', 'CREATE')} canRelease={can('ops_dispatch', 'EDIT')} canCancel={can('ops_dispatch', 'DELETE')} />
             : <WarehouseView embedded />}</GiveOutHub>}
           {selected.id === 'stock' && <StockWorkspace can={can} />}
@@ -197,7 +197,7 @@ function Overview({ goto, can }: { goto: (t: WarehousePage, tab?: StockTab) => v
   // What the person can do, in the words they would use. Each is one click.
   const quick = [
     { icon: ArrowDownToLine, title: 'Receive stock', hint: 'Something arrived: rice, inputs, fuel or bags', go: () => goto('receive'), allowed: can('ops_receiving', 'CREATE') },
-    { icon: Truck, title: 'Give out or send out', hint: 'Hand stock to a farmer, a job or a buyer', go: () => goto('sendout'), allowed: can('ops_dispatch') || can('warehouse_desk') },
+    { icon: Truck, title: 'Give out stock', hint: 'To a farmer or to a buyer', go: () => goto('sendout'), allowed: can('ops_dispatch') || can('warehouse_desk') },
     { icon: Factory, title: 'Mill paddy', hint: 'Turn paddy into rice', go: () => goto('mill'), allowed: can('ops_processing', 'CREATE') },
     { icon: ClipboardList, title: 'Count stock', hint: 'Check the shelves against the record', go: () => goto('stock', 'counts'), allowed: can('ops_stock', 'CREATE') },
   ].filter((q) => q.allowed);
