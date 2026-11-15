@@ -151,8 +151,8 @@ export function FarmSearch({ schemeId }: { schemeId: string }) {
   }, []);
   return (
     <div className="so-search" ref={box}>
-      <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-      <input className="input-field" aria-label="Find a farm" placeholder="Find a farm: 1:1R-1, name or member no." autoComplete="off" value={text}
+      <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', width: 16, height: 16, color: 'var(--text-3)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+      <input className="input-field" style={{ paddingLeft: 38 }} aria-label="Find a farm by its ID, the farmer's name or member number" title="Type a farm ID such as 1:1R-1, a farmer's name or a member number" placeholder="Find a farm, e.g. 1:1R-1" autoComplete="off" value={text}
         onChange={(e) => { setText(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }} />
       {open && q.length >= 2 && (
         <div className="so-search-results" aria-live="polite">
