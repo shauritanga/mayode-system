@@ -1,13 +1,14 @@
 'use client';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, ArrowDownToLine, Boxes, CheckCircle2, ClipboardList, Factory, LayoutDashboard, Package, RefreshCw, Truck, Warehouse } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, CheckCircle2, ClipboardList, Factory, LayoutDashboard, Package, RefreshCw, Truck, Warehouse } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { inputStockApi, opsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { hasPermission } from '@/lib/nav';
 import { kg, tzs } from '@/lib/ops';
-import { DataTable, ErrorNote, Loading, TablePageSizeContext, Tabs, useLoad } from '@/components/ops/ui';
+import { DataTable, ErrorNote, Loading, TablePageSizeContext, Tabs as OpsTabs, useLoad } from '@/components/ops/ui';
+import { PageHeader, Tabs } from '../irrigation/ui';
 import { ChartCard } from '@/components/role-dashboards/Charts';
 import { WarehouseView } from '../warehouse/page';
 import StockCountsPanel from '@/components/ops/StockCountsPanel';
@@ -69,31 +70,22 @@ export default function OpsWarehousePage() {
     if (tab) window.sessionStorage.setItem(TAB_KEY, tab);
     router.push(`/dashboard/ops-warehouse/${page.slug}`);
   };
+  // The sections are few, so they sit across the top as tabs instead of in a second sidebar next to the main one.
   return (
     <main>
-      {!selected ? <ErrorNote message="Your role does not include warehouse access." /> : <div className="warehouse-layout">
-        <aside className="warehouse-subsidebar" aria-label="Warehouse and Inventory sections">
-          <div className="warehouse-subsidebar-heading">Warehouse</div>
-          <nav aria-label="Warehouse sections">{pages.map((page) => {
-            const Icon = page.icon;
-            const href = `/dashboard/ops-warehouse/${page.slug}`;
-            const active = selected.id === page.id;
-            return <Link key={page.id} href={href} aria-current={active ? 'page' : undefined} className={`warehouse-nav-link ${active ? 'is-active' : ''}`}><Icon size={17} strokeWidth={1.8} /><span>{page.label}</span></Link>;
-          })}</nav>
-        </aside>
-        <section className="warehouse-workspace">
-          {selected.id !== 'overview' && <header className="warehouse-section-heading"><span className="warehouse-section-icon"><selected.icon size={21} /></span><div><span className="warehouse-section-kicker">Warehouse &amp; Inventory</span><h2>{selected.label}</h2><p>{selected.description}</p></div></header>}
-          <TablePageSizeContext.Provider value={10}><div className={`warehouse-section-content section-${selected.id}`} data-path={pathname}>
-            {selected.id === 'overview' && <Overview goto={goto} can={can} />}
-            {selected.id === 'receive' && <ReceiveHub can={can} />}
-            {selected.id === 'mill' && <ProcessingPanel canCreate={can('ops_processing', 'CREATE')} canReverse={can('ops_processing', 'DELETE')} />}
-            {selected.id === 'sendout' && <GiveOutHub can={can}>{can('ops_dispatch')
-              ? <DispatchPanel canAllocate={can('ops_dispatch', 'CREATE')} canRelease={can('ops_dispatch', 'EDIT')} canCancel={can('ops_dispatch', 'DELETE')} />
-              : <WarehouseView embedded />}</GiveOutHub>}
-            {selected.id === 'stock' && <StockWorkspace can={can} />}
-          </div></TablePageSizeContext.Provider>
-        </section>
-      </div>}
+      {!selected ? <ErrorNote message="Your role does not include warehouse access." /> : <>
+        <PageHeader title="Warehouse" subtitle={selected.description} />
+        {pages.length > 1 && <Tabs tabs={pages.map((page) => ({ id: page.id, label: page.label }))} active={selected.id} onChange={(id) => router.push(`/dashboard/ops-warehouse/${pages.find((p) => p.id === id)!.slug}`)} />}
+        <TablePageSizeContext.Provider value={10}><div className={`warehouse-section-content section-${selected.id}`} data-path={pathname}>
+          {selected.id === 'overview' && <Overview goto={goto} can={can} />}
+          {selected.id === 'receive' && <ReceiveHub can={can} />}
+          {selected.id === 'mill' && <ProcessingPanel canCreate={can('ops_processing', 'CREATE')} canReverse={can('ops_processing', 'DELETE')} />}
+          {selected.id === 'sendout' && <GiveOutHub can={can}>{can('ops_dispatch')
+            ? <DispatchPanel canAllocate={can('ops_dispatch', 'CREATE')} canRelease={can('ops_dispatch', 'EDIT')} canCancel={can('ops_dispatch', 'DELETE')} />
+            : <WarehouseView embedded />}</GiveOutHub>}
+          {selected.id === 'stock' && <StockWorkspace can={can} />}
+        </div></TablePageSizeContext.Provider>
+      </>}
     </main>
   );
 }
@@ -129,7 +121,7 @@ function StockWorkspace({ can }: { can: Can }) {
     return t ?? 'all';
   });
   return <>
-    <Tabs tabs={[
+    <OpsTabs tabs={[
       { id: 'all' as StockTab, label: 'Everything' }, { id: 'position' as StockTab, label: 'Rice & paddy' }, { id: 'batches' as StockTab, label: 'Rice batches' }, { id: 'inputbatches' as StockTab, label: 'Input batches & expiry' }, { id: 'ledger' as StockTab, label: 'History' },
       { id: 'transfers' as StockTab, label: 'Transfers' }, { id: 'counts' as StockTab, label: 'Count stock' }, { id: 'trace' as StockTab, label: 'Trace a batch' },
     ]} value={tab} onChange={setTab} />
@@ -223,14 +215,10 @@ function Overview({ goto, can }: { goto: (t: WarehousePage, tab?: StockTab) => v
   ];
 
   return <section className="warehouse-overview wo" aria-label="Warehouse overview">
-    <div className="warehouse-overview-head">
-      <div className="warehouse-overview-title"><span className="warehouse-overview-icon"><Boxes size={26} /></span><div><h2>Warehouse</h2><p>What you have in store, and what to do next.</p></div></div>
-      <div className="warehouse-overview-actions"><button type="button" className="btn-secondary" onClick={() => void reload()}><RefreshCw size={15} /> Refresh</button></div>
-    </div>
     <ErrorNote message={error} />
 
     {quick.length > 0 && <section className="wo-block" aria-label="What would you like to do?">
-      <h3 className="wo-title">What would you like to do?</h3>
+      <div className="wo-title-row"><h3 className="wo-title">What would you like to do?</h3><button type="button" className="btn-secondary" onClick={() => void reload()}><RefreshCw size={14} /> Refresh</button></div>
       <div className="wo-actions">{quick.map(({ icon: Icon, title, hint, go }) => <button key={title} type="button" className="wo-action" onClick={go}><span className="wo-action-icon"><Icon size={22} /></span><span className="wo-action-text"><strong>{title}</strong><small>{hint}</small></span></button>)}</div>
     </section>}
 
