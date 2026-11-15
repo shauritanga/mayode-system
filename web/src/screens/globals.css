@@ -3693,3 +3693,9 @@ a.farmers-name { display: block; cursor: pointer; }
 .sd-pick { display: flex; gap: 8px; margin-top: 8px; }
 .sd-problems { margin-top: 16px; font-size: 0.8125rem; }
 .sd-problems > summary { cursor: pointer; font-weight: 600; color: var(--text-2); }
+
+/* Warehouses: a table on a desktop screen, cards on a phone or narrow window */
+.whl-fill { display: inline-flex; align-items: center; gap: 8px; min-width: 110px; font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.whl-fill .whl-bar { flex: 1; min-width: 60px; }
+@media (min-width: 900px) { .whl-mobile { display: none; } }
+@media (max-width: 899px) { .whl-desktop { display: none; } }

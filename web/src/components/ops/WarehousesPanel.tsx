@@ -3,13 +3,14 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Modal from '@/components/Modal';
 import { ChoiceCards, Field, Form, FormError, Row, Section } from '@/components/FormKit';
 import { inputStockApi, opsApi, warehousesApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-error';
 import { kg } from '@/lib/ops';
 import { Keepers, NewWarehouse, type Warehouse } from '@/screens/dashboard/warehouse/page';
-import { ErrorNote, Loading, useLoad } from './ui';
+import { DataTable, ErrorNote, Loading, useLoad } from './ui';
 import { AllStockPanel, InputReceivePanel } from './InputStockPanels';
 import { NewReceiptModal } from './ReceivingPanel';
 
@@ -43,7 +44,12 @@ function useWarehouseData(can: Can) {
 export function WarehouseList({ can }: { can: Can }) {
   const { list, stockOf, reload } = useWarehouseData(can);
   const [adding, setAdding] = useState(false);
+  const router = useRouter();
   const rows = list.data ?? [];
+  const statusOf = (w: Warehouse) => {
+    const low = (stockOf.get(w.id) ?? { low: 0 }).low;
+    return !w.isActive ? <span className="badge badge-gray">Not in use</span> : low > 0 ? <span className="badge badge-red">{low} running low</span> : <span className="badge badge-green">OK</span>;
+  };
   return (
     <>
       <div className="wo-title-row" style={{ marginBottom: 14 }}>
@@ -58,7 +64,21 @@ export function WarehouseList({ can }: { can: Can }) {
           {can('warehouses', 'CREATE') && <button type="button" className="btn-primary" onClick={() => setAdding(true)}>+ Add warehouse</button>}
         </div>
       ) : (
-        <div className="whl-grid">
+        <>
+        <div className="whl-desktop">
+          <DataTable rows={rows} rowKey={(w) => w.id} onRow={(w) => router.push(`${BASE}/${w.id}`)} pageSize={15}
+            columns={[
+              { header: 'Warehouse', render: (w) => <span><strong>{w.name}</strong><div className="muted" style={{ fontSize: 12 }}>{w.location || 'No location set'}</div></span> },
+              { header: 'Keeper', render: (w) => keeperNames(w).join(', ') || <span className="muted">None assigned</span> },
+              { header: 'Rice and paddy', align: 'right', render: (w) => kg((stockOf.get(w.id) ?? { riceKg: 0 }).riceKg) },
+              { header: 'Can be sold now', align: 'right', render: (w) => kg((stockOf.get(w.id) ?? { freeKg: 0 }).freeKg) },
+              { header: 'Input items', align: 'right', render: (w) => (stockOf.get(w.id) ?? { inputItems: 0 }).inputItems },
+              { header: 'How full', render: (w) => (w.capacityKg ? <span className="whl-fill"><span className="whl-bar"><i style={{ width: `${Math.min(100, ((stockOf.get(w.id)?.riceKg ?? 0) / w.capacityKg) * 100)}%` }} /></span>{Math.round(Math.min(100, ((stockOf.get(w.id)?.riceKg ?? 0) / w.capacityKg) * 100))}%</span> : <span className="muted">—</span>) },
+              { header: 'Status', render: (w) => statusOf(w) },
+              { header: '', align: 'right', render: (w) => <Link href={`${BASE}/${w.id}`} className="btn-secondary" onClick={(e) => e.stopPropagation()}>Open</Link> },
+            ]} />
+        </div>
+        <div className="whl-grid whl-mobile">
           {rows.map((w) => {
             const s = stockOf.get(w.id) ?? { riceKg: 0, freeKg: 0, inputItems: 0, low: 0 };
             const keepers = keeperNames(w);
@@ -78,6 +98,7 @@ export function WarehouseList({ can }: { can: Can }) {
             );
           })}
         </div>
+        </>
       )}
       {adding && <NewWarehouse onClose={() => setAdding(false)} onDone={() => { setAdding(false); reload(); }} />}
     </>
