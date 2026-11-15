@@ -3655,8 +3655,10 @@ a.farmers-name { display: block; cursor: pointer; }
 .whl-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid var(--border-subtle); font-size: 0.75rem; color: var(--text-2); }
 .whl-low { color: var(--red-400); font-weight: 700; }
 .whl-open { color: var(--accent); font-weight: 600; }
-.whl-back { display: inline-block; margin-bottom: 12px; font-size: 0.8125rem; color: var(--text-2); text-decoration: none; }
-.whl-back:hover { color: var(--text-1); }
+.whl-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; font-size: 0.8125rem; color: var(--text-2); }
+.whl-crumbs a { color: var(--text-2); text-decoration: none; }
+.whl-crumbs a:hover { color: var(--text-1); text-decoration: underline; }
+.whl-crumbs [aria-current='page'] { color: var(--text-1); font-weight: 600; }
 .whl-top { display: grid; gap: 18px; }
 .whl-title { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .whl-title h2 { margin: 0; font-family: var(--font-outfit), sans-serif; font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

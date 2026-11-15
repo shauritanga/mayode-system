@@ -84,19 +84,30 @@ export function WarehouseList({ can }: { can: Can }) {
   );
 }
 
+/** Where you are: Warehouses / the warehouse. The first part takes you back to the list. */
+function Crumbs({ name }: { name?: string }) {
+  return (
+    <nav aria-label="Breadcrumb" className="whl-crumbs">
+      <Link href={BASE}>Warehouses</Link>
+      <span aria-hidden>/</span>
+      <span aria-current="page">{name ?? 'Not found'}</span>
+    </nav>
+  );
+}
+
 // ───────────────────────── one warehouse ─────────────────────────
 export function WarehouseDetail({ id, can, goto }: { id: string; can: Can; goto: (page: 'sendout' | 'stock') => void }) {
   const { list, stockOf, reload } = useWarehouseData(can);
   const [dialog, setDialog] = useState<'' | 'edit' | 'keepers' | 'add' | 'rice' | 'inputs'>('');
   const w = (list.data ?? []).find((x) => x.id === id);
   if (list.loading && !list.data) return <Loading />;
-  if (!w) return <><Link href={BASE} className="whl-back">← All warehouses</Link><ErrorNote message={list.error || 'This warehouse was not found.'} /></>;
+  if (!w) return <><Crumbs /><ErrorNote message={list.error || 'This warehouse was not found.'} /></>;
   const s = stockOf.get(w.id) ?? { riceKg: 0, freeKg: 0, inputItems: 0, low: 0 };
   const keepers = keeperNames(w);
   const done = () => { setDialog(''); reload(); };
   return (
     <>
-      <Link href={BASE} className="whl-back">← All warehouses</Link>
+      <Crumbs name={w.name} />
       <section className="so-card whl-top">
         <div className="whl-title">
           <div>
