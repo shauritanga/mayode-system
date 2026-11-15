@@ -254,7 +254,7 @@ export class DuesService {
 
   async createDue(actor: RequestUser, dto: CreateDueDto, mamcosIdParam?: string) {
     const mamcosId = this.tenant(actor, mamcosIdParam);
-    if (dto.category === 'FERTILISER') throw new BadRequestException('Use Issue fertiliser to record fertiliser taken on credit');
+    if (dto.category === 'FERTILISER') throw new BadRequestException('Farm inputs taken on credit are given in Input Distribution, which also takes them out of stock');
     await this.farmerOf(mamcosId, dto.farmerId);
     if (dto.typeId) await this.findType(mamcosId, dto.typeId);
     const dueDate = dto.dueDate ? day(dto.dueDate) : null;
@@ -520,7 +520,7 @@ export class DuesService {
       this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { name: true } }),
       this.prisma.user.findUnique({ where: { id: actor.id }, select: { firstName: true, lastName: true, phone: true } }),
     ]);
-    const KIND: Record<string, string> = { LEVY: 'Levy', MEMBERSHIP_FEE: 'Membership fee', CANAL_CLEANING: 'Canal cleaning', FERTILISER: 'Fertiliser', HARVEST_FEE: 'Harvest fee', OTHER: 'Other' };
+    const KIND: Record<string, string> = { LEVY: 'Levy', MEMBERSHIP_FEE: 'Membership fee', CANAL_CLEANING: 'Canal cleaning', FERTILISER: 'Farm inputs', HARVEST_FEE: 'Harvest fee', OTHER: 'Other' };
     const STATE: Record<string, string> = { OPEN: 'Not paid', PARTIAL: 'Part paid', PAID: 'Paid', CANCELLED: 'Cancelled', OVERDUE: 'Overdue' };
     const asAt = longDate(new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10));
     const filters = [q.category ? `Kind: ${KIND[q.category] ?? q.category}` : '', q.state ? `Status: ${STATE[q.state] ?? q.state}` : '', q.q?.trim() ? `Search: “${q.q.trim()}”` : ''].filter(Boolean);

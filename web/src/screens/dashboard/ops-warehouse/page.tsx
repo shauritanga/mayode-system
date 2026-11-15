@@ -3,7 +3,7 @@ import { useParams, usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, ArrowDownToLine, Boxes, CheckCircle2, ClipboardList, Factory, LayoutDashboard, Package, RefreshCw, Settings2, Truck, Warehouse } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { opsApi } from '@/lib/api';
+import { inputStockApi, opsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { hasPermission } from '@/lib/nav';
 import { kg, tzs } from '@/lib/ops';
@@ -18,7 +18,7 @@ import DispatchPanel from '@/components/ops/DispatchPanel';
 import TracePanel from '@/components/ops/TracePanel';
 import ProductsPanel from '@/components/ops/ProductsPanel';
 import ReportsRunner from '@/components/ops/ReportsRunner';
-import { AllStockPanel, GiveOutHub, HowItWorks, InputReceivePanel } from '@/components/ops/InputStockPanels';
+import { AllStockPanel, GiveOutHub, HowItWorks, InputBatchesPanel, InputReceivePanel } from '@/components/ops/InputStockPanels';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type WarehousePage = 'overview' | 'receive' | 'mill' | 'sendout' | 'stock' | 'setup';
@@ -40,7 +40,7 @@ const OLD_ADDRESSES: Record<string, WarehousePage> = {
   'quality-loss-control': 'mill', 'milling-production-stock': 'mill', 'dispatch-returns': 'sendout', 'inventory-reports': 'setup',
 };
 
-type StockTab = 'all' | 'position' | 'batches' | 'ledger' | 'transfers' | 'counts' | 'trace';
+type StockTab = 'all' | 'position' | 'batches' | 'inputbatches' | 'ledger' | 'transfers' | 'counts' | 'trace';
 /** Lets a shortcut on the overview open the Stock page on a particular tab. */
 const TAB_KEY = 'warehouse-stock-tab';
 
@@ -131,10 +131,11 @@ function StockWorkspace({ can }: { can: Can }) {
   });
   return <>
     <Tabs tabs={[
-      { id: 'all' as StockTab, label: 'Everything' }, { id: 'position' as StockTab, label: 'Rice & paddy' }, { id: 'batches' as StockTab, label: 'Batches' }, { id: 'ledger' as StockTab, label: 'History' },
+      { id: 'all' as StockTab, label: 'Everything' }, { id: 'position' as StockTab, label: 'Rice & paddy' }, { id: 'batches' as StockTab, label: 'Rice batches' }, { id: 'inputbatches' as StockTab, label: 'Input batches & expiry' }, { id: 'ledger' as StockTab, label: 'History' },
       { id: 'transfers' as StockTab, label: 'Transfers' }, { id: 'counts' as StockTab, label: 'Count stock' }, { id: 'trace' as StockTab, label: 'Trace a batch' },
     ]} value={tab} onChange={setTab} />
     {tab === 'all' && <AllStockPanel canRice={can('ops_stock')} canInputs={can('ops_stock')} canAdjust={can('ops_stock', 'EDIT')} />}
+    {tab === 'inputbatches' && <InputBatchesPanel onFix={() => setTab('all')} />}
     {(tab === 'position' || tab === 'batches' || tab === 'ledger' || tab === 'transfers') && <StockPanel key={tab} hideTabs initialTab={tab} canAdjust={can('ops_stock', 'EDIT')} canTransfer={can('ops_stock', 'EDIT')} canManageQuality={can('ops_quality', 'EDIT')} />}
     {tab === 'counts' && <StockCountsPanel canStart={can('ops_stock', 'CREATE')} canApprove={can('ops_stock', 'EDIT')} />}
     {tab === 'trace' && <TracePanel />}
@@ -165,15 +166,17 @@ const CATEGORY_CARDS: { key: string; title: string; categories: string[]; tone: 
 function Overview({ goto, can }: { goto: (t: WarehousePage, tab?: StockTab) => void; can: Can }) {
   const { data: d, error, loading, reload } = useLoad<any>(async () => {
     const soft = <T,>(allowed: boolean, call: () => Promise<{ data: T }>) => (allowed ? call().then((r) => r.data).catch(() => null) : Promise.resolve(null));
-    const [position, ledger, valuation, drafts, counts, dashboard] = await Promise.all([
+    const [position, ledger, valuation, drafts, counts, dashboard, inputs, inputBatches] = await Promise.all([
       soft(can('ops_stock'), () => opsApi.position()),
       soft(can('ops_stock'), () => opsApi.ledger()),
       soft(can('ops_stock'), () => opsApi.valuation()),
       soft(can('ops_receiving'), () => opsApi.receipts({ status: 'DRAFT' })),
       soft(can('ops_stock'), () => opsApi.stockCounts()),
       soft(can('ops_reports'), () => opsApi.commercialDashboard()),
+      soft(can('ops_stock'), () => inputStockApi.overview()),
+      soft(can('ops_stock'), () => inputStockApi.batches()),
     ]);
-    return { data: { position: position ?? [], ledger: ledger ?? [], valuation, drafts: drafts ?? [], counts: counts ?? [], dashboard } };
+    return { data: { position: position ?? [], ledger: ledger ?? [], valuation, drafts: drafts ?? [], counts: counts ?? [], dashboard, inputs: inputs as any, inputBatches: inputBatches as any } };
   });
   const rows: any[] = useMemo(() => d?.position ?? [], [d]);
   const byWarehouse = useMemo(() => {
@@ -197,6 +200,8 @@ function Overview({ goto, can }: { goto: (t: WarehousePage, tab?: StockTab) => v
   const waitingCounts = d.counts.filter((c: any) => c.status === 'PENDING_APPROVAL').length;
   const orders = d.dashboard?.ordersAwaitingFulfilment ?? 0;
   const lowStock: any[] = rows.filter((r) => r.lowStock);
+  const lowInputs: any[] = [...new Map((d.inputs?.data ?? []).filter((r: any) => r.low && r.isActive).map((r: any) => [r.itemId, r])).values()];
+  const batchSummary = d.inputBatches?.summary;
 
   // Everything that needs a person, each with the button that takes them there.
   const todo: { text: string; action: string; go: () => void; tone?: 'red' }[] = [
@@ -204,6 +209,9 @@ function Overview({ goto, can }: { goto: (t: WarehousePage, tab?: StockTab) => v
     ...(orders ? [{ text: `${orders} paid ${orders === 1 ? 'order is' : 'orders are'} waiting to be sent out`, action: 'Send out', go: () => goto('sendout') }] : []),
     ...(waitingCounts ? [{ text: `${waitingCounts} stock ${waitingCounts === 1 ? 'count is' : 'counts are'} waiting for approval`, action: 'Approve', go: () => goto('stock', 'counts') }] : []),
     ...lowStock.slice(0, 3).map((r) => ({ text: `${r.product} at ${r.warehouse} is running low: ${kg(r.availableKg)} free`, action: 'See stock', go: () => goto('stock'), tone: 'red' as const })),
+    ...lowInputs.slice(0, 3).map((r: any) => ({ text: `${r.name} is running low: ${Math.round(r.itemTotal * 1000) / 1000} ${r.unit} left. Time to order more`, action: 'See stock', go: () => goto('stock'), tone: 'red' as const })),
+    ...(batchSummary?.expired ? [{ text: `${batchSummary.expired} input ${batchSummary.expired === 1 ? 'batch has' : 'batches have'} expired and still ${batchSummary.expired === 1 ? 'has' : 'have'} stock`, action: 'See batches', go: () => goto('stock', 'inputbatches'), tone: 'red' as const }] : []),
+    ...(batchSummary?.expiring ? [{ text: `${batchSummary.expiring} input ${batchSummary.expiring === 1 ? 'batch expires' : 'batches expire'} within 30 days`, action: 'See batches', go: () => goto('stock', 'inputbatches') }] : []),
     ...(valuation && valuation.uncostedKg > 0 ? [{ text: `${kg(valuation.uncostedKg)} of our stock has no cost yet, so it is missing from the accounts`, action: 'Set cost', go: () => goto('stock', 'batches') }] : []),
     ...(valuation && !valuation.matches ? [{ text: 'The stock value and the accounts do not agree. See the check below.', action: 'Look', go: () => undefined, tone: 'red' as const }] : []),
   ];
@@ -212,7 +220,7 @@ function Overview({ goto, can }: { goto: (t: WarehousePage, tab?: StockTab) => v
   const movementLabel = (type: string, qty: number) => ({ RECEIPT: 'Received', TRANSFER_IN: 'Transfer in', TRANSFER_OUT: 'Transfer out', PROCESS_IN: 'Made by milling', PROCESS_OUT: 'Used in milling', DISPATCH: 'Sent out', ADJUSTMENT: qty < 0 ? 'Corrected down' : 'Corrected up', WRITE_OFF: 'Written off' }[type] ?? type);
 
   const quick = [
-    { icon: ArrowDownToLine, title: 'Receive paddy', hint: 'A delivery has arrived', go: () => goto('receive'), allowed: can('ops_receiving', 'CREATE') },
+    { icon: ArrowDownToLine, title: 'Receive stock', hint: 'Rice, inputs, fuel or bags arrived', go: () => goto('receive'), allowed: can('ops_receiving', 'CREATE') },
     { icon: Factory, title: 'Mill paddy', hint: 'Turn paddy into rice', go: () => goto('mill'), allowed: can('ops_processing', 'CREATE') },
     { icon: Truck, title: 'Send out rice', hint: 'Load a customer’s order', go: () => goto('sendout'), allowed: can('ops_dispatch') || can('warehouse_desk') },
     { icon: ClipboardList, title: 'Count stock', hint: 'Check shelves against the record', go: () => goto('stock', 'counts'), allowed: can('ops_stock', 'CREATE') },

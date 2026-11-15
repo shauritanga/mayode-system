@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { SELLABLE_CATEGORIES, lockWarehouse, saleOrderReservedKg, warehouseBalance } from '../warehouses/stock';
 import { Actor, assertVisible, batchBalances, lockBatches, nextRef, OpsNotifyService, scope, Tx } from './ops-common';
 import { r3, suggestAllocation } from './ops-rules';
 import { lineKg } from './sales-ops.service';
@@ -111,8 +112,18 @@ export class DispatchService {
       }
       const allBatchIds = [...picksByLine.values()].flat().map((p) => p.batchId);
       if (!allBatchIds.length && !shortages.length) throw new BadRequestException('Choose the batches to set aside');
+      await lockWarehouse(tx, dto.warehouseId);
       await lockBatches(tx, allBatchIds);
       const bal = await batchBalances(tx, allBatchIds, dto.warehouseId);
+      // Rice already promised to sale orders is not free to set aside, even though it is not tied to a batch.
+      const promisedToSaleOrders = await saleOrderReservedKg(tx, dto.warehouseId);
+      const sellable = new Set((await tx.stockBatch.findMany({ where: { id: { in: allBatchIds }, product: { category: { in: [...SELLABLE_CATEGORIES] } } }, select: { id: true } })).map((b) => b.id));
+      const askedTotal = r3([...picksByLine.values()].flat().filter((p) => sellable.has(p.batchId)).reduce((t, p) => t + p.quantityKg, 0));
+      if (askedTotal > 0) {
+        const wb = await warehouseBalance(tx, dto.warehouseId);
+        if (askedTotal > wb.availableKg + 0.0005)
+          throw new ConflictException(`${wh.name} has only ${Math.max(wb.availableKg, 0)} kg free to set aside (${promisedToSaleOrders} kg is promised to sale orders)`);
+      }
       const asked = new Map<string, number>();
       for (const [lineId, picks] of picksByLine) {
         const line = order.lines.find((l) => l.id === lineId);

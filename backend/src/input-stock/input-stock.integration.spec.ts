@@ -104,4 +104,48 @@ const BASE_URL = process.env.IRRIGATION_TEST_DATABASE_URL;
     expect([row.warehouseId, row.balance, row.low]).toEqual([a.main, 15, true]); // 15 is under the reorder level of 20
     expect((await svc.overview(a.actor, { stockClass: 'FUEL' }) as any).data.find((r: any) => r.itemId === a.item.id)).toBeUndefined();
   });
+
+  it('fuel or bags used are taken off with a purpose', async () => {
+    const a = await coop();
+    await svc.receive(a.actor, { itemId: a.item.id, quantity: 50, source: 'OPENING' });
+    await expect(svc.adjust(a.actor, { itemId: a.item.id, warehouseId: a.main, quantity: -10, reason: 'USED' })).rejects.toThrow(/used for/);
+    await svc.adjust(a.actor, { itemId: a.item.id, warehouseId: a.main, quantity: -10, reason: 'USED', note: 'Tractor, plot 4' });
+    expect(await bal(a)).toEqual({ [a.main]: 40 });
+  });
+
+  describe('batches', () => {
+    const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+
+    it('numbers each receipt as a batch and takes the one that expires first', async () => {
+      const a = await coop();
+      await svc.receive(a.actor, { itemId: a.item.id, quantity: 30, source: 'OPENING', expiresOn: day(200) });
+      await svc.receive(a.actor, { itemId: a.item.id, quantity: 20, source: 'OPENING', expiresOn: day(60) });
+      await prisma.$transaction((tx) => svc.drawOut(tx, { itemId: a.item.id, quantity: 25, userId: a.actor.id, refType: 'FIELD_WORK' }));
+      const b: any = await svc.batches(a.actor, { itemId: a.item.id });
+      const byNo = Object.fromEntries(b.data.map((r: any) => [r.batchNo, r]));
+      expect(byNo['Batch 2'].remaining).toBe(0); // expires first, so all 20 go first
+      expect(byNo['Batch 1'].remaining).toBe(25); // then 5 more come from the later one
+    });
+
+    it('shows when a batch finished and flags expired and expiring stock', async () => {
+      const a = await coop();
+      await svc.receive(a.actor, { itemId: a.item.id, quantity: 10, source: 'OPENING', batchNo: 'Lot A', expiresOn: day(10) });
+      await svc.receive(a.actor, { itemId: a.item.id, quantity: 10, source: 'OPENING', batchNo: 'Lot B' });
+      await prisma.$transaction((tx) => svc.drawOut(tx, { itemId: a.item.id, quantity: 10, userId: a.actor.id, refType: 'FIELD_WORK' }));
+      const b: any = await svc.batches(a.actor, { itemId: a.item.id });
+      const lotA = b.data.find((r: any) => r.batchNo === 'Lot A');
+      expect([lotA.state, lotA.remaining]).toEqual(['FINISHED', 0]);
+      expect(lotA.finishedOn).toBeTruthy();
+      expect(b.data.find((r: any) => r.batchNo === 'Lot B').state).toBe('ACTIVE');
+      await expect(svc.receive(a.actor, { itemId: a.item.id, quantity: 1, source: 'OPENING', expiresOn: day(-3) })).rejects.toThrow(/expired/);
+    });
+
+    it('a transfer keeps the batch number and expiry in the new warehouse', async () => {
+      const a = await coop();
+      await svc.receive(a.actor, { itemId: a.item.id, quantity: 40, source: 'OPENING', batchNo: 'Lot A', expiresOn: day(90) });
+      await svc.transfer(a.actor, { itemId: a.item.id, fromWarehouseId: a.main, toWarehouseId: a.second, quantity: 15 });
+      const b: any = await svc.batches(a.actor, { itemId: a.item.id });
+      expect(b.data.map((r: any) => [r.warehouseId, r.batchNo, r.remaining]).sort()).toEqual([[a.main, 'Lot A', 25], [a.second, 'Lot A', 15]].sort());
+    });
+  });
 });

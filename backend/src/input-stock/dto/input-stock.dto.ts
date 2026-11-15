@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
+import { IsDateString, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
 import { ADJUST_REASONS, RECEIVE_SOURCES } from '../input-stock.service';
 
 export class ReceiveInputDto {
@@ -11,6 +11,8 @@ export class ReceiveInputDto {
   @IsOptional() @IsString() @MaxLength(80) reference?: string;
   @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) unitCost?: number | null;
   @IsOptional() @IsString() @MaxLength(300) note?: string;
+  @IsOptional() @IsString() @MaxLength(60) batchNo?: string;
+  @IsOptional() @IsDateString() expiresOn?: string;
 }
 export class AdjustInputDto {
   @IsUUID() itemId: string;
@@ -18,6 +20,8 @@ export class AdjustInputDto {
   @Type(() => Number) @IsNumber({ maxDecimalPlaces: 3 }) quantity: number;
   @IsIn([...ADJUST_REASONS]) reason: string;
   @IsOptional() @IsString() @MaxLength(300) note?: string;
+  @IsOptional() @IsString() @MaxLength(60) batchNo?: string;
+  @IsOptional() @IsDateString() expiresOn?: string;
 }
 export class TransferInputDto {
   @IsUUID() itemId: string;

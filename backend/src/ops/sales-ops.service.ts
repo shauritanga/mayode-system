@@ -2,6 +2,7 @@ import { ChargesService } from '../charges/charges.service';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { saleOrderReservedKg } from '../warehouses/stock';
 import { Actor, assertVisible, batchBalances, nextRef, owner, OpsNotifyService, scope, Tx } from './ops-common';
 import { canMoveOrder, documentTotals, lineTotals, r2, r3 } from './ops-rules';
 import { CatalogService } from './catalog.service';
@@ -27,11 +28,24 @@ export class SalesOpsService {
   async availability(actor: Actor, productIds: string[]) {
     const batches = await this.prisma.stockBatch.findMany({ where: { ...scope(actor), productId: { in: productIds } }, select: { id: true, productId: true } });
     const rows = await this.prisma.stockLedgerEntry.groupBy({ by: ['batchId', 'warehouseId'], where: { batchId: { in: batches.map((b) => b.id) } }, _sum: { quantityKg: true } });
-    const out = new Map<string, number>();
+    // free kg per warehouse per product, then take off what sale orders have promised at that warehouse
+    const perWarehouse = new Map<string, Map<string, number>>();
     for (const r of rows) {
       const bal = (await batchBalances(this.prisma, [r.batchId], r.warehouseId)).get(r.batchId)!;
       const pid = batches.find((b) => b.id === r.batchId)!.productId;
-      out.set(pid, r3((out.get(pid) ?? 0) + Math.max(bal.availableKg, 0)));
+      const m = perWarehouse.get(r.warehouseId) ?? new Map<string, number>();
+      m.set(pid, (m.get(pid) ?? 0) + Math.max(bal.availableKg, 0));
+      perWarehouse.set(r.warehouseId, m);
+    }
+    const out = new Map<string, number>();
+    for (const [warehouseId, products] of perWarehouse) {
+      let promised = await saleOrderReservedKg(this.prisma, warehouseId);
+      // the promise is not tied to a product: take it from the largest free stock first
+      for (const [pid, kg] of [...products].sort((a, b) => b[1] - a[1])) {
+        const cut = Math.min(promised, kg);
+        promised -= cut;
+        out.set(pid, r3((out.get(pid) ?? 0) + kg - cut));
+      }
     }
     return out;
   }

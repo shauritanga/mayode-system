@@ -573,6 +573,7 @@ export const creditApi = {
 export const inputStockApi = {
   overview: (params?: object) => api.get('/ops/warehouse/inputs/overview', { params }),
   movements: (params?: object) => api.get('/ops/warehouse/inputs/movements', { params }),
+  batches: (params?: object) => api.get('/ops/warehouse/inputs/batches', { params }),
   receive: (data: object) => api.post('/ops/warehouse/inputs/receive', data),
   adjust: (data: object) => api.post('/ops/warehouse/inputs/adjust', data),
   transfer: (data: object) => api.post('/ops/warehouse/inputs/transfer', data),

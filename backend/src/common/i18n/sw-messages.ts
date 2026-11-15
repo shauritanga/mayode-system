@@ -4,6 +4,12 @@
  */
 export const SW_MESSAGES: Record<string, string> = {
   "The guardian must be a different member than the one the hectare is registered to": "Msimamizi lazima awe mwanachama tofauti na yule ambaye hekta imesajiliwa kwake",
+  "That status is set automatically by sales, dispatch and lots": "Hali hiyo huwekwa yenyewe na mauzo, usafirishaji na vifurushi",
+  "The weight cannot change once the delivery is in a warehouse; correct it as a stock adjustment instead": "Uzito hauwezi kubadilishwa mara mzigo ukishaingia ghalani; usahihishe kama marekebisho ya hisa",
+  "{0} has only {1} kg free to set aside ({2} kg is promised to sale orders)": "{0} ina kilo {1} tu zilizo huru kutengwa (kilo {2} zimeahidiwa kwa oda za mauzo)",
+  "Used, damaged, expired or lost stock is taken off, so the quantity must be negative": "Hisa iliyotumika, kuharibika, kuisha muda au kupotea hupunguzwa, kwa hiyo kiasi lazima kiwe hasi",
+  "Say what it was used for in the note": "Andika kwenye maelezo ilitumika kwa ajili ya nini",
+  "This stock has already expired, so it cannot be received": "Bidhaa hii imeshaisha muda, kwa hiyo haiwezi kupokelewa",
   "Guardian not found": "Msimamizi hajapatikana",
   "{0} is blacklisted and cannot be a guardian": "{0} yuko kwenye orodha nyeusi na hawezi kuwa msimamizi",
   "Only a current allocation can have a guardian": "Mgao wa sasa pekee ndio unaoweza kuwa na msimamizi",
@@ -17,7 +23,7 @@ export const SW_MESSAGES: Record<string, string> = {
   "This charge is switched off": "Tozo hii imezimwa",
   "The due date cannot be in the past": "Tarehe ya mwisho ya kulipa haiwezi kuwa ya zamani",
   "Every farmer has already been charged for this": "Kila mkulima tayari ametozwa kwa hili",
-  "Use Issue fertiliser to record fertiliser taken on credit": "Tumia Toa mbolea kurekodi mbolea iliyochukuliwa kwa mkopo",
+  "Farm inputs taken on credit are given in Input Distribution, which also takes them out of stock": "Pembejeo zilizochukuliwa kwa mkopo hutolewa kwenye Ugawaji wa Pembejeo, ambao pia huzitoa kwenye hisa",
   "This farmer has already been charged for that": "Mkulima huyu tayari ametozwa kwa hilo",
   "The due date cannot be before the issue date": "Tarehe ya mwisho ya kulipa haiwezi kuwa kabla ya tarehe ya kutoa",
   "Due not found": "Deni halijapatikana",

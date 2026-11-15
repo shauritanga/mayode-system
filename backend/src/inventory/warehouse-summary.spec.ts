@@ -44,3 +44,29 @@ describe('summariseWarehouse', () => {
     expect(s.byCentre.find((c) => c.name === 'No collection centre')?.weightKg).toBe(300);
   });
 });
+
+describe('summariseWarehouse with the stock ledger', () => {
+  const records = [
+    rec({ weightKg: 100, status: 'RECEIVED' }),
+    rec({ weightKg: 40, status: 'IN_STORAGE', warehouseName: null }),
+    rec({ weightKg: 300, status: 'SOLD' }),
+  ];
+  const s = summariseWarehouse(records, {
+    warehouses: [
+      { name: 'Main store', onHandKg: 70, reservedKg: 20 },
+      { name: 'Bay B', onHandKg: 10, reservedKg: 0 },
+    ],
+  });
+  it('takes in-stock from the ledger, not from record statuses', () => {
+    expect(s.inStockKg).toBe(80);
+    expect(s.currentBalanceKg).toBe(80);
+    expect(s.reservedKg).toBe(20);
+  });
+  it('shows deliveries not yet in a warehouse separately', () => {
+    expect(s.awaitingReceiptKg).toBe(40);
+    expect(s.awaitingReceiptCount).toBe(1);
+  });
+  it('lists warehouses with ledger weights', () => {
+    expect(s.byWarehouse.map((w) => [w.name, w.weightKg])).toEqual([['Main store', 70], ['Bay B', 10]]);
+  });
+});

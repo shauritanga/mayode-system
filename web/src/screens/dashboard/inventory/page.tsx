@@ -22,6 +22,9 @@ interface DashboardSummary {
   shippedKg: number;
   soldKg: number;
   currentBalanceKg: number;
+  reservedKg: number;
+  awaitingReceiptKg: number;
+  awaitingReceiptCount: number;
   purchaseValue: number;
   paidToFarmers: number;
   owedToFarmers: number;
@@ -219,6 +222,10 @@ export default function InventoryPage() {
     event.preventDefault();
     if (!selectedCycle?.farm?.id || !selectedCycle?.farmer?.id) {
       setMessage('Selected crop cycle is missing farm or farmer details.');
+      return;
+    }
+    if (canReceiveIntoWarehouse && !form.warehouseId) {
+      setMessage('Choose the warehouse this rice goes into. Every delivery must be received into a warehouse.');
       return;
     }
     setSaving(true);
@@ -478,15 +485,16 @@ export default function InventoryPage() {
             </label>
             {canReceiveIntoWarehouse && (
               <label className="form-label">
-                Receive into warehouse
+                Receive into warehouse *
                 <select
                   className="input-field"
+                  required
                   value={form.warehouseId}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, warehouseId: event.target.value }))
                   }
                 >
-                  <option value="">Not yet (receive later)</option>
+                  <option value="">Choose a warehouse</option>
                   {warehouses.map((w) => (
                     <option key={w.id} value={w.id}>
                       {w.name}
@@ -768,10 +776,10 @@ export default function InventoryPage() {
           <div className="metric-grid">
             {[
               { label: 'Total rice received', value: kgs(summary.totalReceivedKg), hint: `${summary.totalReceivedCount} deliveries${summary.totalBags ? ` · ${summary.totalBags.toLocaleString()} bags` : ''}`, color: 'var(--blue-500)' },
-              { label: 'Available in stock', value: kgs(summary.inStockKg), hint: 'Received, stored or batched', color: 'var(--gold-400)' },
+              { label: 'In warehouses now', value: kgs(summary.inStockKg), hint: `Live warehouse stock${summary.reservedKg ? ` · ${kgs(summary.reservedKg)} promised to orders` : ''}`, color: 'var(--gold-400)' },
               { label: 'Shipped, awaiting sale', value: kgs(summary.shippedKg), hint: 'Left the warehouse', color: 'var(--neutral-400)' },
               { label: 'Rice sold', value: kgs(summary.soldKg), hint: 'Sales completed', color: 'var(--purple-500)' },
-              { label: 'Delivered and not yet sold', value: kgs(summary.currentBalanceKg), hint: 'Counted from farmer delivery records. The live warehouse stock is on Warehouse → Stock.', color: 'var(--accent)' },
+              { label: 'Awaiting receipt', value: kgs(summary.awaitingReceiptKg), hint: summary.awaitingReceiptCount ? `${summary.awaitingReceiptCount} deliveries not yet in a warehouse, so not counted as stock` : 'Every delivery is in a warehouse', color: 'var(--accent)' },
               { label: 'Purchase value', value: tzs(summary.purchaseValue), hint: summary.unpricedKg ? `${kgs(summary.unpricedKg)} not priced yet` : 'All deliveries priced', color: 'var(--green-500)' },
               { label: 'Paid to farmers', value: tzs(summary.paidToFarmers), hint: `${tzs(summary.owedToFarmers)} still owed`, color: 'var(--green-500)' },
             ].map((s) => (

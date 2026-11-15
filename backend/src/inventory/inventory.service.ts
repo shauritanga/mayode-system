@@ -19,6 +19,7 @@ import {
 } from './dto/inventory.dto';
 import { deliveryValue, paymentStatusFor } from './farmer-payment';
 import { summariseWarehouse } from './warehouse-summary';
+import { warehouseBalance } from '../warehouses/stock';
 import { RiceProtocolsService } from '../rice-protocols/rice-protocols.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { ActivitiesService } from '../activities/activities.service';
@@ -403,6 +404,11 @@ export class InventoryService {
     user?: RequestUser,
   ) {
     await this.findRecordById(id, user); // Verify existence and scope
+    // Sold, shipped and batched are set by sales, dispatch and lots; stock itself comes from the warehouse ledger.
+    if (['SOLD', 'SHIPPED', 'BATCHED'].includes(updateInventoryStatusDto.status))
+      throw new BadRequestException(
+        'That status is set automatically by sales, dispatch and lots',
+      );
 
     return this.prisma.inventoryRecord.update({
       where: { id },
@@ -420,6 +426,10 @@ export class InventoryService {
     if (dto.weightKg != null && record.lotNumber)
       throw new BadRequestException(
         'The weight cannot change once the delivery is in a lot',
+      );
+    if (dto.weightKg != null && record.warehouseId && dto.weightKg !== record.weightKg)
+      throw new BadRequestException(
+        'The weight cannot change once the delivery is in a warehouse; correct it as a stock adjustment instead',
       );
     await this.assertCentre(dto.collectionCentreId, record.mamcosId);
     const weightKg = dto.weightKg ?? record.weightKg;
@@ -665,6 +675,18 @@ export class InventoryService {
         lot: { select: { riceVariety: true } },
       },
     });
+    const warehouses = await this.prisma.warehouse.findMany({
+      where: { ...this.tenantFilter(user), id: filter.warehouseId },
+      select: { id: true, name: true },
+    });
+    const ledger = {
+      warehouses: await Promise.all(
+        warehouses.map(async (w) => {
+          const b = await warehouseBalance(this.prisma, w.id);
+          return { name: w.name, onHandKg: b.onHandKg, reservedKg: b.reservedKg };
+        }),
+      ),
+    };
     return summariseWarehouse(
       records.map((r) => ({
         weightKg: r.weightKg,
@@ -680,6 +702,7 @@ export class InventoryService {
         amountPaid: r.amountPaid,
         farmerPaymentStatus: r.farmerPaymentStatus,
       })),
+      ledger,
     );
   }
 

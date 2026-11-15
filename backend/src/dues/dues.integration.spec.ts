@@ -111,7 +111,7 @@ describeDb('Farmer dues (PostgreSQL)', () => {
       const canal = await svc.createType(adminA, { name: 'Canal cleaning Oct', category: 'CANAL_CLEANING', basis: 'PER_HECTARE', rate: 2_000 });
       await svc.createDue(adminA, { farmerId: neema, category: 'CANAL_CLEANING', description: 'Canal cleaning Oct', amount: 3_000, typeId: canal.id });
       await expect(svc.createDue(adminA, { farmerId: neema, category: 'CANAL_CLEANING', description: 'again', amount: 3_000, typeId: canal.id })).rejects.toBeInstanceOf(ConflictException);
-      await expect(svc.createDue(adminA, { farmerId: neema, category: 'FERTILISER', description: 'x', amount: 1 })).rejects.toThrow(/Issue fertiliser/);
+      await expect(svc.createDue(adminA, { farmerId: neema, category: 'FERTILISER', description: 'x', amount: 1 })).rejects.toThrow(/Input Distribution/);
       await expect(svc.createDue(adminA, { farmerId: outsider, category: 'OTHER', description: 'x', amount: 1 })).rejects.toBeInstanceOf(NotFoundException);
     });
   });

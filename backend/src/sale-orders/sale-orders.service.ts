@@ -271,13 +271,14 @@ export class SaleOrdersService {
       },
       orderBy: { createdAt: 'desc' },
     });
+    // A lot can never offer more than the warehouse really has free, whatever its recorded weight says.
+    const { availableKg } = await warehouseBalance(this.prisma, warehouseId);
     const rows = await Promise.all(
       lots.map(async (lot) => ({
         ...lot,
-        remainingKg: await this.lotRemainingKg(
-          this.prisma,
-          lot.id,
-          lot.totalWeightKg,
+        remainingKg: Math.min(
+          await this.lotRemainingKg(this.prisma, lot.id, lot.totalWeightKg),
+          Math.max(availableKg, 0),
         ),
       })),
     );

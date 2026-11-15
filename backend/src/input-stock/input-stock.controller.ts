@@ -17,6 +17,8 @@ export class InputStockController {
   overview(@CurrentUser() u: RequestUser, @Query('warehouseId') w?: string, @Query('stockClass') c?: string, @Query('mamcosId') m?: string) { return this.svc.overview(u, { warehouseId: w, stockClass: c }, m); }
   @Get('movements') @RequirePermission('ops_stock', 'VIEW')
   movements(@CurrentUser() u: RequestUser, @Query() q: Record<string, string>) { return this.svc.movements(u, { itemId: q.itemId, warehouseId: q.warehouseId, type: q.type, from: q.from, to: q.to, limit: q.limit ? Number(q.limit) : undefined }, q.mamcosId); }
+  @Get('batches') @RequirePermission('ops_stock', 'VIEW')
+  batches(@CurrentUser() u: RequestUser, @Query() q: Record<string, string>) { return this.svc.batches(u, { itemId: q.itemId, warehouseId: q.warehouseId, state: q.state, from: q.from, to: q.to }, q.mamcosId); }
   @Post('receive') @RequirePermission('ops_receiving', 'CREATE')
   receive(@CurrentUser() u: RequestUser, @Body() dto: ReceiveInputDto, @Query('mamcosId') m?: string) { return this.svc.receive(u, dto, m); }
   @Post('adjust') @RequirePermission('ops_stock', 'EDIT')

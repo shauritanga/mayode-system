@@ -5116,6 +5116,9 @@ model FarmInputMovement {
   groupId         String?           @map("group_id")
   /// Set on a movement that cancels another one.
   reversalOfId    String?           @unique @map("reversal_of_id")
+  /// The delivery batch this stock belongs to ("Batch 1"); null on stock older than batches.
+  batchNo         String?           @map("batch_no")
+  expiresOn       DateTime?         @map("expires_on") @db.Date
 
   item      FarmInputItem @relation(fields: [itemId], references: [id])
   task      FarmTask?     @relation(fields: [taskId], references: [id])
@@ -5123,6 +5126,7 @@ model FarmInputMovement {
 
   @@index([itemId])
   @@index([warehouseId, itemId])
+  @@index([itemId, warehouseId, batchNo])
   @@index([refType, refId])
   @@index([taskId])
   @@index([plotId, cropCycleId])

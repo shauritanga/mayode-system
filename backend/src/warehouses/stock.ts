@@ -35,6 +35,13 @@ export async function warehouseBalance(db: Db, warehouseId: string): Promise<Sto
   return composeBalance(physical._sum.quantityKg ?? 0, allocated + sum('RESERVE') - sum('UNRESERVE'));
 }
 
+/** Kilograms at a warehouse that sale orders have promised (reserved and not yet released or loaded). */
+export async function saleOrderReservedKg(db: Db, warehouseId: string): Promise<number> {
+  const rows = await db.stockMovement.groupBy({ by: ['type'], where: { warehouseId, type: { in: ['RESERVE', 'UNRESERVE'] } }, _sum: { quantityKg: true } });
+  const sum = (type: string) => rows.find((r) => r.type === type)?._sum.quantityKg ?? 0;
+  return Math.max(Math.round((sum('RESERVE') - sum('UNRESERVE')) * 1000) / 1000, 0);
+}
+
 /** Serialises concurrent stock changes on one warehouse so reservations cannot oversell. */
 export async function lockWarehouse(db: Db, warehouseId: string): Promise<void> {
   await db.$queryRaw`SELECT id FROM warehouses WHERE id = ${warehouseId} FOR UPDATE`;

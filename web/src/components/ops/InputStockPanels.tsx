@@ -6,12 +6,13 @@ import Link from 'next/link';
 import Modal from '@/components/Modal';
 import { inputStockApi, opsApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-error';
-import { dateTime, kg } from '@/lib/ops';
+import { dateTime, day, kg } from '@/lib/ops';
+import { downloadCsv } from '@/lib/download';
 import { DataTable, ErrorNote, Field, FormGrid, Loading, Toolbar, useLoad } from './ui';
 
 const CLASS_LABEL: Record<string, string> = { INPUT: 'Farm input', FUEL: 'Fuel', PACKAGING: 'Packaging bags', PADDY: 'Paddy', RICE: 'Rice', BYPRODUCT: 'By-product' };
 const MOVE_LABEL: Record<string, string> = { IN: 'Received', OUT: 'Used / given out', ADJUSTMENT: 'Correction', TRANSFER_OUT: 'Moved out', TRANSFER_IN: 'Moved in', WRITE_OFF: 'Written off', COUNT_ADJUSTMENT: 'Count correction' };
-const REASONS: [string, string][] = [['DAMAGED', 'Damaged'], ['EXPIRED', 'Expired'], ['LOST', 'Lost or stolen'], ['FOUND', 'Found (add)'], ['COUNT_CORRECTION', 'Count correction'], ['OTHER', 'Other (explain)']];
+const REASONS: [string, string][] = [['USED', 'Used (fuel, bags, other)'], ['DAMAGED', 'Damaged'], ['EXPIRED', 'Expired'], ['LOST', 'Lost or stolen'], ['FOUND', 'Found (add)'], ['COUNT_CORRECTION', 'Count correction'], ['OTHER', 'Other (explain)']];
 const SOURCES: [string, string][] = [['PURCHASE', 'Bought from a supplier'], ['DIRECT', 'Delivered / brought in'], ['DONATION', 'Donation'], ['OPENING', 'Stock already here (opening balance)']];
 const n3 = (v: number) => (Math.round(v * 1000) / 1000).toLocaleString();
 
@@ -22,6 +23,7 @@ const errOf = (e: unknown) => apiErrorMessage(e, 'That did not work.');
 export function InputReceivePanel({ canReceive, onDone }: { canReceive: boolean; onDone?: () => void }) {
   const stock = useLoad<any>(() => inputStockApi.overview(), []);
   const [item, setItem] = useState(''); const [warehouse, setWarehouse] = useState(''); const [qty, setQty] = useState(''); const [source, setSource] = useState('PURCHASE');
+  const [batchNo, setBatchNo] = useState(''); const [expiresOn, setExpiresOn] = useState('');
   const [supplier, setSupplier] = useState(''); const [reference, setReference] = useState(''); const [cost, setCost] = useState(''); const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [done, setDone] = useState('');
   const items = useMemo(() => {
@@ -38,9 +40,9 @@ export function InputReceivePanel({ canReceive, onDone }: { canReceive: boolean;
   const save = async () => {
     setBusy(true); setError(''); setDone('');
     try {
-      await inputStockApi.receive({ itemId: item, warehouseId: wh || undefined, quantity: Number(qty), source, supplierName: supplier || undefined, reference: reference || undefined, unitCost: cost === '' ? undefined : Number(cost), note: note || undefined });
+      await inputStockApi.receive({ itemId: item, warehouseId: wh || undefined, quantity: Number(qty), source, supplierName: supplier || undefined, reference: reference || undefined, unitCost: cost === '' ? undefined : Number(cost), note: note || undefined, batchNo: batchNo.trim() || undefined, expiresOn: expiresOn || undefined });
       setDone(`${n3(Number(qty))} ${chosen.unit} of ${chosen.name} added to ${whName ?? 'the warehouse'}.`);
-      setQty(''); setReference(''); setNote(''); setCost(''); stock.reload(); onDone?.();
+      setQty(''); setReference(''); setNote(''); setCost(''); setBatchNo(''); setExpiresOn(''); stock.reload(); onDone?.();
     } catch (e) { setError(errOf(e)); } finally { setBusy(false); }
   };
   if (stock.loading && !stock.data) return <Loading />;
@@ -52,7 +54,7 @@ export function InputReceivePanel({ canReceive, onDone }: { canReceive: boolean;
         <div style={card}><strong>Nothing to receive yet.</strong><p className="muted" style={{ margin: '6px 0 0' }}>First add what you stock, such as Urea, diesel or empty bags, in <Link href="/dashboard/amcos-settings/farm-inputs?add=1">Settings → Farm inputs</Link>. Then come back here to receive it into a warehouse.</p></div>
       ) : (
         <form onSubmit={(e) => { e.preventDefault(); if (ok) void save(); }}>
-          <p className="muted" style={{ marginTop: 0 }}>Goods arrive here: choose what came in, how much, which warehouse it was put in, and where it came from. It then shows in <strong>Stock</strong>.</p>
+          <p className="muted" style={{ marginTop: 0 }}>Choose what came in, how much, and which warehouse it was put in. Each delivery becomes a batch, so you can see later how much of it is left. It then shows in <strong>Stock</strong>.</p>
           <FormGrid>
             <Field label="What arrived *"><select className="input-field" value={item} onChange={(e) => setItem(e.target.value)}><option value="">Choose…</option>{items.map((i) => <option key={i.itemId} value={i.itemId}>{i.name} ({CLASS_LABEL[i.stockClass]})</option>)}</select></Field>
             <Field label="Quantity *" hint={chosen ? `in ${chosen.unit}` : undefined}><input className="input-field" type="number" min={0} step="any" value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
@@ -60,6 +62,8 @@ export function InputReceivePanel({ canReceive, onDone }: { canReceive: boolean;
             <Field label="Where did it come from? *"><select className="input-field" value={source} onChange={(e) => setSource(e.target.value)}>{SOURCES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
             {needsWho && <Field label="Supplier / who brought it"><input className="input-field" value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="e.g. Agro Supplies Ltd" /></Field>}
             {needsWho && <Field label="Delivery note / reference"><input className="input-field" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Needed if no supplier name" /></Field>}
+            <Field label="Batch name" hint="Optional. Leave empty and it is numbered for you (Batch 1, Batch 2…)"><input className="input-field" maxLength={60} value={batchNo} onChange={(e) => setBatchNo(e.target.value)} placeholder="e.g. Batch 3 or the maker's lot number" /></Field>
+            <Field label="Expiry date" hint="Optional. Shown in Batches so you can use the oldest first"><input className="input-field" type="date" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} /></Field>
             <Field label="Cost per unit (TZS)" hint="Optional"><input className="input-field" type="number" min={0} step="any" value={cost} onChange={(e) => setCost(e.target.value)} /></Field>
             <Field label="Note" hint="Optional"><input className="input-field" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
           </FormGrid>
@@ -91,6 +95,7 @@ function MovementsModal({ row, onClose, canReverse, onChanged }: { row: { itemId
             { header: 'When', render: (r: any) => dateTime(r.at) },
             { header: 'What', render: (r: any) => <span>{MOVE_LABEL[r.type] ?? r.type}{r.reversed && <span className="badge badge-gray" style={{ marginLeft: 6 }}>Reversed</span>}{r.isReversal && <span className="badge badge-gray" style={{ marginLeft: 6 }}>Reversal</span>}</span> },
             { header: 'Warehouse', render: (r: any) => r.warehouse ?? '—' },
+            { header: 'Batch', render: (r: any) => r.batchNo ?? '—' },
             { header: 'Quantity', align: 'right', render: (r: any) => <strong style={{ color: r.quantity < 0 ? 'var(--red-400)' : undefined }}>{r.quantity > 0 ? '+' : ''}{n3(r.quantity)} {r.unit}</strong> },
             { header: 'Why / from', render: (r: any) => <span>{[r.supplier, r.reason && r.reason !== 'REVERSAL' ? REASONS.find(([k]) => k === r.reason)?.[1] ?? r.reason : '', r.note].filter(Boolean).join(' · ') || '—'}<div className="muted" style={{ fontSize: 11 }}>{r.by ?? ''}</div></span> },
             { header: '', align: 'right', render: (r: any) => canReverse && !r.reversed && !r.isReversal && !/TRANSFER/.test(r.type) ? <button type="button" className="btn-secondary" onClick={() => { setReason(''); setError(''); setReversing(r); }}>Undo</button> : null },
@@ -121,7 +126,7 @@ function CorrectModal({ row, warehouses, onClose, onDone }: { row: any; warehous
       onDone(); onClose();
     } catch (e) { setError(errOf(e)); setBusy(false); }
   };
-  const ready = Number(qty) > 0 && (mode === 'adjust' ? reason !== 'OTHER' || note.trim() : !!to);
+  const ready = Number(qty) > 0 && (mode === 'adjust' ? (reason !== 'OTHER' && reason !== 'USED') || note.trim() : !!to);
   return (
     <Modal title={`${row.name} · ${row.warehouse ?? ''}`} subtitle={`In stock here: ${n3(row.balance)} ${row.unit}`} width="520px" onClose={() => !busy && onClose()}
       footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button><button type="button" className="btn-primary" disabled={busy || !ready} onClick={() => void save()}>{busy ? 'Saving…' : mode === 'transfer' ? 'Move it' : 'Save correction'}</button></>}>
@@ -134,7 +139,7 @@ function CorrectModal({ row, warehouses, onClose, onDone }: { row: any; warehous
         {mode === 'adjust' && <Field label="Reason *"><select className="input-field" value={reason} onChange={(e) => setReason(e.target.value)}>{REASONS.filter(([k]) => k !== 'COUNT_CORRECTION').map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>}
         {mode === 'transfer' && <Field label="Move to *"><select className="input-field" value={to} onChange={(e) => setTo(e.target.value)}><option value="">Choose a warehouse…</option>{others.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>}
         <Field label={`${mode === 'transfer' ? 'How much' : adds ? 'How much was found' : 'How much to take off'} (${row.unit}) *`}><input className="input-field" type="number" min={0} step="any" value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
-        <Field label="Note" hint={mode === 'adjust' && reason === 'OTHER' ? 'Required for “Other”' : 'Optional'}><input className="input-field" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+        <Field label="Note" hint={mode === 'adjust' && reason === 'OTHER' ? 'Required for “Other”' : mode === 'adjust' && reason === 'USED' ? 'Required: what was it used for?' : 'Optional'}><input className="input-field" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
       </div>
     </Modal>
   );
@@ -183,7 +188,7 @@ export function AllStockPanel({ canRice, canInputs, canAdjust, onChanged }: { ca
             { header: 'Warehouse', render: (r) => r.warehouse },
             { header: 'In stock', align: 'right', render: (r) => <strong>{r.unit === 'kg' ? kg(r.balance) : `${n3(r.balance)} ${r.unit}`}</strong> },
             { header: 'Value', align: 'right', render: (r) => (r.value != null && r.value > 0 ? `TZS ${Math.round(r.value).toLocaleString()}` : '—') },
-            { header: '', align: 'right', render: (r) => r.input ? <span style={{ whiteSpace: 'nowrap' }}><button type="button" className="btn-secondary" onClick={() => setHistory(r.input)}>History</button>{canAdjust && r.warehouseId && r.balance > 0 && <> <button type="button" className="btn-secondary" onClick={() => setFix(r.input)}>Correct / move</button></>}</span> : <span className="muted" style={{ fontSize: 12 }}>See Batches and History tabs</span> },
+            { header: '', align: 'right', render: (r) => r.input ? <span style={{ whiteSpace: 'nowrap' }}><button type="button" className="btn-secondary" onClick={() => setHistory(r.input)}>History</button>{canAdjust && r.warehouseId && r.balance > 0 && <> <button type="button" className="btn-secondary" onClick={() => setFix(r.input)}>Correct / move</button></>}</span> : <span className="muted" style={{ fontSize: 12 }}>See Rice batches and History</span> },
           ]} />
       )}
       {history && <MovementsModal row={history} canReverse={canAdjust} onClose={() => setHistory(null)} onChanged={reloadAll} />}
@@ -221,7 +226,7 @@ export function GiveOutHub({ children, can }: { children?: React.ReactNode; can:
   const tiles: { title: string; text: string; href?: string; show: boolean }[] = [
     { title: 'Give inputs to a farmer', text: 'Fertiliser, seed and chemicals on credit. Stock goes down and the farmer confirms with a code.', href: '/dashboard/inputs', show: can('input_distribution') },
     { title: 'Used in field work', text: 'Inputs used on a farm task leave the warehouse automatically when the task report is approved.', show: true },
-    { title: 'Damaged, expired or lost', text: 'Take it off with a reason: open Stock, then “Correct / move” on the item.', show: can('ops_stock') },
+    { title: 'Fuel used, damaged, expired or lost', text: 'Take it off with a reason: open Stock, then “Correct / move” on the item and choose Used, Damaged, Expired or Lost.', show: can('ops_stock') },
   ];
   return (
     <>
@@ -243,4 +248,48 @@ export function GiveOutHub({ children, can }: { children?: React.ReactNode; can:
 /** Lets a purchase-order receipt name the warehouse: used by the Purchase Orders screen. */
 export function useWarehouseChoices() {
   return useLoad<any>(() => inputStockApi.overview(), []);
+}
+
+
+// ───────────────────────── batches of inputs, fuel and bags ─────────────────────────
+const STATE: Record<string, [string, string]> = { ACTIVE: ['In use', 'badge-green'], EXPIRING: ['Expires soon', 'badge-gold'], EXPIRED: ['Expired', 'badge-red'], FINISHED: ['Finished', 'badge-gray'] };
+
+/** Every delivery batch of inputs, fuel and bags: when it came in, when it expires, how much is left and when it ran out. */
+export function InputBatchesPanel({ onFix }: { onFix?: () => void }) {
+  const [warehouse, setWarehouse] = useState(''); const [state, setState] = useState(''); const [from, setFrom] = useState(''); const [to, setTo] = useState('');
+  const stock = useLoad<any>(() => inputStockApi.overview(), []);
+  const list = useLoad<any>(() => inputStockApi.batches({ warehouseId: warehouse || undefined, state: state || undefined, from: from || undefined, to: to || undefined }), [warehouse, state, from, to]);
+  const rows: any[] = list.data?.data ?? [];
+  const sum = list.data?.summary ?? { active: 0, expiring: 0, expired: 0, finished: 0 };
+  const chips: [string, string][] = [['', 'All'], ['ACTIVE', `In use (${sum.active})`], ['EXPIRING', `Expires soon (${sum.expiring})`], ['EXPIRED', `Expired (${sum.expired})`], ['FINISHED', `Finished (${sum.finished})`]];
+  const download = () => downloadCsv('input-batches', rows.map((r) => ({ Item: r.item, Batch: r.batchNo, Warehouse: r.warehouse ?? '', 'Received on': r.receivedOn ? r.receivedOn.slice(0, 10) : '', 'Expires on': r.expiresOn ? r.expiresOn.slice(0, 10) : '', Received: r.receivedKg, Left: r.remaining, Unit: r.unit, 'Finished on': r.finishedOn ? r.finishedOn.slice(0, 10) : '', Status: STATE[r.state]?.[0] ?? r.state })));
+  return (
+    <>
+      <p className="muted" style={{ marginTop: 0 }}>Each delivery of an input is a batch. See how much of each batch is left, when it came in and when it expires. The batch that expires first is used first.</p>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        {chips.map(([k, l]) => <button key={k} type="button" className={state === k ? 'btn-primary' : 'btn-secondary'} style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => setState(k)}>{l}</button>)}
+      </div>
+      <Toolbar right={<button type="button" className="btn-secondary" disabled={!rows.length} onClick={download}>Download for a report</button>}>
+        <Field label="Warehouse"><select className="input-field" value={warehouse} onChange={(e) => setWarehouse(e.target.value)}><option value="">All warehouses</option>{(stock.data?.warehouses ?? []).map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
+        <Field label="Received from"><input className="input-field" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
+        <Field label="Received to"><input className="input-field" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+      </Toolbar>
+      <ErrorNote message={list.error} />
+      {list.loading && !list.data ? <Loading /> : (
+        <DataTable rows={rows} rowKey={(r: any) => `${r.itemId}|${r.warehouseId}|${r.batchNo}|${r.expiresOn ?? ''}`} pageSize={10} empty="No batches yet. Receive inputs to start."
+          columns={[
+            { header: 'Item', render: (r: any) => <strong>{r.item}</strong> },
+            { header: 'Batch', render: (r: any) => r.batchNo },
+            { header: 'Warehouse', render: (r: any) => r.warehouse ?? '—' },
+            { header: 'Came in', render: (r: any) => day(r.receivedOn) },
+            { header: 'Expires', render: (r: any) => r.expiresOn ? <span>{day(r.expiresOn)}{r.state !== 'FINISHED' && r.daysToExpiry != null && <span className="muted" style={{ fontSize: 11 }}> · {r.daysToExpiry < 0 ? `${-r.daysToExpiry} days ago` : `in ${r.daysToExpiry} days`}</span>}</span> : '—' },
+            { header: 'Received', align: 'right', render: (r: any) => `${n3(r.receivedKg)} ${r.unit}` },
+            { header: 'Left', align: 'right', render: (r: any) => <strong>{n3(r.remaining)} {r.unit}</strong> },
+            { header: 'Finished on', render: (r: any) => day(r.finishedOn) },
+            { header: 'Status', render: (r: any) => <span className={`badge ${STATE[r.state]?.[1] ?? 'badge-gray'}`}>{STATE[r.state]?.[0] ?? r.state}</span> },
+          ]} />
+      )}
+      {onFix && sum.expired > 0 && <p className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>Expired stock still in a warehouse should be taken off: open <button type="button" onClick={onFix} style={{ background: 'none', border: 0, padding: 0, color: 'var(--accent)', cursor: 'pointer', font: 'inherit' }}>Everything</button>, choose the item, then “Correct / move” → Expired.</p>}
+    </>
+  );
 }

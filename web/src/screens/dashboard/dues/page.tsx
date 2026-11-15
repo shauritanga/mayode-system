@@ -14,7 +14,7 @@ import {
 import MoneyInput from '@/components/MoneyInput';
 import ExportIcons, { saveDownload } from '@/components/ExportIcons';
 
-const CATEGORY_LABEL: Record<string, string> = { LEVY: 'Levy', MEMBERSHIP_FEE: 'Membership fee', CANAL_CLEANING: 'Canal cleaning', FERTILISER: 'Fertiliser', OTHER: 'Other' };
+const CATEGORY_LABEL: Record<string, string> = { LEVY: 'Levy', MEMBERSHIP_FEE: 'Membership fee', CANAL_CLEANING: 'Canal cleaning', FERTILISER: 'Farm inputs', OTHER: 'Other' };
 const CHARGE_CATEGORIES = ['LEVY', 'MEMBERSHIP_FEE', 'CANAL_CLEANING', 'OTHER'];
 const METHOD_LABEL: Record<string, string> = { CASH: 'Cash', MOBILE_MONEY: 'Mobile money', BANK: 'Bank', HARVEST_DEDUCTION: 'Deducted from harvest payment' };
 const STATE_LABEL: Record<string, string> = { OPEN: 'Not paid', PARTIAL: 'Part paid', PAID: 'Paid', CANCELLED: 'Cancelled' };
@@ -161,56 +161,6 @@ function ChargeFarmerModal({ onClose, onSaved }: { onClose: () => void; onSaved:
   );
 }
 
-function FertiliserModal({ onClose, onSaved }: { onClose: () => void; onSaved: (m: string) => void }) {
-  const [farmer, setFarmer] = useState<any>(null);
-  const [form, setForm] = useState({ itemName: '', quantity: '', unit: 'bags', unitPrice: '', issuedOn: todayISO(), dueDate: '', postToLedger: true });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const set = (k: string, v: any) => { setForm((f) => ({ ...f, [k]: v })); setErrors((e) => ({ ...e, [k]: '' })); };
-  const total = Math.round((Number(form.quantity) || 0) * (Number(form.unitPrice) || 0) * 100) / 100;
-  const save = async () => {
-    const found: Record<string, string> = {};
-    if (!farmer) found.farmer = 'Choose the farmer';
-    if (!form.itemName.trim()) found.itemName = 'Which fertiliser?';
-    if (!(Number(form.quantity) > 0)) found.quantity = 'Enter the quantity';
-    if (!(Number(form.unitPrice) > 0)) found.unitPrice = 'Enter the price';
-    if (form.issuedOn > todayISO()) found.issuedOn = 'Cannot be in the future';
-    if (form.dueDate && form.dueDate < form.issuedOn) found.dueDate = 'Cannot be before the issue date';
-    setErrors(found);
-    if (Object.keys(found).length) return;
-    setSaving(true); setError('');
-    try {
-      await duesApi.issueFertiliser({ farmerId: farmer.id, itemName: form.itemName.trim(), quantity: Number(form.quantity), unit: form.unit.trim() || undefined, unitPrice: Number(form.unitPrice), issuedOn: form.issuedOn, dueDate: form.dueDate || undefined, postToLedger: form.postToLedger });
-      onSaved('Fertiliser recorded as a debt.');
-    } catch (e) { setError(errMsg(e)); setSaving(false); }
-  };
-  return (
-    <Modal title="Issue fertiliser on credit" subtitle="The farmer repays in cash or from their harvest payment." onClose={() => !saving && onClose()} width="560px"
-      footer={<Footer onClose={onClose} saving={saving} form="fert-form" label="Record" />}>
-      <form id="fert-form" onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
-        <div style={{ display: 'grid', gap: 12 }}>
-          <FarmerPicker value={farmer} onChange={setFarmer} error={errors.farmer} />
-          <FormGrid>
-            <Field label="Fertiliser *" error={errors.itemName}><input className="input-field" value={form.itemName} onChange={(e) => set('itemName', e.target.value)} placeholder="e.g. Urea" /></Field>
-            <Field label="Date issued"><input type="date" className="input-field" max={todayISO()} value={form.issuedOn} onChange={(e) => set('issuedOn', e.target.value)} /></Field>
-            <Field label="Quantity *" error={errors.quantity}><input type="number" min="0.01" step="0.01" className="input-field" value={form.quantity} onChange={(e) => set('quantity', e.target.value)} /></Field>
-            <Field label="Unit"><input className="input-field" value={form.unit} onChange={(e) => set('unit', e.target.value)} /></Field>
-            <Field label="Price per unit (TZS) *" error={errors.unitPrice}><MoneyInput min="1" className="input-field" value={form.unitPrice} onChange={(e) => set('unitPrice', e.target.value)} /></Field>
-            <Field label="Repay by" error={errors.dueDate}><input type="date" className="input-field" min={form.issuedOn} value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></Field>
-          </FormGrid>
-          <div style={{ fontSize: 14 }}>Total owed: <strong>{tzs(total)}</strong></div>
-          <label className="form-label" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-            <input type="checkbox" checked={form.postToLedger} onChange={(e) => set('postToLedger', e.target.checked)} />
-            <span>Record in the accounts as fertiliser sold on credit. Untick for fertiliser issued before your books started.</span>
-          </label>
-        </div>
-        {errBox(error)}
-      </form>
-    </Modal>
-  );
-}
-
 function DueDetail({ id, can, onClose, onChanged }: { id: string; can: (r: string, a: string) => boolean; onClose: () => void; onChanged: () => void }) {
   const { data: d, loading, error, reload } = useApi<any>(() => duesApi.get(id), [id]);
   const [sub, setSub] = useState<'pay' | 'waive' | 'cancel' | { void: any } | null>(null);
@@ -284,7 +234,7 @@ function Dues({ can }: { can: (r: string, a: string) => boolean }) {
   const [filters, setFilters] = useState({ q: '', category: '', state: '' });
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [form, setForm] = useState<'due' | 'fertiliser' | null>(null);
+  const [form, setForm] = useState<'due' | null>(null);
   const [message, setMessage] = useState('');
   const params = { ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page, pageSize: 15 };
   const { data, loading, error, reload } = useApi<any>(() => duesApi.list(params), [JSON.stringify(filters), page]);
@@ -293,7 +243,6 @@ function Dues({ can }: { can: (r: string, a: string) => boolean }) {
   const filtered = Object.values(filters).some(Boolean);
   const buttons = can('dues', 'CREATE') ? (
     <span style={{ display: 'flex', gap: 8 }}>
-      <button type="button" className="btn-secondary" style={{ whiteSpace: 'nowrap' }} onClick={() => setForm('fertiliser')}>Issue fertiliser</button>
       <button type="button" className="btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={() => setForm('due')}>Charge a farmer</button>
     </span>
   ) : undefined;
@@ -343,7 +292,6 @@ function Dues({ can }: { can: (r: string, a: string) => boolean }) {
         <Pager meta={data?.meta} onPage={setPage} />
       </section>
       {form === 'due' && <ChargeFarmerModal onClose={() => setForm(null)} onSaved={(m) => { setForm(null); setMessage(m); reload(); }} />}
-      {form === 'fertiliser' && <FertiliserModal onClose={() => setForm(null)} onSaved={(m) => { setForm(null); setMessage(m); reload(); }} />}
       {openId && <DueDetail id={openId} can={can} onClose={() => setOpenId(null)} onChanged={reload} />}
     </>
   );
@@ -556,7 +504,7 @@ function Debts({ can }: { can: (r: string, a: string) => boolean }) {
   );
 }
 
-/** AMCOS Charges: levies, membership and canal cleaning fees, and fertiliser repayments, with what each farmer has paid. */
+/** AMCOS Charges: levies, membership and canal cleaning fees, and farm-input repayments, with what each farmer has paid. */
 export default function DuesPage() {
   const user = useAuthStore((s) => s.user);
   const can = useCan();
@@ -566,7 +514,7 @@ export default function DuesPage() {
   }
   return (
     <div>
-      <PageHeader title="AMCOS Charges" subtitle="Levies, membership and canal cleaning fees, and fertiliser repayments: what each farmer owes, what they have paid, and who is behind." />
+      <PageHeader title="AMCOS Charges" subtitle="Levies, membership and canal cleaning fees, and repayments for farm inputs (given in Input Distribution): what each farmer owes, what they have paid, and who is behind." />
       <Tabs tabs={[{ id: 'dues', label: 'Dues & payments' }, { id: 'charges', label: 'Charges' }, { id: 'debts', label: 'Debts' }]} active={tab} onChange={setTab} />
       {tab === 'dues' && <Dues can={can} />}
       {tab === 'charges' && <Charges can={can} />}

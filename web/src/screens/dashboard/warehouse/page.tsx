@@ -198,7 +198,7 @@ function Receive({ warehouse, onClose, onDone }: { warehouse: Warehouse; onClose
           ))}
         </div>
         <div className="ua-field">
-          <label className="ua-label" htmlFor="wr-manual">Or a counted quantity (kg)<span className="ua-opt">only when no records are picked</span></label>
+          <label className="ua-label" htmlFor="wr-manual">Or an opening balance (kg)<span className="ua-opt">stock already in the building before you started recording; only when no records are picked</span></label>
           <input id="wr-manual" className="input-field" type="number" min={1} step="any" disabled={picked.length > 0} value={manual} onChange={(e) => setManual(e.target.value)} />
         </div>
         <div className="ua-field"><label className="ua-label" htmlFor="wr-note">Note<span className="ua-opt">optional</span></label><input id="wr-note" className="input-field" value={note} onChange={(e) => setNote(e.target.value)} /></div>
