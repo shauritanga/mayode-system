@@ -6,6 +6,7 @@ import AlertToast, { type ToastAlert } from '@/components/AlertToast';
 import { irrigationApi } from '@/lib/api';
 import { Empty, IrrigationProvider, LoadError, Notice, PageHeader, Tabs } from '../irrigation/ui';
 import { useSchemeScope } from '../irrigation/useSchemeScope';
+import { FarmSearch } from '../irrigation/SchemeTree';
 import AddSchemeModal from './AddSchemeModal';
 import Overview from '../irrigation/Overview';
 import { CanalList } from '../irrigation/Canals';
@@ -52,7 +53,7 @@ export default function SchemeStructurePage() {
   return (
     <IrrigationProvider value={context}>
       <main>
-        <PageHeader title="Scheme Structure" subtitle={SUBTITLES[tab]} />
+        <PageHeader title="Scheme Structure" subtitle={SUBTITLES[tab]} actions={schemeId ? <FarmSearch schemeId={schemeId} /> : undefined} />
         <LoadError message={schemes.error} onRetry={schemes.reload} />
         {notice && <Notice tone="success" onDismiss={() => setNotice('')}>{notice}</Notice>}
         <div className="ss-toolbar">
@@ -67,7 +68,7 @@ export default function SchemeStructurePage() {
               </label>
             )}
             {can('irrigation', 'CREATE') && (schemeId || tab === 'overview') && ADD_LABEL[tab] && (
-              <button type="button" className="btn-primary" onClick={() => setAdding(ADD_KIND[tab])}>{ADD_LABEL[tab]}</button>
+              <button type="button" className={tab === 'overview' ? 'btn-secondary' : 'btn-primary'} onClick={() => setAdding(ADD_KIND[tab])}>{ADD_LABEL[tab]}</button>
             )}
           </div>
         </div>

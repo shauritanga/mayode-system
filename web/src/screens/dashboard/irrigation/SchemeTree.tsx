@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { farmId } from '@/lib/farm-id';
 import { irrigationApi } from '@/lib/api';
@@ -133,38 +133,42 @@ export function SchemeTree({ canals, showDebt, empty }: { canals: any[]; showDeb
   );
 }
 
-/** Type a farm id (1:1R-1, 1.1R-1 or 1.1R1), a name or a member number and jump to the hectare. */
-export function FarmFinder({ schemeId }: { schemeId: string }) {
+/**
+ * A compact search for the page header: type a farm id (1:1R-1, 1.1R-1 or 1.1R1), a farmer's name or a member number, and pick
+ * the hectare from the list that drops down. It is a tool, not a section of the page.
+ */
+export function FarmSearch({ schemeId }: { schemeId: string }) {
   const [text, setText] = useState('');
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
   const q = useDebounced(text.trim(), 300);
   const { data, loading, error } = useApi<any>(schemeId && q.length >= 2 ? () => irrigationApi.hectares({ schemeId, q, pageSize: 6 }) : null, [schemeId, q]);
   const rows: any[] = q.length >= 2 ? data?.data ?? [] : [];
+  useEffect(() => {
+    const away = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', away);
+    return () => document.removeEventListener('mousedown', away);
+  }, []);
   return (
-    <div>
-      <label htmlFor="farm-finder" className="muted" style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>Find a farm by its ID (for example 1:1R-1), or by the farmer’s name or member number</label>
-      <input id="farm-finder" className="input-field" style={{ maxWidth: 420 }} placeholder="1:1R-1" autoComplete="off" value={text} onChange={(e) => setText(e.target.value)} />
-      {q.length >= 2 && (
-        <div style={{ marginTop: 10 }} aria-live="polite">
-          {error ? <span className="muted" style={{ fontSize: 13 }}>Could not search. Try again.</span>
-            : loading ? <span className="muted" style={{ fontSize: 13 }}>Searching…</span>
-            : !rows.length ? <span className="muted" style={{ fontSize: 13 }}>No farm matches “{q}”.</span>
-            : (
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6, maxWidth: 560 }}>
-                {rows.map((h) => {
-                  const tone = TONE[toneOf(h)];
-                  return (
-                    <li key={h.id}>
-                      <Link href={`${BASE}/structure/hectares/${h.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: '1px solid var(--border-subtle)', borderRadius: 8, textDecoration: 'none', color: 'inherit' }}>
-                        <span style={{ width: 10, height: 10, borderRadius: 10, background: tone.fg }} title={tone.label} />
-                        <strong style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{farmId(h.code)}</strong>
-                        <span style={{ flex: 1 }}>{h.farmer ? <>{h.farmer.name} <span className="muted">· {h.farmer.memberNumber}</span></> : <span className="muted">Not allocated</span>}</span>
-                        <span className="muted" style={{ fontSize: 12 }}>Open</span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+    <div className="so-search" ref={box}>
+      <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+      <input className="input-field" aria-label="Find a farm" placeholder="Find a farm: 1:1R-1, name or member no." autoComplete="off" value={text}
+        onChange={(e) => { setText(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }} />
+      {open && q.length >= 2 && (
+        <div className="so-search-results" aria-live="polite">
+          {error ? <div className="so-search-note">Could not search. Try again.</div>
+            : loading ? <div className="so-search-note">Searching…</div>
+            : !rows.length ? <div className="so-search-note">No farm matches “{q}”.</div>
+            : rows.map((h) => {
+              const tone = TONE[toneOf(h)];
+              return (
+                <Link key={h.id} href={`${BASE}/structure/hectares/${h.id}`} className="so-search-row" onClick={() => setOpen(false)}>
+                  <span className="so-dot" style={{ background: tone.fg }} title={tone.label} />
+                  <strong>{farmId(h.code)}</strong>
+                  <span className="so-search-who">{h.farmer ? <>{h.farmer.name} <span className="muted">· {h.farmer.memberNumber}</span></> : <span className="muted">Not allocated</span>}</span>
+                </Link>
+              );
+            })}
         </div>
       )}
     </div>
