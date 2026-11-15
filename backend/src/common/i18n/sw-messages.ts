@@ -1380,7 +1380,7 @@ export const SW_MESSAGES: Record<string, string> = {
   "No combine harvester is registered with this number": "Hakuna kombaini iliyosajiliwa kwa namba hii",
   "This combine harvester is no longer active": "Kombaini hii haifanyi kazi tena",
   "The harvest date cannot be in the future": "Tarehe ya mavuno haiwezi kuwa ya baadaye",
-  "Record how much was harvested: bags, baskets or kilograms": "Andika kiasi kilichovunwa: mifuko, vikapu au kilo",
+  "Record how much was harvested: half bags (Vipeto), bags or kilograms": "Andika kiasi kilichovunwa: vipeto, mifuko au kilo",
   "The person who collected the money must be the canal leader or block leader of this block": "Aliyekusanya pesa lazima awe kiongozi wa mfereji au kiongozi wa block ya block hii",
   "Choose the canal or block leader who received the money": "Chagua kiongozi wa mfereji au block aliyepokea pesa",
   "Could not number the receipt. Try again": "Imeshindwa kupa stakabadhi namba. Jaribu tena",

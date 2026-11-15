@@ -21,7 +21,7 @@ function printReceipt(r: any) {
   const rows = [
     row('Farm ID', r.farmId), r.farmer ? row('Farmer', `${r.farmer.name} (${r.farmer.memberNumber})`) : '',
     row('Combine harvester', `${r.combine.registrationNumber}${r.combine.make ? ` · ${r.combine.make} ${r.combine.model ?? ''}` : ''}`), row('Owner', r.combine.ownerName), r.combine.operatorName ? row('Operator', r.combine.operatorName) : '',
-    r.riceType ? row('Rice type', r.riceType) : '', row('Harvested on', String(r.harvestedOn)), row('Harvest', `${fmtNum(r.totalBags, 2)} bags${r.basketsCounted ? ` (${r.bagsCounted} bags + ${r.basketsCounted} baskets at ${r.basketsPerBag} baskets a bag)` : ''}${r.quantityKg ? `, ${r.quantityKg} kg` : ''}`),
+    r.riceType ? row('Rice type', r.riceType) : '', row('Harvested on', String(r.harvestedOn)), row('Harvest', `${fmtNum(r.totalBags, 2)} bags${r.basketsCounted ? ` (${r.bagsCounted ? `${r.bagsCounted} bags + ` : ''}${r.basketsCounted} half bags (Vipeto) at ${r.basketsPerBag} half bags in one bag)` : ''}${r.quantityKg ? `, ${r.quantityKg} kg` : ''}`),
     row('Amount', tzs(r.amount)), row('Status', r.status === 'COLLECTED' ? 'Collected' : 'NOT COLLECTED YET'),
     r.status === 'COLLECTED' ? row('Collected by', `${r.collectedByName} (${POSITION[r.collectedByPosition] ?? ''}) on ${String(r.collectedAt).slice(0, 10)}`) : '',
   ].join('');
@@ -98,11 +98,12 @@ function RecordModal({ onClose, onDone }: { onClose: () => void; onDone: (m: str
   const riceList: any[] = (Array.isArray(rice.data) ? rice.data : rice.data?.data ?? []).filter((v: any) => v.isActive !== false);
   const [farmIdText, setFarmIdText] = useState(''); const [ctx, setCtx] = useState<any>(null); const [ctxError, setCtxError] = useState('');
   const [reg, setReg] = useState(''); const [combine, setCombine] = useState<any>(null);
-  const [bags, setBags] = useState(''); const [baskets, setBaskets] = useState(''); const [kg, setKg] = useState(''); const [amount, setAmount] = useState(''); const [day, setDay] = useState(todayISO());
+  const [baskets, setBaskets] = useState(''); const [kg, setKg] = useState(''); const [amount, setAmount] = useState(''); const [day, setDay] = useState(todayISO());
   const [received, setReceived] = useState(true); const [collector, setCollector] = useState(''); const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const per = settings.data?.basketsPerBag ?? 2;
-  const totalBags = (Number(bags) || 0) + (Number(baskets) || 0) / per;
+  // the harvest is counted in half bags (Vipeto); the bags follow from it and are never typed
+  const totalBags = (Number(baskets) || 0) / per;
   const worth = settings.data?.pricePerBag ? totalBags * settings.data.pricePerBag : null;
   const canSave = !!farmIdText && !!reg && !!riceId && amount !== '' && (totalBags > 0 || Number(kg) > 0) && !busy;
   // a click outside or Escape asks "Close without saving?" once something has been typed (the shared Modal does this)
@@ -111,7 +112,7 @@ function RecordModal({ onClose, onDone }: { onClose: () => void; onDone: (m: str
   const save = async () => {
     setBusy(true); setError('');
     try {
-      const r: any = await harvestCollectionsApi.create({ farmId: farmIdText.trim(), registrationNumber: reg.trim(), riceVarietyId: riceId || undefined, harvestedOn: day, bags: bags ? Number(bags) : undefined, baskets: baskets ? Number(baskets) : undefined, quantityKg: kg ? Number(kg) : undefined, amount: Number(amount), collected: received, collectorFarmerId: received && collector ? collector : undefined, note: note.trim() || undefined });
+      const r: any = await harvestCollectionsApi.create({ farmId: farmIdText.trim(), registrationNumber: reg.trim(), riceVarietyId: riceId || undefined, harvestedOn: day, baskets: baskets ? Number(baskets) : undefined, quantityKg: kg ? Number(kg) : undefined, amount: Number(amount), collected: received, collectorFarmerId: received && collector ? collector : undefined, note: note.trim() || undefined });
       printReceipt(r.data);
       onDone(`${r.data.receiptNo} saved${r.data.status === 'COLLECTED' ? ': the farmer and both leaders were texted.' : '. It is pending until the leader records the money.'}`);
       onClose();
@@ -146,8 +147,8 @@ function RecordModal({ onClose, onDone }: { onClose: () => void; onDone: (m: str
           <div style={{ ...row2, marginTop: 14 }}>
             <Field label="Rice type *"><select className="input-field" value={riceId} onChange={(e) => setRiceId(e.target.value)}><option value="">Choose the rice type…</option>{riceList.map((v: any) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></Field>
             <Field label="Harvested on *"><input type="date" className="input-field" max={todayISO()} value={day} onChange={(e) => setDay(e.target.value)} /></Field>
-            <Field label="Bags"><input type="number" min={0} className="input-field" value={bags} onChange={(e) => setBags(e.target.value)} /></Field>
-            <Field label="Baskets" hint={`${per} baskets = 1 bag`}><input type="number" min={0} step="any" className="input-field" value={baskets} onChange={(e) => setBaskets(e.target.value)} /></Field>
+            <Field label="Half bags (Vipeto)" hint={`${per} half bags (Vipeto) = 1 bag`}><input type="number" min={0} step="any" className="input-field" value={baskets} onChange={(e) => setBaskets(e.target.value)} placeholder="Number of Vipeto" /></Field>
+            <Field label="Bags" hint="Worked out from the Vipeto"><input className="input-field" readOnly tabIndex={-1} value={Number(baskets) > 0 ? fmtNum(totalBags, 2) : ''} placeholder="Automatic" style={{ background: 'var(--surface-2, rgba(127,127,127,.1))' }} /></Field>
             <Field label="Kilograms (optional)"><input type="number" min={0} className="input-field" value={kg} onChange={(e) => setKg(e.target.value)} /></Field>
             <Field label="Amount paid (TZS) *"><input type="number" min={0} className="input-field" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Enter amount" /></Field>
           </div>
@@ -265,26 +266,9 @@ function Report() {
   );
 }
 
-function CombineForm({ onClose, onDone }: { onClose: () => void; onDone: (m: string) => void }) {
-  const [f, setF] = useState({ registrationNumber: '', make: '', model: '', ownerName: '', ownerPhone: '', operatorName: '', operatorPhone: '' }); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
-  const save = async () => { setBusy(true); setError(''); try { await harvestCollectionsApi.createCombine(Object.fromEntries(Object.entries(f).filter(([, v]) => v.trim()))); onDone('Combine harvester registered.'); } catch (e) { setError(errMsg(e, 'Could not save.')); setBusy(false); } };
-  return (
-    <Modal title="Register a combine harvester" onClose={() => !busy && onClose()} width="560px" footer={<><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button type="button" className="btn-primary" disabled={busy || f.registrationNumber.trim().length < 3 || f.ownerName.trim().length < 2} onClick={save}>Save</button></>}>
-      <div style={{ display: 'grid', gap: 12 }}>
-        {error && <Notice tone="error">{error}</Notice>}
-        <Field label="Registration number *"><input className="input-field" value={f.registrationNumber} onChange={set('registrationNumber')} /></Field>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}><Field label="Make"><input className="input-field" value={f.make} onChange={set('make')} /></Field><Field label="Model"><input className="input-field" value={f.model} onChange={set('model')} /></Field></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}><Field label="Owner *"><input className="input-field" value={f.ownerName} onChange={set('ownerName')} /></Field><Field label="Owner phone"><input className="input-field" value={f.ownerPhone} onChange={set('ownerPhone')} /></Field></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}><Field label="Operator"><input className="input-field" value={f.operatorName} onChange={set('operatorName')} /></Field><Field label="Operator phone"><input className="input-field" value={f.operatorPhone} onChange={set('operatorPhone')} /></Field></div>
-      </div>
-    </Modal>
-  );
-}
-
 function Combines() {
   const can = useCan();
-  const [refresh, setRefresh] = useState(0); const [adding, setAdding] = useState(false); const [msg, setMsg] = useState('');
+  const [refresh, setRefresh] = useState(0); const [msg, setMsg] = useState('');
   const list = useApi<any>(() => harvestCollectionsApi.combines(), [refresh]);
   const settings = useApi<any>(() => harvestCollectionsApi.settings(), [refresh]);
   const [bpb, setBpb] = useState(''); const [price, setPrice] = useState('');
@@ -297,16 +281,15 @@ function Combines() {
       {can('combine_harvesters', 'EDIT') && s && (
         <section className="table-panel" style={{ padding: 14, marginBottom: 14, maxWidth: 620 }}>
           <strong>How the harvest is counted</strong>
-          <div className="muted" style={{ fontSize: 12.5, margin: '2px 0 10px' }}>The combine fills baskets first, which are poured into bags later. Say how many baskets make a bag so the bags can be added up. The price of a bag gives each hectare’s income.</div>
+          <div className="muted" style={{ fontSize: 12.5, margin: '2px 0 10px' }}>The combine fills half bags (Vipeto) first. Say how many half bags (Vipeto) make one bag, so the bags are worked out automatically. The price of a bag gives each hectare’s income.</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 10, alignItems: 'end' }}>
-            <Field label="Baskets in one bag"><input type="number" min={0.1} step="any" className="input-field" placeholder={String(s.basketsPerBag)} value={bpb} onChange={(e) => setBpb(e.target.value)} /></Field>
+            <Field label="Half Bags (Vipeto) in one bag"><input type="number" min={0.1} step="any" className="input-field" placeholder={String(s.basketsPerBag)} value={bpb} onChange={(e) => setBpb(e.target.value)} /></Field>
             <Field label="Price of one bag (TZS)"><input type="number" min={0} className="input-field" placeholder={s.pricePerBag ? String(s.pricePerBag) : 'Not set'} value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
             <button type="button" className="btn-primary" disabled={!bpb && !price} onClick={saveSettings}>Save</button>
           </div>
         </section>
       )}
-      {can('combine_harvesters', 'CREATE') && <div style={{ marginBottom: 10 }}><button type="button" className="btn-primary" onClick={() => setAdding(true)}>Register a combine</button></div>}
-      {list.loading && !list.data ? <TableSkeleton cols={4} /> : !rows.length ? <Empty title="No combine harvesters registered" hint="Register each combine by its registration number before recording its payments." /> : (
+      {list.loading && !list.data ? <TableSkeleton cols={4} /> : !rows.length ? <Empty title="No combine harvesters registered" hint="Combine harvesters appear here once they are on the list." /> : (
         <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Registration</th><th>Machine</th><th>Owner</th><th>Operator</th><th /></tr></thead><tbody>
           {rows.map((c) => (
             <tr key={c.id} style={c.isActive ? undefined : { opacity: 0.55 }}><td><strong>{c.registrationNumber}</strong></td><td>{[c.make, c.model].filter(Boolean).join(' ') || '—'}</td><td>{c.ownerName}<div className="muted" style={{ fontSize: 11 }}>{c.ownerPhone}</div></td><td>{c.operatorName ?? '—'}<div className="muted" style={{ fontSize: 11 }}>{c.operatorPhone}</div></td>
@@ -314,7 +297,6 @@ function Combines() {
           ))}
         </tbody></table></div>
       )}
-      {adding && <CombineForm onClose={() => setAdding(false)} onDone={(m) => { setAdding(false); setMsg(m); setRefresh((n) => n + 1); }} />}
     </div>
   );
 }

@@ -165,7 +165,7 @@ export class HarvestCollectionsService {
     const harvestedOn = dto.harvestedOn ? new Date(`${dto.harvestedOn.slice(0, 10)}T00:00:00.000Z`) : todayUtc();
     if (harvestedOn > todayUtc()) throw new BadRequestException('The harvest date cannot be in the future');
     const bags = dto.bags ?? 0; const baskets = dto.baskets ?? 0;
-    if (!bags && !baskets && !dto.quantityKg) throw new BadRequestException('Record how much was harvested: bags, baskets or kilograms');
+    if (!bags && !baskets && !dto.quantityKg) throw new BadRequestException('Record how much was harvested: half bags (Vipeto), bags or kilograms');
     const settings = await this.settings(actor, mamcosId);
     const totalBags = thousandths(bags + baskets / settings.basketsPerBag);
     const collected = dto.collected !== false;
