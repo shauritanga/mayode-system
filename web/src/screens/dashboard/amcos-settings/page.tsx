@@ -9,7 +9,6 @@ import Modal from '@/components/Modal';
 import MoneyInput from '@/components/MoneyInput';
 import { accountingApi, chargesApi, duesApi, machineryApi } from '@/lib/api';
 import { FarmInputsPanel, RiceTypesPanel } from './farm-setup';
-import { WarehouseView } from '../warehouse/page';
 import ProductsPanel from '@/components/ops/ProductsPanel';
 import { TablePageSizeContext } from '@/components/ops/ui';
 import { Field, LoadError, Notice, TableSkeleton, errMsg, titleCase, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
@@ -26,7 +25,7 @@ const SECTIONS: { id: Section; slug: string; label: string; description: string;
   { id: 'penalties', slug: 'late-payments', label: 'Late payments', description: 'What happens when a farmer pays late.', icon: Clock },
   { id: 'rice', slug: 'rice-types', label: 'Rice types', description: 'The rice your farmers grow and sell. Every screen that asks for a rice type offers this list.', icon: Sprout },
   { id: 'inputs', slug: 'farm-inputs', label: 'Farm inputs', description: 'The kinds of input you give farmers, the inputs under each, and the stock you hold.', icon: Package },
-  { id: 'stores', slug: 'warehouses-products', label: 'Warehouses & products', description: 'Where you store things, and the products you handle (rice types, bags, by-products).', icon: Boxes },
+  { id: 'stores', slug: 'products', label: 'Products', description: 'What you store and sell: paddy, rice grades, broken rice, by-products and packed bags. Warehouses are managed on the Warehouse page.', icon: Boxes },
   { id: 'tax', slug: 'vat', label: 'VAT & tax numbers', description: 'VAT registration and rate, and the AMCOS’s tax numbers.', icon: Percent },
 ];
 
@@ -172,15 +171,13 @@ function MachineTypes({ types, canEdit, onChanged }: { types: any[]; canEdit: bo
   );
 }
 
-/** Warehouses and the products stored in them: set up once here, used every day on the Warehouse page. */
+/** The products the warehouses handle: set up once here, used every day on the Warehouse page. */
 function StoresPanel({ can }: { can: (resource: string, action?: string) => boolean }) {
-  const seeWarehouses = can('warehouses') || can('warehouse_desk');
-  const seeProducts = can('ops_catalog');
-  if (!seeWarehouses && !seeProducts) return <p className="muted">Your role does not include setting up warehouses or products.</p>;
+  if (!can('ops_catalog')) return <p className="muted">Your role does not include setting up products.</p>;
   return (
     <TablePageSizeContext.Provider value={10}>
-      {seeWarehouses && <section style={{ marginBottom: 28 }}><h3 style={{ margin: '0 0 4px', fontSize: 15 }}>Warehouses</h3><p className="muted" style={{ margin: '0 0 12px', fontSize: 13 }}>Each place where stock is kept. Choose one whenever you receive or give out stock.</p><WarehouseView embedded setupOnly /></section>}
-      {seeProducts && <section><h3 style={{ margin: '0 0 4px', fontSize: 15 }}>Products</h3><p className="muted" style={{ margin: '0 0 12px', fontSize: 13 }}>What you store and sell: paddy, rice grades, broken rice, by-products and packed bags.</p><ProductsPanel canCreate={can('ops_catalog', 'CREATE')} canEdit={can('ops_catalog', 'EDIT')} /></section>}
+      <p className="muted" style={{ margin: '0 0 12px', fontSize: 13 }}>Need to add a warehouse? Go to <Link href="/dashboard/ops-warehouse/warehouses">Warehouse → Warehouses</Link>.</p>
+      <ProductsPanel canCreate={can('ops_catalog', 'CREATE')} canEdit={can('ops_catalog', 'EDIT')} />
     </TablePageSizeContext.Provider>
   );
 }

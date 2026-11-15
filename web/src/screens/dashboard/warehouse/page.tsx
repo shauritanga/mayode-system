@@ -13,7 +13,7 @@ import Link from 'next/link';
 import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 interface Keeper { user: { id: string; firstName?: string; lastName?: string } }
-interface Warehouse {
+export interface Warehouse {
   id: string; name: string; mamcosId?: string | null; location?: string | null; capacityKg?: number | null; isActive: boolean;
   mamcos?: { name: string } | null; keepers: Keeper[];
   balance: { onHandKg: number; reservedKg: number; availableKg: number };
@@ -156,7 +156,7 @@ function useSubmit(done: () => void) {
   return { saving, error, submit };
 }
 
-function NewWarehouse({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+export function NewWarehouse({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [f, setF] = useState({ name: '', location: '', capacityKg: '' });
   const { saving, error, submit } = useSubmit(onDone);
   return (
@@ -251,7 +251,7 @@ function Adjust({ warehouse, onClose, onDone }: { warehouse: Warehouse; onClose:
   );
 }
 
-function Keepers({ warehouse, onClose, onDone }: { warehouse: Warehouse; onClose: () => void; onDone: () => void }) {
+export function Keepers({ warehouse, onClose, onDone }: { warehouse: Warehouse; onClose: () => void; onDone: () => void }) {
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [userId, setUserId] = useState('');
   const [keepers, setKeepers] = useState(warehouse.keepers);

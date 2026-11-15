@@ -20,7 +20,7 @@ const card: React.CSSProperties = { background: 'var(--bg-elevated, rgba(127,127
 const errOf = (e: unknown) => apiErrorMessage(e, 'That did not work.');
 
 // ───────────────────────── receiving inputs, fuel and bags ─────────────────────────
-export function InputReceivePanel({ canReceive, onDone }: { canReceive: boolean; onDone?: () => void }) {
+export function InputReceivePanel({ canReceive, onDone, defaultWarehouseId }: { canReceive: boolean; onDone?: () => void; defaultWarehouseId?: string }) {
   const stock = useLoad<any>(() => inputStockApi.overview(), []);
   const [item, setItem] = useState(''); const [warehouse, setWarehouse] = useState(''); const [qty, setQty] = useState(''); const [source, setSource] = useState('PURCHASE');
   const [batchNo, setBatchNo] = useState(''); const [expiresOn, setExpiresOn] = useState('');
@@ -33,7 +33,7 @@ export function InputReceivePanel({ canReceive, onDone }: { canReceive: boolean;
   }, [stock.data]);
   const warehouses: any[] = stock.data?.warehouses ?? [];
   const chosen = items.find((i) => i.itemId === item);
-  const wh = warehouse || warehouses.find((w) => w.isDefault)?.id || warehouses[0]?.id || '';
+  const wh = warehouse || defaultWarehouseId || warehouses.find((w) => w.isDefault)?.id || warehouses[0]?.id || '';
   const whName = warehouses.find((w) => w.id === wh)?.name;
   const needsWho = source === 'PURCHASE' || source === 'DIRECT';
   const ok = canReceive && !!chosen && Number(qty) > 0 && (!needsWho || supplier.trim() || reference.trim()) && !busy;
@@ -149,10 +149,10 @@ function CorrectModal({ row, warehouses, onClose, onDone }: { row: any; warehous
 type Row = { key: string; kind: string; name: string; warehouse: string; warehouseId: string | null; balance: number; unit: string; low: boolean; value: number | null; input?: any; free?: number };
 
 /** Rice, by-products, farm inputs, fuel and bags together: what we hold, where, and what is running low. */
-export function AllStockPanel({ canRice, canInputs, canAdjust, onChanged }: { canRice: boolean; canInputs: boolean; canAdjust: boolean; onChanged?: () => void }) {
+export function AllStockPanel({ canRice, canInputs, canAdjust, onChanged, fixedWarehouseId }: { canRice: boolean; canInputs: boolean; canAdjust: boolean; onChanged?: () => void; fixedWarehouseId?: string }) {
   const rice = useLoad<any[]>(() => (canRice ? opsApi.position() : Promise.resolve({ data: [] })), [canRice]);
   const inputs = useLoad<any>(() => (canInputs ? inputStockApi.overview() : Promise.resolve({ data: { data: [], warehouses: [] } })), [canInputs]);
-  const [warehouse, setWarehouse] = useState(''); const [kind, setKind] = useState(''); const [q, setQ] = useState(''); const [low, setLow] = useState(false);
+  const [warehouseSel, setWarehouse] = useState(''); const warehouse = fixedWarehouseId ?? warehouseSel; const [kind, setKind] = useState(''); const [q, setQ] = useState(''); const [low, setLow] = useState(false);
   const [history, setHistory] = useState<any>(null); const [fix, setFix] = useState<any>(null);
   const rows: Row[] = useMemo(() => {
     const out: Row[] = [];
@@ -176,7 +176,7 @@ export function AllStockPanel({ canRice, canInputs, canAdjust, onChanged }: { ca
         {chips.map(([k, l]) => <button key={k} type="button" className={kind === k ? 'btn-primary' : 'btn-secondary'} style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => setKind(k)}>{l}</button>)}
       </div>
       <Toolbar right={<label style={{ fontSize: 13, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={low} onChange={(e) => setLow(e.target.checked)} />Only what is running low{lowCount ? ` (${lowCount})` : ''}</label>}>
-        <Field label="Warehouse"><select className="input-field" value={warehouse} onChange={(e) => setWarehouse(e.target.value)}><option value="">All warehouses</option>{warehouses.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></Field>
+        {!fixedWarehouseId && <Field label="Warehouse"><select className="input-field" value={warehouse} onChange={(e) => setWarehouse(e.target.value)}><option value="">All warehouses</option>{warehouses.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></Field>}
         <Field label="Search"><input className="input-field" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name…" /></Field>
       </Toolbar>
       <ErrorNote message={rice.error || inputs.error} />

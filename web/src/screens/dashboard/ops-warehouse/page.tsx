@@ -9,6 +9,7 @@ import { hasPermission } from '@/lib/nav';
 import { kg, tzs } from '@/lib/ops';
 import { DataTable, ErrorNote, Loading, TablePageSizeContext, Tabs as OpsTabs, useLoad } from '@/components/ops/ui';
 import { PageHeader, Tabs } from '../irrigation/ui';
+import { WarehouseDetail, WarehouseList } from '@/components/ops/WarehousesPanel';
 import { ChartCard } from '@/components/role-dashboards/Charts';
 import { WarehouseView } from '../warehouse/page';
 import StockCountsPanel from '@/components/ops/StockCountsPanel';
@@ -20,16 +21,17 @@ import TracePanel from '@/components/ops/TracePanel';
 import { AllStockPanel, GiveOutHub, InputBatchesPanel, InputReceivePanel } from '@/components/ops/InputStockPanels';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type WarehousePage = 'overview' | 'receive' | 'mill' | 'sendout' | 'stock';
+type WarehousePage = 'warehouses' | 'overview' | 'receive' | 'mill' | 'sendout' | 'stock';
 type Can = (resource: string, action?: 'VIEW' | 'CREATE' | 'EDIT' | 'DELETE') => boolean;
 
-/** Five places, named for what the person is doing, in the order the work happens. Setting up warehouses and products lives in Settings; reports live in Reports. */
+/** The warehouses come first: pick a place, then work in it. The tabs after it do the same jobs across all warehouses. Products are set up in Settings; reports live in Reports. */
 const WAREHOUSE_PAGES: { id: WarehousePage; slug: string; label: string; description: string; icon: typeof Warehouse; allowed: (can: Can) => boolean }[] = [
-  { id: 'overview', slug: 'overview', label: 'Overview', description: 'What we have, what needs doing, and whether the books agree.', icon: LayoutDashboard, allowed: (can) => can('ops_reports') },
+  { id: 'warehouses', slug: 'warehouses', label: 'Warehouses', description: 'Your warehouses. Open one to see what is in it and to add stock.', icon: Warehouse, allowed: (can) => can('warehouses') || can('warehouse_desk') },
   { id: 'receive', slug: 'receive', label: 'Receive', description: 'Record everything that arrives: paddy from a farmer, or inputs, fuel and bags from a supplier. It is added to the warehouse stock when you save.', icon: ArrowDownToLine, allowed: (can) => can('ops_receiving') },
   { id: 'mill', slug: 'mill', label: 'Mill paddy', description: 'Turn paddy into rice, broken rice and by-products. The cost of the paddy moves onto the rice.', icon: Factory, allowed: (can) => can('ops_processing') },
   { id: 'sendout', slug: 'send-out', label: 'Give out / Send out', description: 'Hand stock out: inputs to farmers or field work, and rice to buyers. Stock goes down and the record is kept.', icon: Truck, allowed: (can) => can('ops_dispatch') || can('warehouse_desk') },
   { id: 'stock', slug: 'stock', label: 'Stock', description: 'Everything in the warehouses, rice and inputs together: how much, where, what is running low, and every movement.', icon: Package, allowed: (can) => can('ops_stock') },
+  { id: 'overview', slug: 'overview', label: 'Summary', description: 'What is in store across all warehouses, and what needs your attention.', icon: LayoutDashboard, allowed: (can) => can('ops_reports') },
 ];
 
 /** Addresses of the old eleven pages still work and land on the right new place. */
@@ -58,7 +60,7 @@ export default function OpsWarehousePage() {
   const requested = params?.slug?.[0];
   const moved = requested ? OLD_ADDRESSES[requested] : undefined;
   // Setting up warehouses and products moved to Settings, and the reports to Reports.
-  const elsewhere = requested === 'setup' || requested === 'warehouse-setup' ? '/dashboard/amcos-settings/warehouses-products' : requested === 'inventory-reports' ? '/dashboard/reports' : null;
+  const elsewhere = requested === 'setup' || requested === 'warehouse-setup' ? '/dashboard/ops-warehouse/warehouses' : requested === 'inventory-reports' ? '/dashboard/reports' : null;
   useEffect(() => { if (elsewhere) router.replace(elsewhere); }, [elsewhere, router]);
   const selected = pages.find((page) => page.slug === requested) ?? (moved ? pages.find((p) => p.id === moved) : undefined) ?? pages[0];
   useEffect(() => {
@@ -77,6 +79,9 @@ export default function OpsWarehousePage() {
         <PageHeader title="Warehouse" subtitle={selected.description} />
         {pages.length > 1 && <Tabs tabs={pages.map((page) => ({ id: page.id, label: page.label }))} active={selected.id} onChange={(id) => router.push(`/dashboard/ops-warehouse/${pages.find((p) => p.id === id)!.slug}`)} />}
         <TablePageSizeContext.Provider value={10}><div className={`warehouse-section-content section-${selected.id}`} data-path={pathname}>
+          {selected.id === 'warehouses' && (params?.slug?.[1]
+            ? <WarehouseDetail id={params.slug[1]} can={can} goto={(page) => goto(page, page === 'stock' ? 'counts' : undefined)} />
+            : <WarehouseList can={can} />)}
           {selected.id === 'overview' && <Overview goto={goto} can={can} />}
           {selected.id === 'receive' && <ReceiveHub can={can} />}
           {selected.id === 'mill' && <ProcessingPanel canCreate={can('ops_processing', 'CREATE')} canReverse={can('ops_processing', 'DELETE')} />}

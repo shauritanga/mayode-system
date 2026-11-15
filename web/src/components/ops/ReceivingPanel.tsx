@@ -67,7 +67,7 @@ function ReceiptModal({ id, canConfirm, canCancel, onClose, onChanged }: { id: s
   );
 }
 
-function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean; onClose: () => void; onSaved: () => void }) {
+export function NewReceiptModal({ canConfirm, onClose, onSaved, defaultWarehouseId = '' }: { canConfirm: boolean; onClose: () => void; onSaved: () => void; defaultWarehouseId?: string }) {
   const { data: lookups } = useLoad<any>(() => opsApi.lookups());
   const { data: products } = useLoad<any[]>(() => opsApi.products({ category: 'PADDY' }));
   const [source, setSource] = useState<'EXTERNAL_FARMER' | 'MAYODE_FARM'>('EXTERNAL_FARMER');
@@ -76,7 +76,7 @@ function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean
   const [farmer, setFarmer] = useState<any>(null);
   const [cycles, setCycles] = useState<any[]>([]);
   const [harvests, setHarvests] = useState<any[]>([]);
-  const [f, setF] = useState({ warehouseId: '', productId: '', sellerName: '', sellerPhone: '', farmId: '', cropCycleId: '', harvestRecordId: '', riceVariety: '', receivedAt: new Date().toISOString().slice(0, 10), grossKg: '', bags: '', bagWeightKg: '', moisturePct: '', pricePerKg: '', qualityGrade: '', inspection: 'NOT_REQUIRED', rejectedKg: '', inspectionNotes: '', notes: '' });
+  const [f, setF] = useState({ warehouseId: defaultWarehouseId, productId: '', sellerName: '', sellerPhone: '', farmId: '', cropCycleId: '', harvestRecordId: '', riceVariety: '', receivedAt: new Date().toISOString().slice(0, 10), grossKg: '', bags: '', bagWeightKg: '', moisturePct: '', pricePerKg: '', qualityGrade: '', inspection: 'NOT_REQUIRED', rejectedKg: '', inspectionNotes: '', notes: '' });
   const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }));
   const { busy, error, run } = useAction();
 
@@ -123,7 +123,7 @@ function NewReceiptModal({ canConfirm, onClose, onSaved }: { canConfirm: boolean
       <ErrorNote message={error} />
       <FormGrid>
         <Field label="Where did it come from?"><select className="input-field" value={source} onChange={(e) => setSource(e.target.value as typeof source)}><option value="EXTERNAL_FARMER">A farmer</option><option value="MAYODE_FARM">A Mayode farm</option></select></Field>
-        <Field label="Warehouse" hint={lookups && lookups.warehouses.length === 0 ? 'No warehouse exists yet. Create one in Settings → Warehouses & products.' : undefined}><select className="input-field" value={f.warehouseId} onChange={(e) => set('warehouseId', e.target.value)}><option value="">Choose…</option>{lookups?.warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
+        <Field label="Warehouse" hint={lookups && lookups.warehouses.length === 0 ? 'No warehouse exists yet. Add one on the Warehouse page → Warehouses.' : undefined}><select className="input-field" value={f.warehouseId} onChange={(e) => set('warehouseId', e.target.value)}><option value="">Choose…</option>{lookups?.warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
         <Field label="Paddy product"><select className="input-field" value={f.productId} onChange={(e) => set('productId', e.target.value)}><option value="">Choose…</option>{products?.filter((p) => p.isActive).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
         <Field label="Date received"><input className="input-field" type="date" value={f.receivedAt} onChange={(e) => set('receivedAt', e.target.value)} /></Field>
       </FormGrid>

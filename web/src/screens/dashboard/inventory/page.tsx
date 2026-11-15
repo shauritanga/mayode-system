@@ -504,7 +504,7 @@ export default function InventoryPage() {
                 <small style={{ fontWeight: 400, color: 'var(--neutral-500)' }}>
                   {warehouses.length
                     ? 'Adds this weight to that warehouse\u2019s stock so it can be sold.'
-                    : 'No warehouses yet. Create one in Settings → Warehouses & products.'}
+                    : 'No warehouses yet. Add one on the Warehouse page → Warehouses.'}
                 </small>
               </label>
             )}
