@@ -3601,3 +3601,41 @@ a.farmers-name { display: block; cursor: pointer; }
 .so-search-note { padding: 12px 14px; font-size: 0.8125rem; color: var(--text-2); }
 @media (max-width: 900px) { .so-top { grid-template-columns: 1fr; } }
 @media (max-width: 520px) { .so-dues { grid-template-columns: 1fr; } .so-big { font-size: 2.25rem; } }
+
+/* ── Warehouse home ──
+   Written for a person who is not a storekeeper: first what they can do, then what needs them, then what is in store.
+   Plain words, one idea per block, the accountant's detail folded away at the bottom. */
+.wo { display: grid; gap: 26px; }
+.wo-block { display: grid; gap: 12px; min-width: 0; }
+.wo-title { margin: 0; font-size: 0.9375rem; font-weight: 700; color: var(--text-1); }
+.wo-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.wo-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.wo-action { display: flex; align-items: center; gap: 14px; padding: 16px 18px; text-align: left; font: inherit; color: var(--text-1); cursor: pointer; background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); transition: border-color var(--dur-1) ease, transform var(--dur-1) ease; }
+.wo-action:hover { border-color: var(--accent); transform: translateY(-1px); }
+.wo-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wo-action-icon { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; color: var(--amcos-green, var(--green-500)); background: rgba(34, 197, 94, 0.12); }
+.wo-action-text { display: grid; gap: 2px; min-width: 0; }
+.wo-action-text strong { font-size: 0.9375rem; }
+.wo-action-text small { font-size: 0.8125rem; color: var(--text-2); line-height: 1.35; }
+.wo-clear { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: var(--r-md); background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25); font-size: 0.875rem; color: var(--text-1); }
+.wo-clear svg { color: var(--amcos-green, var(--green-500)); flex-shrink: 0; }
+.wo-todo { list-style: none; margin: 0; padding: 0; background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: var(--r-lg); overflow: hidden; }
+.wo-todo li { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 16px; border-top: 1px solid var(--border-subtle); font-size: 0.875rem; }
+.wo-todo li:first-child { border-top: 0; }
+.wo-todo li > span { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.wo-todo li svg { flex-shrink: 0; }
+.wo-stock { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 12px; }
+.wo-stock-card { display: grid; gap: 3px; align-content: start; text-align: left; font: inherit; color: var(--text-1); cursor: pointer; padding: 16px 18px; background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); transition: border-color var(--dur-1) ease; }
+.wo-stock-card:hover { border-color: var(--border-strong); }
+.wo-stock-name { font-size: 0.8125rem; font-weight: 700; color: var(--text-2); }
+.wo-stock-value { font-family: var(--font-outfit), sans-serif; font-size: 1.625rem; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.wo-stock-what { font-size: 0.75rem; color: var(--text-2); line-height: 1.4; }
+.wo-stock-line { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle); font-size: 0.75rem; color: var(--text-2); }
+.wo-stock-line.is-low { color: var(--red-400); font-weight: 600; }
+.wo-more { border: 1px solid var(--border-subtle); border-radius: var(--r-lg); background: var(--surface-1); padding: 0 18px; }
+.wo-more > summary { cursor: pointer; padding: 14px 0; font-size: 0.875rem; font-weight: 600; color: var(--text-2); list-style: none; }
+.wo-more > summary::-webkit-details-marker { display: none; }
+.wo-more > summary::before { content: '▸'; display: inline-block; margin-right: 8px; font-size: 0.7rem; transition: transform var(--dur-1) ease; }
+.wo-more[open] > summary::before { transform: rotate(90deg); }
+.wo-more[open] { padding-bottom: 16px; }
+.wo-acc-line { margin: 0 0 10px; font-size: 0.875rem; }

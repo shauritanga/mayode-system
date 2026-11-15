@@ -18,7 +18,7 @@ import DispatchPanel from '@/components/ops/DispatchPanel';
 import TracePanel from '@/components/ops/TracePanel';
 import ProductsPanel from '@/components/ops/ProductsPanel';
 import ReportsRunner from '@/components/ops/ReportsRunner';
-import { AllStockPanel, GiveOutHub, HowItWorks, InputBatchesPanel, InputReceivePanel } from '@/components/ops/InputStockPanels';
+import { AllStockPanel, GiveOutHub, InputBatchesPanel, InputReceivePanel } from '@/components/ops/InputStockPanels';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type WarehousePage = 'overview' | 'receive' | 'mill' | 'sendout' | 'stock' | 'setup';
@@ -157,12 +157,6 @@ function SetupWorkspace({ can }: { can: Can }) {
   </>;
 }
 
-const CATEGORY_CARDS: { key: string; title: string; categories: string[]; tone: string }[] = [
-  { key: 'paddy', title: 'Paddy', categories: ['PADDY'], tone: 'gold' },
-  { key: 'rice', title: 'Rice', categories: ['PROCESSED', 'BROKEN'], tone: 'green' },
-  { key: 'byproducts', title: 'By-products', categories: ['BYPRODUCT'], tone: 'purple' },
-];
-
 function Overview({ goto, can }: { goto: (t: WarehousePage, tab?: StockTab) => void; can: Can }) {
   const { data: d, error, loading, reload } = useLoad<any>(async () => {
     const soft = <T,>(allowed: boolean, call: () => Promise<{ data: T }>) => (allowed ? call().then((r) => r.data).catch(() => null) : Promise.resolve(null));
@@ -213,70 +207,92 @@ function Overview({ goto, can }: { goto: (t: WarehousePage, tab?: StockTab) => v
     ...(batchSummary?.expired ? [{ text: `${batchSummary.expired} input ${batchSummary.expired === 1 ? 'batch has' : 'batches have'} expired and still ${batchSummary.expired === 1 ? 'has' : 'have'} stock`, action: 'See batches', go: () => goto('stock', 'inputbatches'), tone: 'red' as const }] : []),
     ...(batchSummary?.expiring ? [{ text: `${batchSummary.expiring} input ${batchSummary.expiring === 1 ? 'batch expires' : 'batches expire'} within 30 days`, action: 'See batches', go: () => goto('stock', 'inputbatches') }] : []),
     ...(valuation && valuation.uncostedKg > 0 ? [{ text: `${kg(valuation.uncostedKg)} of our stock has no cost yet, so it is missing from the accounts`, action: 'Set cost', go: () => goto('stock', 'batches') }] : []),
-    ...(valuation && !valuation.matches ? [{ text: 'The stock value and the accounts do not agree. See the check below.', action: 'Look', go: () => undefined, tone: 'red' as const }] : []),
+    ...(valuation && !valuation.matches ? [{ text: 'The stock value and the accounts do not agree. The accountant section at the bottom shows where.', action: 'Open', go: () => { (document.querySelector('.wo-more') as HTMLDetailsElement | null)?.setAttribute('open', ''); document.querySelector('.wo-more')?.scrollIntoView({ behavior: 'smooth' }); }, tone: 'red' as const }] : []),
   ];
 
   const date = (value: string) => value ? new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Dar_es_Salaam', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value)) : '—';
   const movementLabel = (type: string, qty: number) => ({ RECEIPT: 'Received', TRANSFER_IN: 'Transfer in', TRANSFER_OUT: 'Transfer out', PROCESS_IN: 'Made by milling', PROCESS_OUT: 'Used in milling', DISPATCH: 'Sent out', ADJUSTMENT: qty < 0 ? 'Corrected down' : 'Corrected up', WRITE_OFF: 'Written off' }[type] ?? type);
 
+  // What the person can do, in the words they would use. Each is one click.
   const quick = [
-    { icon: ArrowDownToLine, title: 'Receive stock', hint: 'Rice, inputs, fuel or bags arrived', go: () => goto('receive'), allowed: can('ops_receiving', 'CREATE') },
+    { icon: ArrowDownToLine, title: 'Receive stock', hint: 'Something arrived: rice, inputs, fuel or bags', go: () => goto('receive'), allowed: can('ops_receiving', 'CREATE') },
+    { icon: Truck, title: 'Give out or send out', hint: 'Hand stock to a farmer, a job or a buyer', go: () => goto('sendout'), allowed: can('ops_dispatch') || can('warehouse_desk') },
     { icon: Factory, title: 'Mill paddy', hint: 'Turn paddy into rice', go: () => goto('mill'), allowed: can('ops_processing', 'CREATE') },
-    { icon: Truck, title: 'Send out rice', hint: 'Load a customer’s order', go: () => goto('sendout'), allowed: can('ops_dispatch') || can('warehouse_desk') },
-    { icon: ClipboardList, title: 'Count stock', hint: 'Check shelves against the record', go: () => goto('stock', 'counts'), allowed: can('ops_stock', 'CREATE') },
+    { icon: ClipboardList, title: 'Count stock', hint: 'Check the shelves against the record', go: () => goto('stock', 'counts'), allowed: can('ops_stock', 'CREATE') },
   ].filter((q) => q.allowed);
 
-  return <section className="warehouse-overview" aria-label="Warehouse overview">
-    <HowItWorks can={can} goto={(page) => goto(page === 'giveout' ? 'sendout' : page)} />
+  // What is in store, one card per kind, each saying in plain words what the kind is.
+  const inputRows: any[] = (d.inputs?.data ?? []).filter((r: any) => r.isActive);
+  const inputKind = (cls: string) => {
+    const items = [...new Map(inputRows.filter((r) => r.stockClass === cls).map((r) => [r.itemId, r])).values()];
+    return { count: items.filter((r) => r.itemTotal > 0).length, low: items.filter((r) => r.low).length, any: items.length > 0 };
+  };
+  const rice = totals(['PROCESSED', 'BROKEN']); const paddy = totals(['PADDY']); const byp = totals(['BYPRODUCT']);
+  const soldLine = (t: { free: number; reserved: number }) => `${kg(t.free)} can be sold now${t.reserved ? ` · ${kg(t.reserved)} promised to orders` : ''}`;
+  const stockCards: { key: string; title: string; what: string; value: string; line: string; low?: number }[] = [
+    { key: 'rice', title: 'Rice', what: 'Milled rice, ready to sell', value: kg(rice.onHand), line: soldLine(rice) },
+    { key: 'paddy', title: 'Paddy', what: 'Rice still in the husk, not yet milled', value: kg(paddy.onHand), line: soldLine(paddy) },
+    { key: 'byp', title: 'By-products', what: 'Bran and husks left after milling', value: kg(byp.onHand), line: 'Kept for sale or use' },
+    ...(can('ops_stock') ? ([['INPUT', 'Farm inputs', 'Fertiliser, seed and chemicals'], ['FUEL', 'Fuel', 'Diesel and petrol'], ['PACKAGING', 'Bags', 'Empty bags for packing rice']] as const)
+      .map(([cls, title, what]) => ({ cls, title, what, k: inputKind(cls) })).filter((x) => x.k.any)
+      .map((x) => ({ key: x.cls, title: x.title, what: x.what, value: `${x.k.count} ${x.k.count === 1 ? 'item' : 'items'}`, line: x.k.low ? `${x.k.low} running low` : 'Stock is fine', low: x.k.low })) : []),
+  ];
+
+  return <section className="warehouse-overview wo" aria-label="Warehouse overview">
     <div className="warehouse-overview-head">
-      <div className="warehouse-overview-title"><span className="warehouse-overview-icon"><Boxes size={26} /></span><div><h2>Warehouse &amp; Inventory</h2><p>What we have, what needs doing, and whether the books agree.</p></div></div>
+      <div className="warehouse-overview-title"><span className="warehouse-overview-icon"><Boxes size={26} /></span><div><h2>Warehouse</h2><p>What you have in store, and what to do next.</p></div></div>
       <div className="warehouse-overview-actions"><button type="button" className="btn-secondary" onClick={() => void reload()}><RefreshCw size={15} /> Refresh</button></div>
     </div>
     <ErrorNote message={error} />
 
-    <div className="warehouse-metric-grid">
-      {CATEGORY_CARDS.map((card) => {
-        const t = totals(card.categories);
-        return <WarehouseMetric key={card.key} icon={card.key === 'paddy' ? Package : card.key === 'rice' ? Boxes : Factory} label={card.title} value={kg(t.onHand)} hint={`${kg(t.free)} free to sell${t.reserved ? ` · ${kg(t.reserved)} promised to orders` : ''}`} tone={card.tone} />;
-      })}
-      <WarehouseMetric icon={Warehouse} label="Value of our stock" value={valuation ? tzs(valuation.totalStockValue) : '—'} hint={valuation ? (valuation.uncostedKg > 0 ? `${kg(valuation.uncostedKg)} has no cost yet` : 'At what it cost us') : 'Not available for your role'} tone="blue" />
-    </div>
+    {quick.length > 0 && <section className="wo-block" aria-label="What would you like to do?">
+      <h3 className="wo-title">What would you like to do?</h3>
+      <div className="wo-actions">{quick.map(({ icon: Icon, title, hint, go }) => <button key={title} type="button" className="wo-action" onClick={go}><span className="wo-action-icon"><Icon size={22} /></span><span className="wo-action-text"><strong>{title}</strong><small>{hint}</small></span></button>)}</div>
+    </section>}
 
-    <ChartCard title="Needs your attention" subtitle={todo.length ? 'Start at the top' : 'Nothing is waiting'}>
+    <section className="wo-block" aria-label="Needs your attention">
+      <h3 className="wo-title">Needs your attention</h3>
       {todo.length === 0
-        ? <p style={{ display: 'flex', gap: 8, alignItems: 'center', margin: 0 }}><CheckCircle2 size={18} color="var(--green-600, #16a36a)" /> All clear. Deliveries are in stock, orders are sent out and the books agree.</p>
-        : <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>{todo.map((t) => <li key={t.text} style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--neutral-100)' }}>
-          <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><AlertTriangle size={16} color={t.tone === 'red' ? 'var(--red-500)' : 'var(--gold-500, #f2a62c)'} />{t.text}</span>
-          <button type="button" className="btn-secondary" onClick={t.go}>{t.action}</button></li>)}</ul>}
-    </ChartCard>
+        ? <div className="wo-clear"><CheckCircle2 size={18} /> All clear. Nothing is waiting for you.</div>
+        : <ul className="wo-todo">{todo.map((t) => <li key={t.text}>
+            <span><AlertTriangle size={16} color={t.tone === 'red' ? 'var(--red-500)' : 'var(--gold-500, #f2a62c)'} />{t.text}</span>
+            <button type="button" className="btn-secondary" onClick={t.go}>{t.action}</button></li>)}</ul>}
+    </section>
 
-    {quick.length > 0 && <div className="warehouse-action-grid">{quick.map(({ icon: Icon, title, hint, go }) => <button key={title} type="button" className="warehouse-action-card tone-green" onClick={go}><span className="warehouse-action-icon"><Icon size={20} /></span><span><strong>{title}</strong><small>{hint}</small></span><span className="warehouse-action-arrow">›</span></button>)}</div>}
+    <section className="wo-block" aria-label="What is in store">
+      <h3 className="wo-title">What is in store</h3>
+      <div className="wo-stock">{stockCards.map((c) => (
+        <button key={c.key} type="button" className="wo-stock-card" onClick={() => goto('stock')} title="See this in Stock">
+          <span className="wo-stock-name">{c.title}</span>
+          <span className="wo-stock-value">{c.value}</span>
+          <span className="wo-stock-what">{c.what}</span>
+          <span className={`wo-stock-line${c.low ? ' is-low' : ''}`}>{c.line}</span>
+        </button>))}
+      </div>
+    </section>
 
-    <div className="warehouse-overview-grid warehouse-overview-grid-top">
-      <ChartCard title="By warehouse" subtitle="What each warehouse holds" action={<LinkBtn onClick={() => goto('stock')}>All stock →</LinkBtn>}>
-        <DataTable rows={byWarehouse} rowKey={(row) => row.name} empty="Nothing in stock yet. Receive paddy to get started."
-          columns={[{ header: 'Warehouse', render: (row) => <strong>{row.name}</strong> }, { header: 'In stock', align: 'right', render: (row) => kg(row.onHand) }, { header: 'Free to sell', align: 'right', render: (row) => kg(row.free) }, { header: 'Value', align: 'right', render: (row) => (row.value > 0 ? tzs(row.value) : row.uncosted ? <span className="badge badge-gold">Cost not set</span> : '—') }]} />
-      </ChartCard>
-      <ChartCard title="Do the books agree?" subtitle="Stock value in the warehouse against the accounts">
-        {!valuation ? <p className="muted" style={{ margin: 0 }}>Not available for your role.</p> : <>
-          <p style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '0 0 10px', fontWeight: 600, color: valuation.matches ? 'var(--green-600, #16a36a)' : 'var(--red-500)' }}>
-            {valuation.matches ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}{valuation.matches ? 'Yes. The warehouse and the accounts agree.' : 'No. There is a difference to look into.'}</p>
-          <DataTable rows={valuation.rows} rowKey={(r: any) => r.code} columns={[
-            { header: 'Stock', render: (r: any) => r.name }, { header: 'Warehouse says', align: 'right', render: (r: any) => tzs(r.stockValue) }, { header: 'Accounts say', align: 'right', render: (r: any) => tzs(r.booksValue) },
-            { header: 'Difference', align: 'right', render: (r: any) => <span style={{ color: Math.abs(r.difference) > 1 ? 'var(--red-500)' : undefined }}>{tzs(r.difference)}</span> }]} />
-          {valuation.rows.some((r: any) => r.notYetReceived > 0) && <p className="muted" style={{ fontSize: 12, margin: '8px 0 0' }}>Paddy bought at the collection centre but not yet received into a warehouse is already counted in the accounts: {tzs(valuation.rows.reduce((t: number, r: any) => t + r.notYetReceived, 0))}.</p>}
-        </>}
-      </ChartCard>
-    </div>
+    {byWarehouse.length > 0 && <section className="wo-block" aria-label="By warehouse">
+      <div className="wo-title-row"><h3 className="wo-title">By warehouse</h3><LinkBtn onClick={() => goto('stock')}>See all stock →</LinkBtn></div>
+      <DataTable rows={byWarehouse} rowKey={(row) => row.name} empty="Nothing in stock yet. Use Receive stock to get started."
+        columns={[{ header: 'Warehouse', render: (row) => <strong>{row.name}</strong> }, { header: 'Rice and paddy in store', align: 'right', render: (row) => kg(row.onHand) }, { header: 'Can be sold now', align: 'right', render: (row) => kg(row.free) }]} />
+    </section>}
 
-    {can('ops_stock') && <ChartCard title="Latest movements" subtitle="The last things that went in or out" action={<LinkBtn onClick={() => goto('stock', 'ledger')}>See all →</LinkBtn>}>
-      <DataTable rows={(d.ledger as any[]).slice(0, 8)} rowKey={(entry: any) => entry.id} empty="Nothing has moved yet."
-        columns={[{ header: 'When', render: (entry: any) => date(entry.createdAt) }, { header: 'What', render: (entry: any) => movementLabel(entry.type, entry.quantityKg) }, { header: 'Product', render: (entry: any) => entry.batch?.product?.name || '—' }, { header: 'Batch', render: (entry: any) => entry.batch?.reference || '—' },
+    {can('ops_stock') && <section className="wo-block" aria-label="Latest movements">
+      <div className="wo-title-row"><h3 className="wo-title">What happened last</h3><LinkBtn onClick={() => goto('stock', 'ledger')}>See everything →</LinkBtn></div>
+      <DataTable rows={(d.ledger as any[]).slice(0, 6)} rowKey={(entry: any) => entry.id} empty="Nothing has moved yet."
+        columns={[{ header: 'When', render: (entry: any) => date(entry.createdAt) }, { header: 'What', render: (entry: any) => movementLabel(entry.type, entry.quantityKg) }, { header: 'Product', render: (entry: any) => entry.batch?.product?.name || '—' },
           { header: 'Quantity', align: 'right', render: (entry: any) => <span style={{ color: entry.quantityKg < 0 ? 'var(--red-500)' : undefined }}>{entry.quantityKg > 0 ? '+' : ''}{num(entry.quantityKg)} kg</span> }]} />
-    </ChartCard>}
-  </section>;
-}
+    </section>}
 
-function WarehouseMetric({ icon: Icon, label, value, hint, tone }: { icon: typeof Package; label: string; value: string; hint: string; tone: string }) {
-  return <article className="warehouse-metric-card"><span className={`warehouse-metric-icon tone-${tone}`}><Icon size={21} /></span><div className="warehouse-metric-copy"><div className="warehouse-metric-label">{label}</div><strong>{value}</strong><small>{hint}</small></div></article>;
+    {valuation && <details className="wo-block wo-more">
+      <summary>For the accountant: value of stock and whether the books agree{!valuation.matches && <span className="badge badge-red" style={{ marginLeft: 8 }}>Difference to look into</span>}</summary>
+      <p className="wo-acc-line"><strong>Value of stock: {tzs(valuation.totalStockValue)}</strong>{valuation.uncostedKg > 0 ? ` · ${kg(valuation.uncostedKg)} has no cost yet` : ' · at what it cost us'}</p>
+      <p style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '0 0 10px', fontWeight: 600, color: valuation.matches ? 'var(--green-600, #16a36a)' : 'var(--red-500)' }}>
+        {valuation.matches ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}{valuation.matches ? 'Yes. The warehouse and the accounts agree.' : 'No. There is a difference to look into.'}</p>
+      <DataTable rows={valuation.rows} rowKey={(r: any) => r.code} columns={[
+        { header: 'Stock', render: (r: any) => r.name }, { header: 'Warehouse says', align: 'right', render: (r: any) => tzs(r.stockValue) }, { header: 'Accounts say', align: 'right', render: (r: any) => tzs(r.booksValue) },
+        { header: 'Difference', align: 'right', render: (r: any) => <span style={{ color: Math.abs(r.difference) > 1 ? 'var(--red-500)' : undefined }}>{tzs(r.difference)}</span> }]} />
+      {valuation.rows.some((r: any) => r.notYetReceived > 0) && <p className="muted" style={{ fontSize: 12, margin: '8px 0 0' }}>Paddy bought at the collection centre but not yet received into a warehouse is already counted in the accounts: {tzs(valuation.rows.reduce((t: number, r: any) => t + r.notYetReceived, 0))}.</p>}
+    </details>}
+  </section>;
 }
