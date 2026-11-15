@@ -104,11 +104,14 @@ function EquipmentModal({ item, rates, onClose, onSaved }: { item?: any; rates: 
   const [error, setError] = useState('');
   const set = (k: string, v: any) => { setForm((f) => ({ ...f, [k]: v })); setErrors((e) => ({ ...e, [k]: '' })); };
   const external = form.ownership === 'EXTERNAL';
+  // a combine harvester is found by its registration number when its harvest payments are recorded
+  const isCombine = /combine/i.test((types.data ?? []).find((t: any) => t.id === form.typeId)?.name ?? '');
 
   const save = async () => {
     const found: Record<string, string> = {};
     if (!form.name.trim()) found.name = 'Give the machine a name';
     if (!form.typeId) found.typeId = 'Choose the type of machine';
+    if (isCombine && form.registrationNo.replace(/[^A-Za-z0-9]/g, '').length < 3) found.registrationNo = 'A combine harvester needs its registration number';
     if (external && !form.ownerName.trim()) found.ownerName = 'Who owns this machine?';
     if (form.feePerHectare !== '' && !(Number(form.feePerHectare) >= 0)) found.feePerHectare = 'Enter zero or more';
     if (form.registrationFee !== '' && !(Number(form.registrationFee) >= 0)) found.registrationFee = 'Enter zero or more';
@@ -146,7 +149,7 @@ function EquipmentModal({ item, rates, onClose, onSaved }: { item?: any; rates: 
             </select>
             {types.data && types.data.length === 0 && <Link href="/dashboard/amcos-settings" style={{ fontSize: 12 }}>Add machine types in Settings →</Link>}
           </Field>
-          <Field label="Registration / serial no."><input className="input-field" value={form.registrationNo} onChange={(e) => set('registrationNo', e.target.value)} /></Field>
+          <Field label={isCombine ? 'Registration number *' : 'Registration / serial no.'} error={errors.registrationNo} hint={isCombine ? 'Harvest payments for this combine are recorded by this number' : undefined}><input className="input-field" value={form.registrationNo} onChange={(e) => set('registrationNo', e.target.value)} placeholder={isCombine ? 'e.g. T 123 ABC' : undefined} /></Field>
           <Field label="Owned by" hint={editing ? 'Cannot be changed after the machine has been used' : undefined}>
             <select className="input-field" value={form.ownership} onChange={(e) => set('ownership', e.target.value)} disabled={editing}>
               <option value="AMCOS">The AMCOS</option><option value="EXTERNAL">Someone else, registered with the AMCOS</option>

@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import Modal from '@/components/Modal';
 import { farmId } from '@/lib/farm-id';
 import { harvestCollectionsApi, irrigationApi, riceVarietiesApi } from '@/lib/api';
@@ -33,8 +34,8 @@ function printReceipt(r: any) {
 interface Opt { id: string; label: string; sub?: string; raw: any }
 
 /** A searchable drop-down: opens on click with the first entries, narrows as you type, and works with the keyboard. */
-function Combo({ label, hint, placeholder, selected, onClear, onPick, load, deps }: {
-  label: string; hint?: string; placeholder: string; selected: string | null; onClear: () => void; onPick: (o: Opt) => void;
+function Combo({ label, hint, placeholder, selected, onClear, onPick, load, deps, emptyHint }: {
+  label: string; hint?: string; emptyHint?: React.ReactNode; placeholder: string; selected: string | null; onClear: () => void; onPick: (o: Opt) => void;
   load: (q: string) => Promise<Opt[]>; deps?: unknown[];
 }) {
   const [text, setText] = useState(''); const [open, setOpen] = useState(false); const [active, setActive] = useState(0);
@@ -72,7 +73,7 @@ function Combo({ label, hint, placeholder, selected, onClear, onPick, load, deps
         {open && (
           <div id={`combo-${label}`} role="listbox" style={{ position: 'absolute', zIndex: 30, left: 0, right: 0, top: '100%', marginTop: 4, background: 'var(--surface, #fff)', border: '1px solid var(--border-subtle)', borderRadius: 8, maxHeight: 240, overflow: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.18)' }}>
             {err ? <div style={{ padding: 10, fontSize: 13, color: 'var(--red-400)' }}>{err}</div> : busy && !list.length ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>Searching…</div>
-              : !list.length ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>Nothing matches.</div>
+              : !list.length ? <div className="muted" style={{ padding: 10, fontSize: 13 }}>Nothing matches.{emptyHint}</div>
               : list.map((o, i) => (
                 <button key={o.id} type="button" role="option" aria-selected={i === active} onMouseDown={(e) => { e.preventDefault(); pick(o); }} onMouseEnter={() => setActive(i)}
                   style={{ display: 'flex', width: '100%', justifyContent: 'space-between', gap: 8, padding: '8px 10px', background: i === active ? 'var(--surface-tint, rgba(0,0,0,.06))' : 'none', border: 'none', borderBottom: '1px solid var(--border-subtle)', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
@@ -133,6 +134,7 @@ function RecordModal({ onClose, onDone }: { onClose: () => void; onDone: (m: str
             <Combo label="Combine registration number *" hint="Choose a registered combine, or type to search" placeholder="Select or search a combine" selected={reg ? `${reg}${combine?.make ? ` · ${combine.make} ${combine.model ?? ''}` : ''}` : null}
               onClear={() => { setReg(''); setCombine(null); }} deps={[combines.data]}
               load={async (q) => ((combines.data?.data ?? []) as any[]).filter((c) => c.isActive !== false && (!q || `${c.registrationNumber} ${c.make ?? ''} ${c.model ?? ''} ${c.ownerName ?? ''}`.toLowerCase().includes(q.toLowerCase()))).map((c) => ({ id: c.id, label: c.registrationNumber, sub: `${c.make ?? ''} ${c.model ?? ''}`.trim() || c.ownerName || '', raw: c }))}
+              emptyHint={<> A combine is added in <Link href="/dashboard/task-management">Tools &amp; Equipment</Link>, with its registration number.</>}
               onPick={(o) => { setReg(o.raw.registrationNumber); setCombine(o.raw); }} />
           </div>
           {ctxError && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 12.5, marginTop: 4 }}>{ctxError}</div>}
@@ -289,11 +291,18 @@ function Combines() {
           </div>
         </section>
       )}
-      {list.loading && !list.data ? <TableSkeleton cols={4} /> : !rows.length ? <Empty title="No combine harvesters registered" hint="Combine harvesters appear here once they are on the list." /> : (
-        <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Registration</th><th>Machine</th><th>Owner</th><th>Operator</th><th /></tr></thead><tbody>
+      <div style={{ ...card, marginBottom: 12, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 13 }}>Combine harvesters come from <strong>Tools &amp; Equipment</strong>: register the machine there with the type “Combine harvester” and its registration number, and it appears here and in Record Payment.</span>
+        <Link href="/dashboard/task-management" className="btn-secondary" style={{ whiteSpace: 'nowrap' }}>Open Tools &amp; Equipment</Link>
+      </div>
+      {(list.data?.missingRegistration ?? []).length > 0 && (
+        <Notice tone="error">{(list.data.missingRegistration as string[]).join(', ')} {(list.data.missingRegistration as string[]).length === 1 ? 'is a combine harvester with no registration number' : 'are combine harvesters with no registration number'}. Add the number in Tools &amp; Equipment so payments can be recorded for {(list.data.missingRegistration as string[]).length === 1 ? 'it' : 'them'}.</Notice>
+      )}
+      {list.loading && !list.data ? <TableSkeleton cols={4} /> : !rows.length ? <Empty title="No combine harvesters yet" hint="Register a tool of the type “Combine harvester”, with its registration number, in Tools & Equipment." /> : (
+        <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Registration</th><th>Machine</th><th>Owner</th><th>Status</th></tr></thead><tbody>
           {rows.map((c) => (
-            <tr key={c.id} style={c.isActive ? undefined : { opacity: 0.55 }}><td><strong>{c.registrationNumber}</strong></td><td>{[c.make, c.model].filter(Boolean).join(' ') || '—'}</td><td>{c.ownerName}<div className="muted" style={{ fontSize: 11 }}>{c.ownerPhone}</div></td><td>{c.operatorName ?? '—'}<div className="muted" style={{ fontSize: 11 }}>{c.operatorPhone}</div></td>
-              <td style={{ textAlign: 'right' }}>{can('combine_harvesters', 'EDIT') && <button type="button" className="btn-secondary" onClick={async () => { await harvestCollectionsApi.updateCombine(c.id, { isActive: !c.isActive }); setRefresh((n) => n + 1); }}>{c.isActive ? 'Stop' : 'Resume'}</button>}</td></tr>
+            <tr key={c.id} style={c.isActive ? undefined : { opacity: 0.55 }}><td><strong>{c.registrationNumber}</strong></td><td>{[c.make, c.model].filter(Boolean).join(' ') || '—'}</td><td>{c.ownerName}<div className="muted" style={{ fontSize: 11 }}>{c.ownerPhone}</div></td>
+              <td>{c.isActive ? <span className="badge badge-green">In use</span> : <span className="badge badge-gray">Switched off in Tools &amp; Equipment</span>}</td></tr>
           ))}
         </tbody></table></div>
       )}

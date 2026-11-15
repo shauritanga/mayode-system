@@ -7,7 +7,7 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { HarvestCollectionsService } from './harvest-collections.service';
-import { CollectDto, CollectionQueryDto, CreateCollectionDto, CreateCombineDto, HarvestSettingDto, UpdateCombineDto, VoidDto } from './dto/harvest-collections.dto';
+import { CollectDto, CollectionQueryDto, CreateCollectionDto, HarvestSettingDto, UpdateCombineDto, VoidDto } from './dto/harvest-collections.dto';
 
 @ApiTags('harvest-collections')
 @ApiBearerAuth()
@@ -25,8 +25,6 @@ export class HarvestCollectionsController {
   combines(@CurrentUser() u: RequestUser, @Query('mamcosId') m?: string) { return this.svc.listCombines(u, m); }
   @Get('combines/lookup') @RequirePermission('combine_harvesters', 'VIEW')
   lookup(@CurrentUser() u: RequestUser, @Query('registration') r: string, @Query('mamcosId') m?: string) { return this.svc.lookupCombine(u, r, m); }
-  @Post('combines') @RequirePermission('combine_harvesters', 'CREATE')
-  createCombine(@CurrentUser() u: RequestUser, @Body() dto: CreateCombineDto, @Query('mamcosId') m?: string) { return this.svc.createCombine(u, dto, m); }
   @Patch('combines/:id') @RequirePermission('combine_harvesters', 'EDIT')
   updateCombine(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: UpdateCombineDto, @Query('mamcosId') m?: string) { return this.svc.updateCombine(u, id, dto, m); }
 

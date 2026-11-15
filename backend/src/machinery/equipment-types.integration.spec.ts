@@ -114,4 +114,16 @@ describeDb('Machine types in Settings (PostgreSQL)', () => {
     expect(need('createType')).toMatchObject({ resource: 'machinery', action: 'CREATE' });
     expect(need('updateType')).toMatchObject({ resource: 'machinery', action: 'EDIT' });
   });
+
+  it('a combine harvester must be registered with its registration number, both when added and when changed', async () => {
+    const c = await coop();
+    const type: any = await svc.createType(c.actor, { name: 'Combine harvester' });
+    await expect(machine(c, 'Kubota', { typeId: type.id })).rejects.toThrow(/registration number/);
+    const ok = await machine(c, 'Kubota', { typeId: type.id, registrationNo: 'T 123 ABC' });
+    await expect(svc.updateEquipment(c.actor, ok.id, { registrationNo: '' } as any)).rejects.toThrow(/registration number/);
+    // changing something else, or a machine of another kind, is not held up
+    await expect(svc.updateEquipment(c.actor, ok.id, { notes: 'serviced' } as any)).resolves.toBeTruthy();
+    const other: any = await svc.createType(c.actor, { name: 'Tractor' });
+    await expect(machine(c, 'MF 385', { typeId: other.id })).resolves.toBeTruthy();
+  });
 });

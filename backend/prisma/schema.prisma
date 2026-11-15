@@ -7011,6 +7011,8 @@ model CombineHarvester {
   operatorPhone      String?  @map("operator_phone")
   note               String?
   isActive           Boolean  @default(true) @map("is_active")
+  /// The tool in Tools & Equipment this combine comes from (its registration number is how payments find it).
+  equipmentId        String?  @unique @map("equipment_id")
   createdById        String?  @map("created_by_id")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")

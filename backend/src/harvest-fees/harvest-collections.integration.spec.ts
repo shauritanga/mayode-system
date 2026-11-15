@@ -75,18 +75,30 @@ describeDb('Combine harvest payments (PostgreSQL)', () => {
     const r = (m: string) => Reflect.getMetadata(PERMISSION_KEY, HarvestCollectionsController.prototype[m as 'create']);
     expect(r('create')).toMatchObject({ resource: 'harvest_collections', action: 'CREATE' });
     expect(r('collect')).toMatchObject({ resource: 'harvest_collections', action: 'EDIT' });
-    expect(r('createCombine')).toMatchObject({ resource: 'combine_harvesters', action: 'CREATE' });
+    expect(r('updateCombine')).toMatchObject({ resource: 'combine_harvesters', action: 'EDIT' });
     expect(r('saveSettings')).toMatchObject({ resource: 'combine_harvesters', action: 'EDIT' });
     expect(r('pending')).toMatchObject({ resource: 'farm_administration', action: 'VIEW' });
   });
 
-  it('registers a combine harvester once, whatever the spacing or case of its number, and finds it by its number', async () => {
-    const c: any = await svc.createCombine(office, { registrationNumber: 't 123 abc', ownerName: 'Kilimo Hire Ltd', make: 'Kubota', operatorName: 'Musa' } as any);
-    expect(c.registrationNumber).toBe('T123ABC');
-    await expect(svc.createCombine(office, { registrationNumber: 'T-123-ABC', ownerName: 'Other' } as any)).rejects.toBeInstanceOf(ConflictException);
-    expect(await svc.lookupCombine(blockLeader, 'T 123 ABC')).toMatchObject({ ownerName: 'Kilimo Hire Ltd', make: 'Kubota', operatorName: 'Musa' });
+  it('takes combine harvesters from Tools & Equipment, found by their registration number whatever the spacing or case', async () => {
+    const type = await prisma.amcosEquipmentType.create({ data: { mamcosId: mamcosA, name: 'Combine harvester' } });
+    const noNumber = await prisma.amcosEquipment.create({ data: { mamcosId: mamcosA, name: 'Old combine', type: 'COMBINE_HARVESTER', typeId: type.id, ownership: 'AMCOS' } });
+    expect((await svc.listCombines(office) as any).missingRegistration).toEqual(['Old combine']);
+    const tool = await prisma.amcosEquipment.create({ data: { mamcosId: mamcosA, name: 'Kubota DC-70', type: 'COMBINE_HARVESTER', typeId: type.id, registrationNo: 't 123 abc', ownership: 'EXTERNAL', ownerName: 'Kilimo Hire Ltd', ownerPhone: '0711000111' } });
+    const list: any = await svc.listCombines(office);
+    const c = list.data.find((x: any) => x.registrationNumber === 'T123ABC');
+    expect(c).toMatchObject({ make: 'Kubota DC-70', ownerName: 'Kilimo Hire Ltd', fromTools: true, isActive: true });
+    expect(list.data.length).toBe(1);                       // the tool without a number is not on the list
+    expect(await svc.lookupCombine(blockLeader, 'T 123 ABC')).toMatchObject({ ownerName: 'Kilimo Hire Ltd' });
     await expect(svc.lookupCombine(blockLeader, 'NOPE 1')).rejects.toBeInstanceOf(NotFoundException);
     await expect(svc.lookupCombine(outsider, 'T123ABC')).rejects.toBeInstanceOf(NotFoundException);
+    // the AMCOS's own combine is owned by the AMCOS
+    await prisma.amcosEquipment.update({ where: { id: noNumber.id }, data: { registrationNo: 'T 999 ZZZ' } });
+    expect(((await svc.lookupCombine(office, 't999zzz')) as any).ownerName).toContain('Madibira');
+    // switching a tool off in Tools & Equipment switches its combine off, so no payment can be recorded for it
+    await prisma.amcosEquipment.update({ where: { id: noNumber.id }, data: { isActive: false } });
+    expect((await svc.listCombines(office) as any).data.find((x: any) => x.registrationNumber === 'T999ZZZ').isActive).toBe(false);
+    expect(tool.id).toBeTruthy();
   });
 
   it('converts baskets to bags at the AMCOS’s own rate', async () => {

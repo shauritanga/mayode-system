@@ -1165,7 +1165,6 @@ export const harvestCollectionsApi = {
   saveSettings: (data: object) => api.put('/harvest-collections/settings', data),
   combines: () => api.get('/harvest-collections/combines'),
   lookupCombine: (registration: string) => api.get('/harvest-collections/combines/lookup', { params: { registration } }),
-  createCombine: (data: object) => api.post('/harvest-collections/combines', data),
   updateCombine: (id: string, data: object) => api.patch(`/harvest-collections/combines/${id}`, data),
   context: (farmId: string) => api.get('/harvest-collections/context', { params: { farmId } }),
   list: (params?: object) => api.get('/harvest-collections', { params }),

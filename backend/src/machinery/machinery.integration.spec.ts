@@ -67,7 +67,7 @@ describeDb('Machinery and task management (PostgreSQL)', () => {
   describe('equipment register', () => {
     it('registers AMCOS-owned and external machines and refuses nonsense combinations', async () => {
       tractor = await svc.createEquipment(adminA, { name: 'Tractor MF-385', type: 'TRACTOR', ownership: 'AMCOS', registrationNo: 'T 123 ABC' });
-      harvester = await svc.createEquipment(adminA, { name: 'Combine Kubota', type: 'COMBINE_HARVESTER', ownership: 'EXTERNAL', ownerName: 'Juma Hamisi', ownerPhone: '+255712000111', feePerHectare: 15000 });
+      harvester = await svc.createEquipment(adminA, { name: 'Combine Kubota', type: 'COMBINE_HARVESTER', registrationNo: 'T 555 KBT', ownership: 'EXTERNAL', ownerName: 'Juma Hamisi', ownerPhone: '+255712000111', feePerHectare: 15000 });
       expect(tractor).toMatchObject({ ownership: 'AMCOS', feePerHectare: null, ownerName: null, registrationFeeStatus: 'NOT_APPLICABLE' });
       expect(Number(harvester.feePerHectare)).toBe(15000);
       await expect(svc.createEquipment(adminA, { name: 'Mystery', type: 'OTHER', ownership: 'EXTERNAL' })).rejects.toThrow(/owner of this external machine/);
@@ -143,7 +143,7 @@ describeDb('Machinery and task management (PostgreSQL)', () => {
       expect(await svc.rates(adminC)).toEqual({ toolRegistrationFee: 50_000, toolFeePerHectare: 3_000 });
 
       const own = await svc.createEquipment(adminC, { name: 'Own tractor', type: 'TRACTOR', ownership: 'AMCOS' });
-      const hired = await svc.createEquipment(adminC, { name: 'Hired combine', type: 'COMBINE_HARVESTER', ownership: 'EXTERNAL', ownerName: 'Asha' });
+      const hired = await svc.createEquipment(adminC, { name: 'Hired combine', type: 'COMBINE_HARVESTER', registrationNo: 'T 777 HRD', ownership: 'EXTERNAL', ownerName: 'Asha' });
       const agreed = await svc.createEquipment(adminC, { name: 'Hired sprayer', type: 'SPRAYER', ownership: 'EXTERNAL', ownerName: 'Musa', registrationFee: 20_000, feePerHectare: 1_000 });
       const free = await svc.createEquipment(adminC, { name: 'Hired pump', type: 'OTHER', ownership: 'EXTERNAL', ownerName: 'Neema', registrationFee: 0 });
       expect([own, hired, agreed, free].map((e) => [Number(e.registrationFee), e.registrationFeeStatus])).toEqual([

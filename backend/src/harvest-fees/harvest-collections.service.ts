@@ -64,19 +64,35 @@ export class HarvestCollectionsService {
     return { id: c.id, registrationNumber: c.registrationNumber, make: c.make, model: c.model, ownerName: c.ownerName, ownerPhone: c.ownerPhone, operatorName: c.operatorName, operatorPhone: c.operatorPhone, note: c.note, isActive: c.isActive };
   }
 
-  async createCombine(actor: RequestUser, dto: CreateCombineDto, mamcosIdParam?: string) {
-    const mamcosId = this.tenant(actor, mamcosIdParam);
-    const registrationNumber = normReg(dto.registrationNumber);
-    if (registrationNumber.length < 3) throw new BadRequestException('Enter the combine harvester’s registration number');
-    try {
-      const c = await this.prisma.combineHarvester.create({
-        data: { mamcosId, registrationNumber, make: dto.make?.trim() || null, model: dto.model?.trim() || null, ownerName: dto.ownerName.trim(), ownerPhone: dto.ownerPhone?.trim() || null, operatorName: dto.operatorName?.trim() || null, operatorPhone: dto.operatorPhone?.trim() || null, note: dto.note?.trim() || null, createdById: actor.id },
-      });
-      return this.shapeCombine(c);
-    } catch (e: any) {
-      if (e?.code === 'P2002') throw new ConflictException('A combine harvester with this registration number is already registered');
-      throw e;
+  /**
+   * Combine harvesters are the tools of the combine-harvester type in Tools & Equipment, found by their registration number. This brings
+   * the register up to date from them: a tool adds or updates its combine, a switched-off tool switches it off, and a combine that was
+   * on the register before is linked to the tool with the same number. A combine tool with no registration number cannot be used yet.
+   */
+  private async syncFromTools(mamcosId: string) {
+    const tools = await this.prisma.amcosEquipment.findMany({
+      where: { mamcosId, OR: [{ type: 'COMBINE_HARVESTER' }, { typeRef: { name: { contains: 'combine', mode: 'insensitive' } } }] },
+      select: { id: true, name: true, registrationNo: true, ownership: true, ownerName: true, ownerPhone: true, isActive: true },
+    });
+    const missing: string[] = [];
+    if (!tools.length) return { missing };
+    const amcos = (await this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { name: true } }))?.name ?? 'AMCOS';
+    for (const t of tools) {
+      const reg = normReg(t.registrationNo ?? '');
+      if (reg.length < 3) { if (t.isActive) missing.push(t.name); continue; }
+      const owner = t.ownership === 'EXTERNAL' ? t.ownerName ?? amcos : amcos;
+      const linked = await this.prisma.combineHarvester.findUnique({ where: { equipmentId: t.id } });
+      const sameNumber = linked ?? (await this.prisma.combineHarvester.findUnique({ where: { mamcosId_registrationNumber: { mamcosId, registrationNumber: reg } } }));
+      try {
+        if (sameNumber) {
+          if (sameNumber.equipmentId && sameNumber.equipmentId !== t.id) continue; // that number already belongs to another tool
+          await this.prisma.combineHarvester.update({ where: { id: sameNumber.id }, data: { equipmentId: t.id, registrationNumber: reg, make: t.name, ownerName: owner, ownerPhone: t.ownerPhone ?? sameNumber.ownerPhone, isActive: t.isActive } });
+        } else {
+          await this.prisma.combineHarvester.create({ data: { mamcosId, registrationNumber: reg, make: t.name, ownerName: owner, ownerPhone: t.ownerPhone, isActive: t.isActive, equipmentId: t.id } });
+        }
+      } catch (e: any) { if (e?.code !== 'P2002') throw e; }
     }
+    return { missing };
   }
 
   async updateCombine(actor: RequestUser, id: string, dto: UpdateCombineDto, mamcosIdParam?: string) {
@@ -92,16 +108,18 @@ export class HarvestCollectionsService {
 
   async listCombines(actor: RequestUser, mamcosIdParam?: string) {
     const mamcosId = this.tenant(actor, mamcosIdParam);
+    const { missing } = await this.syncFromTools(mamcosId);
     const rows = await this.prisma.combineHarvester.findMany({ where: { mamcosId }, orderBy: [{ isActive: 'desc' }, { registrationNumber: 'asc' }] });
-    return { data: rows.map((c) => this.shapeCombine(c)) };
+    return { data: rows.map((c) => ({ ...this.shapeCombine(c), fromTools: !!c.equipmentId })), missingRegistration: missing };
   }
 
   /** Typing a registration number brings up the machine's registered details. */
   async lookupCombine(actor: RequestUser, registration: string, mamcosIdParam?: string) {
     const mamcosId = this.tenant(actor, mamcosIdParam);
     const key = normReg(registration ?? '');
+    await this.syncFromTools(mamcosId);
     const c = key ? await this.prisma.combineHarvester.findUnique({ where: { mamcosId_registrationNumber: { mamcosId, registrationNumber: key } } }) : null;
-    if (!c) throw new NotFoundException('No combine harvester is registered with this number');
+    if (!c) throw new NotFoundException('No combine harvester is registered with this number. Register it in Tools & Equipment');
     return this.shapeCombine(c);
   }
 
@@ -157,8 +175,9 @@ export class HarvestCollectionsService {
   async create(actor: RequestUser, dto: CreateCollectionDto, mamcosIdParam?: string) {
     const mamcosId = this.tenant(actor, mamcosIdParam);
     const { hectare, scope } = await this.hectareByFarmId(actor, mamcosId, dto.farmId);
+    await this.syncFromTools(mamcosId);
     const combine = await this.prisma.combineHarvester.findUnique({ where: { mamcosId_registrationNumber: { mamcosId, registrationNumber: normReg(dto.registrationNumber) } } });
-    if (!combine) throw new NotFoundException('No combine harvester is registered with this number');
+    if (!combine) throw new NotFoundException('No combine harvester is registered with this number. Register it in Tools & Equipment');
     if (!combine.isActive) throw new BadRequestException('This combine harvester is no longer active');
     const rice = dto.riceVarietyId ? await this.prisma.riceVariety.findUnique({ where: { id: dto.riceVarietyId }, select: { id: true, name: true, isActive: true } }) : null;
     if (dto.riceVarietyId && (!rice || !rice.isActive)) throw new BadRequestException('Choose a rice type from the list');

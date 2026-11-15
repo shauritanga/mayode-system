@@ -1444,4 +1444,6 @@ export const SW_MESSAGES: Record<string, string> = {
   "Only {0} {1} is left there; some of it has already been used": "Zimebaki {0} {1} tu hapo; sehemu yake tayari imetumika",
   "Choose the packaging bags from your list": "Chagua mifuko ya kufungashia kutoka kwenye orodha yako",
   "Not enough {0} in stock ({1} {2} left, {3} needed)": "{0} haitoshi kwenye hifadhi ({1} {2} zimebaki, zinahitajika {3})",
+  "A combine harvester needs its registration number: it is how its harvest payments are recorded": "Kombaini inahitaji namba yake ya usajili: ndiyo inayotumika kurekodi malipo ya uvunaji",
+  "No combine harvester is registered with this number. Register it in Tools & Equipment": "Hakuna kombaini iliyosajiliwa kwa namba hii. Isajili kwenye Zana na Mitambo",
 };

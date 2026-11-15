@@ -97,18 +97,25 @@ export class MachineryService {
   }
 
   /** The type a machine is saved under: one from the AMCOS's list, or (for older callers) a standard kind that is added to the list. */
-  private async resolveType(mamcosId: string, typeId?: string, kind?: EquipmentType): Promise<{ id: string; type: EquipmentType }> {
+  private async resolveType(mamcosId: string, typeId?: string, kind?: EquipmentType): Promise<{ id: string; type: EquipmentType; name: string }> {
     if (typeId) {
       const t = await this.prisma.amcosEquipmentType.findFirst({ where: { id: typeId, mamcosId } });
       if (!t) throw new NotFoundException('Machine type not found');
       if (!t.isActive) throw new BadRequestException(`"${t.name}" is switched off in Settings`);
-      return { id: t.id, type: MachineryService.STANDARD[t.name.toLowerCase()] ?? 'OTHER' };
+      return { id: t.id, name: t.name, type: MachineryService.STANDARD[t.name.toLowerCase()] ?? 'OTHER' };
     }
     if (!kind) throw new BadRequestException('Choose the type of machine');
     const name = kind.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
     const found = await this.prisma.amcosEquipmentType.findFirst({ where: { mamcosId, name: { equals: name, mode: 'insensitive' } } });
     const t = found ?? (await this.prisma.amcosEquipmentType.create({ data: { mamcosId, name } }));
-    return { id: t.id, type: kind };
+    return { id: t.id, name: t.name, type: kind };
+  }
+
+  /** A combine harvester is found by its registration number when its harvest payments are recorded, so it must have one. */
+  private checkCombineNeedsNumber(typeName: string | undefined, type: EquipmentType, registrationNo?: string | null) {
+    if ((type === 'COMBINE_HARVESTER' || /combine/i.test(typeName ?? '')) && (registrationNo ?? '').replace(/[^A-Za-z0-9]/g, '').length < 3) {
+      throw new BadRequestException('A combine harvester needs its registration number: it is how its harvest payments are recorded');
+    }
   }
 
   private checkOwnership(dto: { ownership?: string; ownerName?: string | null; registrationFee?: number | null }) {
@@ -145,6 +152,7 @@ export class MachineryService {
     const mamcosId = this.tenant(actor, mamcosIdParam);
     this.checkOwnership(dto);
     const kind = await this.resolveType(mamcosId, dto.typeId, dto.type);
+    this.checkCombineNeedsNumber(kind.name, kind.type, dto.registrationNo);
     // Tools owned by someone else pay the AMCOS's registration fee once (or the amount agreed for this tool); the AMCOS's own tools do not.
     const registrationFee = dto.ownership === 'EXTERNAL' ? dto.registrationFee ?? (await this.rates(actor, mamcosIdParam)).toolRegistrationFee ?? 0 : 0;
     try {
@@ -168,6 +176,10 @@ export class MachineryService {
     if (!current) throw new NotFoundException('Equipment not found');
     this.checkOwnership({ ownership: current.ownership, ownerName: dto.ownerName ?? current.ownerName });
     const kind = dto.typeId !== undefined || dto.type !== undefined ? await this.resolveType(mamcosId, dto.typeId, dto.type) : null;
+    if (kind || dto.registrationNo !== undefined) {
+      const typeNow = kind ? { name: kind.name, type: kind.type } : { name: (await this.prisma.amcosEquipmentType.findUnique({ where: { id: current.typeId ?? '' }, select: { name: true } }))?.name, type: current.type };
+      this.checkCombineNeedsNumber(typeNow.name, typeNow.type, dto.registrationNo !== undefined ? dto.registrationNo : current.registrationNo);
+    }
     try {
       return await this.prisma.amcosEquipment.update({
         where: { id },
