@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsBoolean, IsDateString, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString,
-  IsUUID, Matches, Max, MaxLength, Min,
+  IsUUID, Matches, Max, MaxLength, Min, ValidateNested,
 } from 'class-validator';
 import {
   IrrigationBlockSide, IrrigationDocumentType, IrrigationLeadershipPosition, IrrigationStatus,
@@ -127,9 +127,18 @@ export class ReasonDto {
   @IsOptional() @IsDateString() effectiveDate?: string;
 }
 
+export class NewMemberDto {
+  @IsString() @IsNotEmpty() @MaxLength(80) firstName: string;
+  @IsString() @IsNotEmpty() @MaxLength(80) lastName: string;
+  @IsString() @IsNotEmpty() @MaxLength(20) phone: string;
+}
+
 export class CreateTransferDto {
   @IsUUID() hectareId: string;
-  @IsUUID() toFarmerId: string;
+  /** An existing member. Leave out when `newFarmer` is given. */
+  @IsOptional() @IsUUID() toFarmerId: string;
+  /** Someone who is not yet a member: registered in the AMCOS and sent their sign-in details by SMS. */
+  @IsOptional() @ValidateNested() @Type(() => NewMemberDto) newFarmer?: NewMemberDto;
   @IsOptional() @IsDateString() transferDate?: string;
   @IsOptional() @IsDateString() effectiveDate?: string;
   @IsString() @IsNotEmpty() @MaxLength(1000) reason: string;

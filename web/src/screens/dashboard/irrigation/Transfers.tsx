@@ -20,6 +20,9 @@ function NewTransferModal({ schemeId, presetHectareId, onClose, onSaved }: { sch
   const [blockId, setBlockId] = useState('');
   const [hectareId, setHectareId] = useState(presetHectareId ?? '');
   const [member, setMember] = useState<MemberLite | null>(null);
+  // The receiver is a member picked from the list, or someone new who is registered as a member by this transfer.
+  const [isNew, setIsNew] = useState(false);
+  const [fresh, setFresh] = useState({ firstName: '', lastName: '', phone: '' });
   const [transferDate, setTransferDate] = useState(todayISO());
   const [effectiveDate, setEffectiveDate] = useState(todayISO());
   const [reason, setReason] = useState('');
@@ -30,11 +33,21 @@ function NewTransferModal({ schemeId, presetHectareId, onClose, onSaved }: { sch
   const hectares = useApi<any>(blockId ? () => irrigationApi.hectares({ blockId, status: 'ALLOCATED', pageSize: 200 }) : null, [blockId]);
   const chosen = preset.data && preset.data.id === hectareId ? preset.data : hectares.data?.data.find((h: any) => h.id === hectareId);
   const save = async () => {
-    if (!hectareId || !member || !reason.trim()) { setError('Choose an allocated hectare, the receiving member and give a reason.'); return; }
+    if (!hectareId || !reason.trim()) { setError('Choose an allocated hectare and give a reason.'); return; }
+    if (!isNew && !member) { setError('Choose the receiving member.'); return; }
+    if (isNew && (!fresh.firstName.trim() || !fresh.lastName.trim() || !/^\+?[0-9\s-]{9,15}$/.test(fresh.phone.trim()))) { setError('Enter the new member’s first name, last name and phone number, e.g. +255712345678.'); return; }
     setSaving(true); setError('');
     try {
-      const res = await irrigationApi.createTransfer({ hectareId, toFarmerId: member.id, transferDate, effectiveDate, reason: reason.trim() });
-      onSaved(res.data.status === 'AWAITING_RECIPIENT' ? 'Transfer requested. The receiving member has been sent an SMS and must accept it first.' : 'Transfer recorded. It completes once a Manager or Accountant signs it off.');
+      const res = await irrigationApi.createTransfer({
+        hectareId, transferDate, effectiveDate, reason: reason.trim(),
+        ...(isNew ? { newFarmer: { firstName: fresh.firstName.trim(), lastName: fresh.lastName.trim(), phone: fresh.phone.trim() } } : { toFarmerId: member!.id }),
+      });
+      const next = res.data.status === 'AWAITING_RECIPIENT' ? 'They must accept it first.' : 'It completes once a Manager or Accountant signs it off.';
+      const nm = res.data.newMember;
+      if (nm) onSaved(nm.credentialsSms === 'sent'
+        ? `Transfer recorded. ${nm.name} is now a member of the AMCOS and was sent their sign-in details by SMS. ${next}`
+        : `Transfer recorded. ${nm.name} is now a member, but the SMS could not be sent. Give them this temporary password: ${nm.temporaryPassword}. ${next}`);
+      else onSaved(res.data.status === 'AWAITING_RECIPIENT' ? 'Transfer requested. The receiving member has been sent an SMS and must accept it first.' : 'Transfer recorded. It completes once a Manager or Accountant signs it off.');
     } catch (e) { setError(errMsg(e, 'Could not record the transfer.')); setSaving(false); }
   };
   return (
@@ -55,7 +68,22 @@ function NewTransferModal({ schemeId, presetHectareId, onClose, onSaved }: { sch
             </Field>
           </FormGrid>
         )}
-        <MemberPicker schemeId={schemeId} value={member} onChange={setMember} label="Receiving member" />
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className={!isNew ? 'btn-primary' : 'btn-secondary'} onClick={() => setIsNew(false)}>Existing member</button>
+            <button type="button" className={isNew ? 'btn-primary' : 'btn-secondary'} onClick={() => setIsNew(true)}>New person (not yet a member)</button>
+          </div>
+          {!isNew
+            ? <MemberPicker schemeId={schemeId} value={member} onChange={setMember} label="Receiving member" />
+            : <>
+                <FormGrid>
+                  <Field label="First name *"><input className="input-field" value={fresh.firstName} onChange={(e) => setFresh((x) => ({ ...x, firstName: e.target.value }))} autoComplete="off" /></Field>
+                  <Field label="Last name *"><input className="input-field" value={fresh.lastName} onChange={(e) => setFresh((x) => ({ ...x, lastName: e.target.value }))} autoComplete="off" /></Field>
+                  <Field label="Phone number *" wide><input className="input-field" inputMode="tel" value={fresh.phone} onChange={(e) => setFresh((x) => ({ ...x, phone: e.target.value }))} placeholder="+255712345678" autoComplete="off" /></Field>
+                </FormGrid>
+                <span className="muted" style={{ fontSize: 12 }}>They become a member of this AMCOS when you record the transfer, and are sent their sign-in details for the mobile app by SMS.</span>
+              </>}
+        </div>
         <FormGrid>
           <Field label="Transfer date"><input type="date" className="input-field" max={todayISO()} value={transferDate} onChange={(e) => setTransferDate(e.target.value)} /></Field>
           <Field label="Effective date"><input type="date" className="input-field" max={todayISO()} value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} /></Field>

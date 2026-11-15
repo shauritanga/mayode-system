@@ -6,6 +6,7 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
+import { TransferRecipientService } from './transfer-recipient.service';
 import { ALLOCATION_RESOURCE, IRRIGATION_RESOURCE, LEADERSHIP_RESOURCE, TRANSFER_APPROVAL_RESOURCE } from './irrigation-common';
 import { SchemesService } from './schemes.service';
 import { StructureService } from './structure.service';
@@ -46,6 +47,7 @@ export class IrrigationController {
     private readonly documents: DocumentsService,
     private readonly setup: IrrigationSetupService,
     private readonly emancipation: EmancipationService,
+    private readonly recipients: TransferRecipientService,
   ) {}
 
   @Post('setup/roles') @RequirePermission('roles', 'CREATE')
@@ -154,7 +156,7 @@ export class IrrigationController {
   rejectEmancipation(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: ReasonDto) { return this.emancipation.reject(u, id, dto.reason); }
 
   @Post('transfers') @RequirePermission(ALLOC, 'CREATE')
-  createTransfer(@CurrentUser() u: RequestUser, @Body() dto: CreateTransferDto) { return this.allocations.createTransfer(u, dto); }
+  createTransfer(@CurrentUser() u: RequestUser, @Body() dto: CreateTransferDto) { return this.recipients.createTransfer(u, dto); }
   @Post('transfers/:id/approve') @RequirePermission(TRANSFER_APPROVAL, 'EDIT')
   approveTransfer(@CurrentUser() u: RequestUser, @Param('id') id: string) { return this.allocations.approveTransfer(u, id); }
   @Post('transfers/:id/reject') @RequirePermission(ALLOC, 'EDIT')

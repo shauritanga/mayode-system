@@ -9,6 +9,6 @@ import { UploadsModule } from '../uploads/uploads.module';
   imports: [FinanceModule, UploadsModule],
   controllers: [FarmersController],
   providers: [FarmersService, FarmerCredentialsService],
-  exports: [FarmersService],
+  exports: [FarmersService, FarmerCredentialsService],
 })
 export class FarmersModule {}

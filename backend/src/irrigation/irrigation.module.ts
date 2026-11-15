@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { FarmersModule } from '../farmers/farmers.module';
+import { TransferRecipientService } from './transfer-recipient.service';
 import { IrrigationController, MyPlotsController, MyTransfersController } from './irrigation.controller';
 import { IrrigationScopeService } from './irrigation-scope.service';
 import { SchemesService } from './schemes.service';
@@ -13,10 +15,11 @@ import { DebtExposureService } from './debt-exposure.service';
 import { EmancipationService } from './emancipation.service';
 
 @Module({
+  imports: [FarmersModule],
   controllers: [IrrigationController, MyTransfersController, MyPlotsController],
   providers: [
     IrrigationScopeService, SchemesService, StructureService, AllocationService,
-    LeadershipService, DashboardService, DocumentsService, IrrigationSetupService, LeaderAccessService, DebtExposureService, EmancipationService,
+    LeadershipService, DashboardService, DocumentsService, IrrigationSetupService, LeaderAccessService, DebtExposureService, EmancipationService, TransferRecipientService,
   ],
   exports: [IrrigationScopeService, LeaderAccessService],
 })
