@@ -24,6 +24,9 @@ import Modal from '@/components/Modal';
 import StandardReports from '@/components/reports/StandardReports';
 import ReportPreviewTable, { type ReportColumn } from '@/components/reports/ReportPreviewTable';
 import RiceTypeSelect from '@/components/RiceTypeSelect';
+import ReportsRunner from '@/components/ops/ReportsRunner';
+import { useAuthStore } from '@/store/auth.store';
+import { hasPermission } from '@/lib/nav';
 
 // ── Types ──
 interface BuilderRelation {
@@ -66,7 +69,7 @@ interface SavedTemplate extends ReportConfig {
 }
 
 type ExportFormat = 'csv' | 'xlsx' | 'pdf';
-type Tab = 'standard' | 'builder' | 'templates';
+type Tab = 'standard' | 'warehouse' | 'builder' | 'templates';
 
 // ── Static config ──
 const EMPTY_FILTERS: Filters = {
@@ -210,6 +213,8 @@ const cleanFilters = (filters: Filters) =>
 
 export default function ReportsPage() {
   const [tab, setTab] = useState<Tab>('standard');
+  const authUser = useAuthStore((st) => st.user);
+  const tabs: Tab[] = hasPermission(authUser, 'ops_reports', 'VIEW') ? ['standard', 'warehouse', 'builder', 'templates'] : ['standard', 'builder', 'templates'];
   const [schema, setSchema] = useState<BuilderEntity[]>([]);
   const [entityKey, setEntityKey] = useState('');
   const [joins, setJoins] = useState<string[]>([]);
@@ -431,15 +436,15 @@ export default function ReportsPage() {
       {notice && <div className="alert-box alert-success" style={{ marginBottom: 16 }}>{notice}</div>}
 
       <div className="seg-control" style={{ marginBottom: 12 }}>
-        {(['standard', 'builder', 'templates'] as Tab[]).map((t) => (
+        {tabs.map((t) => (
           <button key={t} className={`seg-btn ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
             {tab === t && <motion.span layoutId="seg-pill" className="seg-pill" transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }} />}
-            {t === 'standard' ? 'Standard reports' : t === 'builder' ? 'Custom report builder' : `Templates${savedTemplates.length ? ` · ${savedTemplates.length} saved` : ''}`}
+            {t === 'standard' ? 'Standard reports' : t === 'warehouse' ? 'Warehouse reports' : t === 'builder' ? 'Custom report builder' : `Templates${savedTemplates.length ? ` · ${savedTemplates.length} saved` : ''}`}
           </button>
         ))}
       </div>
 
-      {tab !== 'standard' && <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+      {(tab === 'builder' || tab === 'templates') && <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <button className="btn-secondary" style={{ fontSize: 12, padding: '7px 12px' }} onClick={checkPhase1Datasets} disabled={healthBusy}>
           {healthBusy ? 'Checking datasets…' : 'Check Phase 1 datasets'}
         </button>
@@ -456,6 +461,8 @@ export default function ReportsPage() {
 
       {tab === 'standard' ? (
         <StandardReports />
+      ) : tab === 'warehouse' ? (
+        <ReportsRunner groups={['Warehouse']} />
       ) : tab === 'builder' ? (
         <div className="builder-grid">
           {/* ── Configuration rail ── */}

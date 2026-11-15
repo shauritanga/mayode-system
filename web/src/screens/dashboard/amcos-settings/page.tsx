@@ -4,17 +4,20 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import { Clock, LayoutList, Package, Percent, Sprout, Tractor, Users, Warehouse } from 'lucide-react';
+import { Boxes, Clock, LayoutList, Package, Percent, Sprout, Tractor, Users, Warehouse } from 'lucide-react';
 import Modal from '@/components/Modal';
 import MoneyInput from '@/components/MoneyInput';
 import { accountingApi, chargesApi, duesApi, machineryApi } from '@/lib/api';
 import { FarmInputsPanel, RiceTypesPanel } from './farm-setup';
+import { WarehouseView } from '../warehouse/page';
+import ProductsPanel from '@/components/ops/ProductsPanel';
+import { TablePageSizeContext } from '@/components/ops/ui';
 import { Field, LoadError, Notice, TableSkeleton, errMsg, titleCase, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 const KIND_WORDS: Record<string, string> = { LEVY: 'Levy', MEMBERSHIP_FEE: 'Membership fee', CANAL_CLEANING: 'Canal cleaning / water', OTHER: 'Other' };
 
-type Section = 'overview' | 'levies' | 'tools' | 'warehouse' | 'penalties' | 'tax' | 'rice' | 'inputs';
+type Section = 'overview' | 'levies' | 'tools' | 'warehouse' | 'penalties' | 'tax' | 'rice' | 'inputs' | 'stores';
 const SECTIONS: { id: Section; slug: string; label: string; description: string; icon: typeof Users }[] = [
   { id: 'overview', slug: 'overview', label: 'Price list', description: 'Every amount your AMCOS charges, on one page.', icon: LayoutList },
   { id: 'levies', slug: 'membership-levies', label: 'Membership & levies', description: 'What farmers pay the AMCOS: membership fee, levies and canal cleaning.', icon: Users },
@@ -23,6 +26,7 @@ const SECTIONS: { id: Section; slug: string; label: string; description: string;
   { id: 'penalties', slug: 'late-payments', label: 'Late payments', description: 'What happens when a farmer pays late.', icon: Clock },
   { id: 'rice', slug: 'rice-types', label: 'Rice types', description: 'The rice your farmers grow and sell. Every screen that asks for a rice type offers this list.', icon: Sprout },
   { id: 'inputs', slug: 'farm-inputs', label: 'Farm inputs', description: 'The kinds of input you give farmers, the inputs under each, and the stock you hold.', icon: Package },
+  { id: 'stores', slug: 'warehouses-products', label: 'Warehouses & products', description: 'Where you store things, and the products you handle (rice types, bags, by-products).', icon: Boxes },
   { id: 'tax', slug: 'vat', label: 'VAT & tax numbers', description: 'VAT registration and rate, and the AMCOS’s tax numbers.', icon: Percent },
 ];
 
@@ -165,6 +169,19 @@ function MachineTypes({ types, canEdit, onChanged }: { types: any[]; canEdit: bo
         </div>
       )}
     </section>
+  );
+}
+
+/** Warehouses and the products stored in them: set up once here, used every day on the Warehouse page. */
+function StoresPanel({ can }: { can: (resource: string, action?: string) => boolean }) {
+  const seeWarehouses = can('warehouses') || can('warehouse_desk');
+  const seeProducts = can('ops_catalog');
+  if (!seeWarehouses && !seeProducts) return <p className="muted">Your role does not include setting up warehouses or products.</p>;
+  return (
+    <TablePageSizeContext.Provider value={10}>
+      {seeWarehouses && <section style={{ marginBottom: 28 }}><h3 style={{ margin: '0 0 4px', fontSize: 15 }}>Warehouses</h3><p className="muted" style={{ margin: '0 0 12px', fontSize: 13 }}>Each place where stock is kept. Choose one whenever you receive or give out stock.</p><WarehouseView embedded setupOnly /></section>}
+      {seeProducts && <section><h3 style={{ margin: '0 0 4px', fontSize: 15 }}>Products</h3><p className="muted" style={{ margin: '0 0 12px', fontSize: 13 }}>What you store and sell: paddy, rice grades, broken rice, by-products and packed bags.</p><ProductsPanel canCreate={can('ops_catalog', 'CREATE')} canEdit={can('ops_catalog', 'EDIT')} /></section>}
+    </TablePageSizeContext.Provider>
   );
 }
 
@@ -311,6 +328,7 @@ export default function AmcosSettingsPage() {
     tax: taxRows[0] ? (tax.data?.vatRegistered ? taxRows[0].amount : 'Not on VAT') : '',
     rice: '',
     inputs: '',
+    stores: '',
   };
 
   return (
@@ -372,6 +390,7 @@ export default function AmcosSettingsPage() {
 
               {selected.id === 'rice' && <RiceTypesPanel canEdit={canCharges} onChanged={done} />}
               {selected.id === 'inputs' && <FarmInputsPanel canEdit={canCharges} onChanged={done} />}
+              {selected.id === 'stores' && <StoresPanel can={(r, a) => can(r, a ?? 'VIEW')} />}
               {selected.id === 'warehouse' && <ChargeTable rows={warehouseRows} empty="Not available." />}
               {selected.id === 'penalties' && (
                 <>

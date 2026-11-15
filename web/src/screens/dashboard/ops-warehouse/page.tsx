@@ -1,7 +1,7 @@
 'use client';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, ArrowDownToLine, Boxes, CheckCircle2, ClipboardList, Factory, LayoutDashboard, Package, RefreshCw, Settings2, Truck, Warehouse } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, Boxes, CheckCircle2, ClipboardList, Factory, LayoutDashboard, Package, RefreshCw, Truck, Warehouse } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { inputStockApi, opsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
@@ -16,28 +16,25 @@ import StockPanel from '@/components/ops/StockPanel';
 import ProcessingPanel from '@/components/ops/ProcessingPanel';
 import DispatchPanel from '@/components/ops/DispatchPanel';
 import TracePanel from '@/components/ops/TracePanel';
-import ProductsPanel from '@/components/ops/ProductsPanel';
-import ReportsRunner from '@/components/ops/ReportsRunner';
 import { AllStockPanel, GiveOutHub, InputBatchesPanel, InputReceivePanel } from '@/components/ops/InputStockPanels';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type WarehousePage = 'overview' | 'receive' | 'mill' | 'sendout' | 'stock' | 'setup';
+type WarehousePage = 'overview' | 'receive' | 'mill' | 'sendout' | 'stock';
 type Can = (resource: string, action?: 'VIEW' | 'CREATE' | 'EDIT' | 'DELETE') => boolean;
 
-/** Six places, named for what the person is doing, in the order the work happens. */
+/** Five places, named for what the person is doing, in the order the work happens. Setting up warehouses and products lives in Settings; reports live in Reports. */
 const WAREHOUSE_PAGES: { id: WarehousePage; slug: string; label: string; description: string; icon: typeof Warehouse; allowed: (can: Can) => boolean }[] = [
   { id: 'overview', slug: 'overview', label: 'Overview', description: 'What we have, what needs doing, and whether the books agree.', icon: LayoutDashboard, allowed: (can) => can('ops_reports') },
   { id: 'receive', slug: 'receive', label: 'Receive', description: 'Record everything that arrives: paddy from a farmer, or inputs, fuel and bags from a supplier. It is added to the warehouse stock when you save.', icon: ArrowDownToLine, allowed: (can) => can('ops_receiving') },
   { id: 'mill', slug: 'mill', label: 'Mill paddy', description: 'Turn paddy into rice, broken rice and by-products. The cost of the paddy moves onto the rice.', icon: Factory, allowed: (can) => can('ops_processing') },
   { id: 'sendout', slug: 'send-out', label: 'Give out / Send out', description: 'Hand stock out: inputs to farmers or field work, and rice to buyers. Stock goes down and the record is kept.', icon: Truck, allowed: (can) => can('ops_dispatch') || can('warehouse_desk') },
   { id: 'stock', slug: 'stock', label: 'Stock', description: 'Everything in the warehouses, rice and inputs together: how much, where, what is running low, and every movement.', icon: Package, allowed: (can) => can('ops_stock') },
-  { id: 'setup', slug: 'setup', label: 'Setup & reports', description: 'Warehouses, the products we handle, and printable reports.', icon: Settings2, allowed: (can) => can('warehouses') || can('warehouse_desk') || can('ops_catalog') || can('ops_reports') },
 ];
 
 /** Addresses of the old eleven pages still work and land on the right new place. */
 const OLD_ADDRESSES: Record<string, WarehousePage> = {
-  'warehouse-setup': 'setup', 'goods-receiving': 'receive', 'inventory-overview': 'stock', 'stock-movements': 'stock', 'batches-traceability': 'stock', 'stock-counts': 'stock',
-  'quality-loss-control': 'mill', 'milling-production-stock': 'mill', 'dispatch-returns': 'sendout', 'inventory-reports': 'setup',
+  'goods-receiving': 'receive', 'inventory-overview': 'stock', 'stock-movements': 'stock', 'batches-traceability': 'stock', 'stock-counts': 'stock',
+  'quality-loss-control': 'mill', 'milling-production-stock': 'mill', 'dispatch-returns': 'sendout',
 };
 
 type StockTab = 'all' | 'position' | 'batches' | 'inputbatches' | 'ledger' | 'transfers' | 'counts' | 'trace';
@@ -59,6 +56,9 @@ export default function OpsWarehousePage() {
   const pages = WAREHOUSE_PAGES.filter((page) => page.allowed(can));
   const requested = params?.slug?.[0];
   const moved = requested ? OLD_ADDRESSES[requested] : undefined;
+  // Setting up warehouses and products moved to Settings, and the reports to Reports.
+  const elsewhere = requested === 'setup' || requested === 'warehouse-setup' ? '/dashboard/amcos-settings/warehouses-products' : requested === 'inventory-reports' ? '/dashboard/reports' : null;
+  useEffect(() => { if (elsewhere) router.replace(elsewhere); }, [elsewhere, router]);
   const selected = pages.find((page) => page.slug === requested) ?? (moved ? pages.find((p) => p.id === moved) : undefined) ?? pages[0];
   useEffect(() => {
     if (moved && selected && selected.id === moved) router.replace(`/dashboard/ops-warehouse/${selected.slug}`);
@@ -91,7 +91,6 @@ export default function OpsWarehousePage() {
               ? <DispatchPanel canAllocate={can('ops_dispatch', 'CREATE')} canRelease={can('ops_dispatch', 'EDIT')} canCancel={can('ops_dispatch', 'DELETE')} />
               : <WarehouseView embedded />}</GiveOutHub>}
             {selected.id === 'stock' && <StockWorkspace can={can} />}
-            {selected.id === 'setup' && <SetupWorkspace can={can} />}
           </div></TablePageSizeContext.Provider>
         </section>
       </div>}
@@ -139,21 +138,6 @@ function StockWorkspace({ can }: { can: Can }) {
     {(tab === 'position' || tab === 'batches' || tab === 'ledger' || tab === 'transfers') && <StockPanel key={tab} hideTabs initialTab={tab} canAdjust={can('ops_stock', 'EDIT')} canTransfer={can('ops_stock', 'EDIT')} canManageQuality={can('ops_quality', 'EDIT')} />}
     {tab === 'counts' && <StockCountsPanel canStart={can('ops_stock', 'CREATE')} canApprove={can('ops_stock', 'EDIT')} />}
     {tab === 'trace' && <TracePanel />}
-  </>;
-}
-
-function SetupWorkspace({ can }: { can: Can }) {
-  const available = [
-    ...(can('warehouses') || can('warehouse_desk') ? [{ id: 'warehouses' as const, label: 'Warehouses' }] : []),
-    ...(can('ops_catalog') ? [{ id: 'products' as const, label: 'Products' }] : []),
-    ...(can('ops_reports') ? [{ id: 'reports' as const, label: 'Reports' }] : []),
-  ];
-  const [tab, setTab] = useState<'warehouses' | 'products' | 'reports'>(available[0]?.id ?? 'reports');
-  return <>
-    <Tabs tabs={available} value={tab} onChange={setTab} />
-    {tab === 'warehouses' && <WarehouseView embedded setupOnly />}
-    {tab === 'products' && <ProductsPanel canCreate={can('ops_catalog', 'CREATE')} canEdit={can('ops_catalog', 'EDIT')} />}
-    {tab === 'reports' && <ReportsRunner groups={['Warehouse']} />}
   </>;
 }
 
