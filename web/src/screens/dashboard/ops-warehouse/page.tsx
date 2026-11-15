@@ -1,7 +1,7 @@
 'use client';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, ArrowDownToLine, CheckCircle2, ClipboardList, Factory, LayoutDashboard, Package, RefreshCw, Truck, Warehouse } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, CheckCircle2, ClipboardList, Factory, LayoutDashboard, Package, RefreshCw, Warehouse } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { inputStockApi, opsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
@@ -11,17 +11,15 @@ import { DataTable, ErrorNote, Loading, TablePageSizeContext, Tabs as OpsTabs, u
 import { PageHeader, Tabs } from '../irrigation/ui';
 import { WarehouseDetail, WarehouseList } from '@/components/ops/WarehousesPanel';
 import { ChartCard } from '@/components/role-dashboards/Charts';
-import { WarehouseView } from '../warehouse/page';
 import StockCountsPanel from '@/components/ops/StockCountsPanel';
 import ReceivingPanel from '@/components/ops/ReceivingPanel';
 import StockPanel from '@/components/ops/StockPanel';
 import ProcessingPanel from '@/components/ops/ProcessingPanel';
-import DispatchPanel from '@/components/ops/DispatchPanel';
 import TracePanel from '@/components/ops/TracePanel';
-import { AllStockPanel, GiveOutHub, InputBatchesPanel, InputReceivePanel } from '@/components/ops/InputStockPanels';
+import { AllStockPanel, InputBatchesPanel, InputReceivePanel } from '@/components/ops/InputStockPanels';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type WarehousePage = 'warehouses' | 'overview' | 'receive' | 'mill' | 'sendout' | 'stock';
+type WarehousePage = 'warehouses' | 'overview' | 'receive' | 'mill' | 'stock';
 type Can = (resource: string, action?: 'VIEW' | 'CREATE' | 'EDIT' | 'DELETE') => boolean;
 
 /** The warehouses come first: pick a place, then work in it. The tabs after it do the same jobs across all warehouses. Products are set up in Settings; reports live in Reports. */
@@ -29,7 +27,6 @@ const WAREHOUSE_PAGES: { id: WarehousePage; slug: string; label: string; descrip
   { id: 'warehouses', slug: 'warehouses', label: 'Warehouses', description: 'Your warehouses. Open one to see what is in it and to add stock.', icon: Warehouse, allowed: (can) => can('warehouses') || can('warehouse_desk') },
   { id: 'receive', slug: 'receive', label: 'Receive', description: 'Record everything that arrives: paddy from a farmer, or inputs, fuel and bags from a supplier. It is added to the warehouse stock when you save.', icon: ArrowDownToLine, allowed: (can) => can('ops_receiving') },
   { id: 'mill', slug: 'mill', label: 'Mill paddy', description: 'Turn paddy into rice, broken rice and by-products. The cost of the paddy moves onto the rice.', icon: Factory, allowed: (can) => can('ops_processing') },
-  { id: 'sendout', slug: 'send-out', label: 'Give out', description: 'Hand stock to a farmer, or send rice to a buyer. Stock goes down and the record is kept.', icon: Truck, allowed: (can) => can('ops_dispatch') || can('warehouse_desk') },
   { id: 'stock', slug: 'stock', label: 'Stock', description: 'Everything in the warehouses, rice and inputs together: how much, where, what is running low, and every movement.', icon: Package, allowed: (can) => can('ops_stock') },
   { id: 'overview', slug: 'overview', label: 'Summary', description: 'What is in store across all warehouses, and what needs your attention.', icon: LayoutDashboard, allowed: (can) => can('ops_reports') },
 ];
@@ -37,7 +34,7 @@ const WAREHOUSE_PAGES: { id: WarehousePage; slug: string; label: string; descrip
 /** Addresses of the old eleven pages still work and land on the right new place. */
 const OLD_ADDRESSES: Record<string, WarehousePage> = {
   'goods-receiving': 'receive', 'inventory-overview': 'stock', 'stock-movements': 'stock', 'batches-traceability': 'stock', 'stock-counts': 'stock',
-  'quality-loss-control': 'mill', 'milling-production-stock': 'mill', 'dispatch-returns': 'sendout',
+  'quality-loss-control': 'mill', 'milling-production-stock': 'mill',
 };
 
 type StockTab = 'all' | 'position' | 'batches' | 'inputbatches' | 'ledger' | 'transfers' | 'counts' | 'trace';
@@ -80,14 +77,11 @@ export default function OpsWarehousePage() {
         {pages.length > 1 && <Tabs tabs={pages.map((page) => ({ id: page.id, label: page.label }))} active={selected.id} onChange={(id) => router.push(`/dashboard/ops-warehouse/${pages.find((p) => p.id === id)!.slug}`)} />}
         <TablePageSizeContext.Provider value={10}><div className={`warehouse-section-content section-${selected.id}`} data-path={pathname}>
           {selected.id === 'warehouses' && (params?.slug?.[1]
-            ? <WarehouseDetail id={params.slug[1]} can={can} goto={(page) => goto(page, page === 'stock' ? 'counts' : undefined)} />
+            ? <WarehouseDetail id={params.slug[1]} can={can} goto={() => goto('stock', 'counts')} />
             : <WarehouseList can={can} />)}
           {selected.id === 'overview' && <Overview goto={goto} can={can} />}
           {selected.id === 'receive' && <ReceiveHub can={can} />}
           {selected.id === 'mill' && <ProcessingPanel canCreate={can('ops_processing', 'CREATE')} canReverse={can('ops_processing', 'DELETE')} />}
-          {selected.id === 'sendout' && <GiveOutHub can={can} goto={() => goto('stock', 'ledger')}>{can('ops_dispatch')
-            ? <DispatchPanel canAllocate={can('ops_dispatch', 'CREATE')} canRelease={can('ops_dispatch', 'EDIT')} canCancel={can('ops_dispatch', 'DELETE')} />
-            : <WarehouseView embedded />}</GiveOutHub>}
           {selected.id === 'stock' && <StockWorkspace can={can} />}
         </div></TablePageSizeContext.Provider>
       </>}
@@ -173,7 +167,6 @@ function Overview({ goto, can }: { goto: (t: WarehousePage, tab?: StockTab) => v
   const valuation = d.valuation;
   const waitingReceipts = d.drafts.length;
   const waitingCounts = d.counts.filter((c: any) => c.status === 'PENDING_APPROVAL').length;
-  const orders = d.dashboard?.ordersAwaitingFulfilment ?? 0;
   const lowStock: any[] = rows.filter((r) => r.lowStock);
   const lowInputs: any[] = [...new Map((d.inputs?.data ?? []).filter((r: any) => r.low && r.isActive).map((r: any) => [r.itemId, r])).values()];
   const batchSummary = d.inputBatches?.summary;
@@ -181,7 +174,6 @@ function Overview({ goto, can }: { goto: (t: WarehousePage, tab?: StockTab) => v
   // Everything that needs a person, each with the button that takes them there.
   const todo: { text: string; action: string; go: () => void; tone?: 'red' }[] = [
     ...(waitingReceipts ? [{ text: `${waitingReceipts} delivery ${waitingReceipts === 1 ? 'is' : 'are'} recorded but not yet added to stock`, action: 'Review', go: () => goto('receive') }] : []),
-    ...(orders ? [{ text: `${orders} paid ${orders === 1 ? 'order is' : 'orders are'} waiting to be sent out`, action: 'Send out', go: () => goto('sendout') }] : []),
     ...(waitingCounts ? [{ text: `${waitingCounts} stock ${waitingCounts === 1 ? 'count is' : 'counts are'} waiting for approval`, action: 'Approve', go: () => goto('stock', 'counts') }] : []),
     ...lowStock.slice(0, 3).map((r) => ({ text: `${r.product} at ${r.warehouse} is running low: ${kg(r.availableKg)} free`, action: 'See stock', go: () => goto('stock'), tone: 'red' as const })),
     ...lowInputs.slice(0, 3).map((r: any) => ({ text: `${r.name} is running low: ${Math.round(r.itemTotal * 1000) / 1000} ${r.unit} left. Time to order more`, action: 'See stock', go: () => goto('stock'), tone: 'red' as const })),
@@ -197,7 +189,6 @@ function Overview({ goto, can }: { goto: (t: WarehousePage, tab?: StockTab) => v
   // What the person can do, in the words they would use. Each is one click.
   const quick = [
     { icon: ArrowDownToLine, title: 'Receive stock', hint: 'Something arrived: rice, inputs, fuel or bags', go: () => goto('receive'), allowed: can('ops_receiving', 'CREATE') },
-    { icon: Truck, title: 'Give out stock', hint: 'To a farmer or to a buyer', go: () => goto('sendout'), allowed: can('ops_dispatch') || can('warehouse_desk') },
     { icon: Factory, title: 'Mill paddy', hint: 'Turn paddy into rice', go: () => goto('mill'), allowed: can('ops_processing', 'CREATE') },
     { icon: ClipboardList, title: 'Count stock', hint: 'Check the shelves against the record', go: () => goto('stock', 'counts'), allowed: can('ops_stock', 'CREATE') },
   ].filter((q) => q.allowed);

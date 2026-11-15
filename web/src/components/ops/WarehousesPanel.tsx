@@ -96,7 +96,7 @@ function Crumbs({ name }: { name?: string }) {
 }
 
 // ───────────────────────── one warehouse ─────────────────────────
-export function WarehouseDetail({ id, can, goto }: { id: string; can: Can; goto: (page: 'sendout' | 'stock') => void }) {
+export function WarehouseDetail({ id, can, goto }: { id: string; can: Can; goto: () => void }) {
   const { list, stockOf, reload } = useWarehouseData(can);
   const [dialog, setDialog] = useState<'' | 'edit' | 'keepers' | 'add' | 'rice' | 'inputs'>('');
   const w = (list.data ?? []).find((x) => x.id === id);
@@ -131,8 +131,7 @@ export function WarehouseDetail({ id, can, goto }: { id: string; can: Can; goto:
 
       <div className="whl-bar-actions">
         {can('ops_receiving', 'CREATE') && <button type="button" className="btn-primary" onClick={() => setDialog('add')}>+ Add stock</button>}
-        {can('ops_dispatch') && <button type="button" className="btn-secondary" onClick={() => goto('sendout')}>Give out stock</button>}
-        {can('ops_stock', 'CREATE') && <button type="button" className="btn-secondary" onClick={() => goto('stock')}>Count stock</button>}
+        {can('ops_stock', 'CREATE') && <button type="button" className="btn-secondary" onClick={goto}>Count stock</button>}
       </div>
 
       <h3 className="wo-title" style={{ margin: '22px 0 10px' }}>In this warehouse</h3>
