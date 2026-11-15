@@ -3493,3 +3493,11 @@ a.farmers-name { display: block; cursor: pointer; }
 .warehouse-metric-icon { width: 30px !important; height: 30px !important; background: rgba(var(--kpi-rgb), 0.22) !important; color: rgb(var(--kpi-rgb)) !important; }
 .warehouse-metric-copy { gap: 1px !important; }
 .metric-grid, .scheme-stat-grid, .warehouse-metric-grid { gap: 10px !important; }
+
+/* ── Menu icons are green: the main sidebar and the Accounting & Finance menu ── */
+.sidebar-link-icon,
+.sidebar-link-icon svg,
+.sidebar-link.active .sidebar-link-icon,
+.accounting-nav-category > svg,
+.accounting-nav-category .accounting-nav-chevron { color: var(--accent) !important; }
+.sidebar-link-icon svg [stroke]:not([stroke='none']) { stroke: currentColor; }
