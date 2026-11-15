@@ -3161,7 +3161,7 @@ body {
 .ua-section + .ua-section { padding-top: 20px; border-top: 1px solid var(--border-subtle); }
 .ua-section-title { font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); }
 .ua-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.ua-field { display: grid; gap: 6px; min-width: 0; }
+.ua-field { display: grid; gap: 6px; min-width: 0; align-content: start; }
 .ua-label { font-size: 0.8125rem; font-weight: 600; color: var(--text-1); }
 .ua-label .ua-opt { font-weight: 400; color: var(--text-3); margin-left: 4px; }
 .ua-hint { font-size: 0.75rem; color: var(--text-3); line-height: 1.45; }
@@ -3503,3 +3503,31 @@ a.farmers-name { display: block; cursor: pointer; }
 .accounting-nav-category > svg,
 .accounting-nav-category .accounting-nav-chevron { color: var(--amcos-green, var(--green-500)) !important; }
 .sidebar-link-icon svg [stroke]:not([stroke='none']) { stroke: currentColor; }
+
+/* ── Form kit: the rules every modal form follows ──
+   1. Group fields by purpose into titled sections; one divider between sections.
+   2. One column by default; two columns only for short, related fields (first/last name, two dates).
+   3. Label above the field, hint or error below it. An error replaces the hint, so nothing shifts.
+   4. Mark what is optional, not what is required. Say why, not just what, in hints.
+   5. A choice between two ways of doing something is a pair of cards, and only the chosen way's fields show.
+   6. Spacing scale: 12 between columns, 14 between fields, 22 between sections.
+   7. The footer holds one primary action named for what it does, and Cancel. */
+.fm-callout { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; font-size: 0.8125rem; line-height: 1.5; color: var(--text-1); background: var(--accent-softer); border: 1px solid var(--accent-ring); }
+.fm-callout.is-warn { background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.28); color: var(--red-400); }
+.fm-callout > svg { flex-shrink: 0; margin-top: 2px; }
+.fm-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fm-choice-card { display: grid; gap: 2px; text-align: left; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-subtle); background: var(--surface-2); color: var(--text-1); cursor: pointer; font: inherit; transition: border-color var(--dur-1) ease, background var(--dur-1) ease, box-shadow var(--dur-1) ease; }
+.fm-choice-card:hover { border-color: var(--border-strong); }
+.fm-choice-card[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-softer); box-shadow: 0 0 0 3px var(--accent-softer); }
+.fm-choice-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fm-choice-title { font-size: 0.875rem; font-weight: 700; }
+.fm-choice-sub { font-size: 0.75rem; color: var(--text-2); line-height: 1.4; }
+.fm-readonly { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-radius: 10px; background: var(--surface-tint); border: 1px solid var(--border-subtle); font-size: 0.875rem; }
+.fm-readonly strong { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.fm-more > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; font-weight: 600; color: var(--text-2); padding: 2px 0; }
+.fm-more > summary::-webkit-details-marker { display: none; }
+.fm-more > summary::before { content: '▸'; font-size: 0.7rem; transition: transform var(--dur-1) ease; }
+.fm-more[open] > summary::before { transform: rotate(90deg); }
+.fm-more > summary:hover { color: var(--text-1); }
+.fm-req { color: var(--text-3); margin-left: 2px; }
+@media (max-width: 520px) { .ua-row, .fm-choice { grid-template-columns: 1fr; } }

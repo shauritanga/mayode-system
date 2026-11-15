@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Copy01Icon, Tick02Icon } from '@hugeicons/core-free-icons';
 import Modal from '@/components/Modal';
+import { Callout, Form, FormError, More, Row, Section } from '@/components/FormKit';
 import HectarePicker from './HectarePicker';
 import { useSchemeScope } from '@/screens/dashboard/irrigation/useSchemeScope';
 import { farmersApi, joinRequestsApi } from '@/lib/api';
@@ -78,36 +79,38 @@ function AddFarmerModal({ onClose, onCreated }: { onClose: () => void; onCreated
   };
 
   return (
-    <Modal title="Register farmer" onClose={() => !saving && onClose()} width="520px"
+    <Modal title="Register farmer" subtitle="Add a farmer to the hectare they hold." onClose={() => !saving && onClose()} width="520px"
       footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><button type="submit" form="add-farmer-form" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Register farmer'}</button></>}>
-      <form id="add-farmer-form" onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px 16px', alignItems: 'start' }}>
-          <Field label="First name *" error={errors.firstName}><input className="input-field" value={form.firstName} onChange={(e) => set('firstName', e.target.value)} autoComplete="off" autoFocus /></Field>
-          <Field label="Last name *" error={errors.lastName}><input className="input-field" value={form.lastName} onChange={(e) => set('lastName', e.target.value)} autoComplete="off" /></Field>
-          <Field label="Phone" error={errors.phone}><input className="input-field" inputMode="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} onBlur={() => void checkPhone()} placeholder="+255712345678" autoComplete="off" /></Field>
-          <HectarePicker up value={hectare} onChange={(h) => { setHectare(h); setErrors((e) => ({ ...e, hectare: '' })); }} error={errors.hectare} />
+      <Form id="add-farmer-form" onSubmit={save}>
+        <Section title="Farmer">
+          <Row>
+            <Field label="First name *" error={errors.firstName}><input className="input-field" value={form.firstName} onChange={(e) => set('firstName', e.target.value)} autoComplete="off" autoFocus /></Field>
+            <Field label="Last name *" error={errors.lastName}><input className="input-field" value={form.lastName} onChange={(e) => set('lastName', e.target.value)} autoComplete="off" /></Field>
+          </Row>
+          <Field label="Phone" error={errors.phone} hint="Their sign-in name. A number already used by a member makes that member the guardian.">
+            <input className="input-field" inputMode="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} onBlur={() => void checkPhone()} placeholder="+255712345678" autoComplete="off" />
+          </Field>
           {ownerIsMember && (
-            <div role="status" style={{ gridColumn: '1 / -1', fontSize: 13, padding: '10px 12px', borderRadius: 8, background: 'var(--surface-tint)', border: '1px solid var(--border-strong)' }}>
-              This number belongs to <strong>{owner!.member!.name}</strong> ({owner!.member!.memberNumber}). They will be the <strong>guardian</strong>: the member who owns this hectare, registered here under a relative. To give the farmer their own number, change it above.
-            </div>
+            <Callout>This number belongs to <strong>{owner!.member!.name}</strong> ({owner!.member!.memberNumber}). They will be the <strong>guardian</strong>: the member who owns this hectare, registered here under a relative. To give the farmer their own number, change it above.</Callout>
           )}
-          {ownerElsewhere && <div role="alert" style={{ gridColumn: '1 / -1', fontSize: 13, color: 'var(--red-400)' }}>This number is used by another account. Use a different number.</div>}
+          {ownerElsewhere && <Callout tone="warn">This number is used by another account. Use a different number.</Callout>}
+        </Section>
+
+        <Section title="Hectare">
+          <HectarePicker up value={hectare} onChange={(h) => { setHectare(h); setErrors((e) => ({ ...e, hectare: '' })); }} error={errors.hectare} />
           {!ownerIsMember && (
-            <div style={{ gridColumn: '1 / -1' }}>
-              <MemberPicker schemeId={schemeId} value={guardian} onChange={(m) => { setGuardian(m); setErrors((e) => ({ ...e, phone: '' })); }} label="Guardian (optional)" />
-              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>The member who really owns this hectare, if it is registered here under a relative. Leave empty if the farmer owns it.</div>
-            </div>
+            <MemberPicker schemeId={schemeId} value={guardian} onChange={(m) => { setGuardian(m); setErrors((e) => ({ ...e, phone: '' })); }} label="Guardian" optional hint="The member who really owns this hectare, if it is registered here under a relative. Leave empty if the farmer owns it." />
           )}
-        </div>
-        <details style={{ marginTop: 14 }}>
-          <summary style={{ cursor: 'pointer', fontSize: 13 }} className="muted">More details (optional)</summary>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px 16px', marginTop: 10 }}>
-            <Field label="Email" error={errors.email}><input className="input-field" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} autoComplete="off" /></Field>
-            <Field label="Village"><input className="input-field" value={form.village} onChange={(e) => set('village', e.target.value)} autoComplete="off" /></Field>
-          </div>
-        </details>
-        {error && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 13, marginTop: 12 }}>{error}</div>}
-      </form>
+        </Section>
+
+        <More title="More details (optional)">
+          <Row>
+            <Field label="Email" optional error={errors.email}><input className="input-field" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} autoComplete="off" /></Field>
+            <Field label="Village" optional><input className="input-field" value={form.village} onChange={(e) => set('village', e.target.value)} autoComplete="off" /></Field>
+          </Row>
+        </More>
+        <FormError message={error} />
+      </Form>
     </Modal>
   );
 }

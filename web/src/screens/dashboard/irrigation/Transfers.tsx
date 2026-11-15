@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { irrigationApi } from '@/lib/api';
 import { Emancipations } from './Emancipations';
 import Modal from '@/components/Modal';
+import { Callout, ChoiceCards, Form, FormError, Row, Section } from '@/components/FormKit';
 import {
   BASE, ConfirmDialog, DocumentsPanel, Empty, Field, Filters, FormGrid, LoadError, MemberPicker, Notice, PageHeader, Pager, TableSkeleton, StatusBadge,
   errMsg, fmtDate, todayISO, useApi, useCanalBlockOptions, useIrrigation, type MemberLite,
@@ -51,47 +52,54 @@ function NewTransferModal({ schemeId, presetHectareId, onClose, onSaved }: { sch
     } catch (e) { setError(errMsg(e, 'Could not record the transfer.')); setSaving(false); }
   };
   return (
-    <Modal title="Transfer a hectare" subtitle="The current allocation is closed and a new one is opened for the receiving member." onClose={() => !saving && onClose()} width="560px"
-      footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><button type="button" className="btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Record transfer'}</button></>}>
-      <div style={{ display: 'grid', gap: 12 }}>
-        {presetHectareId ? (
-          <Field label="Hectare"><div className="input-field">{chosen ? `${farmId(chosen.code)}${chosen.farmer ? ` · held by ${chosen.farmer.name}` : ''}` : 'Loading…'}</div></Field>
-        ) : (
-          <FormGrid>
-            <Field label="Canal"><select className="input-field" value={canalId} onChange={(e) => { setCanalId(e.target.value); setBlockId(''); setHectareId(''); }}><option value="">Select canal</option>{opts.canals.map((c: any) => <option key={c.id} value={c.id}>{c.code}</option>)}</select></Field>
-            <Field label="Block"><select className="input-field" value={blockId} onChange={(e) => { setBlockId(e.target.value); setHectareId(''); }}><option value="">Select block</option>{opts.blocks.map((b: any) => <option key={b.id} value={b.id}>{farmId(b.code)}</option>)}</select></Field>
-            <Field label="Allocated hectare" wide>
-              <select className="input-field" value={hectareId} onChange={(e) => setHectareId(e.target.value)} disabled={!blockId}>
-                <option value="">{hectares.loading ? 'Loading…' : 'Select hectare'}</option>
-                {(hectares.data?.data ?? []).map((h: any) => <option key={h.id} value={h.id}>{farmId(h.code)} · {h.farmer?.name}</option>)}
-              </select>
-            </Field>
-          </FormGrid>
-        )}
-        <div style={{ display: 'grid', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button type="button" className={!isNew ? 'btn-primary' : 'btn-secondary'} onClick={() => setIsNew(false)}>Existing member</button>
-            <button type="button" className={isNew ? 'btn-primary' : 'btn-secondary'} onClick={() => setIsNew(true)}>New person (not yet a member)</button>
-          </div>
+    <Modal title="Transfer a hectare" subtitle="Move a hectare from its current holder to another farmer." onClose={() => !saving && onClose()} width="560px"
+      footer={<><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><button type="submit" form="transfer-form" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Record transfer'}</button></>}>
+      <Form id="transfer-form" onSubmit={save}>
+        <Section title="Hectare">
+          {presetHectareId ? (
+            <div className="fm-readonly"><strong>{chosen ? farmId(chosen.code) : 'Loading…'}</strong>{chosen?.farmer && <span className="muted">held by {chosen.farmer.name}</span>}</div>
+          ) : (
+            <>
+              <Row>
+                <Field label="Canal *"><select className="input-field" value={canalId} onChange={(e) => { setCanalId(e.target.value); setBlockId(''); setHectareId(''); }}><option value="">Select canal</option>{opts.canals.map((c: any) => <option key={c.id} value={c.id}>{c.code}</option>)}</select></Field>
+                <Field label="Block *"><select className="input-field" value={blockId} onChange={(e) => { setBlockId(e.target.value); setHectareId(''); }} disabled={!canalId}><option value="">Select block</option>{opts.blocks.map((b: any) => <option key={b.id} value={b.id}>{farmId(b.code)}</option>)}</select></Field>
+              </Row>
+              <Field label="Hectare to transfer *" hint={blockId ? undefined : 'Choose the canal and block first'}>
+                <select className="input-field" value={hectareId} onChange={(e) => setHectareId(e.target.value)} disabled={!blockId}>
+                  <option value="">{hectares.loading ? 'Loading…' : 'Select hectare'}</option>
+                  {(hectares.data?.data ?? []).map((h: any) => <option key={h.id} value={h.id}>{farmId(h.code)} · {h.farmer?.name}</option>)}
+                </select>
+              </Field>
+            </>
+          )}
+        </Section>
+
+        <Section title="Receiving farmer">
+          <ChoiceCards value={isNew ? 'new' : 'member'} onChange={(v) => setIsNew(v === 'new')} options={[
+            { id: 'member', title: 'Existing member', sub: 'Choose from the AMCOS members' },
+            { id: 'new', title: 'New person', sub: 'Register them as a member now' },
+          ]} />
           {!isNew
-            ? <MemberPicker schemeId={schemeId} value={member} onChange={setMember} label="Receiving member" />
+            ? <MemberPicker schemeId={schemeId} value={member} onChange={setMember} label="Receiving member *" />
             : <>
-                <FormGrid>
+                <Row>
                   <Field label="First name *"><input className="input-field" value={fresh.firstName} onChange={(e) => setFresh((x) => ({ ...x, firstName: e.target.value }))} autoComplete="off" /></Field>
                   <Field label="Last name *"><input className="input-field" value={fresh.lastName} onChange={(e) => setFresh((x) => ({ ...x, lastName: e.target.value }))} autoComplete="off" /></Field>
-                  <Field label="Phone number *" wide><input className="input-field" inputMode="tel" value={fresh.phone} onChange={(e) => setFresh((x) => ({ ...x, phone: e.target.value }))} placeholder="+255712345678" autoComplete="off" /></Field>
-                </FormGrid>
-                <span className="muted" style={{ fontSize: 12 }}>They become a member of this AMCOS when you record the transfer, and are sent their sign-in details for the mobile app by SMS.</span>
+                </Row>
+                <Field label="Phone number *" hint="Their sign-in name for the mobile app"><input className="input-field" inputMode="tel" value={fresh.phone} onChange={(e) => setFresh((x) => ({ ...x, phone: e.target.value }))} placeholder="+255712345678" autoComplete="off" /></Field>
+                <Callout>They become a member of this AMCOS when you record the transfer, and are sent their sign-in details for the mobile app by SMS.</Callout>
               </>}
-        </div>
-        <FormGrid>
-          <Field label="Transfer date"><input type="date" className="input-field" max={todayISO()} value={transferDate} onChange={(e) => setTransferDate(e.target.value)} /></Field>
-          <Field label="Effective date"><input type="date" className="input-field" max={todayISO()} value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} /></Field>
-          <Field label="Reason *" wide><textarea className="input-field" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Sale of rights, inheritance, member left the scheme" /></Field>
-        </FormGrid>
-        <span className="muted" style={{ fontSize: 12 }}>You can attach supporting documents to the transfer from the history list after saving.</span>
-        {error && <div role="alert" style={{ color: 'var(--red-400)', fontSize: 13 }}>{error}</div>}
-      </div>
+        </Section>
+
+        <Section title="Details">
+          <Row>
+            <Field label="Transfer date"><input type="date" className="input-field" max={todayISO()} value={transferDate} onChange={(e) => setTransferDate(e.target.value)} /></Field>
+            <Field label="Effective date" hint="When the new holder takes over"><input type="date" className="input-field" max={todayISO()} value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} /></Field>
+          </Row>
+          <Field label="Reason *" hint="You can attach supporting documents from the history list after saving"><textarea className="input-field" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Sale of rights, inheritance, member left the scheme" /></Field>
+        </Section>
+        <FormError message={error} />
+      </Form>
     </Modal>
   );
 }

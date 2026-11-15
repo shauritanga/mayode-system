@@ -1,6 +1,7 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
+import { Field as KitField } from '@/components/FormKit';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import Modal from '@/components/Modal';
@@ -216,15 +217,9 @@ export function Pager({ meta, onPage }: { meta?: Meta; onPage: (page: number) =>
   );
 }
 
-export function Field({ label, children, hint, error, wide }: { label: string; children: ReactNode; hint?: string; error?: string; wide?: boolean }) {
-  return (
-    <label className="form-label" style={wide ? { gridColumn: '1 / -1' } : undefined}>
-      {label}
-      {children}
-      {hint && !error && <span className="muted" style={{ fontSize: 11, fontWeight: 400 }}>{hint}</span>}
-      {error && <span style={{ color: 'var(--red-400)', fontSize: 12, fontWeight: 400 }}>{error}</span>}
-    </label>
-  );
+export function Field({ label, children, hint, error, wide, optional }: { label: string; children: ReactNode; hint?: string; error?: string; wide?: boolean; optional?: boolean }) {
+  const field = <KitField label={label} hint={hint} error={error} optional={optional}>{children}</KitField>;
+  return wide ? <div style={{ gridColumn: '1 / -1' }}>{field}</div> : field;
 }
 
 export const FormGrid = ({ children }: { children: ReactNode }) => (
@@ -279,8 +274,8 @@ export function ConfirmDialog({ title, body, confirmLabel, danger, askReason, re
 export interface MemberLite { id: string; name: string; memberNumber: string; village?: string | null; phone?: string | null; hectaresHeld: number }
 
 /** A searchable drop-down over the existing AMCOS member registry: opens on click with the first members, narrows as you type; nothing here can create a member. */
-export function MemberPicker({ schemeId, value, onChange, purpose = 'allocation', label = 'Member' }: {
-  schemeId: string; value: MemberLite | null; onChange: (m: MemberLite | null) => void; purpose?: 'allocation' | 'leadership'; label?: string;
+export function MemberPicker({ schemeId, value, onChange, purpose = 'allocation', label = 'Member', optional, hint }: {
+  schemeId: string; value: MemberLite | null; onChange: (m: MemberLite | null) => void; purpose?: 'allocation' | 'leadership'; label?: string; optional?: boolean; hint?: string;
 }) {
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
@@ -304,7 +299,7 @@ export function MemberPicker({ schemeId, value, onChange, purpose = 'allocation'
   const pick = (m: MemberLite) => { onChange(m); setOpen(false); setText(''); };
   if (value) {
     return (
-      <Field label={label}>
+      <Field label={label} optional={optional}>
         <div className="input-field" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <span><strong>{value.name}</strong> <span className="muted">· {value.memberNumber}{value.phone ? ` · ${value.phone}` : ''}</span></span>
           <button type="button" className="btn-secondary" onClick={() => { onChange(null); setText(''); }}>Change</button>
@@ -319,7 +314,7 @@ export function MemberPicker({ schemeId, value, onChange, purpose = 'allocation'
     else if (e.key === 'Escape') setOpen(false);
   };
   return (
-    <Field label={label} hint="Click to see members, or type a name, member number or phone to narrow the list">
+    <Field label={label} optional={optional} hint={hint ?? "Click to see members, or type a name, member number or phone to narrow the list"}>
       <div style={{ position: 'relative' }}>
         <input className="input-field" role="combobox" aria-controls="member-picker-list" aria-expanded={open} aria-autocomplete="list" value={text} placeholder="Select or search a member"
           onChange={(e) => { setText(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} onKeyDown={onKey} autoComplete="off" />
