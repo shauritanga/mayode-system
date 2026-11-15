@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -8,7 +9,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { DuesService } from './dues.service';
 import {
-  ChargeDto, CreateDueDto, CreateDueTypeDto, DueListQueryDto, IssueFertiliserDto, ReasonDto, RecordPaymentDto, UpdateDueTypeDto, WaiveDto,
+  ChargeDto, CreateDueDto, CreateDueTypeDto, DueExportQueryDto, DueListQueryDto, IssueFertiliserDto, ReasonDto, RecordPaymentDto, UpdateDueTypeDto, WaiveDto,
 } from './dto/dues.dto';
 
 @ApiTags('dues')
@@ -20,6 +21,15 @@ export class DuesController {
 
   @Get() @RequirePermission('dues', 'VIEW')
   list(@CurrentUser() u: RequestUser, @Query() q: DueListQueryDto) { return this.dues.list(u, q); }
+  /** The list or the debts, as PDF, Word or Excel; before ':id' so it is not read as one. */
+  @Get('export') @RequirePermission('dues', 'VIEW')
+  async export(@CurrentUser() u: RequestUser, @Query() q: DueExportQueryDto, @Res() res: Response) {
+    const f = await this.dues.exportFile(u, q);
+    res.setHeader('Content-Type', f.mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${f.fileName}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.send(f.buffer);
+  }
   @Post() @RequirePermission('dues', 'CREATE')
   create(@CurrentUser() u: RequestUser, @Body() dto: CreateDueDto, @Query('mamcosId') m?: string) { return this.dues.createDue(u, dto, m); }
 

@@ -5,6 +5,8 @@
 import 'reflect-metadata';
 import { randomUUID } from 'crypto';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import * as XLSX from 'xlsx';
+import { strFromU8, unzipSync } from 'fflate';
 import { PrismaClient, UserRole } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -273,8 +275,44 @@ describeDb('Farmer dues (PostgreSQL)', () => {
   it('declares an explicit dues permission on every route', () => {
     const proto = DuesController.prototype as any;
     const handlers = Object.getOwnPropertyNames(proto).filter((n) => n !== 'constructor' && typeof proto[n] === 'function');
-    expect(handlers.length).toBe(16);
+    expect(handlers.length).toBe(17);
     for (const name of handlers) expect({ name, resource: Reflect.getMetadata(PERMISSION_KEY, proto[name])?.resource }).toEqual({ name, resource: 'dues' });
     for (const name of ['voidPayment', 'waive', 'cancel']) expect(Reflect.getMetadata(PERMISSION_KEY, proto[name]).action).toBe('DELETE');
+  });
+
+  describe('downloads', () => {
+    const rowsOf = (file: Buffer) => {
+      const wb = XLSX.read(file);
+      return XLSX.utils.sheet_to_json<any[]>(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+    };
+    it('exports every farmer who owes, with Farm IDs and totals, in all three formats', async () => {
+      const x = await svc.exportFile(adminA, { view: 'debts', format: 'XLSX' });
+      expect(x.fileName).toMatch(/^farmers-with-debts-\d{4}-\d{2}-\d{2}\.xlsx$/);
+      const rows = rowsOf(x.buffer);
+      expect(String(rows[1][0])).toMatch(/^Farmers with Debts as at /);
+      const asha = rows.find((r) => String(r[0]).startsWith('Asha'))!;
+      expect(asha[2]).toBe('H1, H2');           // her Farm IDs
+      expect(typeof asha[5]).toBe('number');    // the debt is a number, so it can be added up in Excel
+      const total = rows.find((r) => String(r[0]).startsWith('Total ·'))!;
+      expect(total[5]).toBe(rows.filter((r) => typeof r[5] === 'number' && !String(r[0]).startsWith('Total')).reduce((n, r) => n + r[5], 0));
+      expect(rows.flat().join(' ')).not.toContain('Outsider'); // another AMCOS's farmers never appear
+      const pdf = await svc.exportFile(adminA, { view: 'debts', format: 'PDF' });
+      expect(pdf.buffer.subarray(0, 5).toString()).toBe('%PDF-');
+      const docx = await svc.exportFile(adminA, { view: 'debts', format: 'DOCX' });
+      const xml = strFromU8(unzipSync(new Uint8Array(docx.buffer))['word/document.xml']);
+      expect(xml).toContain('Farmers with Debts as at');
+    });
+    it('follows the filters, and the charges list exports every row, not one page', async () => {
+      const levyOnly = await svc.exportFile(adminA, { view: 'debts', format: 'XLSX', category: 'LEVY' });
+      expect(rowsOf(levyOnly.buffer)[2][0]).toContain('Kind: Levy');
+      const fert = await svc.exportFile(adminA, { view: 'debts', format: 'XLSX', category: 'FERTILISER' });
+      expect(fert.rows).toBe((await svc.arrears(adminA, { category: 'FERTILISER' })).farmers);
+      const all = await svc.exportFile(adminA, { view: 'dues', format: 'XLSX' });
+      const listed: any = await svc.list(adminA, { page: 1, pageSize: 1 } as any);
+      expect(all.rows).toBe(listed.meta.total);
+      expect(rowsOf(all.buffer)[1][0]).toMatch(/^AMCOS Charges and Payments as at /);
+      const searched = await svc.exportFile(adminA, { view: 'dues', format: 'XLSX', q: 'Asha' });
+      expect(rowsOf(searched.buffer).filter((r) => String(r[0]).startsWith('Asha')).length).toBe(searched.rows);
+    });
   });
 });

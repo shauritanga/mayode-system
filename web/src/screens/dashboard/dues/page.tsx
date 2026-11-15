@@ -12,6 +12,7 @@ import {
   errMsg, fmtDate, titleCase, todayISO, useApi, useCan, useDebounced,
 } from '@/screens/dashboard/irrigation/ui';
 import MoneyInput from '@/components/MoneyInput';
+import ExportIcons, { saveDownload } from '@/components/ExportIcons';
 
 const CATEGORY_LABEL: Record<string, string> = { LEVY: 'Levy', MEMBERSHIP_FEE: 'Membership fee', CANAL_CLEANING: 'Canal cleaning', FERTILISER: 'Fertiliser', OTHER: 'Other' };
 const CHARGE_CATEGORIES = ['LEVY', 'MEMBERSHIP_FEE', 'CANAL_CLEANING', 'OTHER'];
@@ -307,7 +308,12 @@ function Dues({ can }: { can: (r: string, a: string) => boolean }) {
         <StatCard label="Overdue" value={t ? tzs(t.overdue) : '—'} tone={t?.overdue ? 'warn' : undefined} />
       </div>
       <section className="table-panel">
-        <div className="section-toolbar"><strong>What farmers owe</strong>{buttons}</div>
+        <div className="section-toolbar"><strong>What farmers owe</strong>
+          <span style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <ExportIcons label="Export what farmers owe" onExport={async (format) => saveDownload(await duesApi.exportFile({ view: 'dues', format, q: filters.q || undefined, category: filters.category || undefined, state: filters.state || undefined }), `amcos-charges.${format.toLowerCase()}`)} />
+            {buttons}
+          </span>
+        </div>
         <Filters>
           <Field label="Search"><input className="input-field" placeholder="Farmer, member number or charge" value={filters.q} onChange={(e) => setFilter('q', e.target.value)} /></Field>
           <Field label="Kind"><select className="input-field" value={filters.category} onChange={(e) => setFilter('category', e.target.value)}><option value="">All</option>{Object.entries(CATEGORY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
@@ -513,6 +519,7 @@ function Debts({ can }: { can: (r: string, a: string) => boolean }) {
         <div className="section-toolbar">
           <strong>Farmers with debts</strong>
           <span style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <ExportIcons label="Export farmers with debts" onExport={async (format) => saveDownload(await duesApi.exportFile({ view: 'debts', format, category: category || undefined }), `farmers-with-debts.${format.toLowerCase()}`)} />
             <select className="input-field" style={{ width: 'auto' }} value={category} onChange={(e) => { setCategory(e.target.value); setSelected(new Set()); }} aria-label="Kind"><option value="">All kinds</option>{Object.entries(CATEGORY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
             {can('communication', 'CREATE') && <button type="button" className="btn-primary" style={{ whiteSpace: 'nowrap' }} disabled={!selected.size} onClick={() => setReminding(true)}>{selected.size ? `Remind ${selected.size} by SMS` : 'Remind by SMS'}</button>}
           </span>

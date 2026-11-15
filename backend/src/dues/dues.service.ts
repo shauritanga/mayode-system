@@ -8,6 +8,9 @@ import { resolveCashAccount } from '../accounting/cash-resolve';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { AccountingService } from '../accounting/accounting.service';
 import { farmIdDisplay } from '../irrigation/irrigation-codes';
+import { FORMAT_INFO, render, type ExportFormat } from '../accounting/exports/writers';
+import { longDate } from '../accounting/exports/report-titles';
+import type { ReportDocument, Row } from '../accounting/exports/report-document';
 import {
   ChargeDto, CreateDueDto, CreateDueTypeDto, DueListQueryDto, IssueFertiliserDto, RecordPaymentDto, UpdateDueTypeDto,
 } from './dto/dues.dto';
@@ -493,5 +496,64 @@ export class DuesService {
     }
     const items = [...byFarmer.values()].sort((a, b) => b.overdue - a.overdue || b.balance - a.balance);
     return { farmers: items.length, outstanding: cents(items.reduce((n, i) => n + i.balance, 0)), overdue: cents(items.reduce((n, i) => n + i.overdue, 0)), items };
+  }
+
+  // ───────────── downloads: the same list as on screen, as PDF, Word or Excel ─────────────
+
+  /** The Farm IDs of several farmers at once, for the export. */
+  private async farmIdsOfMany(farmerIds: string[]) {
+    const held = farmerIds.length ? await this.prisma.irrigationHectareAllocation.findMany({
+      where: { farmerId: { in: farmerIds }, status: 'ACTIVE' }, select: { farmerId: true, hectare: { select: { code: true } } }, orderBy: { allocatedOn: 'asc' },
+    }) : [];
+    const by = new Map<string, string[]>();
+    for (const h of held) by.set(h.farmerId, [...(by.get(h.farmerId) ?? []), farmIdDisplay(h.hectare.code)]);
+    return by;
+  }
+
+  /**
+   * "Dues & payments" (every charge with what was paid) or "Debts" (each farmer who owes, with the total), with the filters the
+   * screen has applied. It is everything that matches, not just the page on screen.
+   */
+  async exportFile(actor: RequestUser, q: { view: 'dues' | 'debts'; format: ExportFormat; category?: DueCategory; state?: string; q?: string; mamcosId?: string }) {
+    const mamcosId = this.tenant(actor, q.mamcosId);
+    const [mamcos, me] = await Promise.all([
+      this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { name: true } }),
+      this.prisma.user.findUnique({ where: { id: actor.id }, select: { firstName: true, lastName: true, phone: true } }),
+    ]);
+    const KIND: Record<string, string> = { LEVY: 'Levy', MEMBERSHIP_FEE: 'Membership fee', CANAL_CLEANING: 'Canal cleaning', FERTILISER: 'Fertiliser', HARVEST_FEE: 'Harvest fee', OTHER: 'Other' };
+    const STATE: Record<string, string> = { OPEN: 'Not paid', PARTIAL: 'Part paid', PAID: 'Paid', CANCELLED: 'Cancelled', OVERDUE: 'Overdue' };
+    const asAt = longDate(new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10));
+    const filters = [q.category ? `Kind: ${KIND[q.category] ?? q.category}` : '', q.state ? `Status: ${STATE[q.state] ?? q.state}` : '', q.q?.trim() ? `Search: “${q.q.trim()}”` : ''].filter(Boolean);
+    const stamp = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Dar_es_Salaam', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()) + ' EAT';
+    const base = {
+      amcosName: mamcos?.name ?? 'AMCOS', currency: 'Tanzanian Shillings (TZS)', notes: [] as string[],
+      preparedBy: [me?.firstName, me?.lastName].filter(Boolean).join(' ') || me?.phone || 'Office', approvedBy: null, generatedAt: stamp,
+    };
+    let doc: ReportDocument;
+    let slug: string;
+    if (q.view === 'debts') {
+      const a = await this.arrears(actor, { mamcosId, category: q.category });
+      const farm = await this.farmIdsOfMany(a.items.map((i) => i.farmer.id));
+      const rows: Row[] = a.items.map((i) => ({ cells: [i.farmer.name, i.farmer.memberNumber, (farm.get(i.farmer.id) ?? []).join(', ') || '—', i.farmer.phone ?? '—', i.dues, i.balance, i.overdue || 0] }));
+      rows.push({ cells: [`Total · ${a.farmers} farmer${a.farmers === 1 ? '' : 's'}`, '', '', '', null, a.outstanding, a.overdue], style: 'total' });
+      doc = {
+        ...base, kind: 'Farmers with Debts', heading: `Farmers with Debts as at ${asAt}`, periodLine: filters.length ? filters.join(' · ') : 'Every farmer with an unpaid debt, the most overdue first',
+        tables: [{ columns: [{ label: 'Farmer', width: 3 }, { label: 'Member no.', width: 2 }, { label: 'Farm ID', width: 2 }, { label: 'Phone', width: 2.4 }, { label: 'Charges', align: 'right', width: 1.2, money: false }, { label: 'Debt', align: 'right', width: 2 }, { label: 'Overdue', align: 'right', width: 2 }], rows }],
+      };
+      slug = 'farmers-with-debts';
+    } else {
+      const all = await this.list(actor, { mamcosId, category: q.category, state: q.state, q: q.q, page: 1, pageSize: 1_000_000 } as DueListQueryDto);
+      const rows: Row[] = all.data.map((d: any) => ({ cells: [d.farmer.name, d.farmer.memberNumber, d.description, KIND[d.category] ?? d.category, d.amount, d.paid, d.balance, d.dueDate ? longDate(new Date(d.dueDate).toISOString().slice(0, 10)) : '—', d.overdue ? 'Overdue' : STATE[d.state] ?? d.state] }));
+      rows.push({ cells: [`Total · ${all.meta.total} charge${all.meta.total === 1 ? '' : 's'}`, '', '', '', all.totals.charged, all.totals.collected, all.totals.outstanding, '', ''], style: 'total' });
+      doc = {
+        ...base, kind: 'AMCOS Charges and Payments', heading: `AMCOS Charges and Payments as at ${asAt}`, periodLine: filters.length ? filters.join(' · ') : 'Every charge to farmers, with what has been paid and what is still owed',
+        tables: [{ columns: [{ label: 'Farmer', width: 3 }, { label: 'Member no.', width: 2 }, { label: 'Charge', width: 3 }, { label: 'Kind', width: 2 }, { label: 'Charged', align: 'right', width: 2 }, { label: 'Paid', align: 'right', width: 2 }, { label: 'Balance', align: 'right', width: 2 }, { label: 'Pay by', width: 2.2 }, { label: 'Status', width: 1.8 }], rows }],
+      };
+      slug = 'amcos-charges-and-payments';
+    }
+    const info = FORMAT_INFO[q.format];
+    const file = await render(q.format, doc);
+    const date = new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
+    return { buffer: file, fileName: `${slug}${q.category ? `-${q.category.toLowerCase()}` : ''}-${date}.${info.ext}`, mime: info.mime, heading: doc.heading, rows: doc.tables[0].rows.length - 1 };
   }
 }

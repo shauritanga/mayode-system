@@ -80,3 +80,12 @@ export class DueListQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) pageSize?: number;
 }
+
+export class DueExportQueryDto {
+  @IsOptional() @IsString() mamcosId?: string;
+  @IsIn(['dues', 'debts']) view: 'dues' | 'debts';
+  @IsIn(['PDF', 'DOCX', 'XLSX']) format: 'PDF' | 'DOCX' | 'XLSX';
+  @IsOptional() @IsString() q?: string;
+  @IsOptional() @IsEnum(DueCategory) category?: DueCategory;
+  @IsOptional() @IsIn(['OPEN', 'PARTIAL', 'OVERDUE', 'PAID', 'CANCELLED']) state?: string;
+}

@@ -1192,6 +1192,8 @@ export const waterApi = {
 
 export const duesApi = {
   list: (params?: object) => api.get('/dues', { params }),
+  /** The list or the debts as PDF, Word or Excel (everything that matches, not one page). */
+  exportFile: (params: object) => api.get('/dues/export', { params, responseType: 'blob' }),
   get: (id: string) => api.get(`/dues/${id}`),
   create: (data: object) => api.post('/dues', data),
   types: (params?: object) => api.get('/dues/types', { params }),
