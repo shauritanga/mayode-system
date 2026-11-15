@@ -114,12 +114,28 @@ export class FarmersService {
   async create(dto: CreateFarmerDto & { password: string }, actor?: RequestUser, options: { mustChangePassword?: boolean } = {}) {
     const tenantId = actor ? this.ownership.resolveTenantMamcosId(actor) : null;
     if (tenantId) dto = { ...dto, mamcosId: tenantId };
-    // A farmer with no phone of their own (a child registered under a parent) needs someone who can be reached instead.
-    const supervisor = this.manualSupervisor(dto);
-    if (!dto.phone?.trim() && !dto.guardianId && !supervisor) {
-      throw new BadRequestException('Enter the farmer’s phone number, or name a supervisor who can be reached');
+    // The guardian is always an existing member: the real owner of the hectare, which is registered in this farmer's name
+    // (for example under a parent or other relative). A number that already belongs to a member of this AMCOS makes that
+    // member the guardian automatically, and the farmer then has no login number of their own.
+    let guardianId = dto.guardianId;
+    let phoneInput = dto.phone?.trim() || undefined;
+    if (phoneInput && tenantId) {
+      const owner = await this.prisma.user.findFirst({
+        where: { phone: normalizeMsisdn(phoneInput) },
+        select: { farmer: { select: { id: true, firstName: true, lastName: true, mamcosId: true } } },
+      });
+      if (owner?.farmer && owner.farmer.mamcosId === tenantId) {
+        if (guardianId && guardianId !== owner.farmer.id) {
+          throw new ConflictException(`This number belongs to ${owner.farmer.firstName} ${owner.farmer.lastName}, a member. Use a different number, or choose them as the guardian`);
+        }
+        guardianId = owner.farmer.id;
+        phoneInput = undefined;
+      }
     }
-    const ownPhone = dto.phone?.trim() ? normalizeMsisdn(dto.phone) : null;
+    if (!phoneInput && !guardianId) {
+      throw new BadRequestException('Enter the farmer’s phone number, or choose the guardian who can be reached');
+    }
+    const ownPhone = phoneInput ? normalizeMsisdn(phoneInput) : null;
     const loginPhone = ownPhone ?? placeholderPhone();
     const existing = await this.prisma.user.findFirst({
       where: { OR: [...(ownPhone ? [{ phone: ownPhone }] : []), { email: dto.email || undefined }] },
@@ -134,8 +150,8 @@ export class FarmersService {
 
     // An AMCOS farmer is registered on the hectare they already hold, and that hectare's code is their ID.
     const hectare = dto.hectareId ? await this.hectareForRegistration(dto.hectareId, tenantId) : null;
-    if (dto.guardianId && !hectare) throw new BadRequestException('Choose a hectare before naming a guardian');
-    const guardian = dto.guardianId ? await this.guardianForRegistration(dto.guardianId, tenantId) : null;
+    if (guardianId && !hectare) throw new BadRequestException('Choose a hectare before naming a guardian');
+    const guardian = guardianId ? await this.guardianForRegistration(guardianId, tenantId) : null;
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const controlNumber = hectare ? hectare.code : await this.generateControlNumber();
     // A farmer registered by a field officer is credited to, and assigned to, that officer.
@@ -181,7 +197,6 @@ export class FarmersService {
           farmingExperienceYears: dto.farmingExperienceYears,
           familySize: dto.familySize,
           dependents: dto.dependents,
-          ...(supervisor ? { supervisorName: supervisor.name, supervisorPhone: supervisor.phone } : {}),
           dataShareConsent: dto.dataShareConsent ?? false,
           consentedAt: dto.dataShareConsent ? new Date() : null,
           registeredByOfficerId: registeringOfficer?.id,
@@ -209,17 +224,6 @@ export class FarmersService {
       if (hectare && error?.code === 'P2002') throw new ConflictException('This hectare was just taken or its ID is already in use');
       throw error;
     });
-  }
-
-  /** A supervisor who is not a member: both name and phone, the phone in the same format as every other number. */
-  private manualSupervisor(dto: { supervisorName?: string; supervisorPhone?: string }) {
-    const name = dto.supervisorName?.trim();
-    const phone = dto.supervisorPhone?.trim();
-    if (!name && !phone) return null;
-    if (!name) throw new BadRequestException('Enter the supervisor’s full name');
-    if (!phone) throw new BadRequestException('Enter the supervisor’s phone number');
-    if (!/^\+?[0-9\s-]{9,15}$/.test(phone)) throw new BadRequestException('Enter a valid phone number for the supervisor, for example +255712345678');
-    return { name, phone: normalizeMsisdn(phone) };
   }
 
   /**

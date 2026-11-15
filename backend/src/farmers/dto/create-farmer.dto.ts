@@ -33,23 +33,11 @@ export class CreateFarmerDto {
 
   @ApiPropertyOptional({
     example: '+255700000001',
-    description: 'Login phone number (unique). May be left out only when a supervisor who can be reached is named (a member as guardian, or a name and phone below).',
+    description: 'Login phone number (unique). If it already belongs to a member of the same AMCOS, that member becomes the guardian and the farmer has no number of their own. May be left out only when a guardian is chosen.',
   })
   @IsOptional()
   @IsString()
   phone?: string;
-
-  @ApiPropertyOptional({ description: 'A supervisor or guardian who is not an AMCOS member (for example a relative with their own number). Needs supervisorPhone.' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  supervisorName?: string;
-
-  @ApiPropertyOptional({ description: 'Phone of that supervisor; required when supervisorName is given.' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  supervisorPhone?: string;
 
   @ApiPropertyOptional({
     example: 'ChangeMe123',

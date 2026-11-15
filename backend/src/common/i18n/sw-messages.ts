@@ -10,6 +10,8 @@ export const SW_MESSAGES: Record<string, string> = {
   "Used, damaged, expired or lost stock is taken off, so the quantity must be negative": "Hisa iliyotumika, kuharibika, kuisha muda au kupotea hupunguzwa, kwa hiyo kiasi lazima kiwe hasi",
   "Say what it was used for in the note": "Andika kwenye maelezo ilitumika kwa ajili ya nini",
   "This stock has already expired, so it cannot be received": "Bidhaa hii imeshaisha muda, kwa hiyo haiwezi kupokelewa",
+  "This number belongs to {0} {1}, a member. Use a different number, or choose them as the guardian": "Namba hii ni ya {0} {1}, mwanachama. Tumia namba nyingine, au mchague kuwa msimamizi",
+  "Enter the farmer’s phone number, or choose the guardian who can be reached": "Weka namba ya simu ya mkulima, au chagua msimamizi anayepatikana",
   "Guardian not found": "Msimamizi hajapatikana",
   "{0} is blacklisted and cannot be a guardian": "{0} yuko kwenye orodha nyeusi na hawezi kuwa msimamizi",
   "Only a current allocation can have a guardian": "Mgao wa sasa pekee ndio unaoweza kuwa na msimamizi",
