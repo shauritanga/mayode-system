@@ -39,7 +39,7 @@ export function useLoad<T>(load: () => Promise<{ data: T }>, deps: unknown[]) {
 }
 
 export function Card({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: 'good' | 'bad' }) {
-  return <div className="glass-card" style={{ padding: 16 }}>
+  return <div className="glass-card kpi-tile" style={{ padding: 16 }}>
     <div className="muted" style={{ fontSize: 12 }}>{label}</div>
     <strong style={{ display: 'block', marginTop: 6, fontSize: 20, color: tone === 'bad' ? 'var(--red-400)' : tone === 'good' ? 'var(--green-400, #4ade80)' : undefined }}>{value}</strong>
     {hint && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{hint}</div>}

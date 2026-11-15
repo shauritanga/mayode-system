@@ -122,7 +122,7 @@ export function PageHeader({ title, subtitle, crumbs, actions }: { title: string
 
 export function StatCard({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: 'warn' | 'good' }) {
   return (
-    <div className="glass-card" style={{ padding: 16 }}>
+    <div className="glass-card kpi-tile" style={{ padding: 16 }}>
       <div className="muted" style={{ fontSize: 12 }}>{label}</div>
       <strong style={{ display: 'block', marginTop: 6, fontSize: 22, color: tone === 'warn' ? 'var(--red-500)' : undefined }}>{value}</strong>
       {hint && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{hint}</div>}

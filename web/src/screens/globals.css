@@ -3455,3 +3455,41 @@ a.farmers-name { display: block; cursor: pointer; }
 .ss-toolbar-actions { display: flex; align-items: center; gap: 12px; padding-bottom: 8px; flex-wrap: wrap; }
 .ss-scheme-picker { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .ss-scheme-picker select { min-width: 220px; }
+
+/* ── KPI cards: compact, each tinted a different colour ──
+   Applies to every KPI row (metric-grid, scheme-stat-grid, warehouse-metric-grid, stat-card, kpi-card). The colour follows the
+   position in the row, so the cards of one page never share a colour (eight distinct hues before any repeat). */
+:is(.metric-grid, .scheme-stat-grid, .warehouse-metric-grid) > *,
+.stat-card, .kpi-tile, .kpi-card:not(.kpi-card-plain), .kpi-card-solid {
+  --kpi-rgb: 16, 185, 129;
+  padding: 9px 14px !important;
+  gap: 2px !important;
+  min-height: 0 !important;
+  border-radius: 12px !important;
+  background: rgba(var(--kpi-rgb), 0.13) !important;
+  border: 1px solid rgba(var(--kpi-rgb), 0.34) !important;
+  box-shadow: none !important;
+}
+:is(.metric-grid, .scheme-stat-grid, .warehouse-metric-grid) > *:nth-child(8n + 2), .stat-card:nth-child(8n + 2), .kpi-tile:nth-child(8n + 2), .kpi-card:nth-child(8n + 2) { --kpi-rgb: 59, 130, 246; }
+:is(.metric-grid, .scheme-stat-grid, .warehouse-metric-grid) > *:nth-child(8n + 3), .stat-card:nth-child(8n + 3), .kpi-tile:nth-child(8n + 3), .kpi-card:nth-child(8n + 3) { --kpi-rgb: 245, 158, 11; }
+:is(.metric-grid, .scheme-stat-grid, .warehouse-metric-grid) > *:nth-child(8n + 4), .stat-card:nth-child(8n + 4), .kpi-tile:nth-child(8n + 4), .kpi-card:nth-child(8n + 4) { --kpi-rgb: 139, 92, 246; }
+:is(.metric-grid, .scheme-stat-grid, .warehouse-metric-grid) > *:nth-child(8n + 5), .stat-card:nth-child(8n + 5), .kpi-tile:nth-child(8n + 5), .kpi-card:nth-child(8n + 5) { --kpi-rgb: 244, 63, 94; }
+:is(.metric-grid, .scheme-stat-grid, .warehouse-metric-grid) > *:nth-child(8n + 6), .stat-card:nth-child(8n + 6), .kpi-tile:nth-child(8n + 6), .kpi-card:nth-child(8n + 6) { --kpi-rgb: 20, 184, 166; }
+:is(.metric-grid, .scheme-stat-grid, .warehouse-metric-grid) > *:nth-child(8n + 7), .stat-card:nth-child(8n + 7), .kpi-tile:nth-child(8n + 7), .kpi-card:nth-child(8n + 7) { --kpi-rgb: 249, 115, 22; }
+:is(.metric-grid, .scheme-stat-grid, .warehouse-metric-grid) > *:nth-child(8n + 8), .stat-card:nth-child(8n + 8), .kpi-tile:nth-child(8n + 8), .kpi-card:nth-child(8n + 8) { --kpi-rgb: 99, 102, 241; }
+:is(.metric-grid, .scheme-stat-grid, .warehouse-metric-grid) > *:hover, .stat-card:hover, .kpi-tile:hover, .kpi-card:hover { transform: none !important; border-color: rgba(var(--kpi-rgb), 0.6) !important; box-shadow: none !important; }
+/* smaller text so the card stays short */
+:is(.metric-grid, .scheme-stat-grid) > * strong, .kpi-tile strong, .stat-card .stat-value, .kpi-card .kpi-card-body strong, .kpi-card-solid .kpi-card-body strong, .warehouse-metric-card strong {
+  margin-top: 1px !important; font-size: 19px !important; line-height: 1.15 !important; letter-spacing: -0.2px;
+}
+:is(.metric-grid, .scheme-stat-grid) > * .muted, .kpi-tile .muted, .stat-card .stat-label, .kpi-card .kpi-card-body span, .kpi-card-solid .kpi-card-body span, .warehouse-metric-card span {
+  font-size: 11.5px !important; margin-top: 0 !important; line-height: 1.25;
+}
+:is(.metric-grid, .scheme-stat-grid) > * .muted:last-child:not(:first-child), .kpi-card .kpi-card-body small { font-size: 10.5px !important; margin-top: 1px !important; }
+.stat-card .stat-top { margin-bottom: 4px !important; }
+.stat-card .stat-icon, .kpi-card .kpi-card-icon, .kpi-card-solid .kpi-card-icon { width: 28px !important; height: 28px !important; border-radius: 8px !important; background: rgba(var(--kpi-rgb), 0.22) !important; color: rgb(var(--kpi-rgb)) !important; }
+.stat-card .stat-icon svg, .kpi-card .kpi-card-icon svg { width: 14px !important; height: 14px !important; }
+.warehouse-metric-card { gap: 10px !important; align-items: center !important; }
+.warehouse-metric-icon { width: 30px !important; height: 30px !important; background: rgba(var(--kpi-rgb), 0.22) !important; color: rgb(var(--kpi-rgb)) !important; }
+.warehouse-metric-copy { gap: 1px !important; }
+.metric-grid, .scheme-stat-grid, .warehouse-metric-grid { gap: 10px !important; }
