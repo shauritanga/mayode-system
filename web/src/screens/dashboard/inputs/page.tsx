@@ -4,10 +4,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Modal from '@/components/Modal';
-import { inputApplicationsApi, inputDistributionApi, inputStockApi } from '@/lib/api';
+import { creditInterestApi, inputApplicationsApi, inputDistributionApi, inputStockApi } from '@/lib/api';
 import { farmId } from '@/lib/farm-id';
 import { useAuthStore } from '@/store/auth.store';
 import { InputApplications } from './Applications';
+import { CreditTerms } from './CreditTerms';
 import { FarmerPicker } from '@/screens/dashboard/dues/page';
 import { ConfirmDialog, Empty, Field, LoadError, Notice, PageHeader, StatCard, TableSkeleton, Tabs, errMsg, fmtDate, todayISO, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 
@@ -31,6 +32,7 @@ function IssueModal({ items, onClose, onDone, canSetup }: { items: any[]; onClos
   const left = item ? Math.round((item.balance - (Number(qty) || 0)) * 1000) / 1000 : 0;
   const tooMuch = !!item && (Number(qty) || 0) > item.balance;
   const canSave = !!farmer && !!item && Number(qty) > 0 && unitPrice > 0 && !tooMuch && !busy;
+  const interest = useApi<any>(amount > 0 ? () => creditInterestApi.preview(amount) : null, [Math.round(amount)]);
   const groups = items.reduce<Record<string, any[]>>((g, i) => { (g[i.typeName ?? 'Other'] ??= []).push(i); return g; }, {});
   const save = async () => {
     setBusy(true); setError('');
@@ -79,6 +81,7 @@ function IssueModal({ items, onClose, onDone, canSetup }: { items: any[]; onClos
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="muted">Quantity</span><span>{qty} {item.unit}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="muted">Charged to the farmer</span><strong>{tzs(amount)}</strong></div>
+              {interest.data?.enabled && <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="muted">Interest if not paid on time</span><strong>{interest.data.periods.length ? `${tzs(interest.data.periods[0].interest)} ${interest.data.periods[0].label.startsWith('month') ? 'a month' : `(${interest.data.periods[0].label})`}` : 'No rate set yet'}</strong></div><span className="muted" style={{ fontSize: 12 }}>{interest.data.text}</span></div>}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="muted">Stock after</span><span style={{ color: tooMuch ? 'var(--red-400)' : undefined }}>{left} {item.unit}</span></div>
             </div>
             <div style={{ marginTop: 10, borderRadius: 8, padding: '9px 12px', fontSize: 13, fontWeight: 600, background: tooMuch || unitPrice <= 0 ? 'rgba(248,113,113,.12)' : 'rgba(74,222,128,.12)', color: tooMuch || unitPrice <= 0 ? 'var(--red-400, #f87171)' : 'var(--green-400, #4ade80)' }}>
@@ -202,7 +205,7 @@ function Stock({ canSetup }: { canSetup: boolean }) {
 /** Procurement Officer: inputs handed to farmers, confirmed by the farmer's code. */
 export default function InputsPage() {
   const user = useAuthStore((s) => s.user); const can = useCan();
-  const [tab, setTab] = useState<'issues' | 'apps' | 'stock'>('issues');
+  const [tab, setTab] = useState<'issues' | 'apps' | 'terms' | 'stock'>('issues');
   const open = useApi<any>(() => inputApplicationsApi.openCount(), []);
   const openN = Number(open.data?.open) || 0;
   if (!can('input_distribution', 'VIEW')) return <Empty title="You do not have access to this section" hint="Ask an administrator to grant the input distribution permission." />;
@@ -211,8 +214,8 @@ export default function InputsPage() {
   return (
     <div>
       <PageHeader title="Input Distribution" subtitle="Fertiliser, seed and chemicals given to farmers on credit. Each one is tied to the farmer’s Farm ID and signed for with a code sent to their phone." />
-      <Tabs tabs={[{ id: 'issues', label: 'Given to farmers' }, { id: 'apps', label: `Farmers’ applications${openN ? ` (${openN})` : ''}` }, { id: 'stock', label: 'In stock' }]} active={tab} onChange={(v) => setTab(v as 'issues' | 'apps' | 'stock')} />
-      <div style={{ marginTop: 14 }} key={tab}>{tab === 'issues' ? <Issues canSetup={canSetup} /> : tab === 'apps' ? <InputApplications onChanged={open.reload} /> : <Stock canSetup={canSetup} />}</div>
+      <Tabs tabs={[{ id: 'issues', label: 'Given to farmers' }, { id: 'apps', label: `Farmers’ applications${openN ? ` (${openN})` : ''}` }, { id: 'terms', label: 'Credit & interest' }, { id: 'stock', label: 'In stock' }]} active={tab} onChange={(v) => setTab(v as 'issues' | 'apps' | 'terms' | 'stock')} />
+      <div style={{ marginTop: 14 }} key={tab}>{tab === 'issues' ? <Issues canSetup={canSetup} /> : tab === 'apps' ? <InputApplications onChanged={open.reload} /> : tab === 'terms' ? <CreditTerms /> : <Stock canSetup={canSetup} />}</div>
     </div>
   );
 }

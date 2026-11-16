@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { SmsService } from '../messaging/sms.service';
 import { farmIdDisplay } from '../irrigation/irrigation-codes';
+import { CreditInterestService } from '../credit-interest/credit-interest.service';
 import { InputDistributionService } from './input-distribution.service';
 import { ApplyForInputsDto } from './dto/staff-tasks.dto';
 import { cents, num, tenantOf, tzs } from './common';
@@ -39,7 +40,17 @@ export class InputApplicationsService {
     private readonly ownership: OwnershipService,
     private readonly sms: SmsService,
     private readonly distribution: InputDistributionService,
+    private readonly interest: CreditInterestService,
   ) {}
+
+  /** The fixed terms, plus the AMCOS's own interest terms when it charges interest, so the farmer consents to them too. */
+  private async termsLines(mamcosId: string, language?: string | null) {
+    const lang = language === 'en' ? 'en' : 'sw';
+    const lines = [...termsFor(language)];
+    const i = await this.interest.describe(mamcosId, lang);
+    if (i.enabled) lines.splice(2, 0, i.text);
+    return lines;
+  }
 
   // ───────────────────────── the farmer's side ─────────────────────────
 
@@ -59,7 +70,7 @@ export class InputApplicationsService {
   async options(actor: RequestUser) {
     const f = await this.me(actor);
     const [hectares, items] = await Promise.all([this.hectaresOf(f.id), this.availableItems(f.mamcosId)]);
-    return { hectares, items, terms: { version: TERMS_VERSION, lines: termsFor(f.user?.language) }, blocked: f.isBlacklisted ? 'You cannot apply for inputs on credit right now. Please visit the AMCOS office.' : null };
+    return { hectares, items, terms: { version: TERMS_VERSION, lines: await this.termsLines(f.mamcosId, f.user?.language) }, blocked: f.isBlacklisted ? 'You cannot apply for inputs on credit right now. Please visit the AMCOS office.' : null };
   }
 
   private async availableItems(mamcosId: string) {
@@ -95,7 +106,7 @@ export class InputApplicationsService {
     });
     const open = await this.prisma.inputApplication.count({ where: { farmerId: f.id, status: { in: ['SUBMITTED', 'PARTLY_ISSUED'] } } });
     if (open >= 3) throw new ConflictException('You already have applications waiting. Wait for the AMCOS to answer them first');
-    const text = termsFor(f.user?.language).map((t, i) => `${i + 1}. ${t}`).join('\n');
+    const text = (await this.termsLines(f.mamcosId, f.user?.language)).map((t, i) => `${i + 1}. ${t}`).join('\n');
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
         const row = await this.prisma.inputApplication.create({

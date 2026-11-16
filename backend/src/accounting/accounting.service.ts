@@ -44,6 +44,7 @@ const CHART = [
   ['4230', 'Fertiliser sales to members', AccountType.INCOME],
   ['4240', 'Tool registration fees', AccountType.INCOME],
   ['4250', 'Tool contribution income', AccountType.INCOME],
+  ['4260', 'Interest on input credit', AccountType.INCOME],
   ['4300', 'Gain or loss on disposal of assets', AccountType.INCOME],
   ['4400', 'Grants and donations', AccountType.INCOME],
   ['4410', 'Service and hire income', AccountType.INCOME],

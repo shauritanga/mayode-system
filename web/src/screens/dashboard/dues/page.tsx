@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Modal from '@/components/Modal';
 import { MoneyAccountSelect } from '@/screens/dashboard/accounting/controls';
-import { chargesApi, communicationsApi, duesApi } from '@/lib/api';
+import { chargesApi, communicationsApi, creditInterestApi, duesApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import {
   ConfirmDialog, Empty, Field, Filters, FormGrid, LoadError, Notice, PageHeader, Pager, StatCard, TableSkeleton, Tabs,
@@ -14,7 +14,7 @@ import {
 import MoneyInput from '@/components/MoneyInput';
 import ExportIcons, { saveDownload } from '@/components/ExportIcons';
 
-const CATEGORY_LABEL: Record<string, string> = { LEVY: 'Levy', MEMBERSHIP_FEE: 'Membership fee', CANAL_CLEANING: 'Canal cleaning', FERTILISER: 'Farm inputs', OTHER: 'Other' };
+const CATEGORY_LABEL: Record<string, string> = { LEVY: 'Levy', MEMBERSHIP_FEE: 'Membership fee', CANAL_CLEANING: 'Canal cleaning', FERTILISER: 'Farm inputs', INTEREST: 'Interest on inputs', OTHER: 'Other' };
 const CHARGE_CATEGORIES = ['LEVY', 'MEMBERSHIP_FEE', 'CANAL_CLEANING', 'OTHER'];
 const METHOD_LABEL: Record<string, string> = { CASH: 'Cash', MOBILE_MONEY: 'Mobile money', BANK: 'Bank', HARVEST_DEDUCTION: 'Deducted from harvest payment' };
 const STATE_LABEL: Record<string, string> = { OPEN: 'Not paid', PARTIAL: 'Part paid', PAID: 'Paid', CANCELLED: 'Cancelled' };
@@ -90,25 +90,60 @@ export function FarmerPicker({ value, onChange, error }: { value: any; onChange:
   );
 }
 
+/** What one input credit costs: the inputs themselves, the interest added so far, and what is still owed on each. */
+function CreditBreakdown({ acct }: { acct: any }) {
+  if (!acct || (!acct.enabled && !acct.interest.items.length)) return null;
+  const row = (label: string, a: number, b: number, c: number, strong = false) => (
+    <tr style={strong ? { fontWeight: 700 } : undefined}><td>{label}</td><td className="num">{tzs(a)}</td><td className="num">{tzs(b)}</td><td className="num">{tzs(c)}</td></tr>);
+  return (
+    <section style={{ marginBottom: 14 }}>
+      <table className="data-table">
+        <thead><tr><th /><th className="num">Charged</th><th className="num">Paid</th><th className="num">Owed</th></tr></thead>
+        <tbody>
+          {row('Inputs (principal)', acct.principal.amount, acct.principal.paid, acct.principal.balance)}
+          {row('Interest', acct.interest.charged, acct.interest.paid, acct.interest.balance)}
+          {row('Total', acct.principal.amount + acct.interest.charged, acct.principal.paid + acct.interest.paid, acct.totalOwed, true)}
+        </tbody>
+      </table>
+      {acct.interest.items.length > 0 && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>{acct.interest.items.map((i: any) => `${i.ratePercent}% on ${tzs(i.base)} (${i.periodEnd}): ${tzs(i.amount)}`).join(' · ')}</div>}
+      {acct.next && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Next interest on {fmtDate(acct.next.on)}: about {tzs(acct.next.estimate)} ({acct.next.ratePercent}%) if it is not paid before then.</div>}
+      {acct.totalOwed > 0 && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>A payment settles {acct.paymentOrder === 'INTEREST_FIRST' ? 'the interest first, then the inputs' : 'the inputs first, then the interest'}.</div>}
+    </section>
+  );
+}
+
 function PayModal({ due, onClose, onSaved }: { due: any; onClose: () => void; onSaved: (m: string) => void }) {
   const [form, setForm] = useState({ amount: String(due.balance), paidOn: todayISO(), method: 'CASH', cashAccountId: '', reference: '', note: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  // inputs given on credit may carry interest: the payment then settles both, and each is receipted
+  const credit = useApi<any>(due.category === 'FERTILISER' ? () => creditInterestApi.account(due.id) : null, [due.id]);
+  const acct = credit.data;
+  const withInterest = !!acct && (acct.enabled || acct.interest.items.length > 0);
+  const owedNow = withInterest ? acct.totalOwed : due.balance;
+  useEffect(() => { if (withInterest) setForm((f) => ({ ...f, amount: String(owedNow) })); }, [withInterest, owedNow]);
   const save = async () => {
     const amount = Number(form.amount);
     if (!(amount > 0)) { setError('Enter the amount paid'); return; }
-    if (amount > due.balance) { setError(`Only ${tzs(due.balance)} is still owed`); return; }
+    if (amount > owedNow) { setError(`Only ${tzs(owedNow)} is still owed`); return; }
     if (form.paidOn > todayISO()) { setError('The payment date cannot be in the future'); return; }
     setSaving(true); setError('');
     try {
-      const p: any = (await duesApi.pay(due.id, { amount, paidOn: form.paidOn, method: form.method, cashAccountId: form.cashAccountId || undefined, reference: form.reference.trim() || undefined, note: form.note.trim() || undefined })).data;
+      const body = { amount, paidOn: form.paidOn, method: form.method, cashAccountId: form.cashAccountId || undefined, reference: form.reference.trim() || undefined, note: form.note.trim() || undefined };
+      if (withInterest) {
+        const r: any = (await creditInterestApi.pay(due.id, body)).data;
+        onSaved(`Payment recorded. Receipts ${r.receipts.map((x: any) => `${x.receiptNo} (${x.kind} ${tzs(x.amount)})`).join(', ')}. ${r.stillOwed > 0 ? `Still owed: ${tzs(r.stillOwed)}.` : 'Fully paid.'} The farmer was sent it by SMS.`);
+        return;
+      }
+      const p: any = (await duesApi.pay(due.id, body)).data;
       onSaved(`Payment recorded. Receipt ${p.receiptNo}${p.farmIds?.length ? ` for Farm ID ${p.farmIds.join(', ')}` : ''}. The farmer was sent it by SMS.`);
     } catch (e) { setError(errMsg(e)); setSaving(false); }
   };
   return (
-    <Modal title="Record payment" subtitle={`${due.farmer.name} · ${due.description} · owes ${tzs(due.balance)}`} onClose={() => !saving && onClose()} width="520px"
+    <Modal title="Record payment" subtitle={`${due.farmer.name} · ${due.description} · owes ${tzs(owedNow)}${withInterest ? ' with interest' : ''}`} onClose={() => !saving && onClose()} width="520px"
       footer={<Footer onClose={onClose} saving={saving} form="pay-form" label="Record payment" />}>
+      <CreditBreakdown acct={withInterest ? acct : null} />
       <form id="pay-form" onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
         <FormGrid>
           <Field label="Amount (TZS) *"><MoneyInput min="1" className="input-field" value={form.amount} onChange={(e) => set('amount', e.target.value)} autoFocus /></Field>
@@ -167,6 +202,7 @@ function DueDetail({ id, can, onClose, onChanged }: { id: string; can: (r: strin
   const [message, setMessage] = useState('');
   const done = (m: string) => { setSub(null); setMessage(m); reload(); onChanged(); };
   const live = d && d.state !== 'CANCELLED';
+  const credit = useApi<any>(d?.category === 'FERTILISER' ? () => creditInterestApi.account(id) : null, [id, d?.category]);
   return (
     <Modal title={d ? `${d.farmer.name} · ${d.description}` : 'Due'} onClose={onClose} width="680px"
       footer={d && live ? (
@@ -190,6 +226,7 @@ function DueDetail({ id, can, onClose, onChanged }: { id: string; can: (r: strin
             {d.waivedAmount > 0 && <> · waived {tzs(d.waivedAmount)} ({d.waivedReason})</>}
             {d.state === 'CANCELLED' && <> · cancelled ({d.cancelReason})</>}
           </div>
+          <CreditBreakdown acct={credit.data} />
           <section>
             <strong>Payments</strong>
             {!d.payments.length ? <p className="muted" style={{ fontSize: 13 }}>No payment yet.</p> : (

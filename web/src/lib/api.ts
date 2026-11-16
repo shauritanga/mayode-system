@@ -1151,6 +1151,17 @@ export const inputApplicationsApi = {
   approve: (id: string, data?: object) => api.post(`/input-applications/${id}/approve`, data ?? {}),
   reject: (id: string, reason: string) => api.post(`/input-applications/${id}/reject`, { reason }),
 };
+export const creditInterestApi = {
+  terms: () => api.get('/credit-interest/terms'),
+  saveTerms: (data: object) => api.put('/credit-interest/terms', data),
+  addRate: (data: object) => api.post('/credit-interest/rates', data),
+  updateRate: (id: string, data: object) => api.put(`/credit-interest/rates/${id}`, data),
+  removeRate: (id: string) => api.delete(`/credit-interest/rates/${id}`),
+  accrue: () => api.post('/credit-interest/accrue'),
+  preview: (amount: number) => api.get('/credit-interest/preview', { params: { amount } }),
+  account: (dueId: string) => api.get(`/credit-interest/credit/${dueId}`),
+  pay: (dueId: string, data: object) => api.post(`/credit-interest/credit/${dueId}/pay`, data),
+};
 export const purchaseOrdersApi = {
   list: (params?: object) => api.get('/purchase-orders', { params }),
   get: (id: string) => api.get(`/purchase-orders/${id}`),

@@ -23,7 +23,7 @@ const fullName = (f: { firstName: string; lastName: string }) => `${f.firstName}
 
 /** Where a payment of each kind of due is booked as income (or, for fertiliser, as the receivable coming down). */
 const CREDIT_ACCOUNT: Record<DueCategory, string> = {
-  LEVY: '4210', MEMBERSHIP_FEE: '4200', CANAL_CLEANING: '4220', FERTILISER: '1310', HARVEST_FEE: '4210', OTHER: '4210',
+  LEVY: '4210', MEMBERSHIP_FEE: '4200', CANAL_CLEANING: '4220', FERTILISER: '1310', HARVEST_FEE: '4210', OTHER: '4210', INTEREST: '4260',
 };
 
 const farmerSelect = { id: true, firstName: true, lastName: true, controlNumber: true, user: { select: { phone: true } } } as const;
@@ -342,7 +342,8 @@ export class DuesService {
     return `RCT-${String(n + 1).padStart(6, '0')}`;
   }
 
-  async recordPayment(actor: RequestUser, id: string, dto: RecordPaymentDto, mamcosIdParam?: string) {
+  /** `silent`: the caller sends one receipt text for several parts of a single payment. */
+  async recordPayment(actor: RequestUser, id: string, dto: RecordPaymentDto, mamcosIdParam?: string, opts?: { silent?: boolean }) {
     const mamcosId = this.tenant(actor, mamcosIdParam);
     const paidOn = dto.paidOn ? day(dto.paidOn) : today();
     if (paidOn > today()) throw new BadRequestException('The payment date cannot be in the future');
@@ -386,7 +387,7 @@ export class DuesService {
       throw e;
     }
     this.settled(mamcosId, payment.farmerId);
-    void this.sendReceipt(mamcosId, payment.farmerId, payment, due!.description, id);
+    if (!opts?.silent) void this.sendReceipt(mamcosId, payment.farmerId, payment, due!.description, id);
     return { ...payment, farmIds: await this.farmIdsOf(payment.farmerId) };
   }
 

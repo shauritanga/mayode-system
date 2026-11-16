@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AccountingModule } from '../accounting/accounting.module';
+import { CreditInterestModule } from '../credit-interest/credit-interest.module';
 import { InputStockModule } from '../input-stock/input-stock.module';
 import { CashDrawerController, ComplianceReportController, InputDistributionController, InputApplicationsController, MaintenanceController, PurchaseOrdersController, InputSetupController } from './staff-tasks.controller';
 import { CashDrawerService } from './cash-drawer.service';
@@ -11,7 +12,7 @@ import { ComplianceReportService } from './compliance-report.service';
 import { InputSetupService } from './input-setup.service';
 
 @Module({
-  imports: [AccountingModule, InputStockModule],
+  imports: [AccountingModule, InputStockModule, CreditInterestModule],
   controllers: [InputSetupController, CashDrawerController, InputDistributionController, PurchaseOrdersController, MaintenanceController, ComplianceReportController],
   providers: [InputApplicationsService, CashDrawerService, InputDistributionService, PurchaseOrdersService, MaintenanceService, ComplianceReportService, InputSetupService],
 })

@@ -33,7 +33,7 @@ describeDb('Input applications from the app (PostgreSQL)', () => {
     const ownership = new OwnershipService(prisma as any);
     const sms: any = { send: async (to: string, text: string) => { texts.push({ to, text }); } };
     dist = new InputDistributionService(prisma as any, ownership, new AccountingService(prisma as any, ownership), sms, new InputStockService(prisma as any, ownership));
-    svc = new InputApplicationsService(prisma as any, ownership, sms, dist);
+    svc = new InputApplicationsService(prisma as any, ownership, sms, dist, { describe: async () => ({ enabled: false, text: '' }) } as any);
     tag = randomUUID().slice(0, 5);
     mamcosA = (await prisma.mamcos.create({ data: { name: `Apps A ${tag}` } })).id;
     mamcosB = (await prisma.mamcos.create({ data: { name: `Apps B ${tag}` } })).id;

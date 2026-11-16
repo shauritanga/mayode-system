@@ -5581,6 +5581,8 @@ enum DueCategory {
   FERTILISER
   HARVEST_FEE
   OTHER
+  /// Interest charged on fertiliser taken on credit (see InputCreditTerms).
+  INTEREST
 }
 
 enum DueBasis {
@@ -6912,6 +6914,57 @@ model InputApplicationLine {
 
   @@index([applicationId])
   @@map("input_application_lines")
+}
+
+/// How one AMCOS charges interest (riba) on inputs given on credit. Nothing is built in: it is off until the AMCOS turns it on and sets its own rates.
+model InputCreditTerms {
+  mamcosId     String   @id @map("mamcos_id")
+  enabled      Boolean  @default(false)
+  /// MONTHLY: interest is added each month the credit stays unpaid. SEASON: once for each season (rate entry) that ends while it is unpaid.
+  period       String   @default("MONTHLY")
+  /// Days after the inputs are given before interest starts to count.
+  graceDays    Int      @default(0) @map("grace_days")
+  /// INTEREST_FIRST or PRINCIPAL_FIRST: what a payment settles first.
+  paymentOrder String   @default("INTEREST_FIRST") @map("payment_order")
+  updatedById  String?  @map("updated_by_id")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("input_credit_terms")
+}
+
+/// An interest rate the AMCOS has set for a stretch of time (a season, or any run of months). The rate is per period: per month, or per season.
+model InputInterestRate {
+  id          String    @id @default(uuid())
+  mamcosId    String    @map("mamcos_id")
+  label       String
+  ratePercent Decimal   @map("rate_percent") @db.Decimal(7, 3)
+  validFrom   DateTime  @map("valid_from") @db.Date
+  validTo     DateTime? @map("valid_to") @db.Date
+  seasonId    String?   @map("season_id")
+  createdById String?   @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([mamcosId, validFrom])
+  @@map("input_interest_rates")
+}
+
+/// One period's interest, added to a fertiliser debt as its own charge. The (debt, period) pair is unique so it is never added twice.
+model InputInterestAccrual {
+  id             String   @id @default(uuid())
+  mamcosId       String   @map("mamcos_id")
+  principalDueId String   @map("principal_due_id")
+  interestDueId  String   @map("interest_due_id")
+  periodKey      String   @map("period_key")
+  periodEnd      DateTime @map("period_end") @db.Date
+  basePrincipal  Decimal  @map("base_principal") @db.Decimal(14, 2)
+  ratePercent    Decimal  @map("rate_percent") @db.Decimal(7, 3)
+  amount         Decimal  @db.Decimal(14, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([principalDueId, periodKey])
+  @@index([mamcosId])
+  @@index([interestDueId])
+  @@map("input_interest_accruals")
 }
 
 enum PurchaseOrderStatus {

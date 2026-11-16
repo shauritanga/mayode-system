@@ -70,6 +70,7 @@ import { MeetingsModule } from './meetings/meetings.module';
 import { TendersModule } from './tenders/tenders.module';
 import { WaterModule } from './water/water.module';
 import { StaffTasksModule } from './staff-tasks/staff-tasks.module';
+import { CreditInterestModule } from './credit-interest/credit-interest.module';
 import { FarmDefaultsModule } from './farm-defaults/farm-defaults.module';
 import { CommunicationsModule } from './communications/communications.module';
 import { AccountingModule } from './accounting/accounting.module';
@@ -160,6 +161,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     TendersModule,
     WaterModule,
     StaffTasksModule,
+    CreditInterestModule,
     FarmDefaultsModule,
     CommunicationsModule,
     GovernanceModule,
