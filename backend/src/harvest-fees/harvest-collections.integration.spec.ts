@@ -107,7 +107,7 @@ describeDb('Combine harvest payments (PostgreSQL)', () => {
   });
 
   let firstId: string;
-  it('shows who farms the Farm ID and who the leaders are, then records the payment with a receipt and texts all three', async () => {
+  it('shows who farms the Farm ID and who the leaders are, then records the payment with a receipt and texts the harvester owner and both leaders', async () => {
     const riceName = `Super ${randomUUID().slice(0, 5)}`;
     const riceId = (await prisma.riceVariety.create({ data: { name: riceName } })).id;
     const ctx: any = await svc.context(blockLeader, '1:1R-1');
@@ -120,8 +120,9 @@ describeDb('Combine harvest payments (PostgreSQL)', () => {
     expect(r.riceType).toBe(riceName);
     await expect(svc.create(blockLeader, { farmId: '1:1R-1', registrationNumber: 't123abc', bags: 1, amount: 1, riceVarietyId: randomUUID() } as any)).rejects.toThrow(/rice type/);
     expect(r.amcos).toContain('Madibira');
-    const asha = sentTo((global as any).__asha)[0].text; const canal = sentTo((global as any).__cl)[0].text; const block = sentTo((global as any).__bl)[0].text;
-    expect(asha).toMatch(/Asante\. Madibira.* imepokea malipo ya uvunaji.*Shamba 1:1R-1.*T123ABC/);
+    expect(sentTo((global as any).__asha)).toHaveLength(0); // the farmer is not texted
+    const asha = texts.find((t) => t.to.endsWith('711000111'))!.text; const canal = sentTo((global as any).__cl)[0].text; const block = sentTo((global as any).__bl)[0].text;
+    expect(asha).toMatch(/Asante\. Madibira.* imepokea malipo ya uvunaji.*Shamba 1:1R-1.*T123ABC.*Kilimo Hire Ltd/); // the harvester owner
     expect(canal).toMatch(/combine T123ABC harvested Farm ID 1:1R-1 \(Asha Test\).*collected by BlockLeader/); // the canal leader reads English
     expect(block).toMatch(/kombaini T123ABC/);
   });

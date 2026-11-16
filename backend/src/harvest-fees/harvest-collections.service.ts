@@ -259,14 +259,9 @@ export class HarvestCollectionsService {
     ]);
     const farm = farmIdDisplay(hectare.code); const amcos = mamcos?.name ?? 'AMCOS'; const reg = row.combine.registrationNumber; const bags = thousandths(num(row.totalBags));
     const send = async (phone: string | null | undefined, body: string) => { if (phone) await this.sms.send(phone, body, 'harvest_collection').catch(() => undefined); };
-    if (farmer) {
-      const en = farmer.user?.language === 'en';
-      const text = en
-        ? `Thank you. ${amcos} has received the combine harvesting payment for Farm ID ${farm} (combine ${reg}, ${bags} bags), ${tzs(num(row.amount))}. Receipt ${row.receiptNo}. We appreciate your cooperation.`
-        : `Asante. ${amcos} imepokea malipo ya uvunaji wa kombaini kwa Shamba ${farm} (kombaini ${reg}, mifuko ${bags}), ${tzs(num(row.amount))}. Stakabadhi ${row.receiptNo}. Tunathamini ushirikiano wako.`;
-      if (farmer.user?.phone) await send(farmer.user.phone, text);
-      for (const sv of await supervisorsOfFarmer(this.prisma, farmer.id)) if (sv.phone !== farmer.user?.phone) await send(sv.phone, text);
-    }
+    // The combine harvester's owner is told, not the farmer: the owner is the one who is paid.
+    await send(row.combine.ownerPhone,
+      `Asante. ${amcos} imepokea malipo ya uvunaji wa kombaini kwa Shamba ${farm} (kombaini ${reg}, mifuko ${bags}), ${tzs(num(row.amount))}. Stakabadhi ${row.receiptNo}. Mmiliki: ${row.combine.ownerName}.`);
     for (const l of await this.leadersOfBlock(hectare.block)) {
       const en = l.language === 'en';
       await send(l.phone, en

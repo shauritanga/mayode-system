@@ -115,7 +115,7 @@ function RecordModal({ onClose, onDone }: { onClose: () => void; onDone: (m: str
     try {
       const r: any = await harvestCollectionsApi.create({ farmId: farmIdText.trim(), registrationNumber: reg.trim(), riceVarietyId: riceId || undefined, harvestedOn: day, baskets: baskets ? Number(baskets) : undefined, quantityKg: kg ? Number(kg) : undefined, amount: Number(amount), collected: received, collectorFarmerId: received && collector ? collector : undefined, note: note.trim() || undefined });
       printReceipt(r.data);
-      onDone(`${r.data.receiptNo} saved${r.data.status === 'COLLECTED' ? ': the farmer and both leaders were texted.' : '. It is pending until the leader records the money.'}`);
+      onDone(`${r.data.receiptNo} saved${r.data.status === 'COLLECTED' ? ': the harvester owner and both leaders were texted.' : '. It is pending until the leader records the money.'}`);
       onClose();
     } catch (e) { setError(errMsg(e, 'Could not save the payment.')); setBusy(false); }
   };
@@ -168,7 +168,7 @@ function RecordModal({ onClose, onDone }: { onClose: () => void; onDone: (m: str
                 {amount !== '' && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="muted">Amount paid</span><span>{tzs(Number(amount))}</span></div>}
               </div>
               <div style={{ marginTop: 10, borderRadius: 8, padding: '9px 12px', fontSize: 13, fontWeight: 600, background: received ? 'rgba(74,222,128,.12)' : 'rgba(251,191,36,.12)', color: received ? 'var(--green-400, #4ade80)' : '#fbbf24' }}>
-                {received ? '✓ Confirming records the payment, prints the receipt, and texts the farmer and both leaders' : 'This will be saved as pending until the money is received'}
+                {received ? '✓ Confirming records the payment, prints the receipt, and texts the harvester owner and both leaders' : 'This will be saved as pending until the money is received'}
               </div>
             </div>
           )}
