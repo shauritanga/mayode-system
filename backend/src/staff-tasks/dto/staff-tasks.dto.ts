@@ -119,6 +119,27 @@ export class ApplyForInputsDto {
 }
 export class ApproveApplicationDto { @IsOptional() @IsUUID() warehouseId?: string; }
 export class ApplicationQueryDto {
-  @IsOptional() @IsIn(['OPEN', 'SUBMITTED', 'PARTLY_ISSUED', 'APPROVED', 'REJECTED', 'WITHDRAWN', 'ALL']) status?: string;
+  @IsOptional() @IsIn(['OPEN', 'SUBMITTED', 'READY', 'COLLECTED', 'PARTLY_ISSUED', 'APPROVED', 'REJECTED', 'WITHDRAWN', 'ALL']) status?: string;
+  @IsOptional() @IsString() mamcosId?: string;
+}
+
+export class CollectCodeDto { @IsString() @MinLength(8) @MaxLength(12) code: string; }
+export class CollectDto extends CollectCodeDto {
+  /** Hand over less than approved: the quantity for each line (never more than approved). */
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CollectLineDto) lines?: CollectLineDto[];
+}
+export class CollectLineDto {
+  @IsUUID() lineId: string;
+  @Type(() => Number) @IsNumber({ maxDecimalPlaces: 3 }) @Min(0) quantity: number;
+}
+export class MinimumDto {
+  @IsUUID() warehouseId: string;
+  @IsUUID() itemId: string;
+  /** Leave null to remove the minimum. */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) minQuantity?: number | null;
+}
+export class WarehouseQueryDto {
+  @IsOptional() @IsUUID() warehouseId?: string;
+  @IsOptional() @IsUUID() itemId?: string;
   @IsOptional() @IsString() mamcosId?: string;
 }

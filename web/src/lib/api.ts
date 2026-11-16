@@ -1150,6 +1150,15 @@ export const inputApplicationsApi = {
   openCount: () => api.get('/input-applications/open-count'),
   approve: (id: string, data?: object) => api.post(`/input-applications/${id}/approve`, data ?? {}),
   reject: (id: string, reason: string) => api.post(`/input-applications/${id}/reject`, { reason }),
+  resendCode: (id: string, data?: object) => api.post(`/input-applications/${id}/resend-code`, data ?? {}),
+  lookup: (code: string) => api.post('/input-applications/lookup', { code }),
+  collect: (code: string, lines?: { lineId: string; quantity: number }[]) => api.post('/input-applications/collect', { code, lines }),
+};
+export const inputWarehouseApi = {
+  minimums: () => api.get('/input-warehouse/minimums'),
+  setMinimum: (data: { warehouseId: string; itemId: string; minQuantity: number | null }) => api.post('/input-warehouse/minimums', data),
+  books: (params?: object) => api.get('/input-warehouse/books', { params }),
+  collections: (params?: object) => api.get('/input-warehouse/collections', { params }),
 };
 export const creditInterestApi = {
   terms: () => api.get('/credit-interest/terms'),

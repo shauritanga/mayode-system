@@ -5,7 +5,7 @@ import { Stack, useFocusEffect } from 'expo-router';
 import { inputApplicationsApi as api } from '../src/lib/api';
 import { useI18n } from '../src/i18n';
 
-const STATUS_COLOR: Record<string, string> = { SUBMITTED: '#F59E0B', PROCESSING: '#F59E0B', PARTLY_ISSUED: '#F59E0B', APPROVED: '#10B981', REJECTED: '#EF4444', WITHDRAWN: '#9CA3AF' };
+const STATUS_COLOR: Record<string, string> = { SUBMITTED: '#F59E0B', READY: '#3B82F6', COLLECTED: '#10B981', PROCESSING: '#F59E0B', PARTLY_ISSUED: '#F59E0B', APPROVED: '#10B981', REJECTED: '#EF4444', WITHDRAWN: '#9CA3AF' };
 const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${Math.round(n).toLocaleString()}`);
 const day = (v?: string | null) => (v ? new Date(v).toLocaleDateString() : '—');
 
@@ -74,6 +74,7 @@ export default function InputApplyScreen() {
                 <View style={styles.row}><Text style={styles.cardTitle}>{a.reference}</Text><Text style={{ fontSize: 12, fontWeight: '700', color: STATUS_COLOR[a.status] }}>{t(`inputApplyStatus_${a.status}` as any)}</Text></View>
                 <Text style={styles.line}>{a.lines.map((l: any) => `${l.item} ${l.quantity} ${l.unit}`).join(', ')}</Text>
                 <Text style={styles.muted}>Farm ID {a.farmIds.join(', ')} · {day(a.submittedAt)}</Text>
+                {!!a.warehouse && a.status === 'READY' && <Text style={[styles.line, { fontWeight: '700' }]}>{t('inputApplyCollectAt')}: {a.warehouse.name}{a.warehouse.location ? ` (${a.warehouse.location})` : ''}</Text>}
                 <Text style={styles.line}>{tzs(a.estimatedTotal)}</Text>
                 {!!a.rejectReason && <Text style={styles.muted}>{t('inputApplyReason')}: {a.rejectReason}</Text>}
                 {a.status === 'SUBMITTED' && <TouchableOpacity onPress={() => withdraw(a)}><Text style={[styles.link, { color: '#EF4444' }]}>{t('inputApplyWithdraw')}</Text></TouchableOpacity>}

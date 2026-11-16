@@ -10,6 +10,7 @@ import { CashDrawerService } from './cash-drawer.service';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AllowSelfService } from '../auth/decorators/allow-self-service.decorator';
+import { InputWarehouseService } from './input-warehouse.service';
 import { InputApplicationsService } from './input-applications.service';
 import { InputDistributionService } from './input-distribution.service';
 import { PurchaseOrdersService } from './purchase-orders.service';
@@ -17,7 +18,7 @@ import { MaintenanceService } from './maintenance.service';
 import { ComplianceReportService } from './compliance-report.service';
 import { InputSetupService } from './input-setup.service';
 import {
-  AcknowledgeDto, ApplyForInputsDto, ApproveApplicationDto, ApplicationQueryDto, CloseDrawerDto, CreateOrderDto, CreateScheduleDto, DoneDto, DrawerQueryDto, IssueInputDto, IssueQueryDto,
+  AcknowledgeDto, ApplyForInputsDto, ApproveApplicationDto, ApplicationQueryDto, CollectCodeDto, CollectDto, MinimumDto, WarehouseQueryDto, CloseDrawerDto, CreateOrderDto, CreateScheduleDto, DoneDto, DrawerQueryDto, IssueInputDto, IssueQueryDto,
   InputItemDto, InputStockDto, InputTypeDto, OrderQueryDto, ReasonDto, ReceiveDrawerDto, ReceiveOrderDto, UpdateScheduleDto,
 } from './dto/staff-tasks.dto';
 
@@ -71,8 +72,29 @@ export class InputApplicationsController {
   openCount(@CurrentUser() u: RequestUser, @Query('mamcosId') m?: string) { return this.svc.openCount(u, m); }
   @Post(':id/approve') @RequirePermission('input_distribution', 'CREATE')
   approve(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: ApproveApplicationDto, @Query('mamcosId') m?: string) { return this.svc.approve(u, id, dto.warehouseId, m); }
+  @Post(':id/resend-code') @RequirePermission('input_distribution', 'CREATE')
+  resend(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: ApproveApplicationDto, @Query('mamcosId') m?: string) { return this.svc.resend(u, id, dto.warehouseId, m); }
+  // the warehouse keeper
+  @Post('lookup') @RequirePermission('input_distribution', 'CREATE')
+  lookup(@CurrentUser() u: RequestUser, @Body() dto: CollectCodeDto, @Query('mamcosId') m?: string) { return this.svc.lookup(u, dto.code, m); }
+  @Post('collect') @RequirePermission('input_distribution', 'CREATE')
+  collect(@CurrentUser() u: RequestUser, @Body() dto: CollectDto, @Query('mamcosId') m?: string) { return this.svc.collect(u, dto.code, dto.lines, m); }
   @Post(':id/reject') @RequirePermission('input_distribution', 'EDIT')
   reject(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: ReasonDto, @Query('mamcosId') m?: string) { return this.svc.reject(u, id, dto.reason, m); }
+}
+
+/** Minimum stock, history and the books of each warehouse's input stock. */
+@ApiTags('input-warehouse') @ApiBearerAuth() @UseGuards(...guards) @Controller('input-warehouse')
+export class InputWarehouseController {
+  constructor(private readonly svc: InputWarehouseService) {}
+  @Get('minimums') @RequirePermission('input_distribution', 'VIEW')
+  minimums(@CurrentUser() u: RequestUser, @Query('mamcosId') m?: string) { return this.svc.minimums(u, m); }
+  @Post('minimums') @RequirePermission('input_distribution', 'EDIT')
+  setMinimum(@CurrentUser() u: RequestUser, @Body() dto: MinimumDto, @Query('mamcosId') m?: string) { return this.svc.setMinimum(u, { warehouseId: dto.warehouseId, itemId: dto.itemId, minQuantity: dto.minQuantity ?? null }, m); }
+  @Get('books') @RequirePermission('input_distribution', 'VIEW')
+  books(@CurrentUser() u: RequestUser, @Query() q: WarehouseQueryDto) { return this.svc.books(u, q, q.mamcosId); }
+  @Get('collections') @RequirePermission('input_distribution', 'VIEW')
+  collections(@CurrentUser() u: RequestUser, @Query() q: WarehouseQueryDto) { return this.svc.collections(u, q, q.mamcosId); }
 }
 
 @ApiTags('purchase-orders') @ApiBearerAuth() @UseGuards(...guards) @Controller('purchase-orders')

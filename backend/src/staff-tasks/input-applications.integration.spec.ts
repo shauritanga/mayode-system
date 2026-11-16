@@ -10,6 +10,7 @@ import { AccountingService } from '../accounting/accounting.service';
 import { InputStockService } from '../input-stock/input-stock.service';
 import { InputDistributionService } from './input-distribution.service';
 import { InputApplicationsService, TERMS_VERSION } from './input-applications.service';
+import { InputWarehouseService } from './input-warehouse.service';
 
 const BASE_URL = process.env.IRRIGATION_TEST_DATABASE_URL;
 const SCHEMA = 'irrigation_test';
@@ -19,6 +20,7 @@ describeDb('Input applications from the app (PostgreSQL)', () => {
   jest.setTimeout(120_000);
   let pool: Pool; let prisma: PrismaClient; let svc: InputApplicationsService; let dist: InputDistributionService;
   let mamcosA: string; let mamcosB: string; let tag: string; let itemId: string; let farmerId: string;
+  let wh1: string; let wh2: string; let keeper: RequestUser; let otherKeeper: RequestUser; const alerts: any[] = [];
   let farmer: RequestUser; let office: RequestUser; let outsider: RequestUser; let other: RequestUser;
   const texts: { to: string; text: string }[] = [];
   const grants = (list: [string, string][]) => ({ isActive: true, isSystem: false, permissions: list.map(([resource, action]) => ({ action, resource: { key: resource } })) });
@@ -33,7 +35,10 @@ describeDb('Input applications from the app (PostgreSQL)', () => {
     const ownership = new OwnershipService(prisma as any);
     const sms: any = { send: async (to: string, text: string) => { texts.push({ to, text }); } };
     dist = new InputDistributionService(prisma as any, ownership, new AccountingService(prisma as any, ownership), sms, new InputStockService(prisma as any, ownership));
-    svc = new InputApplicationsService(prisma as any, ownership, sms, dist, { describe: async () => ({ enabled: false, text: '' }) } as any);
+    const stock = new InputStockService(prisma as any, ownership);
+    const whs = new InputWarehouseService(prisma as any, ownership, stock, { create: async (n: any) => { alerts.push(n); } } as any);
+    svc = new InputApplicationsService(prisma as any, ownership, sms, dist, { describe: async () => ({ enabled: false, text: '' }) } as any, stock, whs);
+    (global as any).__whs = whs;
     tag = randomUUID().slice(0, 5);
     mamcosA = (await prisma.mamcos.create({ data: { name: `Apps A ${tag}` } })).id;
     mamcosB = (await prisma.mamcos.create({ data: { name: `Apps B ${tag}` } })).id;
@@ -52,6 +57,12 @@ describeDb('Input applications from the app (PostgreSQL)', () => {
     const ou2 = await mkUser(mamcosA, UserRole.FARMER, phone());
     await prisma.farmer.create({ data: { userId: ou2, controlNumber: `AQ-${tag}`, firstName: 'Other', lastName: 'Farmer', mamcosId: mamcosA } });
     other = { id: ou2, role: UserRole.FARMER, mamcosId: mamcosA } as RequestUser;
+    wh1 = (await prisma.warehouse.create({ data: { mamcosId: mamcosA, name: 'Warehouse 01', location: 'Madibira', isDefaultForInputs: true } })).id;
+    wh2 = (await prisma.warehouse.create({ data: { mamcosId: mamcosA, name: 'Warehouse 02' } })).id;
+    const ku = await mkUser(mamcosA, UserRole.CUSTOM, phone()); const ku2 = await mkUser(mamcosA, UserRole.CUSTOM, phone());
+    await prisma.warehouseKeeper.create({ data: { warehouseId: wh1, userId: ku } }); await prisma.warehouseKeeper.create({ data: { warehouseId: wh2, userId: ku2 } });
+    const kg = grants([['input_distribution', 'VIEW'], ['input_distribution', 'CREATE']]);
+    keeper = { id: ku, role: UserRole.CUSTOM, mamcosId: mamcosA, customRole: kg } as RequestUser; otherKeeper = { id: ku2, role: UserRole.CUSTOM, mamcosId: mamcosA, customRole: kg } as RequestUser;
     itemId = (await prisma.farmInputItem.create({ data: { mamcosId: mamcosA, name: `Urea ${tag}`, type: 'FERTILIZER' as any, unit: 'kg', unitCost: 2_000 } })).id;
     await prisma.farmInputMovement.create({ data: { itemId, type: 'IN', quantity: 100, note: 'opening', createdByUserId: ou } });
   });
@@ -94,27 +105,70 @@ describeDb('Input applications from the app (PostgreSQL)', () => {
     await expect(svc.approve(outsider, appId, undefined)).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('approving gives the inputs out through Input Distribution: stock down, a charge, a code texted, marked as app', async () => {
-    const r: any = await svc.approve(office, appId, undefined);
-    expect(r.status).toBe('APPROVED');
-    const issues = await prisma.inputIssue.findMany({ where: { applicationId: appId } });
-    expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ channel: 'APP', quantity: 50, farmerId });
-    expect(Number(issues[0].amount)).toBe(100_000);
-    expect(texts.some((t) => /you received 50 kg/.test(t.text))).toBe(true);
-    expect((await prisma.farmInputMovement.aggregate({ where: { itemId }, _sum: { quantity: true } }))._sum.quantity).toBe(50);
-    expect(((await dist.list(office, {})) as any).data.find((x: any) => x.applicationId === appId).channel).toBe('APP');
-    await expect(svc.approve(office, appId, undefined)).rejects.toBeInstanceOf(ConflictException);
-    await expect(svc.withdraw(farmer, appId)).rejects.toBeInstanceOf(ConflictException);
+  let code = '';
+  it('approving names the warehouse and texts an authorization code, without touching stock', async () => {
+    const r: any = await svc.approve(office, appId, wh1);
+    expect(r).toMatchObject({ status: 'READY', warehouse: 'Warehouse 01', codeSent: true });
+    const sms = texts.filter((t) => /Collection code/.test(t.text)).pop()!.text;
+    expect(sms).toMatch(/Urea .* 50 kg/); expect(sms).toMatch(/Collect at: Warehouse 01 \(Madibira\)/);
+    code = /Collection code: ([A-Z0-9]{4}-[A-Z0-9]{4})/.exec(sms)![1];
+    expect((await prisma.farmInputMovement.aggregate({ where: { itemId }, _sum: { quantity: true } }))._sum.quantity).toBe(100); // nothing deducted yet
+    expect(await prisma.inputIssue.count({ where: { applicationId: appId } })).toBe(0);
+    await expect(svc.approve(office, appId, wh1)).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('holds an application when stock is short, then finishes it once stock is added', async () => {
-    const a: any = await svc.apply(farmer, form({ lines: [{ itemId, quantity: 50 }] }) as any);
-    await prisma.farmInputMovement.create({ data: { itemId, type: 'OUT', quantity: -30, note: 'used', createdByUserId: office.id } });
-    await expect(svc.approve(office, a.id, undefined)).rejects.toThrow(/Nothing was given/);
-    expect((await prisma.inputApplication.findUniqueOrThrow({ where: { id: a.id } })).status).toBe('SUBMITTED');
-    await prisma.farmInputMovement.create({ data: { itemId, type: 'IN', quantity: 60, note: 'new stock', createdByUserId: office.id } });
-    expect(((await svc.approve(office, a.id, undefined)) as any).status).toBe('APPROVED');
+  it('only the keeper of that warehouse can use the code; a wrong code is refused', async () => {
+    await expect(svc.lookup(otherKeeper, code)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(svc.lookup(keeper, 'AAAA-AAAA')).rejects.toBeInstanceOf(NotFoundException);
+    const l: any = await svc.lookup(keeper, code.toLowerCase().replace('-', ' '));
+    expect(l).toMatchObject({ reference: expect.stringMatching(/^APP-/), farmer: { name: 'Elisha Test' }, warehouse: { name: 'Warehouse 01' }, farmIds: ['9:1R-1'] });
+    expect(l.lines[0]).toMatchObject({ quantity: 50, inStock: 100 });
+  });
+
+  it('the keeper hands over: stock comes out of that warehouse, everything is recorded, and the code cannot be used again', async () => {
+    const lookup: any = await svc.lookup(keeper, code);
+    const r: any = await svc.collect(keeper, code, [{ lineId: lookup.lines[0].id, quantity: 40 }]); // the farmer takes 40 of the 50
+    expect(r.given).toEqual([expect.objectContaining({ name: expect.stringContaining('Urea'), qty: 40 })]);
+    const issue = await prisma.inputIssue.findFirstOrThrow({ where: { applicationId: appId } });
+    expect(issue).toMatchObject({ channel: 'APP', quantity: 40, farmerId, warehouseId: wh1, issuedById: keeper.id, ackStatus: 'ACKNOWLEDGED' });
+    expect(issue.farmIds).toEqual(['9:1R-1']);
+    expect(Number(issue.amount)).toBe(80_000);
+    expect((await prisma.farmInputMovement.aggregate({ where: { itemId }, _sum: { quantity: true } }))._sum.quantity).toBe(60);
+    expect(await prisma.farmInputMovement.count({ where: { refType: 'DISTRIBUTION', refId: issue.id, warehouseId: wh1 } })).toBeGreaterThan(0);
+    expect((await prisma.inputApplication.findUniqueOrThrow({ where: { id: appId } }))).toMatchObject({ status: 'COLLECTED', collectCodeHash: null, collectedById: keeper.id });
+    await expect(svc.lookup(keeper, code)).rejects.toBeInstanceOf(NotFoundException); // spent
+    await expect(svc.collect(keeper, code, undefined)).rejects.toBeInstanceOf(NotFoundException);
+    const h: any = await (global as any).__whs.collections(office, { warehouseId: wh1 });
+    expect(h.data[0]).toMatchObject({ warehouse: 'Warehouse 01', keeper: 'U Test', farmer: { name: 'Elisha Test' }, previous: 100, issued: 40, remaining: 60, applicationRef: expect.stringMatching(/^APP-/) });
+    const b: any = await (global as any).__whs.books(office, { warehouseId: wh1 });
+    expect(b.data[0].lines[0]).toMatchObject({ received: 100, issued: 40, remaining: 60 });
+  });
+
+  it('will not promise the same stock twice, and a short warehouse is refused', async () => {
+    const a: any = await svc.apply(farmer, form({ lines: [{ itemId, quantity: 40 }] }) as any);
+    const b: any = await svc.apply(farmer, form({ lines: [{ itemId, quantity: 40 }] }) as any);
+    await svc.approve(office, a.id, wh1); // 60 in stock, 40 now promised
+    await expect(svc.approve(office, b.id, wh1)).rejects.toThrow(/already promised/);
+    await expect(svc.approve(office, b.id, wh2)).rejects.toThrow(/does not have enough/); // warehouse 02 holds nothing
+    await svc.reject(office, b.id, 'Not enough stock'); await svc.reject(office, a.id, 'Changed my mind');
+  });
+
+  it('warns management once when a warehouse reaches its minimum, and again only after it is topped up', async () => {
+    const whs = (global as any).__whs as InputWarehouseService;
+    await whs.setMinimum(office, { warehouseId: wh1, itemId, minQuantity: 50 });
+    alerts.length = 0;
+    const a: any = await svc.apply(farmer, form({ lines: [{ itemId, quantity: 20 }] }) as any);
+    await svc.approve(office, a.id, wh1);
+    const code2 = /Collection code: ([A-Z0-9-]{9})/.exec(texts.filter((t) => /Collection code/.test(t.text)).pop()!.text)![1];
+    await svc.collect(keeper, code2, undefined); // 60 -> 40, below the minimum of 50
+    await new Promise((r) => setTimeout(r, 300));
+    expect((await whs.minimums(office) as any).data.find((x: any) => x.warehouseId === wh1 && x.itemId === itemId)).toMatchObject({ balance: 40, minQuantity: 50, low: true });
+    expect(await whs.checkLow(mamcosA, wh1)).toBe(0); // already told
+    const row = await prisma.inputStockThreshold.findFirstOrThrow({ where: { warehouseId: wh1, itemId } });
+    expect(row.lowSince).toBeTruthy();
+    await prisma.farmInputMovement.create({ data: { itemId, warehouseId: wh1, type: 'IN', quantity: 100, note: 'delivery', createdByUserId: office.id } });
+    await whs.checkLow(mamcosA, wh1);
+    expect((await prisma.inputStockThreshold.findFirstOrThrow({ where: { warehouseId: wh1, itemId } })).lowSince).toBeNull();
   });
 
   it('lets the farmer withdraw an unhandled application, and the office reject one with a reason', async () => {
@@ -126,5 +180,16 @@ describeDb('Input applications from the app (PostgreSQL)', () => {
     expect(((await svc.reject(office, b.id, 'Not enough stock this season')) as any).status).toBe('REJECTED');
     expect(texts.some((t) => /not approved.*Not enough stock/.test(t.text))).toBe(true);
     await expect(svc.reject(office, b.id, 'again')).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('a lost code is replaced: the old one stops working', async () => {
+    const a: any = await svc.apply(farmer, form({ lines: [{ itemId, quantity: 5 }] }) as any);
+    await svc.approve(office, a.id, wh1);
+    const first = /Collection code: ([A-Z0-9-]{9})/.exec(texts.filter((t) => /Collection code/.test(t.text)).pop()!.text)![1];
+    await svc.resend(office, a.id, undefined);
+    const second = /Collection code: ([A-Z0-9-]{9})/.exec(texts.filter((t) => /Collection code/.test(t.text)).pop()!.text)![1];
+    expect(second).not.toBe(first);
+    await expect(svc.lookup(keeper, first)).rejects.toBeInstanceOf(NotFoundException);
+    expect(((await svc.lookup(keeper, second)) as any).reference).toBe(a.reference);
   });
 });

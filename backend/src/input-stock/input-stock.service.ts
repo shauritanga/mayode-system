@@ -60,6 +60,11 @@ export class InputStockService {
     return out;
   }
 
+  /** What one warehouse holds of one item right now. */
+  async availableIn(itemId: string, mamcosId: string, warehouseId: string): Promise<number> {
+    return (await this.perWarehouse(this.prisma, itemId, mamcosId)).get(warehouseId) ?? 0;
+  }
+
   /** Filter for one warehouse's rows; rows with no warehouse belong to the default store. */
   private async whWhere(db: Db, mamcosId: string | null, warehouseId: string): Promise<Prisma.FarmInputMovementWhereInput> {
     const fallback = mamcosId ? await this.defaultWarehouse(db, mamcosId) : null;

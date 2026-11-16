@@ -6862,6 +6862,8 @@ model InputIssue {
   /// OFFICE (handed over at the AMCOS office) or APP (the farmer applied in the mobile app and the office approved it).
   channel       String  @default("OFFICE")
   applicationId String? @map("application_id")
+  /// The warehouse the goods left from (set when the keeper hands them over against an authorization code).
+  warehouseId   String? @map("warehouse_id")
 
   @@unique([mamcosId, reference])
   @@index([mamcosId, ackStatus])
@@ -6870,6 +6872,7 @@ model InputIssue {
   @@map("input_issues")
 }
 
+/// Statuses: SUBMITTED, READY (approved: the farmer collects at the warehouse with the code), COLLECTED, PARTLY_ISSUED, APPROVED (older: given at approval), REJECTED, WITHDRAWN.
 /// A farmer's request for inputs (fertilizer, seed, chemicals) made in the mobile app. The office reviews it; approving it issues the inputs
 /// through the normal Input Distribution flow (stock out, charge to the farmer, confirmation code), so both channels end up in one place.
 model InputApplication {
@@ -6889,6 +6892,13 @@ model InputApplication {
   decidedById  String?  @map("decided_by_id")
   decidedAt    DateTime? @map("decided_at")
   rejectReason String?  @map("reject_reason")
+  /// Where the farmer must collect, and the code the keeper checks. The code is kept hashed and is cleared once used.
+  warehouseId     String?   @map("warehouse_id")
+  collectCodeHash String?   @unique @map("collect_code_hash")
+  collectCodeHint String?   @map("collect_code_hint")
+  readyAt         DateTime? @map("ready_at")
+  collectedAt     DateTime? @map("collected_at")
+  collectedById   String?   @map("collected_by_id")
 
   lines InputApplicationLine[]
 
@@ -6965,6 +6975,23 @@ model InputInterestAccrual {
   @@index([mamcosId])
   @@index([interestDueId])
   @@map("input_interest_accruals")
+}
+
+/// The least of an input a warehouse should hold. When its stock falls to this, management is told (once, until it is topped up).
+model InputStockThreshold {
+  id          String    @id @default(uuid())
+  mamcosId    String    @map("mamcos_id")
+  warehouseId String    @map("warehouse_id")
+  itemId      String    @map("item_id")
+  minQuantity Float     @map("min_quantity")
+  /// Set while the stock is at or below the minimum and management has been told; cleared when it is back above.
+  lowSince    DateTime? @map("low_since")
+  updatedById String?   @map("updated_by_id")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([warehouseId, itemId])
+  @@index([mamcosId])
+  @@map("input_stock_thresholds")
 }
 
 enum PurchaseOrderStatus {

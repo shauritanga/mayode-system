@@ -9,6 +9,8 @@ import { farmId } from '@/lib/farm-id';
 import { useAuthStore } from '@/store/auth.store';
 import { InputApplications } from './Applications';
 import { CreditTerms } from './CreditTerms';
+import { Collect } from './Collect';
+import { WarehouseStock } from './WarehouseStock';
 import { FarmerPicker } from '@/screens/dashboard/dues/page';
 import { ConfirmDialog, Empty, Field, LoadError, Notice, PageHeader, StatCard, TableSkeleton, Tabs, errMsg, fmtDate, todayISO, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 
@@ -205,7 +207,7 @@ function Stock({ canSetup }: { canSetup: boolean }) {
 /** Procurement Officer: inputs handed to farmers, confirmed by the farmer's code. */
 export default function InputsPage() {
   const user = useAuthStore((s) => s.user); const can = useCan();
-  const [tab, setTab] = useState<'issues' | 'apps' | 'terms' | 'stock'>('issues');
+  const [tab, setTab] = useState<'issues' | 'apps' | 'collect' | 'whstock' | 'terms' | 'stock'>('issues');
   const open = useApi<any>(() => inputApplicationsApi.openCount(), []);
   const openN = Number(open.data?.open) || 0;
   if (!can('input_distribution', 'VIEW')) return <Empty title="You do not have access to this section" hint="Ask an administrator to grant the input distribution permission." />;
@@ -214,8 +216,8 @@ export default function InputsPage() {
   return (
     <div>
       <PageHeader title="Input Distribution" subtitle="Fertiliser, seed and chemicals given to farmers on credit. Each one is tied to the farmer’s Farm ID and signed for with a code sent to their phone." />
-      <Tabs tabs={[{ id: 'issues', label: 'Given to farmers' }, { id: 'apps', label: `Farmers’ applications${openN ? ` (${openN})` : ''}` }, { id: 'terms', label: 'Credit & interest' }, { id: 'stock', label: 'In stock' }]} active={tab} onChange={(v) => setTab(v as 'issues' | 'apps' | 'terms' | 'stock')} />
-      <div style={{ marginTop: 14 }} key={tab}>{tab === 'issues' ? <Issues canSetup={canSetup} /> : tab === 'apps' ? <InputApplications onChanged={open.reload} /> : tab === 'terms' ? <CreditTerms /> : <Stock canSetup={canSetup} />}</div>
+      <Tabs tabs={[{ id: 'issues', label: 'Given to farmers' }, { id: 'apps', label: `Farmers’ applications${openN ? ` (${openN})` : ''}` }, { id: 'collect', label: 'Collect with code' }, { id: 'whstock', label: 'Warehouse stock' }, { id: 'terms', label: 'Credit & interest' }, { id: 'stock', label: 'In stock' }]} active={tab} onChange={(v) => setTab(v as 'issues' | 'apps' | 'collect' | 'whstock' | 'terms' | 'stock')} />
+      <div style={{ marginTop: 14 }} key={tab}>{tab === 'issues' ? <Issues canSetup={canSetup} /> : tab === 'apps' ? <InputApplications onChanged={open.reload} /> : tab === 'collect' ? <Collect onChanged={open.reload} /> : tab === 'whstock' ? <WarehouseStock /> : tab === 'terms' ? <CreditTerms /> : <Stock canSetup={canSetup} />}</div>
     </div>
   );
 }

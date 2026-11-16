@@ -57,7 +57,11 @@ export class InputDistributionService {
     try { await this.sms.send(phone, body, 'input_issue'); return true; } catch (e) { this.logger.warn(`Could not text an input code: ${e instanceof Error ? e.message : e}`); return false; }
   }
 
-  async issue(actor: RequestUser, dto: IssueInputDto, mamcosIdParam?: string) {
+  /**
+   * `opts.collected`: the farmer already proved who they are with the authorization code at the warehouse, so the issue is signed for
+   * at once and no second code is texted. `applicationId` ties it to the farmer's app application.
+   */
+  async issue(actor: RequestUser, dto: IssueInputDto, mamcosIdParam?: string, opts?: { collected?: boolean; applicationId?: string }) {
     const mamcosId = tenantOf(this.ownership, actor, mamcosIdParam);
     const farmer = await this.prisma.farmer.findFirst({ where: { id: dto.farmerId, mamcosId }, select: { id: true, firstName: true, lastName: true, isBlacklisted: true, user: { select: { phone: true, language: true } } } });
     if (!farmer) throw new NotFoundException('Farmer not found');
@@ -76,7 +80,8 @@ export class InputDistributionService {
     const issue = await this.prisma.$transaction(async (tx) => {
       const reference = await this.nextReference(mamcosId);
       const issued = await tx.inputIssue.create({
-        data: { mamcosId, reference, farmerId: farmer.id, itemId: item.id, itemName: item.name, quantity: dto.quantity, unit: item.unit, unitPrice, amount, farmIds: plots, dueDate, ackCodeHash: 'pending', note: dto.note?.trim() || null, issuedById: actor.id },
+        data: { mamcosId, reference, farmerId: farmer.id, itemId: item.id, itemName: item.name, quantity: dto.quantity, unit: item.unit, unitPrice, amount, farmIds: plots, dueDate, ackCodeHash: 'pending', note: dto.note?.trim() || null, issuedById: actor.id,
+          ...(opts?.collected ? { ackStatus: 'ACKNOWLEDGED', ackAt: new Date(), ackById: actor.id } : {}), ...(opts?.applicationId ? { channel: 'APP', applicationId: opts.applicationId } : {}), warehouseId: dto.warehouseId ?? null },
       });
       await tx.inputIssue.update({ where: { id: issued.id }, data: { ackCodeHash: hash(issued.id, code) } });
       // the stock leaves under a lock, from the warehouse chosen (or the default store, then any other that holds it)
@@ -99,7 +104,7 @@ export class InputDistributionService {
       });
       throw e;
     }
-    const texted = await this.text(farmer.user.phone, farmer.user.language, { reference: issue.reference, item: item.name, qty: dto.quantity, unit: item.unit, amount, plots, due: dueDate, code });
+    const texted = opts?.collected ? false : await this.text(farmer.user.phone, farmer.user.language, { reference: issue.reference, item: item.name, qty: dto.quantity, unit: item.unit, amount, plots, due: dueDate, code });
     return { id: issue.id, reference: issue.reference, amount, farmIds: plots, ackStatus: 'PENDING', codeSent: texted };
   }
 
@@ -114,7 +119,7 @@ export class InputDistributionService {
       data: rows.map((r) => ({
         id: r.id, reference: r.reference, issuedAt: r.issuedAt, item: r.itemName, quantity: r.quantity, unit: r.unit, amount: num(r.amount), farmIds: r.farmIds, dueDate: r.dueDate,
         farmer: f.get(r.farmerId) ? { id: r.farmerId, name: `${f.get(r.farmerId)!.firstName} ${f.get(r.farmerId)!.lastName}`, memberNumber: f.get(r.farmerId)!.controlNumber } : null,
-        channel: r.channel, applicationId: r.applicationId,
+        channel: r.channel, applicationId: r.applicationId, warehouseId: r.warehouseId,
         ackStatus: r.ackStatus, ackAt: r.ackAt, locked: r.ackStatus === 'PENDING' && r.ackAttempts >= MAX_ATTEMPTS,
         daysWaiting: r.ackStatus === 'PENDING' ? Math.floor((Date.now() - +r.issuedAt) / 86_400_000) : null,
       })),
