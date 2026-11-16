@@ -1145,6 +1145,12 @@ export const inputDistributionApi = {
   acknowledge: (id: string, code: string) => api.post(`/input-distribution/${id}/acknowledge`, { code }),
   resend: (id: string) => api.post(`/input-distribution/${id}/resend`),
 };
+export const inputApplicationsApi = {
+  list: (params?: object) => api.get('/input-applications', { params }),
+  openCount: () => api.get('/input-applications/open-count'),
+  approve: (id: string, data?: object) => api.post(`/input-applications/${id}/approve`, data ?? {}),
+  reject: (id: string, reason: string) => api.post(`/input-applications/${id}/reject`, { reason }),
+};
 export const purchaseOrdersApi = {
   list: (params?: object) => api.get('/purchase-orders', { params }),
   get: (id: string) => api.get(`/purchase-orders/${id}`),

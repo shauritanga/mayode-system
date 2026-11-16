@@ -483,6 +483,13 @@ export const weatherWarningsApi = {
   setWhatsapp: (whatsappOptIn: boolean) => api.patch('/weather/preferences/me', { whatsappOptIn }),
 };
 
+export const inputApplicationsApi = {
+  options: () => api.get('/input-applications/options'),
+  mine: () => api.get('/input-applications/mine'),
+  apply: (data: { farmIds: string[]; lines: { itemId: string; quantity: number }[]; note?: string; acceptTerms: boolean; termsVersion: string }) => api.post('/input-applications', data),
+  withdraw: (id: string) => api.post(`/input-applications/${id}/withdraw`),
+};
+
 export const insuranceApplicationsApi = {
   insurers: () => api.get<{ id: string; name: string }[]>('/insurance/insurers'),
   risk: () => api.get<{ level: 'LOW' | 'MEDIUM' | 'HIGH'; factors: { label: string; detail: string }[] }>('/insurance/risk'),

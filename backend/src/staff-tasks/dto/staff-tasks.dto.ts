@@ -104,3 +104,21 @@ export class InputStockDto {
   @Type(() => Number) @IsNumber({ maxDecimalPlaces: 3 }) @Min(0.001) quantity: number;
   @IsOptional() @IsString() @MaxLength(200) note?: string;
 }
+
+export class ApplicationLineDto {
+  @IsUUID() itemId: string;
+  @Type(() => Number) @IsNumber({ maxDecimalPlaces: 3 }) @Min(0.001) @Max(100000) quantity: number;
+}
+/** A farmer's request for inputs, made in the mobile app. */
+export class ApplyForInputsDto {
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(50) @IsString({ each: true }) farmIds: string[];
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @ValidateNested({ each: true }) @Type(() => ApplicationLineDto) lines: ApplicationLineDto[];
+  @IsOptional() @IsString() @MaxLength(300) note?: string;
+  @IsBoolean() acceptTerms: boolean;
+  @IsString() termsVersion: string;
+}
+export class ApproveApplicationDto { @IsOptional() @IsUUID() warehouseId?: string; }
+export class ApplicationQueryDto {
+  @IsOptional() @IsIn(['OPEN', 'SUBMITTED', 'PARTLY_ISSUED', 'APPROVED', 'REJECTED', 'WITHDRAWN', 'ALL']) status?: string;
+  @IsOptional() @IsString() mamcosId?: string;
+}

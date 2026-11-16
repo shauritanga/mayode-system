@@ -6857,11 +6857,61 @@ model InputIssue {
   note        String?
   issuedById  String    @map("issued_by_id")
   issuedAt    DateTime  @default(now()) @map("issued_at")
+  /// OFFICE (handed over at the AMCOS office) or APP (the farmer applied in the mobile app and the office approved it).
+  channel       String  @default("OFFICE")
+  applicationId String? @map("application_id")
 
   @@unique([mamcosId, reference])
   @@index([mamcosId, ackStatus])
+  @@index([applicationId])
   @@index([farmerId])
   @@map("input_issues")
+}
+
+/// A farmer's request for inputs (fertilizer, seed, chemicals) made in the mobile app. The office reviews it; approving it issues the inputs
+/// through the normal Input Distribution flow (stock out, charge to the farmer, confirmation code), so both channels end up in one place.
+model InputApplication {
+  id          String   @id @default(uuid())
+  mamcosId    String   @map("mamcos_id")
+  reference   String
+  farmerId    String   @map("farmer_id")
+  /// SUBMITTED, PARTLY_ISSUED (approved but some lines still to give), APPROVED (all issued), REJECTED, WITHDRAWN.
+  status      String   @default("SUBMITTED")
+  farmIds     String[] @map("farm_ids")
+  note        String?
+  /// The terms the farmer accepted, kept as they were read.
+  termsVersion String  @map("terms_version")
+  termsText    String  @map("terms_text")
+  consentAt    DateTime @map("consent_at")
+  submittedAt  DateTime @default(now()) @map("submitted_at")
+  decidedById  String?  @map("decided_by_id")
+  decidedAt    DateTime? @map("decided_at")
+  rejectReason String?  @map("reject_reason")
+
+  lines InputApplicationLine[]
+
+  @@unique([mamcosId, reference])
+  @@index([mamcosId, status])
+  @@index([farmerId])
+  @@map("input_applications")
+}
+
+model InputApplicationLine {
+  id            String  @id @default(uuid())
+  applicationId String  @map("application_id")
+  itemId        String  @map("item_id")
+  itemName      String  @map("item_name")
+  unit          String
+  quantity      Float
+  /// The price when the farmer applied; the price at issue time is what is charged.
+  unitPrice     Decimal @map("unit_price") @db.Decimal(14, 2)
+  /// Set once this line has been given out (the InputIssue it became).
+  issueId       String? @map("issue_id")
+
+  application InputApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("input_application_lines")
 }
 
 enum PurchaseOrderStatus {

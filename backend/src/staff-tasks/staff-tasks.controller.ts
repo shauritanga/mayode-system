@@ -7,13 +7,17 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../common/ownership.service';
 import { CashDrawerService } from './cash-drawer.service';
+import { UserRole } from '@prisma/client';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { AllowSelfService } from '../auth/decorators/allow-self-service.decorator';
+import { InputApplicationsService } from './input-applications.service';
 import { InputDistributionService } from './input-distribution.service';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { MaintenanceService } from './maintenance.service';
 import { ComplianceReportService } from './compliance-report.service';
 import { InputSetupService } from './input-setup.service';
 import {
-  AcknowledgeDto, CloseDrawerDto, CreateOrderDto, CreateScheduleDto, DoneDto, DrawerQueryDto, IssueInputDto, IssueQueryDto,
+  AcknowledgeDto, ApplyForInputsDto, ApproveApplicationDto, ApplicationQueryDto, CloseDrawerDto, CreateOrderDto, CreateScheduleDto, DoneDto, DrawerQueryDto, IssueInputDto, IssueQueryDto,
   InputItemDto, InputStockDto, InputTypeDto, OrderQueryDto, ReasonDto, ReceiveDrawerDto, ReceiveOrderDto, UpdateScheduleDto,
 } from './dto/staff-tasks.dto';
 
@@ -45,6 +49,30 @@ export class InputDistributionController {
   acknowledge(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: AcknowledgeDto, @Query('mamcosId') m?: string) { return this.svc.acknowledge(u, id, dto.code, m); }
   @Post(':id/resend') @RequirePermission('input_distribution', 'EDIT')
   resend(@CurrentUser() u: RequestUser, @Param('id') id: string, @Query('mamcosId') m?: string) { return this.svc.resend(u, id, m); }
+}
+
+/** Farmers apply for inputs in the mobile app; the office reviews and approves. Both end up in Input Distribution. */
+@ApiTags('input-applications') @ApiBearerAuth() @UseGuards(...guards) @Controller('input-applications')
+export class InputApplicationsController {
+  constructor(private readonly svc: InputApplicationsService) {}
+  // the farmer's own
+  @Get('options') @Roles(UserRole.FARMER) @AllowSelfService()
+  options(@CurrentUser() u: RequestUser) { return this.svc.options(u); }
+  @Get('mine') @Roles(UserRole.FARMER) @AllowSelfService()
+  mine(@CurrentUser() u: RequestUser) { return this.svc.mine(u); }
+  @Post() @Roles(UserRole.FARMER) @AllowSelfService()
+  apply(@CurrentUser() u: RequestUser, @Body() dto: ApplyForInputsDto) { return this.svc.apply(u, dto); }
+  @Post(':id/withdraw') @Roles(UserRole.FARMER) @AllowSelfService()
+  withdraw(@CurrentUser() u: RequestUser, @Param('id') id: string) { return this.svc.withdraw(u, id); }
+  // the office
+  @Get() @RequirePermission('input_distribution', 'VIEW')
+  list(@CurrentUser() u: RequestUser, @Query() q: ApplicationQueryDto) { return this.svc.list(u, q, q.mamcosId); }
+  @Get('open-count') @RequirePermission('input_distribution', 'VIEW')
+  openCount(@CurrentUser() u: RequestUser, @Query('mamcosId') m?: string) { return this.svc.openCount(u, m); }
+  @Post(':id/approve') @RequirePermission('input_distribution', 'CREATE')
+  approve(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: ApproveApplicationDto, @Query('mamcosId') m?: string) { return this.svc.approve(u, id, dto.warehouseId, m); }
+  @Post(':id/reject') @RequirePermission('input_distribution', 'EDIT')
+  reject(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: ReasonDto, @Query('mamcosId') m?: string) { return this.svc.reject(u, id, dto.reason, m); }
 }
 
 @ApiTags('purchase-orders') @ApiBearerAuth() @UseGuards(...guards) @Controller('purchase-orders')

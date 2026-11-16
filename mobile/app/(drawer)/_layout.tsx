@@ -59,6 +59,7 @@ function FarmerDrawerContent(props: DrawerContentComponentProps) {
     { key: 'marketplace', label: t('marketplace'), icon: ShoppingCart02Icon, color: '#059669', onPress: () => go('/marketplace') },
     { key: 'finances', label: t('finances'), icon: Wallet01Icon, color: '#0F766E', onPress: () => go('/finances') },
     { key: 'payments', label: t('paymentsHistory'), icon: CoinsDollarIcon, color: '#10B981', onPress: () => go('/payments') },
+    { key: 'input-apply', label: t('inputApply'), icon: Package01Icon, color: '#065F46', onPress: () => go('/input-apply') },
     { key: 'insurance', label: t('insurance'), icon: Shield01Icon, color: '#047857', onPress: () => go('/insurance') },
     { key: 'inventory', label: t('warehouseStock'), icon: Package01Icon, color: '#0F766E', onPress: () => go('/inventory') },
     { key: 'calendar', label: t('calendar'), icon: Calendar01Icon, color: '#047857', onPress: () => go('/calendar') },

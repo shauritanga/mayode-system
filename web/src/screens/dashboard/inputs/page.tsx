@@ -4,9 +4,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Modal from '@/components/Modal';
-import { inputDistributionApi, inputStockApi } from '@/lib/api';
+import { inputApplicationsApi, inputDistributionApi, inputStockApi } from '@/lib/api';
 import { farmId } from '@/lib/farm-id';
 import { useAuthStore } from '@/store/auth.store';
+import { InputApplications } from './Applications';
 import { FarmerPicker } from '@/screens/dashboard/dues/page';
 import { ConfirmDialog, Empty, Field, LoadError, Notice, PageHeader, StatCard, TableSkeleton, Tabs, errMsg, fmtDate, todayISO, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 
@@ -137,7 +138,7 @@ function Issues({ canSetup }: { canSetup: boolean }) {
                   <td style={{ padding: '11px 14px', paddingLeft: 20 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                       <div aria-hidden style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(52,211,153,.18)', color: 'var(--accent, #34d399)', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>{initials(r.farmer?.name)}</div>
-                      <div><div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.farmer?.name ?? '—'}</div><div className="muted" style={{ fontSize: 11.5 }}>{r.reference} · {fmtDate(r.issuedAt)}</div></div>
+                      <div><div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.farmer?.name ?? '—'}</div><div className="muted" style={{ fontSize: 11.5 }}>{r.reference} · {fmtDate(r.issuedAt)}{r.channel === 'APP' ? ' · From app' : ''}</div></div>
                     </div>
                   </td>
                   <td style={{ padding: '11px 14px', fontWeight: 600, fontSize: 13.5 }}>{r.farmIds?.length ? r.farmIds.map(farmId).join(', ') : '—'}</td>
@@ -201,15 +202,17 @@ function Stock({ canSetup }: { canSetup: boolean }) {
 /** Procurement Officer: inputs handed to farmers, confirmed by the farmer's code. */
 export default function InputsPage() {
   const user = useAuthStore((s) => s.user); const can = useCan();
-  const [tab, setTab] = useState<'issues' | 'stock'>('issues');
+  const [tab, setTab] = useState<'issues' | 'apps' | 'stock'>('issues');
+  const open = useApi<any>(() => inputApplicationsApi.openCount(), []);
+  const openN = Number(open.data?.open) || 0;
   if (!can('input_distribution', 'VIEW')) return <Empty title="You do not have access to this section" hint="Ask an administrator to grant the input distribution permission." />;
   if (!user?.mamcosId) return <><PageHeader title="Input Distribution" /><Empty title="Inputs belong to an AMCOS" hint="Sign in with an AMCOS account." /></>;
   const canSetup = can('amcos_settings', 'EDIT');
   return (
     <div>
       <PageHeader title="Input Distribution" subtitle="Fertiliser, seed and chemicals given to farmers on credit. Each one is tied to the farmer’s Farm ID and signed for with a code sent to their phone." />
-      <Tabs tabs={[{ id: 'issues', label: 'Given to farmers' }, { id: 'stock', label: 'In stock' }]} active={tab} onChange={(v) => setTab(v as 'issues' | 'stock')} />
-      <div style={{ marginTop: 14 }} key={tab}>{tab === 'issues' ? <Issues canSetup={canSetup} /> : <Stock canSetup={canSetup} />}</div>
+      <Tabs tabs={[{ id: 'issues', label: 'Given to farmers' }, { id: 'apps', label: `Farmers’ applications${openN ? ` (${openN})` : ''}` }, { id: 'stock', label: 'In stock' }]} active={tab} onChange={(v) => setTab(v as 'issues' | 'apps' | 'stock')} />
+      <div style={{ marginTop: 14 }} key={tab}>{tab === 'issues' ? <Issues canSetup={canSetup} /> : tab === 'apps' ? <InputApplications onChanged={open.reload} /> : <Stock canSetup={canSetup} />}</div>
     </div>
   );
 }

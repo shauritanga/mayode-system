@@ -114,6 +114,7 @@ export class InputDistributionService {
       data: rows.map((r) => ({
         id: r.id, reference: r.reference, issuedAt: r.issuedAt, item: r.itemName, quantity: r.quantity, unit: r.unit, amount: num(r.amount), farmIds: r.farmIds, dueDate: r.dueDate,
         farmer: f.get(r.farmerId) ? { id: r.farmerId, name: `${f.get(r.farmerId)!.firstName} ${f.get(r.farmerId)!.lastName}`, memberNumber: f.get(r.farmerId)!.controlNumber } : null,
+        channel: r.channel, applicationId: r.applicationId,
         ackStatus: r.ackStatus, ackAt: r.ackAt, locked: r.ackStatus === 'PENDING' && r.ackAttempts >= MAX_ATTEMPTS,
         daysWaiting: r.ackStatus === 'PENDING' ? Math.floor((Date.now() - +r.issuedAt) / 86_400_000) : null,
       })),
