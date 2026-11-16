@@ -5,6 +5,7 @@ import { opsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { hasPermission } from '@/lib/nav';
 import { dateTime, day, downloadBlob, kg, label, openBlob } from '@/lib/ops';
+import { printBlob } from '@/lib/print';
 import { DataTable, ErrorNote, Facts, Field, FormGrid, Loading, Status, Tabs, useAction, useLoad } from './ui';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -194,6 +195,7 @@ function DispatchModal({ id, canRelease, canCancel, onClose, onChanged }: { id: 
   if (!d) return <Modal title="Dispatch" onClose={onClose} footer={<button className="btn-secondary" onClick={onClose}>Close</button>}>{loadError ? <ErrorNote message={loadError} /> : <Loading />}</Modal>;
   const act = async (fn: () => Promise<unknown>) => { if ((await run(fn)) !== undefined) { setPanel(null); await reload(); onChanged(); } };
   const pdf = async (download: boolean) => { const r = await run(() => opsApi.releaseNotePdf(id)); if (r) { if (download) downloadBlob(r.data as BlobPart, `${d.releaseNoteNumber ?? d.reference}.pdf`, 'application/pdf'); else openBlob(r.data as BlobPart); } };
+  const printNote = async () => { const r = await run(() => opsApi.releaseNotePdf(id)); if (r) await printBlob(r.data as BlobPart); };
   const whatsapp = async () => { const r = await run(() => opsApi.shareDispatch(id)); if (r) { window.open((r.data as any).whatsappLink, '_blank', 'noopener'); setShareNote(`Link: ${(r.data as any).url}`); } };
   return (
     <Modal title={`${d.reference}${d.releaseNoteNumber ? ` · ${d.releaseNoteNumber}` : ''}`} subtitle={`${d.order.reference} · ${d.order.customer.name}`} width="820px" onClose={onClose}
@@ -215,7 +217,8 @@ function DispatchModal({ id, canRelease, canCancel, onClose, onChanged }: { id: 
       <DataTable rows={d.lines} rowKey={(l: any) => l.id} columns={[{ header: 'Product', render: (l: any) => l.orderLine?.product?.name ?? '—' }, { header: 'Batch', render: (l: any) => l.batch?.reference ?? '—' }, { header: 'Quantity', align: 'right', render: (l: any) => kg(l.quantityKg) }, { header: 'Packages', align: 'right', render: (l: any) => l.packages ?? '—' }]} />
       {d.releaseNoteNumber && (
         <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-          <button className="btn-secondary" disabled={busy} onClick={() => pdf(false)}>View release note</button>
+          <button className="btn-secondary" disabled={busy} onClick={() => pdf(false)}>Print preview</button>
+          <button className="btn-secondary" disabled={busy} onClick={printNote}>Print</button>
           <button className="btn-secondary" disabled={busy} onClick={() => pdf(true)}>Download PDF</button>
           <button className="btn-secondary" disabled={busy} onClick={whatsapp}>Share on WhatsApp</button>
         </div>

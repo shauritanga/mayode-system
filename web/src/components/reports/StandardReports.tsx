@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { reportsApi } from '@/lib/api';
+import { previewBlob, printBlob } from '@/lib/print';
 import { ChartCard, HorizontalBarChart } from '@/components/role-dashboards/Charts';
 import { MetricTile, toneFromColor } from '@/components/role-dashboards/DashboardPrimitives';
 
@@ -147,6 +148,18 @@ export default function StandardReports() {
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const visible = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
+  const printReport = async (mode: 'print' | 'preview') => {
+    setExporting('pdf');
+    try {
+      const res = await reportsApi.downloadAnalytics(active, { ...params, format: 'pdf' });
+      if (mode === 'print') await printBlob(res.data as BlobPart); else previewBlob(res.data as BlobPart);
+    } catch (e) {
+      setError(await blobError(e, 'Could not prepare this report for printing.'));
+    } finally {
+      setExporting(null);
+    }
+  };
+
   const exportReport = async (format: Format) => {
     setExporting(format);
     try {
@@ -224,9 +237,11 @@ export default function StandardReports() {
                 disabled={!!exporting || loading || !rows.length}
                 onClick={() => exportReport(f.id)}
               >
-                {exporting === f.id ? 'Preparing…' : f.label}
+                {exporting === f.id ? 'Preparing…' : f.id === 'pdf' ? 'Download PDF' : f.label}
               </button>
             ))}
+            <button className="btn-secondary" style={{ fontSize: 12, padding: '7px 12px' }} disabled={!!exporting || loading || !rows.length} onClick={() => printReport('print')}>Print</button>
+            <button className="btn-secondary" style={{ fontSize: 12, padding: '7px 12px' }} disabled={!!exporting || loading || !rows.length} onClick={() => printReport('preview')}>Print preview</button>
           </div>
         </div>
 

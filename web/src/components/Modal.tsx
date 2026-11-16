@@ -1,5 +1,8 @@
 'use client';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Printer } from 'lucide-react';
+import { printElement } from '@/lib/print';
+import { useAuthStore } from '@/store/auth.store';
 
 interface ModalProps {
   title: string;
@@ -22,6 +25,9 @@ export default function Modal({ title, subtitle, onClose, footer, children, widt
   const cardRef = useRef<HTMLDivElement>(null);
   const edited = useRef(false);
   const [asking, setAsking] = useState(false);
+  const [readOnly, setReadOnly] = useState(false); // a window that only shows a document (no form) can be printed
+  const user = useAuthStore((s) => s.user);
+  useEffect(() => { setReadOnly(!cardRef.current?.querySelector('form, input, select, textarea')); });
 
   // A stray click or key press must not lose what was typed: ask first, but only after something was changed.
   const dismiss = () => {
@@ -67,7 +73,11 @@ export default function Modal({ title, subtitle, onClose, footer, children, widt
           overflow: 'hidden',
         }}
       >
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, position: 'relative' }}>
+          {readOnly && (
+            <button type="button" className="icon-btn no-print" title="Print" aria-label="Print this window" onClick={() => { const body = cardRef.current?.querySelector('[data-modal-body]') as HTMLElement | null; if (body) printElement(body, `${title}${subtitle ? ` · ${subtitle}` : ''}`, [user?.firstName, user?.lastName].filter(Boolean).join(' ')); }}
+              style={{ position: 'absolute', right: 16, top: 16 }}><Printer size={17} strokeWidth={1.8} /></button>
+          )}
           <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>
             {title}
           </h2>
@@ -76,7 +86,7 @@ export default function Modal({ title, subtitle, onClose, footer, children, widt
           )}
         </div>
 
-        <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+        <div data-modal-body style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
           {children}
         </div>
 

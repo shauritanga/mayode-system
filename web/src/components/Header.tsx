@@ -7,6 +7,8 @@ import { Notification01Icon, Sun01Icon, Moon02Icon, Menu02Icon, PanelLeftCloseIc
 import { notificationsApi } from '@/lib/api';
 import { useThemeStore } from '@/store/theme.store';
 import { useUiStore } from '@/store/ui.store';
+import { Printer } from 'lucide-react';
+import { printPage } from '@/lib/print';
 import UserMenu from './UserMenu';
 
 interface Notification {
@@ -189,6 +191,10 @@ export default function Header() {
       </AnimatePresence>
 
       <div style={{ flex: 1 }} />
+
+      <button className="icon-btn" onClick={printPage} title="Print this page (or save it as PDF)" aria-label="Print this page">
+        <Printer size={18} strokeWidth={1.8} />
+      </button>
 
       <button
         className="icon-btn"

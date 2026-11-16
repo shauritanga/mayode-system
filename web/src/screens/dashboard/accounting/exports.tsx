@@ -1,5 +1,6 @@
 'use client';
 
+import { previewBlob, printBlob } from '@/lib/print';
 import { useMemo, useState } from 'react';
 import { accountingApi } from '@/lib/api';
 import ErrorBanner from '@/components/ErrorBanner';
@@ -47,16 +48,19 @@ export function ReportExportView() {
   const period = () => (mode === 'year' ? { year } : mode === 'month' ? { year, month } : { from, to });
   const asAtDate = mode === 'year' ? `31 December ${year}` : mode === 'month' ? `end of ${MONTHS[month - 1]} ${year}` : to;
 
-  const download = async (id: string, fileName: string) => {
+  type Action = 'download' | 'print' | 'preview';
+  const download = async (id: string, fileName: string, action: Action = 'download') => {
     const res = await accountingApi.downloadReport(id);
-    saveBlob(res.data as Blob, fileName);
+    if (action === 'print') await printBlob(res.data as Blob);
+    else if (action === 'preview') previewBlob(res.data as Blob);
+    else saveBlob(res.data as Blob, fileName);
   };
-  const generate = async (format: string) => {
-    setBusy(format); setErr(''); setNotice('');
+  const generate = async (format: string, action: Action = 'download') => {
+    setBusy(action === 'download' ? format : action); setErr(''); setNotice('');
     try {
       const row = (await accountingApi.generateReport({ report, format, ...period(), approvedBy: approvedBy.trim() || undefined })).data;
-      await download(row.id, row.fileName);
-      setNotice(`${row.title} was downloaded and saved in the archive below.`);
+      await download(row.id, row.fileName, action);
+      setNotice(`${row.title} ${action === 'download' ? 'was downloaded' : action === 'print' ? 'was sent to the print dialog' : 'was opened for preview'} and saved in the archive below.`);
       archive.reload();
     } catch (e: any) {
       // a failed blob request carries its JSON error as a Blob
@@ -65,9 +69,9 @@ export function ReportExportView() {
       setErr(Array.isArray(msg) ? msg.join(', ') : msg);
     } finally { setBusy(''); }
   };
-  const again = async (row: any) => {
+  const again = async (row: any, action: Action = 'download') => {
     setBusy(row.id); setErr('');
-    try { await download(row.id, row.fileName); } catch (e) { setErr(errText(e, 'Could not download this report.')); } finally { setBusy(''); }
+    try { await download(row.id, row.fileName, action); } catch (e) { setErr(errText(e, 'Could not download this report.')); } finally { setBusy(''); }
   };
 
   return <div>
@@ -107,6 +111,8 @@ export function ReportExportView() {
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         {FORMATS.map((f) => <button key={f.key} type="button" className="btn-primary" disabled={!!busy || (mode === 'range' && (!to || (!meta.asAt && !from)))} onClick={() => void generate(f.key)}>
           {busy === f.key ? 'Preparing…' : `Download ${f.label}`}</button>)}
+        <button type="button" className="btn-secondary" disabled={!!busy || (mode === 'range' && (!to || (!meta.asAt && !from)))} onClick={() => void generate('PDF', 'print')}>{busy === 'print' ? 'Preparing…' : 'Print'}</button>
+        <button type="button" className="btn-secondary" disabled={!!busy || (mode === 'range' && (!to || (!meta.asAt && !from)))} onClick={() => void generate('PDF', 'preview')}>{busy === 'preview' ? 'Preparing…' : 'Print preview'}</button>
       </div>
     </section>
 
@@ -126,7 +132,7 @@ export function ReportExportView() {
             <td>{kb(r.sizeBytes)}</td>
             <td>{r.preparedBy ?? '—'}{r.approvedBy ? <div className="muted" style={{ fontSize: 12 }}>Approved: {r.approvedBy}</div> : null}</td>
             <td>{when(r.generatedAt)}</td>
-            <td><button type="button" className="btn-secondary" disabled={!!busy} onClick={() => void again(r)}>{busy === r.id ? '…' : 'Download'}</button></td>
+            <td style={{ whiteSpace: 'nowrap' }}><button type="button" className="btn-secondary" disabled={!!busy} onClick={() => void again(r)}>{busy === r.id ? '…' : 'Download'}</button>{r.format === 'PDF' && <> <button type="button" className="btn-secondary" disabled={!!busy} onClick={() => void again(r, 'print')}>Print</button> <button type="button" className="btn-secondary" disabled={!!busy} onClick={() => void again(r, 'preview')}>Preview</button></>}</td>
           </tr>)}
         </tbody></table></div>}
     </section>

@@ -13,6 +13,7 @@ import {
 } from '@/screens/dashboard/irrigation/ui';
 import MoneyInput from '@/components/MoneyInput';
 import ExportIcons, { saveDownload } from '@/components/ExportIcons';
+import { previewBlob, printBlob } from '@/lib/print';
 
 const CATEGORY_LABEL: Record<string, string> = { LEVY: 'Levy', MEMBERSHIP_FEE: 'Membership fee', CANAL_CLEANING: 'Canal cleaning', FERTILISER: 'Farm inputs', INTEREST: 'Interest on inputs', OTHER: 'Other' };
 const CHARGE_CATEGORIES = ['LEVY', 'MEMBERSHIP_FEE', 'CANAL_CLEANING', 'OTHER'];
@@ -296,7 +297,8 @@ function Dues({ can }: { can: (r: string, a: string) => boolean }) {
       <section className="table-panel">
         <div className="section-toolbar"><strong>What farmers owe</strong>
           <span style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <ExportIcons label="Export what farmers owe" onExport={async (format) => saveDownload(await duesApi.exportFile({ view: 'dues', format, q: filters.q || undefined, category: filters.category || undefined, state: filters.state || undefined }), `amcos-charges.${format.toLowerCase()}`)} />
+            <ExportIcons label="Export what farmers owe" onExport={async (format) => saveDownload(await duesApi.exportFile({ view: 'dues', format, q: filters.q || undefined, category: filters.category || undefined, state: filters.state || undefined }), `amcos-charges.${format.toLowerCase()}`)}
+              onPrint={async (mode) => { const r = await duesApi.exportFile({ view: 'dues', format: 'PDF', q: filters.q || undefined, category: filters.category || undefined, state: filters.state || undefined }); if (mode === 'print') await printBlob(r.data); else previewBlob(r.data); }} />
             {buttons}
           </span>
         </div>
@@ -504,7 +506,8 @@ function Debts({ can }: { can: (r: string, a: string) => boolean }) {
         <div className="section-toolbar">
           <strong>Farmers with debts</strong>
           <span style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <ExportIcons label="Export farmers with debts" onExport={async (format) => saveDownload(await duesApi.exportFile({ view: 'debts', format, category: category || undefined }), `farmers-with-debts.${format.toLowerCase()}`)} />
+            <ExportIcons label="Export farmers with debts" onExport={async (format) => saveDownload(await duesApi.exportFile({ view: 'debts', format, category: category || undefined }), `farmers-with-debts.${format.toLowerCase()}`)}
+              onPrint={async (mode) => { const r = await duesApi.exportFile({ view: 'debts', format: 'PDF', category: category || undefined }); if (mode === 'print') await printBlob(r.data); else previewBlob(r.data); }} />
             <select className="input-field" style={{ width: 'auto' }} value={category} onChange={(e) => { setCategory(e.target.value); setSelected(new Set()); }} aria-label="Kind"><option value="">All kinds</option>{Object.entries(CATEGORY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
             {can('communication', 'CREATE') && <button type="button" className="btn-primary" style={{ whiteSpace: 'nowrap' }} disabled={!selected.size} onClick={() => setReminding(true)}>{selected.size ? `Remind ${selected.size} by SMS` : 'Remind by SMS'}</button>}
           </span>

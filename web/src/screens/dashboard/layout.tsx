@@ -1,4 +1,5 @@
 'use client';
+import PrintHeader from '@/components/PrintHeader';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import PageTransition from '@/components/PageTransition';
@@ -73,6 +74,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="shell-main">
         <Header />
         <main className="shell-content">
+          <PrintHeader />
           <PageTransition>{children}</PageTransition>
         </main>
       </div>

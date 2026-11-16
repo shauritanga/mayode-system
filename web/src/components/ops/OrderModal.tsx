@@ -1,4 +1,5 @@
 'use client';
+import { printBlob } from '@/lib/print';
 import { useState } from 'react';
 import Modal from '@/components/Modal';
 import { MoneyAccountSelect } from '@/screens/dashboard/accounting/controls';
@@ -147,7 +148,8 @@ export default function OrderModal({ id, onClose, onChanged }: { id: string; onC
           <h4 style={{ margin: '16px 0 6px', fontSize: 13 }}>Invoice {invoice.invoiceNumber}</h4>
           <Facts items={[['Status', <Status key="s" value={invoice.status} />], ['Total', tzs(invoice.total)], ['Paid', tzs(invoice.amountPaid)], ['Balance', tzs(balance)], ['Due', day(invoice.dueDate)], ['Control number', invoice.controlNumber ?? 'Not set']]} />
           <div style={{ display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' }}>
-            <button className="btn-secondary" onClick={pdf} disabled={busy}>View invoice PDF</button>
+            <button className="btn-secondary" onClick={pdf} disabled={busy}>Print preview</button>
+            <button className="btn-secondary" disabled={busy} onClick={async () => { const r = await run(() => opsApi.invoicePdf(invoice.id)); if (r) await printBlob(r.data as BlobPart); }}>Print invoice</button>
             <button className="btn-secondary" onClick={async () => { const r = await run(() => opsApi.invoicePdf(invoice.id)); if (r) { const url = URL.createObjectURL(new Blob([r.data as BlobPart], { type: 'application/pdf' })); const a = document.createElement('a'); a.href = url; a.download = `${invoice.invoiceNumber}.pdf`; a.click(); await opsApi.invoiceShared(invoice.id); } }}>Download for sharing</button>
             {can('ops_payments', 'CREATE') && !invoice.controlNumber && <button className="btn-secondary" onClick={() => open('control')}>Enter control number</button>}
             {can('ops_payments', 'CREATE') && !invoice.controlNumber && <button className="btn-secondary" disabled={busy} onClick={async () => { const r = await run(() => opsApi.requestControlNumber(invoice.id)); if (r) { if ((r.data as any).mode === 'MANUAL') setError((r.data as any).message); await reload(); } }}>Request control number</button>}

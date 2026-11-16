@@ -1,4 +1,5 @@
 'use client';
+import { previewBlob, printBlob } from '@/lib/print';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
@@ -316,7 +317,7 @@ export default function ReportsPage() {
       current.includes(key) ? current.filter((k) => k !== key) : [...current, key],
     );
 
-  const exportConfig = async (format: ExportFormat, config: ReportConfig, name: string) => {
+  const exportConfig = async (format: ExportFormat, config: ReportConfig, name: string, action: 'download' | 'print' | 'preview' = 'download') => {
     setExportOpen(false);
     if (!config.entity || config.columns.length === 0) {
       setError('Choose a data set and at least one column.');
@@ -331,7 +332,9 @@ export default function ReportsPage() {
         format,
         name,
       });
-      downloadBlob(res.data as BlobPart, `${slugify(name)}-${new Date().toISOString().slice(0, 10)}.${format}`);
+      if (action === 'print') await printBlob(res.data as BlobPart);
+      else if (action === 'preview') previewBlob(res.data as BlobPart);
+      else downloadBlob(res.data as BlobPart, `${slugify(name)}-${new Date().toISOString().slice(0, 10)}.${format}`);
     } catch (err) {
       setError(await errorMessage(err, `Unable to export ${format.toUpperCase()}.`));
     } finally {
@@ -686,6 +689,8 @@ export default function ReportsPage() {
                             {FORMAT_LABELS[f]}
                           </button>
                         ))}
+                        <button className="dropdown-item" onClick={() => exportConfig('pdf', { entity: entityKey, joins, columns, filters }, `${entity.label} report`, 'print')}><HugeiconsIcon icon={File01Icon} size={15} strokeWidth={2} />Print</button>
+                        <button className="dropdown-item" onClick={() => exportConfig('pdf', { entity: entityKey, joins, columns, filters }, `${entity.label} report`, 'preview')}><HugeiconsIcon icon={File01Icon} size={15} strokeWidth={2} />Print preview</button>
                       </div>
                     )}
                   </div>

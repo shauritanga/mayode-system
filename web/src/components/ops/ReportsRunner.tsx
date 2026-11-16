@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { opsApi } from '@/lib/api';
 import { downloadBlob } from '@/lib/ops';
+import { previewBlob, printBlob } from '@/lib/print';
 import { DataTable, Empty, ErrorNote, Field, Loading, Toolbar, useAction, useLoad } from './ui';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -26,6 +27,10 @@ export default function ReportsRunner({ groups }: { groups?: string[] }) {
     const r = await run(() => opsApi.downloadReport(current.key, { ...params, format }));
     if (r) downloadBlob(r.data as BlobPart, `${current.key}.${format}`);
   };
+  const printAs = async (mode: 'print' | 'preview') => {
+    const r = await run(() => opsApi.downloadReport(current.key, { ...params, format: 'pdf' }));
+    if (r) { if (mode === 'print') await printBlob(r.data as BlobPart); else previewBlob(r.data as BlobPart); }
+  };
   const columns = rows?.length ? Object.keys(rows[0]).map((h) => ({ header: h, render: (r: Record<string, any>) => String(r[h] ?? '—') })) : [];
 
   return (
@@ -33,7 +38,9 @@ export default function ReportsRunner({ groups }: { groups?: string[] }) {
       <Toolbar right={<>
         <button className="btn-secondary" disabled={busy} onClick={() => exportAs('csv')}>CSV</button>
         <button className="btn-secondary" disabled={busy} onClick={() => exportAs('xlsx')}>Excel</button>
-        <button className="btn-secondary" disabled={busy} onClick={() => exportAs('pdf')}>PDF</button>
+        <button className="btn-secondary" disabled={busy} onClick={() => exportAs('pdf')}>Download PDF</button>
+        <button className="btn-secondary" disabled={busy} onClick={() => printAs('print')}>Print</button>
+        <button className="btn-secondary" disabled={busy} onClick={() => printAs('preview')}>Print preview</button>
       </>}>
         <Field label="Report"><select className="input-field" value={current.key} onChange={(e) => { setKey(e.target.value); setRows(null); }}>
           {[...new Set(defs.map((d) => d.group))].map((g) => <optgroup key={g} label={g}>{defs.filter((d) => d.group === g).map((d) => <option key={d.key} value={d.key}>{d.title}</option>)}</optgroup>)}
