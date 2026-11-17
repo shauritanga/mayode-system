@@ -94,7 +94,10 @@ export function SecretaryDashboard() {
           </div>
           <div className="ov-mid">
             {contributions.data?.contributions?.length ? <ContributionsTrend contributions={contributions.data.contributions} /> : <BlockStatus distribution={o.blockDistribution} blocks={allocation.data?.byBlock ?? null} />}
-            <CoverageGauge totals={o.totals} />
+            <div className="ov-stack">
+              <CoverageGauge totals={o.totals} />
+              {(showOrders || showContributions) && <MoneySnapshot showSales={showOrders} showContributions={showContributions} />}
+            </div>
           </div>
           <AttentionTable rows={attention} />
           <CanalPerformance canals={o.canals} />
@@ -106,12 +109,7 @@ export function SecretaryDashboard() {
         </>
       )}
 
-      {(showOrders || showContributions) && (
-        <div className="dash-two-col">
-          {showOrders && <OrdersAndStock />}
-          <MoneySnapshot showSales={showOrders} showContributions={showContributions} />
-        </div>
-      )}
+      {showOrders && <OrdersAndStock />}
     </div>
   );
 }

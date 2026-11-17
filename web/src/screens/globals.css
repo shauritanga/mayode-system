@@ -3756,3 +3756,6 @@ a.farmers-name { display: block; cursor: pointer; }
 @media (max-width: 1100px) { .ov-top, .ov-mid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 560px) { .ov-kpis { grid-template-columns: minmax(0, 1fr); } }
 @media print { .ov-export { display: none !important; } }
+
+.ov-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.ov-mid > .insight-panel { height: 100%; }
