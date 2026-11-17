@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { irrigationApi, opsApi, accountingApi } from '@/lib/api';
 import { printPage } from '@/lib/print';
 import { useAuthStore } from '@/store/auth.store';
-import { BASE, CardsSkeleton, LoadError, StatusBadge, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
+import { BASE, CardsSkeleton, LoadError, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 import {
   AllocationSummary, AttentionRow, AttentionTable, BlockStatus, CanalPerformance, ContributionsTrend, CoverageGauge,
   IrrigationActivity, LeadershipWatch, MembersApprovals, MoneySnapshot, OrdersAndStock, OverviewKpis,
@@ -65,7 +65,6 @@ export function SecretaryDashboard() {
           </p>
         </div>
         <div className="ov-actions">
-          {o?.scheme && <StatusBadge value={o.scheme.status} />}
           {(schemes.data?.length ?? 0) > 1 && (
             <select className="input-field" aria-label="Scheme" value={schemeId} onChange={(e) => pick(e.target.value)}>
               {schemes.data!.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
