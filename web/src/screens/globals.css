@@ -3759,3 +3759,12 @@ a.farmers-name { display: block; cursor: pointer; }
 
 .ov-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .ov-mid > .insight-panel { height: 100%; }
+
+/* Page loader: dims the page and shows a ring while a page change is slow. Above modals, below toasts. */
+.page-loader { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.28); backdrop-filter: blur(2px); animation: pageLoaderIn 0.15s ease both; cursor: progress; }
+.page-loader-spinner { position: relative; width: 48px; height: 48px; }
+.page-loader-spinner i { position: absolute; left: 50%; top: 50%; width: 4px; height: 12px; margin: -6px 0 0 -2px; border-radius: 2px; background: var(--accent); opacity: 0.15; transform: rotate(calc(var(--i) * 45deg)) translateY(-17px); animation: pageLoaderSpoke 0.8s linear infinite; animation-delay: calc((var(--i) - 8) * 0.1s); }
+@keyframes pageLoaderSpoke { 0% { opacity: 1; } 100% { opacity: 0.15; } }
+@keyframes pageLoaderIn { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .page-loader { backdrop-filter: none; } .page-loader-spinner i { animation-duration: 2s; } }
+@media print { .page-loader { display: none !important; } }

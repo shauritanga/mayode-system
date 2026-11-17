@@ -3,6 +3,7 @@ import PrintHeader from '@/components/PrintHeader';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import PageTransition from '@/components/PageTransition';
+import PageLoader from '@/components/PageLoader';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { useRouter, usePathname } from 'next/navigation';
@@ -80,6 +81,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
       {user?.mustChangePassword && <ChangePasswordGate />}
       <LoginAlerts />
+      <PageLoader />
     </div>
   );
 }
