@@ -3,12 +3,13 @@
 
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
-import { irrigationApi } from '@/lib/api';
+import { irrigationApi, opsApi, accountingApi } from '@/lib/api';
+import { printPage } from '@/lib/print';
 import { useAuthStore } from '@/store/auth.store';
 import { BASE, CardsSkeleton, LoadError, StatusBadge, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 import {
-  BlockStatus, CanalPerformance, IrrigationActivity, LeadershipWatch, MembersApprovals, MoneySnapshot,
-  OrdersAndStock, SchemeStatistics,
+  AllocationSummary, AttentionRow, AttentionTable, BlockStatus, CanalPerformance, ContributionsTrend, CoverageGauge,
+  IrrigationActivity, LeadershipWatch, MembersApprovals, MoneySnapshot, OrdersAndStock, OverviewKpis,
 } from './amcos/sections';
 
 /**
@@ -37,23 +38,40 @@ export function SecretaryDashboard() {
   const noScheme = showScheme && !schemes.loading && !schemes.error && !(schemes.data?.length);
   const mamcosName = schemes.data?.find((s) => s.id === schemeId)?.mamcos?.name;
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const commercial = useApi<any>(schemeId && showOrders ? () => opsApi.commercialDashboard() : null, [schemeId, showOrders]);
+  const contributions = useApi<any>(showContributions ? () => accountingApi.memberContributions() : null, [showContributions]);
+
+  const attention: AttentionRow[] = [];
+  if (o?.totals) {
+    const t = o.totals;
+    if (t.pendingAllocations) attention.push({ task: `${t.pendingAllocations} allocations to approve`, who: 'AMCOS office', due: 'Now', status: 'Waiting', href: `${BASE}/allocation/allocate` });
+    if (t.pendingTransfers) attention.push({ task: `${t.pendingTransfers} hectare transfers to approve`, who: 'AMCOS office', due: 'Now', status: 'Waiting', href: `${BASE}/allocation/transfers` });
+    const lt = leadership.data?.totals;
+    if (lt?.unassignedCanals) attention.push({ task: `${lt.unassignedCanals} canals without a leader`, who: 'Management', due: 'Open', status: 'Open', href: `${BASE}/leadership/overview` });
+    if (lt?.blocksWithoutLeaders) attention.push({ task: `${lt.blocksWithoutLeaders} blocks without a leader`, who: 'Management', due: 'Open', status: 'Open', href: `${BASE}/leadership/overview` });
+    if (leadership.data?.expiring?.length) attention.push({ task: `${leadership.data.expiring.length} leader terms ending soon`, who: 'Management', due: `Within ${leadership.data.windowDays} days`, status: 'Soon', href: `${BASE}/leadership/overview` });
+  }
+  if (commercial.data?.ordersAwaitingReview) attention.push({ task: `${commercial.data.ordersAwaitingReview} orders to review`, who: 'Sales desk', due: 'Now', status: 'Waiting', href: '/dashboard/ops-orders' });
+
   return (
-    <div className="page-shell">
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+    <div className="page-shell ov-page">
+      <div className="ov-head">
         <div>
-          <div className="page-kicker" style={{ marginBottom: 4 }}>{mamcosName ?? 'MAYODE GROUP Cooperative'}</div>
-          <h1 className="page-title" style={{ fontSize: '1.7rem' }}>{o?.scheme?.name ?? 'Your AMCOS'}</h1>
-          <p className="page-subtitle">
-            {o?.scheme ? [o.scheme.code, [o.scheme.village, o.scheme.district].filter(Boolean).join(', ')].filter(Boolean).join(' · ') : `Welcome${user?.firstName ? `, ${user.firstName}` : ''}.`}
+          <h1 className="ov-greeting">{greeting}{user?.firstName ? `, ${user.firstName}` : ''}!</h1>
+          <p className="ov-sub">
+            {[o?.scheme?.name ?? mamcosName ?? 'Your AMCOS', o?.scheme?.code, [o?.scheme?.village, o?.scheme?.district].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="ov-actions">
           {o?.scheme && <StatusBadge value={o.scheme.status} />}
           {(schemes.data?.length ?? 0) > 1 && (
             <select className="input-field" aria-label="Scheme" value={schemeId} onChange={(e) => pick(e.target.value)}>
               {schemes.data!.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           )}
+          <button type="button" className="ov-export" onClick={() => printPage()}>Export</button>
         </div>
       </div>
 
@@ -70,16 +88,21 @@ export function SecretaryDashboard() {
 
       {o?.totals && (
         <>
-          <SchemeStatistics totals={o.totals} plannedCanals={o.scheme.plannedCanalCount} />
+          <div className="ov-top">
+            <OverviewKpis totals={o.totals} />
+            <AllocationSummary distribution={o.blockDistribution} />
+          </div>
+          <div className="ov-mid">
+            {contributions.data?.contributions?.length ? <ContributionsTrend contributions={contributions.data.contributions} /> : <BlockStatus distribution={o.blockDistribution} blocks={allocation.data?.byBlock ?? null} />}
+            <CoverageGauge totals={o.totals} />
+          </div>
+          <AttentionTable rows={attention} />
           <CanalPerformance canals={o.canals} />
           <div className="dash-two-col">
-            <BlockStatus distribution={o.blockDistribution} blocks={allocation.data?.byBlock ?? null} />
             <MembersApprovals totals={o.totals} />
+            {leadership.data?.totals ? <LeadershipWatch data={leadership.data} /> : <IrrigationActivity events={o.recent} />}
           </div>
-          <div className="dash-two-col">
-            {leadership.data?.totals ? <LeadershipWatch data={leadership.data} /> : null}
-            <IrrigationActivity events={o.recent} />
-          </div>
+          {leadership.data?.totals && <IrrigationActivity events={o.recent} />}
         </>
       )}
 

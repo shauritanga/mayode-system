@@ -3725,3 +3725,34 @@ a.farmers-name { display: block; cursor: pointer; }
   .shell-content input, .shell-content select { border: none !important; padding: 0 !important; appearance: none; background: none !important; }
   [role="dialog"] { position: static !important; }
 }
+
+/* ── AMCOS overview (ov-*): soft white cards, greeting header, KPI row, donut, chart, gauge ───────────────────── */
+.ov-page { gap: 18px; }
+.ov-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.ov-greeting { margin: 0; font-family: var(--font-outfit), sans-serif; font-size: 1.6rem; font-weight: 700; color: var(--text-1); }
+.ov-sub { margin: 4px 0 0; font-size: 0.82rem; color: var(--text-2); }
+.ov-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ov-export { border: 0; border-radius: 10px; padding: 10px 22px; font-weight: 600; font-size: 0.85rem; color: #fff; background: var(--green-500); cursor: pointer; box-shadow: 0 2px 8px rgba(34, 139, 34, 0.25); }
+.ov-export:hover { filter: brightness(0.95); }
+.ov-card { padding: 18px 20px; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface-1); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05); min-width: 0; }
+.ov-title { margin: 0 0 12px; font-family: var(--font-outfit), sans-serif; font-size: 1rem; font-weight: 700; color: var(--text-1); }
+.ov-title-row { display: flex; justify-content: space-between; align-items: center; }
+.ov-top { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.ov-mid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.ov-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.ov-kpi { display: flex; flex-direction: column; gap: 6px; }
+.ov-kpi-top { display: flex; justify-content: space-between; align-items: center; color: var(--text-2); font-size: 0.85rem; font-weight: 600; }
+.ov-kpi-top svg { color: var(--green-500); }
+.ov-kpi strong { font-size: 1.7rem; line-height: 1.1; color: var(--text-1); }
+.ov-kpi small { font-size: 0.72rem; }
+.ov-up { color: var(--green-500); }
+.ov-down { color: var(--red-400); }
+.ov-table th { font-size: 0.72rem; text-transform: none; color: var(--text-3); }
+.ov-link { font-size: 0.8rem; font-weight: 600; color: var(--green-500); }
+.gauge-arcs svg { display: block; width: 100%; max-width: 300px; margin: 6px auto 0; }
+.gauge-legend { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; font-size: 0.8rem; color: var(--text-2); }
+.gauge-legend li { display: flex; align-items: center; gap: 8px; }
+.gauge-legend strong { margin-left: auto; color: var(--text-1); }
+@media (max-width: 1100px) { .ov-top, .ov-mid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 560px) { .ov-kpis { grid-template-columns: minmax(0, 1fr); } }
+@media print { .ov-export { display: none !important; } }

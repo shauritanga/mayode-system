@@ -261,3 +261,35 @@ export function LeaderboardTable({
     </div>
   );
 }
+
+/** Half-circle gauge: up to three concentric arcs, each a percentage (0-100) with its own colour and label. */
+export function GaugeArcs({ arcs }: { arcs: { label: string; pct: number; color: string }[] }) {
+  const cx = 110, cy = 105, stroke = 13, gap = 6, r0 = 92;
+  const point = (r: number, a: number) => [cx + r * Math.cos(a), cy - r * Math.sin(a)];
+  const arc = (r: number, from: number, to: number) => {
+    const [x1, y1] = point(r, from);
+    const [x2, y2] = point(r, to);
+    return `M ${x1} ${y1} A ${r} ${r} 0 ${from - to > Math.PI ? 1 : 0} 1 ${x2} ${y2}`;
+  };
+  return (
+    <div className="gauge-arcs">
+      <svg viewBox="0 0 220 118" role="img" aria-label={arcs.map((a) => `${a.label} ${a.pct}%`).join(', ')}>
+        {arcs.map((a, i) => {
+          const r = r0 - i * (stroke + gap);
+          const pct = Math.max(0, Math.min(100, a.pct || 0));
+          return (
+            <g key={a.label}>
+              <path d={arc(r, Math.PI, 0)} fill="none" stroke="var(--border)" strokeWidth={stroke} strokeLinecap="round" opacity={0.55} />
+              {pct > 0 && <path d={arc(r, Math.PI, Math.PI * (1 - pct / 100))} fill="none" stroke={a.color} strokeWidth={stroke} strokeLinecap="round" />}
+            </g>
+          );
+        })}
+      </svg>
+      <ul className="gauge-legend">
+        {arcs.map((a) => (
+          <li key={a.label}><span className="donut-legend-dot" style={{ background: a.color }} /><span>{a.label}</span><strong>{Math.round(a.pct || 0)}%</strong></li>
+        ))}
+      </ul>
+    </div>
+  );
+}

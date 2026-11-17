@@ -2,12 +2,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- API payloads are untyped JSON, as in the other dashboard screens */
 
 import Link from 'next/link';
+import { HugeiconsIcon } from '@hugeicons/react';
 import { ReactNode } from 'react';
 import {
   Building05Icon, CheckmarkBadge02Icon, DashboardSquare01Icon, MapsIcon, Plant01Icon, UserGroupIcon,
 } from '@hugeicons/core-free-icons';
 import { opsApi, accountingApi } from '@/lib/api';
-import { ChartCard, DonutBreakdown } from '../Charts';
+import { ChartCard, DonutBreakdown, GaugeArcs, TrendAreaChart } from '../Charts';
 import { MetricTile } from '../DashboardPrimitives';
 import { BASE, LoadError, ProgressBar, StatusBadge, fmtDate, fmtNum, useApi } from '@/screens/dashboard/irrigation/ui';
 
@@ -199,3 +200,106 @@ export function MoneySnapshot({ showSales, showContributions }: { showSales: boo
   );
 }
 
+
+/** Four headline cards for the top of the overview. */
+export function OverviewKpis({ totals }: { totals: any }) {
+  const leaderTotal = (totals.canals || 0) + (totals.blocks || 0);
+  const leaderHave = (totals.canalLeaders || 0) + (totals.blockLeaders || 0);
+  const cards: { label: string; value: string; note: string; good?: boolean; icon: any }[] = [
+    { label: 'Registered hectares', value: fmtNum(totals.registeredHectares), note: `${fmtNum(totals.canals)} canals · ${fmtNum(totals.blocks)} blocks`, icon: MapsIcon },
+    { label: 'Allocated hectares', value: fmtNum(totals.allocatedHectares), note: `${totals.completionPct}% allocated`, good: totals.completionPct >= 50, icon: Plant01Icon },
+    { label: 'Farmers with a hectare', value: fmtNum(totals.registeredFarmers), note: totals.membersWithoutHectare ? `${fmtNum(totals.membersWithoutHectare)} members without` : 'All members covered', good: !totals.membersWithoutHectare, icon: UserGroupIcon },
+    { label: 'Leadership coverage', value: `${leaderHave} / ${leaderTotal}`, note: leaderHave < leaderTotal ? `${leaderTotal - leaderHave} posts open` : 'All posts filled', good: leaderHave >= leaderTotal, icon: CheckmarkBadge02Icon },
+  ];
+  return (
+    <div className="ov-kpis">
+      {cards.map((c) => (
+        <article key={c.label} className="ov-card ov-kpi">
+          <div className="ov-kpi-top"><span>{c.label}</span><HugeiconsIcon icon={c.icon} size={20} strokeWidth={1.8} /></div>
+          <strong>{c.value}</strong>
+          <small className={c.good ? 'ov-up' : 'ov-down'}>{c.note}</small>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+/** Block allocation donut, restyled as an overview card. */
+export function AllocationSummary({ distribution }: { distribution: { full: number; partial: number; none: number } }) {
+  return (
+    <section className="ov-card">
+      <h2 className="ov-title">Block allocation summary</h2>
+      <DonutBreakdown height={170} data={[
+        { name: 'Fully allocated', value: distribution.full },
+        { name: 'Partly allocated', value: distribution.partial },
+        { name: 'Not allocated', value: distribution.none },
+      ]} />
+    </section>
+  );
+}
+
+/** Member contributions per month, from the contributions the AMCOS has recorded. Omitted when there are none. */
+export function ContributionsTrend({ contributions }: { contributions: any[] }) {
+  const byMonth = new Map<string, number>();
+  for (const c of contributions) {
+    const d = new Date(c.contributionDate);
+    if (Number.isNaN(+d)) continue;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    byMonth.set(key, (byMonth.get(key) ?? 0) + Number(c.amount || 0));
+  }
+  const data = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-9)
+    .map(([key, amount]) => ({ month: new Date(`${key}-01`).toLocaleString('en-GB', { month: 'short' }), amount: Math.round(amount) }));
+  if (data.length < 2) return null;
+  return (
+    <section className="ov-card">
+      <h2 className="ov-title">Member contributions by month</h2>
+      <TrendAreaChart data={data} xKey="month" series={[{ key: 'amount', label: 'TZS', color: 'var(--green-500)' }]} height={230} />
+    </section>
+  );
+}
+
+/** Half-circle gauge for allocation and leader coverage. */
+export function CoverageGauge({ totals }: { totals: any }) {
+  const pct = (a: number, b: number) => (b ? (a / b) * 100 : 0);
+  return (
+    <section className="ov-card">
+      <h2 className="ov-title">Scheme coverage</h2>
+      <GaugeArcs arcs={[
+        { label: 'Hectares allocated', pct: totals.completionPct ?? 0, color: 'var(--green-500)' },
+        { label: 'Canals with a leader', pct: pct(totals.canalLeaders, totals.canals), color: 'var(--blue-500)' },
+        { label: 'Blocks with a leader', pct: pct(totals.blockLeaders, totals.blocks), color: 'var(--gold-400)' },
+      ]} />
+    </section>
+  );
+}
+
+export type AttentionRow = { task: string; who: string; due: string; status: 'Waiting' | 'Open' | 'Soon'; href: string };
+
+/** "Needs attention" list in the task-table style, built from figures the page has already loaded. */
+export function AttentionTable({ rows }: { rows: AttentionRow[] }) {
+  return (
+    <section className="ov-card">
+      <div className="ov-title-row">
+        <h2 className="ov-title">Needs attention</h2>
+      </div>
+      {!rows.length ? <Empty>Nothing is waiting for you.</Empty> : (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table ov-table">
+            <thead><tr><th>Task</th><th>Who</th><th>When</th><th>Status</th><th /></tr></thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.task}>
+                  <td style={{ fontWeight: 600 }}>{r.task}</td>
+                  <td>{r.who}</td>
+                  <td>{r.due}</td>
+                  <td><span className={`badge ${r.status === 'Soon' ? 'badge-gold' : r.status === 'Waiting' ? 'badge-blue' : 'badge-red'}`}>{r.status}</span></td>
+                  <td><Link href={r.href} className="ov-link">View</Link></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
