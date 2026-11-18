@@ -77,11 +77,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className="shell-content">
           <PrintHeader />
           <PageTransition>{children}</PageTransition>
+          <PageLoader />
         </main>
       </div>
       {user?.mustChangePassword && <ChangePasswordGate />}
       <LoginAlerts />
-      <PageLoader />
     </div>
   );
 }

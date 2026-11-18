@@ -917,6 +917,7 @@ body {
   min-width: 0;
 }
 .shell-content {
+  position: relative;
   flex: 1;
   padding: 20px 16px 48px;
 }
@@ -3774,3 +3775,6 @@ a.farmers-name { display: block; cursor: pointer; }
 
 /* Full-page cover: the old screen is hidden completely while the next one loads. */
 .page-loader { background: var(--bg); backdrop-filter: none; }
+
+/* The loader covers the page content only; the sidebar and header stay usable. */
+.shell-content > .page-loader { position: absolute; inset: 0; z-index: 30; align-items: flex-start; padding-top: 28vh; }
