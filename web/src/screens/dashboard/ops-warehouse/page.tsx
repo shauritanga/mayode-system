@@ -25,9 +25,9 @@ type Can = (resource: string, action?: 'VIEW' | 'CREATE' | 'EDIT' | 'DELETE') =>
 /** The warehouses come first: pick a place, then work in it. The tabs after it do the same jobs across all warehouses. Products are set up in Settings; reports live in Reports. */
 const WAREHOUSE_PAGES: { id: WarehousePage; slug: string; label: string; description: string; icon: typeof Warehouse; allowed: (can: Can) => boolean }[] = [
   { id: 'warehouses', slug: 'warehouses', label: 'Warehouses', description: 'Your warehouses. Open one to see what is in it and to add stock.', icon: Warehouse, allowed: (can) => can('warehouses') || can('warehouse_desk') },
-  { id: 'receive', slug: 'receive', label: 'Receive', description: 'Record everything that arrives: paddy from a farmer, or inputs, fuel and bags from a supplier. It is added to the warehouse stock when you save.', icon: ArrowDownToLine, allowed: (can) => can('ops_receiving') },
+  { id: 'receive', slug: 'receive', label: 'Receive stock', description: 'Record what arrives. It is added to the warehouse when you save.', icon: ArrowDownToLine, allowed: (can) => can('ops_receiving') },
   { id: 'mill', slug: 'mill', label: 'Mill paddy', description: 'Turn paddy into rice, broken rice and by-products. The cost of the paddy moves onto the rice.', icon: Factory, allowed: (can) => can('ops_processing') },
-  { id: 'stock', slug: 'stock', label: 'Stock', description: 'Everything in the warehouses, rice and inputs together: how much, where, what is running low, and every movement.', icon: Package, allowed: (can) => can('ops_stock') },
+  { id: 'stock', slug: 'stock', label: 'Stock in store', description: 'What is in each warehouse, its batches, every movement, and counting.', icon: Package, allowed: (can) => can('ops_stock') },
   { id: 'overview', slug: 'overview', label: 'Summary', description: 'What is in store across all warehouses, and what needs your attention.', icon: LayoutDashboard, allowed: (can) => can('ops_reports') },
 ];
 
@@ -89,46 +89,64 @@ export default function OpsWarehousePage() {
   );
 }
 
-/** The first question of receiving: what is arriving? */
+/** Receiving: a switch at the top, then the list and its one button straight away. The last choice is remembered. */
 function ReceiveHub({ can }: { can: Can }) {
-  const [what, setWhat] = useState<'rice' | 'inputs' | null>(null);
-  if (what === 'rice') return <><button type="button" className="btn-secondary" onClick={() => setWhat(null)} style={{ marginBottom: 12 }}>← What is arriving?</button><ReceivingPanel canCreate={can('ops_receiving', 'CREATE')} canConfirm={can('ops_receiving', 'EDIT')} canCancel={can('ops_receiving', 'DELETE')} /></>;
-  if (what === 'inputs') return <><button type="button" className="btn-secondary" onClick={() => setWhat(null)} style={{ marginBottom: 12 }}>← What is arriving?</button><InputReceivePanel canReceive={can('ops_receiving', 'CREATE')} /></>;
-  const tile = (key: 'rice' | 'inputs', title: string, text: string) => (
-    <button key={key} type="button" onClick={() => setWhat(key)} style={{ textAlign: 'left', background: 'var(--bg-elevated, rgba(127,127,127,.08))', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '16px 18px', color: 'inherit', cursor: 'pointer' }}>
-      <strong style={{ fontSize: 15 }}>{title}</strong><div className="muted" style={{ fontSize: 13, marginTop: 6 }}>{text}</div>
-    </button>
-  );
+  const [what, setWhat] = useState<'rice' | 'inputs'>(() => {
+    if (typeof window === 'undefined') return 'rice';
+    return window.sessionStorage.getItem('warehouse-receive-kind') === 'inputs' ? 'inputs' : 'rice';
+  });
+  const choose = (k: 'rice' | 'inputs') => { setWhat(k); window.sessionStorage.setItem('warehouse-receive-kind', k); };
   return (
     <>
-      <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>What is arriving?</h3>
-      <p className="muted" style={{ marginTop: 0 }}>Choose one. Either way it is put into a warehouse and shows up in Stock.</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
-        {tile('rice', 'Rice or paddy', 'From a farmer or a farm. Record weight, quality and what you pay.')}
-        {tile('inputs', 'Farm inputs, fuel or bags', 'Fertiliser, seed, chemicals, diesel, empty bags: from a supplier or a delivery.')}
-      </div>
+      <OpsTabs tabs={[{ id: 'rice' as const, label: 'Paddy' }, { id: 'inputs' as const, label: 'Inputs, fuel & bags' }]} value={what} onChange={choose} />
+      {what === 'rice'
+        ? <ReceivingPanel canCreate={can('ops_receiving', 'CREATE')} canConfirm={can('ops_receiving', 'EDIT')} canCancel={can('ops_receiving', 'DELETE')} />
+        : <InputReceivePanel canReceive={can('ops_receiving', 'CREATE')} />}
       <p className="muted" style={{ fontSize: 12.5, marginTop: 14 }}>Receiving a purchase order? Open <Link href="/dashboard/purchase-orders">Purchase Orders</Link> and use “Receive goods”, then pick the warehouse.</p>
     </>
   );
 }
 
+/** Four views instead of eight. Each has a small switch for the related view that used to be a tab of its own. */
+type Main = 'store' | 'batches' | 'moves' | 'counts';
+type SubView = 'all' | 'rice' | 'inputs' | 'trace' | 'history' | 'transfers';
+/** Where each old tab id now lives, so shortcuts from the Summary page still land in the right place. */
+const OLD_TAB: Record<StockTab, [Main, SubView]> = {
+  all: ['store', 'all'], position: ['store', 'rice'], batches: ['batches', 'rice'], inputbatches: ['batches', 'inputs'],
+  trace: ['batches', 'trace'], ledger: ['moves', 'history'], transfers: ['moves', 'transfers'], counts: ['counts', 'all'],
+};
+
 function StockWorkspace({ can }: { can: Can }) {
-  const [tab, setTab] = useState<StockTab>(() => {
-    if (typeof window === 'undefined') return 'all';
+  const [start] = useState<[Main, SubView]>(() => {
+    if (typeof window === 'undefined') return ['store', 'all'];
     const t = window.sessionStorage.getItem(TAB_KEY) as StockTab | null;
     window.sessionStorage.removeItem(TAB_KEY);
-    return t ?? 'all';
+    return (t && OLD_TAB[t]) || ['store', 'all'];
   });
+  const [main, setMain] = useState<Main>(start[0]);
+  const [subs, setSubs] = useState<Record<Main, SubView>>({ store: 'all', batches: 'rice', moves: 'history', counts: 'all', [start[0]]: start[1] } as Record<Main, SubView>);
+  const sub = subs[main];
+  const setSub = (v: SubView) => setSubs((x) => ({ ...x, [main]: v }));
+  const stock = (initialTab: 'position' | 'batches' | 'ledger' | 'transfers') => (
+    <StockPanel key={initialTab} hideTabs initialTab={initialTab} canAdjust={can('ops_stock', 'EDIT')} canTransfer={can('ops_stock', 'EDIT')} canManageQuality={can('ops_quality', 'EDIT')} />
+  );
   return <>
     <OpsTabs tabs={[
-      { id: 'all' as StockTab, label: 'Everything' }, { id: 'position' as StockTab, label: 'Rice & paddy' }, { id: 'batches' as StockTab, label: 'Rice batches' }, { id: 'inputbatches' as StockTab, label: 'Input batches & expiry' }, { id: 'ledger' as StockTab, label: 'History' },
-      { id: 'transfers' as StockTab, label: 'Transfers' }, { id: 'counts' as StockTab, label: 'Count stock' }, { id: 'trace' as StockTab, label: 'Trace a batch' },
-    ]} value={tab} onChange={setTab} />
-    {tab === 'all' && <AllStockPanel canRice={can('ops_stock')} canInputs={can('ops_stock')} canAdjust={can('ops_stock', 'EDIT')} />}
-    {tab === 'inputbatches' && <InputBatchesPanel onFix={() => setTab('all')} />}
-    {(tab === 'position' || tab === 'batches' || tab === 'ledger' || tab === 'transfers') && <StockPanel key={tab} hideTabs initialTab={tab} canAdjust={can('ops_stock', 'EDIT')} canTransfer={can('ops_stock', 'EDIT')} canManageQuality={can('ops_quality', 'EDIT')} />}
-    {tab === 'counts' && <StockCountsPanel canStart={can('ops_stock', 'CREATE')} canApprove={can('ops_stock', 'EDIT')} />}
-    {tab === 'trace' && <TracePanel />}
+      { id: 'store' as Main, label: 'In store' }, { id: 'batches' as Main, label: 'Batches & expiry' }, { id: 'moves' as Main, label: 'Movements' }, { id: 'counts' as Main, label: 'Count stock' },
+    ]} value={main} onChange={setMain} />
+    {main === 'store' && <>
+      <OpsTabs tabs={[{ id: 'all' as SubView, label: 'Everything' }, { id: 'rice' as SubView, label: 'Rice & paddy: promised and free' }]} value={sub} onChange={setSub} />
+      {sub === 'rice' ? stock('position') : <AllStockPanel canRice={can('ops_stock')} canInputs={can('ops_stock')} canAdjust={can('ops_stock', 'EDIT')} />}
+    </>}
+    {main === 'batches' && <>
+      <OpsTabs tabs={[{ id: 'rice' as SubView, label: 'Rice batches' }, { id: 'inputs' as SubView, label: 'Input batches & expiry' }, { id: 'trace' as SubView, label: 'Trace a batch' }]} value={sub} onChange={setSub} />
+      {sub === 'inputs' ? <InputBatchesPanel onFix={() => setMain('store')} /> : sub === 'trace' ? <TracePanel /> : stock('batches')}
+    </>}
+    {main === 'moves' && <>
+      <OpsTabs tabs={[{ id: 'history' as SubView, label: 'History' }, { id: 'transfers' as SubView, label: 'Transfers' }]} value={sub} onChange={setSub} />
+      {sub === 'transfers' ? stock('transfers') : stock('ledger')}
+    </>}
+    {main === 'counts' && <StockCountsPanel canStart={can('ops_stock', 'CREATE')} canApprove={can('ops_stock', 'EDIT')} />}
   </>;
 }
 

@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Modal from '@/components/Modal';
-import { ChoiceCards, Field, Form, FormError, Row, Section } from '@/components/FormKit';
+import { Field, Form, FormError, Row, Section } from '@/components/FormKit';
 import { inputStockApi, opsApi, warehousesApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-error';
 import { kg } from '@/lib/ops';
@@ -119,7 +119,7 @@ function Crumbs({ name }: { name?: string }) {
 // ───────────────────────── one warehouse ─────────────────────────
 export function WarehouseDetail({ id, can, goto }: { id: string; can: Can; goto: () => void }) {
   const { list, stockOf, reload } = useWarehouseData(can);
-  const [dialog, setDialog] = useState<'' | 'edit' | 'keepers' | 'add' | 'rice' | 'inputs'>('');
+  const [dialog, setDialog] = useState<'' | 'edit' | 'keepers' | 'rice' | 'inputs'>('');
   const w = (list.data ?? []).find((x) => x.id === id);
   if (list.loading && !list.data) return <Loading />;
   if (!w) return <><Crumbs /><ErrorNote message={list.error || 'This warehouse was not found.'} /></>;
@@ -151,7 +151,8 @@ export function WarehouseDetail({ id, can, goto }: { id: string; can: Can; goto:
       </section>
 
       <div className="whl-bar-actions">
-        {can('ops_receiving', 'CREATE') && <button type="button" className="btn-primary" onClick={() => setDialog('add')}>+ Add stock</button>}
+        {can('ops_receiving', 'CREATE') && <button type="button" className="btn-primary" onClick={() => setDialog('rice')}>Receive paddy</button>}
+        {can('ops_receiving', 'CREATE') && <button type="button" className="btn-secondary" onClick={() => setDialog('inputs')}>Receive inputs, fuel or bags</button>}
         {can('ops_stock', 'CREATE') && <button type="button" className="btn-secondary" onClick={goto}>Count stock</button>}
       </div>
 
@@ -160,7 +161,6 @@ export function WarehouseDetail({ id, can, goto }: { id: string; can: Can; goto:
 
       {dialog === 'edit' && <EditWarehouse w={w} onClose={() => setDialog('')} onDone={done} />}
       {dialog === 'keepers' && <Keepers warehouse={w} onClose={() => setDialog('')} onDone={reload} />}
-      {dialog === 'add' && <AddStock name={w.name} onClose={() => setDialog('')} pick={(k) => setDialog(k)} />}
       {dialog === 'rice' && <NewReceiptModal canConfirm={can('ops_receiving', 'EDIT')} defaultWarehouseId={w.id} onClose={() => setDialog('')} onSaved={done} />}
       {dialog === 'inputs' && (
         <Modal title={`Add inputs, fuel or bags to ${w.name}`} width="780px" onClose={() => setDialog('')} footer={<button type="button" className="btn-secondary" onClick={done}>Close</button>}>
@@ -168,21 +168,6 @@ export function WarehouseDetail({ id, can, goto }: { id: string; can: Can; goto:
         </Modal>
       )}
     </>
-  );
-}
-
-/** What kind of stock is arriving: the answer decides which form opens, already pointed at this warehouse. */
-function AddStock({ name, onClose, pick }: { name: string; onClose: () => void; pick: (kind: 'rice' | 'inputs') => void }) {
-  const [kind, setKind] = useState<'rice' | 'inputs'>('rice');
-  return (
-    <Modal title={`Add stock to ${name}`} subtitle="Stock is added by receiving it. Choose what arrived." width="520px" onClose={onClose}
-      footer={<><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button type="button" className="btn-primary" onClick={() => pick(kind)}>Continue</button></>}>
-      <ChoiceCards value={kind} onChange={setKind} options={[
-        { id: 'rice', title: 'Rice or paddy', sub: 'From a farmer or a farm. You record the weight, quality and price.' },
-        { id: 'inputs', title: 'Farm inputs, fuel or bags', sub: 'Fertiliser, seed, chemicals, diesel or empty bags from a supplier.' },
-      ]} />
-      <p className="muted" style={{ fontSize: 12.5, margin: '12px 0 0' }}>New product that is not in the list yet? Add it first in Settings: products for rice, farm inputs for inputs.</p>
-    </Modal>
   );
 }
 
