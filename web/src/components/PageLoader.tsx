@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
-const SHOW_AFTER_MS = 250; // quick page changes finish before this, so they never flash
+const SHOW_AFTER_MS = 0; // covers the screen straight away, so the old page is never left showing while the next one loads
 const GIVE_UP_AFTER_MS = 60_000;
 
 /** Anything a screen draws while it waits for its data. The loader stands in for all of it, so these are hidden (see globals.css). */

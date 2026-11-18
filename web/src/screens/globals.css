@@ -3771,3 +3771,6 @@ a.farmers-name { display: block; cursor: pointer; }
 
 /* The loader replaces the grey placeholder blocks: they keep their space but draw nothing. */
 .skeleton, .ua-skel, .farmers-skeleton { visibility: hidden; animation: none !important; }
+
+/* Full-page cover: the old screen is hidden completely while the next one loads. */
+.page-loader { background: var(--bg); backdrop-filter: none; }
