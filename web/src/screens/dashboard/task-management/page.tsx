@@ -213,11 +213,6 @@ function Activities({ equipment, blocks, canWrite }: { equipment: any[]; blocks:
         <StatCard label="Fees collected" value={s ? tzs(s.feesPaid) : '—'} tone="good" />
         <StatCard label="Fees still due" value={s ? tzs(s.feesDue) : '—'} tone={s?.feesDue ? 'warn' : undefined} />
       </div>
-      {s?.byType?.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-          {s.byType.map((t: any) => <span key={t.type} className="badge badge-blue">{titleCase(t.type)} · {fmtNum(t.hectares, 1)} ha · {t.jobs} job{t.jobs === 1 ? '' : 's'}</span>)}
-        </div>
-      )}
 
       <section className="table-panel">
         <div className="section-toolbar">
