@@ -2,11 +2,12 @@
 -- Everything is tagged DEMO so demo-payments-remove.sql can delete exactly these rows. Nothing here is posted to the ledger.
 -- Run once:  psql "$DB" -v ON_ERROR_STOP=1 -v mamcos=<AMCOS id> -v admin=<user id> -f demo-payments.sql
 BEGIN;
+SELECT set_config('demo.mamcos', :'mamcos', true), set_config('demo.admin', :'admin', true);
 
 DO $$
 DECLARE
-  m_id   text := :'mamcos';
-  adm    text := :'admin';
+  m_id   text := current_setting('demo.mamcos');
+  adm    text := current_setting('demo.admin');
   farmers text[];
   nf     int;
   start0 date := (date_trunc('year', current_date) - interval '1 month')::date;   -- 1 December last year
