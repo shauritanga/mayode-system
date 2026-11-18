@@ -25,8 +25,8 @@ const RATE_TONE: Record<string, string> = { ACTIVE: 'badge-green', PENDING_APPRO
 const RATE_LABEL: Record<string, string> = { ACTIVE: 'In use', PENDING_APPROVAL: 'Waiting for approval', SUPERSEDED: 'Replaced', REJECTED: 'Rejected' };
 
 function useStructure() {
-  const { data } = useApi<{ canals: any[]; blocks: any[]; seasons: any[] }>(() => harvestApi.structure(), []);
-  return { canals: data?.canals ?? [], blocks: data?.blocks ?? [], seasons: data?.seasons ?? [] };
+  const { data, error } = useApi<{ canals: any[]; blocks: any[]; seasons: any[] }>(() => harvestApi.structure(), []);
+  return { canals: data?.canals ?? [], blocks: data?.blocks ?? [], seasons: data?.seasons ?? [], ready: data !== null || !!error };
 }
 
 /** The list a Block Chairman checks before a combine harvester starts on a hectare. */
@@ -72,7 +72,7 @@ function Clearance({ blocks }: { blocks: any[] }) {
           <StatCard label="No holder" value={s.unallocated} />
         </div>
       )}
-      {loading && !data ? <TableSkeleton cols={6} /> : !data?.hectares?.length ? <Empty title="No hectares in this block" /> : (
+      {(loading || (chosen && !error)) && !data ? <TableSkeleton cols={6} /> : !data?.hectares?.length ? <Empty title="No hectares in this block" /> : (
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead><tr><th>Hectare</th><th>Farmer</th><th>Hectares</th><th>Harvest fee</th><th>Still owed</th><th>Clearance</th>{showPasses && <th>Pass code</th>}{(canSignOff || canHold) && <th />}</tr></thead>
@@ -179,7 +179,7 @@ function Collection({ canals, blocks, seasons, canOpen }: { canals: any[]; block
           <StatCard label="Still owed" value={tzs(data.totals.outstanding)} tone={data.totals.outstanding ? 'warn' : 'good'} />
         </div>
       )}
-      {loading && !data ? <TableSkeleton cols={6} /> : !data?.blocks?.length ? <Empty title="No blocks in this canal" /> : (
+      {(loading || (chosen && !error)) && !data ? <TableSkeleton cols={6} /> : !data?.blocks?.length ? <Empty title="No blocks in this canal" /> : (
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead><tr><th>Block</th><th>Season</th><th>Farmers cleared</th><th>Charged</th><th>Collected</th><th>Still owed</th></tr></thead>
@@ -290,7 +290,7 @@ type Tab = 'clearance' | 'collection' | 'rates' | 'incidents' | 'reconcile';
 
 export default function HarvestPage() {
   const can = useCan();
-  const { canals, blocks, seasons } = useStructure();
+  const { canals, blocks, seasons, ready } = useStructure();
   const tabs: { id: Tab; label: string }[] = [
     ...(can('harvest_clearance', 'VIEW') ? [{ id: 'clearance' as Tab, label: 'Clearance' }, { id: 'collection' as Tab, label: 'Collection' }] : []),
     ...(can('harvest_passes', 'VIEW') ? [{ id: 'incidents' as Tab, label: 'Gate incidents' }] : []),
@@ -298,6 +298,8 @@ export default function HarvestPage() {
   ];
   const [tab, setTab] = useState<Tab | null>(null);
   const active: Tab = tab && tabs.some((t) => t.id === tab) ? tab : tabs[0]?.id ?? 'clearance';
+  // Nothing is drawn until the blocks and canals are known, so the page opens once instead of filling in.
+  if (!ready) return <div className="skeleton" style={{ minHeight: 400 }} />;
   return (
     <div>
       <PageHeader title="Harvest Fees" subtitle="The per-hectare harvest fee, who has paid it, and which hectares a combine harvester may clear." />
