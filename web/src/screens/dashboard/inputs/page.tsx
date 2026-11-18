@@ -58,7 +58,7 @@ function IssueModal({ items, onClose, onDone, canSetup }: { items: any[]; onClos
           </div>
         )}
         <div style={row2}>
-          <Field label="Farmer *"><FarmerPicker value={farmer} onChange={setFarmer} /></Field>
+          <FarmerPicker value={farmer} onChange={setFarmer} />
           <Field label="Input *" hint={items.length ? 'Grouped by type, with what is in stock' : undefined}>
             <select className="input-field" value={itemId} onChange={(e) => setItemId(e.target.value)} disabled={!items.length}>
               <option value="">{items.length ? 'Choose the input…' : 'No inputs added yet'}</option>
