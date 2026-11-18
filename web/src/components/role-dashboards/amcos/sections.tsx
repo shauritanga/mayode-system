@@ -7,10 +7,9 @@ import { ReactNode } from 'react';
 import {
   Building05Icon, CheckmarkBadge02Icon, DashboardSquare01Icon, MapsIcon, Plant01Icon, UserGroupIcon,
 } from '@hugeicons/core-free-icons';
-import { opsApi, accountingApi } from '@/lib/api';
 import { ChartCard, DonutBreakdown, GaugeArcs, TrendAreaChart } from '../Charts';
 import { MetricTile } from '../DashboardPrimitives';
-import { BASE, LoadError, ProgressBar, StatusBadge, fmtDate, fmtNum, useApi } from '@/screens/dashboard/irrigation/ui';
+import { BASE, LoadError, ProgressBar, StatusBadge, fmtDate, fmtNum } from '@/screens/dashboard/irrigation/ui';
 
 const tzs = (value?: number | null) => `TZS ${Math.round(Number(value) || 0).toLocaleString('en-US')}`;
 const kg = (value?: number | null) => `${Math.round(Number(value) || 0).toLocaleString('en-US')} kg`;
@@ -157,8 +156,8 @@ export function IrrigationActivity({ events }: { events: any[] }) {
 }
 
 /** Orders and stock for the AMCOS. Only mounted for roles with ops_reports VIEW, so it never makes a call that would fail. */
-export function OrdersAndStock() {
-  const { data, loading, error, reload } = useApi<any>(() => opsApi.commercialDashboard(), []);
+export function OrdersAndStock({ data }: { data: any }) {
+  const loading = false, error = '', reload = () => undefined;
   return (
     <Panel title="Orders & stock" subtitle="Sales workload and rice on hand." badge={<Link href="/dashboard/ops-orders" className="badge badge-blue">Orders</Link>}>
       <LoadError message={error} onRetry={reload} />
@@ -179,10 +178,10 @@ export function OrdersAndStock() {
  * Money snapshot from AMCOS-scoped sources only (invoices/payments from the sales desk, member contributions). The general
  * ledger endpoints are platform-wide, so they are deliberately not used here.
  */
-export function MoneySnapshot({ showSales, showContributions }: { showSales: boolean; showContributions: boolean }) {
-  const sales = useApi<any>(showSales ? () => opsApi.commercialDashboard() : null, [showSales]);
-  const contributions = useApi<any>(showContributions ? () => accountingApi.memberContributions() : null, [showContributions]);
-  const loading = sales.loading || contributions.loading;
+export function MoneySnapshot({ showSales, showContributions, salesData, contributionsData }: { showSales: boolean; showContributions: boolean; salesData: any; contributionsData: any }) {
+  const sales = { data: salesData, error: '' };
+  const contributions = { data: contributionsData, error: '' };
+  const loading = false;
   return (
     <Panel title="Money snapshot" subtitle="Collections and amounts still owed to the AMCOS." badge={<Link href="/dashboard/accounting" className="badge badge-blue">Accounting</Link>}>
       <LoadError message={sales.error || contributions.error} />

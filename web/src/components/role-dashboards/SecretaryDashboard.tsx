@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { irrigationApi, opsApi, accountingApi } from '@/lib/api';
 import { printPage } from '@/lib/print';
 import { useAuthStore } from '@/store/auth.store';
-import { BASE, CardsSkeleton, LoadError, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
+import { BASE, LoadError, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 import {
   AllocationSummary, AttentionRow, AttentionTable, BlockStatus, CanalPerformance, ContributionsTrend, CoverageGauge,
   IrrigationActivity, LeadershipWatch, MembersApprovals, MoneySnapshot, OrdersAndStock, OverviewKpis,
@@ -55,6 +55,13 @@ export function SecretaryDashboard() {
   }
   if (commercial.data?.ordersAwaitingReview) attention.push({ task: `${commercial.data.ordersAwaitingReview} orders to review`, who: 'Sales desk', due: 'Now', status: 'Waiting', href: '/dashboard/ops-orders' });
 
+  // Show the page once, complete: nothing is drawn until every request it needs has answered (the loader covers the wait).
+  const settled = (r: { data: unknown; error: string }, wanted: boolean) => !wanted || r.data !== null || !!r.error;
+  const ready = settled(schemes, showScheme)
+    && (!schemeId || (settled(overview, true) && settled(allocation, showAllocation) && settled(leadership, showLeadership)
+      && settled(commercial, showOrders) && settled(contributions, showContributions)));
+  if (!ready) return <div className="page-shell ov-page"><div className="skeleton" style={{ minHeight: 480 }} /></div>;
+
   return (
     <div className="page-shell ov-page">
       <div className="ov-head">
@@ -83,8 +90,6 @@ export function SecretaryDashboard() {
         </section>
       )}
 
-      {showScheme && (schemes.loading || (schemeId && overview.loading)) && <CardsSkeleton count={8} />}
-
       {o?.totals && (
         <>
           <div className="ov-top">
@@ -95,7 +100,7 @@ export function SecretaryDashboard() {
             {contributions.data?.contributions?.length ? <ContributionsTrend contributions={contributions.data.contributions} /> : <BlockStatus distribution={o.blockDistribution} blocks={allocation.data?.byBlock ?? null} />}
             <div className="ov-stack">
               <CoverageGauge totals={o.totals} />
-              {(showOrders || showContributions) && <MoneySnapshot showSales={showOrders} showContributions={showContributions} />}
+              {(showOrders || showContributions) && <MoneySnapshot showSales={showOrders} showContributions={showContributions} salesData={commercial.data} contributionsData={contributions.data} />}
             </div>
           </div>
           <AttentionTable rows={attention} />
@@ -108,7 +113,7 @@ export function SecretaryDashboard() {
         </>
       )}
 
-      {showOrders && <OrdersAndStock />}
+      {showOrders && commercial.data && <OrdersAndStock data={commercial.data} />}
     </div>
   );
 }
