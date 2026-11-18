@@ -3790,8 +3790,9 @@ a.farmers-name { display: block; cursor: pointer; }
 .ov-foot strong.ov-up { color: var(--green-500); }
 .ov-foot strong.ov-down { color: var(--red-400); }
 
-/* Headline cards on the overview: raised look, the shadow falls to the right and below. */
-.ov-kpi { border: 1px solid var(--border-subtle); border-radius: 4px; box-shadow: 3px 4px 9px rgba(15, 23, 42, 0.28); transition: box-shadow 0.15s ease, transform 0.15s ease; }
-.ov-kpi:hover { box-shadow: 4px 6px 12px rgba(15, 23, 42, 0.34); transform: translateY(-1px); }
-:root[data-theme="dark"] .ov-kpi, [data-theme="dark"] .ov-kpi { box-shadow: 3px 4px 10px rgba(0, 0, 0, 0.7); }
-@media print { .ov-kpi { box-shadow: none; } }
+/* Headline cards on the overview: raised look, the shadow falls to the right and below. Dark is the default theme. */
+.ov-kpi { border: 1px solid var(--border-subtle); border-radius: 4px; box-shadow: 3px 4px 10px rgba(0, 0, 0, 0.7); transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.ov-kpi:hover { box-shadow: 4px 6px 13px rgba(0, 0, 0, 0.8); transform: translateY(-1px); }
+:root[data-theme='light'] .ov-kpi { box-shadow: 3px 4px 9px rgba(15, 23, 42, 0.28); }
+:root[data-theme='light'] .ov-kpi:hover { box-shadow: 4px 6px 12px rgba(15, 23, 42, 0.34); }
+@media print { .ov-kpi { box-shadow: none !important; } }
