@@ -99,10 +99,9 @@ export function SecretaryDashboard() {
           </div>
           <div className="ov-mid">
             <PaymentsTrend data={payments.data} />
-            <div className="ov-stack">
-              <CoverageGauge totals={o.totals} />
-              {(showOrders || showContributions) && <MoneySnapshot showSales={showOrders} showContributions={showContributions} salesData={commercial.data} contributionsData={contributions.data} />}
-            </div>
+            <CoverageGauge totals={o.totals} />
+            {showOrders && commercial.data ? <OrdersAndStock data={commercial.data} /> : <div />}
+            {(showOrders || showContributions) ? <MoneySnapshot showSales={showOrders} showContributions={showContributions} salesData={commercial.data} contributionsData={contributions.data} /> : <div />}
           </div>
           <AttentionTable rows={attention} />
           <CanalPerformance canals={o.canals} />
@@ -114,7 +113,6 @@ export function SecretaryDashboard() {
         </>
       )}
 
-      {showOrders && commercial.data && <OrdersAndStock data={commercial.data} />}
     </div>
   );
 }
