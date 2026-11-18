@@ -668,7 +668,7 @@ export default function ReportsPage() {
                     <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 1 }}>
                       {preview?.grain ?? `One row per ${entity.noun}`}
                       {' · '}{columns.length} columns
-                      {preview && <> · {preview.rows.length.toLocaleString()}{preview.total > preview.rows.length ? ` of ${preview.total.toLocaleString()}` : ''} rows</>}
+                      {preview && <> · {preview.rows.length.toLocaleString('en-US')}{preview.total > preview.rows.length ? ` of ${preview.total.toLocaleString('en-US')}` : ''} rows</>}
                       {previewing && preview && <span style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 5 }}><span className="updating-dot" />Updating…</span>}
                     </div>
                   </div>
@@ -866,7 +866,7 @@ export default function ReportsPage() {
       {standardPreview && (
         <Modal
           title={standardPreview.title}
-          subtitle={`${standardPreview.rows.length.toLocaleString()} rows`}
+          subtitle={`${standardPreview.rows.length.toLocaleString('en-US')} rows`}
           onClose={() => setStandardPreview(null)}
           width="960px"
           footer={<button className="btn-primary" onClick={() => setStandardPreview(null)}>Close</button>}

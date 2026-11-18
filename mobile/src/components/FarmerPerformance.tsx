@@ -47,11 +47,11 @@ export function FarmerPerformance({ farmerId }: { farmerId: string }) {
         <>
           <Text>
             {t("totalYield")}:{" "}
-            {Number(summary.totalActualYieldKg ?? 0).toLocaleString()} kg
+            {Number(summary.totalActualYieldKg ?? 0).toLocaleString('en-US')} kg
           </Text>
           <Text>
             {t("totalCosts")}: TZS{" "}
-            {Number(summary.totalCostsTzs ?? 0).toLocaleString()}
+            {Number(summary.totalCostsTzs ?? 0).toLocaleString('en-US')}
           </Text>
           {(summary.cycles ?? []).map((cycle: any) => (
             <TouchableOpacity
@@ -72,8 +72,8 @@ export function FarmerPerformance({ farmerId }: { farmerId: string }) {
                 {cycle.season} · {cycle.farmCode}
               </Text>
               <Text>
-                {Number(cycle.actualYieldKg ?? 0).toLocaleString()} kg · TZS{" "}
-                {Number(cycle.totalCostsTzs ?? 0).toLocaleString()}
+                {Number(cycle.actualYieldKg ?? 0).toLocaleString('en-US')} kg · TZS{" "}
+                {Number(cycle.totalCostsTzs ?? 0).toLocaleString('en-US')}
               </Text>
             </TouchableOpacity>
           ))}

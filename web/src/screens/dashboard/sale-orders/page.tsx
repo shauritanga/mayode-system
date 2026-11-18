@@ -142,7 +142,7 @@ export function SaleOrdersView({ embedded = false }: { embedded?: boolean }) {
                   <tr key={r.id}>
                     <td style={{ fontWeight: 700 }}>{r.reference}</td>
                     <td>{r.buyer.name}</td>
-                    <td>{r.quantityKg.toLocaleString()} kg{r.grade ? ` · ${r.grade}` : ''}</td>
+                    <td>{r.quantityKg.toLocaleString('en-US')} kg{r.grade ? ` · ${r.grade}` : ''}</td>
                     <td>{r.warehouse.name}</td>
                     <td><StatusChip status={r.status} /></td>
                     <td className="ua-muted">{r.createdByName ?? '—'}</td>
@@ -192,12 +192,12 @@ export function SaleOrdersView({ embedded = false }: { embedded?: boolean }) {
                   setForm((f) => ({ ...f, agreementId: e.target.value, pricePerKg: a && !f.pricePerKg ? String(a.pricePerKg) : f.pricePerKg }));
                 }}>
                   <option value="">No purchase agreement</option>
-                  {buyerAgreements.map((a) => <option key={a.id} value={a.id}>{a.reference} · {a.quantityKg.toLocaleString()} kg @ TZS {a.pricePerKg.toLocaleString()}</option>)}
+                  {buyerAgreements.map((a) => <option key={a.id} value={a.id}>{a.reference} · {a.quantityKg.toLocaleString('en-US')} kg @ TZS {a.pricePerKg.toLocaleString('en-US')}</option>)}
                 </select>
                 {openBuyerOrders.length > 0 && (
                   <select aria-label="Buyer order" className="input-field" style={{ marginTop: 6 }} value={form.buyerOrderId} onChange={(e) => set('buyerOrderId', e.target.value)}>
                     <option value="">No buyer order</option>
-                    {openBuyerOrders.map((o) => <option key={o.id} value={o.id}>Order · {o.quantityRequiredKg.toLocaleString()} kg{o.riceVariety ? ` · ${o.riceVariety}` : ''}</option>)}
+                    {openBuyerOrders.map((o) => <option key={o.id} value={o.id}>Order · {o.quantityRequiredKg.toLocaleString('en-US')} kg{o.riceVariety ? ` · ${o.riceVariety}` : ''}</option>)}
                   </select>
                 )}
               </div>
@@ -206,14 +206,14 @@ export function SaleOrdersView({ embedded = false }: { embedded?: boolean }) {
               <label className="ua-label" htmlFor="so-wh">Warehouse</label>
               <select id="so-wh" className="input-field" required value={form.warehouseId} onChange={(e) => set('warehouseId', e.target.value)}>
                 <option value="">Select a warehouse…</option>
-                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name} — {w.balance.availableKg.toLocaleString()} kg available</option>)}
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name} — {w.balance.availableKg.toLocaleString('en-US')} kg available</option>)}
               </select>
             </div>
             <div className="ua-field">
               <label className="ua-label" htmlFor="so-lot">Lot</label>
               <select id="so-lot" className="input-field" required value={form.lotId} onChange={(e) => set('lotId', e.target.value)} disabled={!form.warehouseId}>
                 <option value="">{form.warehouseId ? 'Select a lot…' : 'Choose a warehouse first'}</option>
-                {warehouseLots.map((l) => <option key={l.id} value={l.id}>{l.lotNumber}{l.grade ? ` · ${l.grade}` : ''} — {l.remainingKg.toLocaleString()} kg left</option>)}
+                {warehouseLots.map((l) => <option key={l.id} value={l.id}>{l.lotNumber}{l.grade ? ` · ${l.grade}` : ''} — {l.remainingKg.toLocaleString('en-US')} kg left</option>)}
               </select>
               {form.warehouseId && warehouseLots.length === 0 && <span className="ua-hint">No lot has rice left to sell in this warehouse. Receive harvest and make a lot, or make a lot from counted stock on the Warehouse page.</span>}
             </div>
@@ -235,14 +235,14 @@ export function SaleOrdersView({ embedded = false }: { embedded?: boolean }) {
               <div className="ua-field">
                 <label className="ua-label" htmlFor="so-qty">Total weight (kg)</label>
                 <input id="so-qty" className="input-field" type="number" min={1} step="any" required value={form.quantityKg} onChange={(e) => set('quantityKg', e.target.value)} />
-                {pickedLot ? <span className="ua-hint">Up to {Math.min(pickedLot.remainingKg, wh?.balance.availableKg ?? pickedLot.remainingKg).toLocaleString()} kg can be sold from this lot</span> : wh && <span className="ua-hint">Pick a lot to see how much can be sold</span>}
+                {pickedLot ? <span className="ua-hint">Up to {Math.min(pickedLot.remainingKg, wh?.balance.availableKg ?? pickedLot.remainingKg).toLocaleString('en-US')} kg can be sold from this lot</span> : wh && <span className="ua-hint">Pick a lot to see how much can be sold</span>}
               </div>
               <div className="ua-field">
                 <label className="ua-label" htmlFor="so-price">Price per kg (TZS)</label>
                 <MoneyInput id="so-price" className="input-field" min={0} step="any" required value={form.pricePerKg} onChange={(e) => set('pricePerKg', e.target.value)} />
               </div>
             </div>
-            {form.quantityKg && form.pricePerKg && <div className="ua-role-note">Order value: TZS {Math.round(Number(form.quantityKg) * Number(form.pricePerKg)).toLocaleString()}</div>}
+            {form.quantityKg && form.pricePerKg && <div className="ua-role-note">Order value: TZS {Math.round(Number(form.quantityKg) * Number(form.pricePerKg)).toLocaleString('en-US')}</div>}
             <label className="so-check"><input type="checkbox" checked={form.needsTransport} onChange={(e) => set('needsTransport', e.target.checked)} /> The buyer has no transport — the warehouse arranges it</label>
             <div className="ua-field">
               <label className="ua-label" htmlFor="so-notes">Notes<span className="ua-opt">optional</span></label>

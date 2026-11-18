@@ -358,7 +358,7 @@ export class SalesService {
           allocation.farmerId,
           'sale.apportioned',
           `Cooperative sale recorded: ${invoiceNumber}`,
-          `TZS ${(allocation.grossAmount + allocation.fairtradePremium).toLocaleString()} pending payment`,
+          `TZS ${(allocation.grossAmount + allocation.fairtradePremium).toLocaleString('en-US')} pending payment`,
           '💰',
           {
             invoice: invoiceNumber,

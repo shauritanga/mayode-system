@@ -328,7 +328,7 @@ export default function CropCycleDetail() {
             <>
               <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>{t('totalExpenses')}</Text>
-                <Text style={styles.totalValue}>TZS {totalExpenses.toLocaleString()}</Text>
+                <Text style={styles.totalValue}>TZS {totalExpenses.toLocaleString('en-US')}</Text>
               </View>
               {cycle.costs.map((c) => (
                 <View key={c.id} style={styles.row}>
@@ -336,7 +336,7 @@ export default function CropCycleDetail() {
                     <Text style={styles.rowTitle}>{c.itemName}</Text>
                     <Text style={styles.rowSub}>{c.category.replace(/_/g, ' ')}</Text>
                   </View>
-                  <Text style={styles.rowAmount}>TZS {c.totalCost.toLocaleString()}</Text>
+                  <Text style={styles.rowAmount}>TZS {c.totalCost.toLocaleString('en-US')}</Text>
                 </View>
               ))}
             </>
@@ -352,7 +352,7 @@ export default function CropCycleDetail() {
               <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>{t('totalRevenue')}</Text>
                 <Text style={styles.totalValue}>
-                  TZS {cycle.revenues.reduce((s, r) => s + r.totalRevenue + (r.fairtradePremium ?? 0), 0).toLocaleString()}
+                  TZS {cycle.revenues.reduce((s, r) => s + r.totalRevenue + (r.fairtradePremium ?? 0), 0).toLocaleString('en-US')}
                 </Text>
               </View>
               {cycle.revenues.map((r) => (
@@ -361,7 +361,7 @@ export default function CropCycleDetail() {
                     <Text style={styles.rowTitle}>{r.quantityKg}kg</Text>
                     <Text style={styles.rowSub}>{r.revenueType.replace(/_/g, ' ')}</Text>
                   </View>
-                  <Text style={styles.rowAmount}>TZS {r.totalRevenue.toLocaleString()}</Text>
+                  <Text style={styles.rowAmount}>TZS {r.totalRevenue.toLocaleString('en-US')}</Text>
                 </View>
               ))}
             </>

@@ -1,4 +1,4 @@
-export const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${Math.round(n).toLocaleString()}`);
+export const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${Math.round(n).toLocaleString('en-US')}`);
 export const day = (v?: string | null) =>
   v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 

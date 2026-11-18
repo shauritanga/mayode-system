@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { marketplaceApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 
+import MoneyInput from '@/components/MoneyInput';
 interface EscrowPayment {
   id: string;
   amount: number;
@@ -588,10 +589,10 @@ export default function MarketplacePage() {
             <TextField label="Farm ID *" value={listingForm.farmId} onChange={v => setL('farmId', v)} placeholder="farm-uuid" />
             <TextField label="Owner (Farmer) ID *" value={listingForm.ownerId} onChange={v => setL('ownerId', v)} placeholder="farmer-uuid" />
             <div>
-              <TextField label="Asking price (TZS) *" value={listingForm.askingPrice} onChange={v => setL('askingPrice', v)} placeholder="2000000" />
+              <TextField money label="Asking price (TZS) *" value={listingForm.askingPrice} onChange={v => setL('askingPrice', v)} placeholder="2000000" />
               {suggested && (
                 <div style={{ fontSize: '11px', marginTop: '4px', fontWeight: 700, color: suggested.marketGauge === 'above' ? 'var(--red-400)' : 'var(--accent)' }}>
-                  Suggested: {suggested.suggestedPrice.toLocaleString()} TZS ({suggested.marketGauge})
+                  Suggested: {suggested.suggestedPrice.toLocaleString('en-US')} TZS ({suggested.marketGauge})
                 </div>
               )}
             </div>
@@ -668,7 +669,7 @@ export default function MarketplacePage() {
             <TextField label="Registration No. *" value={tractorForm.registrationNo} onChange={v => setT('registrationNo', v)} placeholder="T123ABC" />
             <TextField label="Model" value={tractorForm.model} onChange={v => setT('model', v)} />
             <TextField label="Horsepower" value={tractorForm.horsePower} onChange={v => setT('horsePower', v)} />
-            <TextField label="Price per hectare (TZS)" value={tractorForm.pricePerHectare} onChange={v => setT('pricePerHectare', v)} placeholder="60000" />
+            <TextField money label="Price per hectare (TZS)" value={tractorForm.pricePerHectare} onChange={v => setT('pricePerHectare', v)} placeholder="60000" />
           </div>
           {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
         </Modal>
@@ -688,7 +689,7 @@ export default function MarketplacePage() {
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
             <TextField label="Commodity *" value={priceForm.commodity} onChange={v => setP('commodity', v)} placeholder="rice_sack_100kg" />
-            <TextField label="Price (TZS) *" value={priceForm.price} onChange={v => setP('price', v)} placeholder="100000" />
+            <TextField money label="Price (TZS) *" value={priceForm.price} onChange={v => setP('price', v)} placeholder="100000" />
             <TextField label="Market" value={priceForm.market} onChange={v => setP('market', v)} placeholder="Mafinga" />
             <TextField label="Source" value={priceForm.source} onChange={v => setP('source', v)} />
             <div>
@@ -715,7 +716,7 @@ export default function MarketplacePage() {
         >
           <p style={{ fontSize: '13px', color: 'var(--neutral-400)', marginBottom: '12px' }}>
             The current renter wants to hand off the rest of this season to a new renter.
-            {subLeaseTarget.subLease.newAskingPrice ? ` Proposed price: ${Number(subLeaseTarget.subLease.newAskingPrice).toLocaleString()} TZS.` : ''}
+            {subLeaseTarget.subLease.newAskingPrice ? ` Proposed price: ${Number(subLeaseTarget.subLease.newAskingPrice).toLocaleString('en-US')} TZS.` : ''}
           </p>
           <TextField label="Owner (Farmer) ID — confirms this decision on their behalf" value={subLeaseOwnerId} onChange={setSubLeaseOwnerId} placeholder="farmer-uuid" />
           {error && <div style={{ color: 'var(--red-400)', fontSize: '13px', marginTop: '12px' }}>{error}</div>}
@@ -792,7 +793,7 @@ export default function MarketplacePage() {
       {offersTarget && (
         <Modal
           title="Offers"
-          subtitle={`Farm ${offersTarget.farm?.farmCode ?? ''} — asking ${Number(offersTarget.askingPrice).toLocaleString()} TZS`}
+          subtitle={`Farm ${offersTarget.farm?.farmCode ?? ''} — asking ${Number(offersTarget.askingPrice).toLocaleString('en-US')} TZS`}
           onClose={() => { setOffersTarget(null); setError(''); }}
           width="560px"
           footer={<button className="btn-secondary" onClick={() => setOffersTarget(null)}>Close</button>}
@@ -807,7 +808,7 @@ export default function MarketplacePage() {
               <div key={o.id} style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>{Number(o.offerAmount).toLocaleString()} TZS</div>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>{Number(o.offerAmount).toLocaleString('en-US')} TZS</div>
                     <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>
                       {o.farmer ? `${o.farmer.firstName} ${o.farmer.lastName} (${o.farmer.controlNumber})` : o.farmerId} · {o.status}
                     </div>
@@ -852,7 +853,7 @@ export default function MarketplacePage() {
                 <div key={y.year} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                   <span style={{ fontSize: '13px', color: 'var(--neutral-400)' }}>Year {y.year}</span>
                   <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {Number(y.amount).toLocaleString()} TZS {y.paid ? '✓' : ''}
+                    {Number(y.amount).toLocaleString('en-US')} TZS {y.paid ? '✓' : ''}
                   </span>
                 </div>
               ))}
@@ -910,8 +911,8 @@ export default function MarketplacePage() {
                               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{l.owner?.firstName} {l.owner?.lastName}</div>
                               <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>{l.owner?.controlNumber}</div>
                             </td>
-                            <td style={{ fontWeight: 700, color: 'var(--accent)' }}>{l.askingPrice != null ? `${Number(l.askingPrice).toLocaleString()} TZS` : '—'}</td>
-                            <td style={{ color: 'var(--gold-400)', fontSize: '12px' }}>{l.suggestedPrice ? `${Number(l.suggestedPrice).toLocaleString()} TZS` : '—'}</td>
+                            <td style={{ fontWeight: 700, color: 'var(--accent)' }}>{l.askingPrice != null ? `${Number(l.askingPrice).toLocaleString('en-US')} TZS` : '—'}</td>
+                            <td style={{ color: 'var(--gold-400)', fontSize: '12px' }}>{l.suggestedPrice ? `${Number(l.suggestedPrice).toLocaleString('en-US')} TZS` : '—'}</td>
                             <td>
                               <span className={`badge ${l.isFlashDeal ? 'badge-red' : l.dealType === 'RELATIONSHIP' ? 'badge-blue' : 'badge-gold'}`}>
                                 {l.isFlashDeal ? '⚡ Flash' : `${l.isPrivate ? '🔒 ' : ''}${l.dealType}`}
@@ -1025,7 +1026,7 @@ export default function MarketplacePage() {
                     <div>📍 {t.location || '—'}</div>
                     <div>👤 {t.owner?.name || '—'}</div>
                     <div style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                      {t.pricePerHectare ? `${Number(t.pricePerHectare).toLocaleString()} TZS/ha` : '—'}
+                      {t.pricePerHectare ? `${Number(t.pricePerHectare).toLocaleString('en-US')} TZS/ha` : '—'}
                     </div>
                   </div>
                   <button
@@ -1061,7 +1062,7 @@ export default function MarketplacePage() {
                       <tr key={p.id}>
                         <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.commodity}</td>
                         <td style={{ fontWeight: 700, color: 'var(--accent)', fontSize: '15px' }}>
-                          {Number(p.price).toLocaleString()}
+                          {Number(p.price).toLocaleString('en-US')}
                         </td>
                         <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{p.market || '—'}</td>
                         <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{p.source || '—'}</td>
@@ -1095,7 +1096,7 @@ export default function MarketplacePage() {
                 )}
                 {toolsResult?.eligibility?.eligible && (
                   <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-                    <TextField label="Input credit amount (TZS)" value={tools.creditAmount} onChange={v => setTools(f => ({ ...f, creditAmount: v }))} placeholder="300000" />
+                    <TextField money label="Input credit amount (TZS)" value={tools.creditAmount} onChange={v => setTools(f => ({ ...f, creditAmount: v }))} placeholder="300000" />
                     <button className="btn-primary" style={{ marginTop: '10px' }} disabled={toolsBusy} onClick={issueCredit}>Issue input credit</button>
                   </div>
                 )}
@@ -1116,7 +1117,7 @@ export default function MarketplacePage() {
                 {toolsResult?.stability && (
                   <div style={{ marginTop: '14px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                     <MetricTile label="Farms on M-LAX" value={`${toolsResult.stability.stabilityPercent}%`} tone="green" />
-                    <MetricTile label="Secretary bonus (TZS)" value={toolsResult.stability.secretaryStabilityBonus.toLocaleString()} tone="gold" />
+                    <MetricTile label="Secretary bonus (TZS)" value={toolsResult.stability.secretaryStabilityBonus.toLocaleString('en-US')} tone="gold" />
                     <MetricTile label="Farms on M-LAX (count)" value={toolsResult.stability.farmsOnMlax} tone="blue" />
                     <MetricTile label="Total farms" value={toolsResult.stability.totalFarms} tone="purple" />
                   </div>
@@ -1132,11 +1133,11 @@ export default function MarketplacePage() {
 
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: 'var(--neutral-400)', marginBottom: '5px', fontWeight: 600 };
 
-function TextField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+function TextField({ label, value, onChange, placeholder, money }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; money?: boolean }) {
   return (
     <div>
       <label style={labelStyle}>{label}</label>
-      <input className="input-field" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+      {money ? <MoneyInput className="input-field" min={0} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} /> : <input className="input-field" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />}
     </div>
   );
 }

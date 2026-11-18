@@ -775,7 +775,7 @@ export default function InventoryPage() {
         <>
           <div className="metric-grid">
             {[
-              { label: 'Total rice received', value: kgs(summary.totalReceivedKg), hint: `${summary.totalReceivedCount} deliveries${summary.totalBags ? ` · ${summary.totalBags.toLocaleString()} bags` : ''}`, color: 'var(--blue-500)' },
+              { label: 'Total rice received', value: kgs(summary.totalReceivedKg), hint: `${summary.totalReceivedCount} deliveries${summary.totalBags ? ` · ${summary.totalBags.toLocaleString('en-US')} bags` : ''}`, color: 'var(--blue-500)' },
               { label: 'In warehouses now', value: kgs(summary.inStockKg), hint: `Live warehouse stock${summary.reservedKg ? ` · ${kgs(summary.reservedKg)} promised to orders` : ''}`, color: 'var(--gold-400)' },
               { label: 'Shipped, awaiting sale', value: kgs(summary.shippedKg), hint: 'Left the warehouse', color: 'var(--neutral-400)' },
               { label: 'Rice sold', value: kgs(summary.soldKg), hint: 'Sales completed', color: 'var(--purple-500)' },
@@ -900,7 +900,7 @@ export default function InventoryPage() {
                     <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>
                       {r.moistureContentPct != null ? `${r.moistureContentPct}%` : '—'}
                     </td>
-                    <td style={{ fontSize: '12px' }}>{r.pricePerKg != null ? Math.round(r.pricePerKg).toLocaleString() : '—'}</td>
+                    <td style={{ fontSize: '12px' }}>{r.pricePerKg != null ? Math.round(r.pricePerKg).toLocaleString('en-US') : '—'}</td>
                     <td style={{ fontSize: '12px', fontWeight: 600 }}>{tzs(r.totalValue)}</td>
                     <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>
                       {r.warehouse?.name ? (

@@ -40,7 +40,7 @@ export default function AuditorDashboardPage() {
           {pack.traceability.slice(0, 8).map((sale: any) => <div className="role-list-item" key={sale.invoiceNumber}>
             <div>
               <strong>{sale.invoiceNumber}</strong>
-              <p>{sale.buyer.name} · {sale.lotNumber} · {Number(sale.quantityKg).toLocaleString()} kg</p>
+              <p>{sale.buyer.name} · {sale.lotNumber} · {Number(sale.quantityKg).toLocaleString('en-US')} kg</p>
             </div>
             <span className={`badge ${sale.buyer.isCertified ? 'badge-green' : 'badge-gold'}`}>{sale.buyer.isCertified ? 'Certified buyer' : 'Check buyer'}</span>
           </div>)}

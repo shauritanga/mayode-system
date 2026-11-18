@@ -339,7 +339,7 @@ export class InsuranceService {
         at: claim.paidAt,
         note:
           claim.paidAmount != null
-            ? `Paid TZS ${claim.paidAmount.toLocaleString()}`
+            ? `Paid TZS ${claim.paidAmount.toLocaleString('en-US')}`
             : null,
       },
     ];

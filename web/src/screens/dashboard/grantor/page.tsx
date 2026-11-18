@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { reportsApi } from '@/lib/api';
 
 function money(n: number) {
-  return `TZS ${Math.round(n || 0).toLocaleString()}`;
+  return `TZS ${Math.round(n || 0).toLocaleString('en-US')}`;
 }
 
 function downloadBlob(filename: string, content: string, type: string) {
@@ -163,7 +163,7 @@ export default function GrantorImpactPage() {
             {[
               ['Farmers', data.totalFarmers],
               ['Hectares', Math.round(data.totalHectares || 0)],
-              ['Yield', `${Math.round(data.totalYieldKg || 0).toLocaleString()} kg`],
+              ['Yield', `${Math.round(data.totalYieldKg || 0).toLocaleString('en-US')} kg`],
               ['Avg yield / ha', `${Math.round(data.averageYieldPerHectare || 0)} kg`],
               ['Farmer revenue', money(data.totalRevenue)],
               ['Avg farmer income', money(data.averageFarmerIncome)],
@@ -204,10 +204,10 @@ export default function GrantorImpactPage() {
                         <td style={{ fontWeight: 600 }}>{s.season}</td>
                         <td>{s.cropCycles}</td>
                         <td>
-                          {Math.round(s.actualYieldKg || 0).toLocaleString()} kg
+                          {Math.round(s.actualYieldKg || 0).toLocaleString('en-US')} kg
                         </td>
                         <td>
-                          {Math.round(s.estimatedYieldKg || 0).toLocaleString()}{' '}
+                          {Math.round(s.estimatedYieldKg || 0).toLocaleString('en-US')}{' '}
                           kg
                         </td>
                         <td>{money(s.farmerIncome)}</td>

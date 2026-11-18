@@ -23,7 +23,7 @@ export const INPUT_UNITS = ['kg', 'g', 'litres', 'ml', 'bags', 'tonnes', 'pieces
 /** Input name, quantity and unit for display, falling back to the older free-form inputsUsed JSON. */
 export function activityInputs(a: any): { text: string; quantity: string } {
   if (a.inputName) {
-    return { text: a.inputName, quantity: a.inputQuantity != null ? `${a.inputQuantity.toLocaleString()} ${a.inputUnit ?? ''}`.trim() : '' };
+    return { text: a.inputName, quantity: a.inputQuantity != null ? `${a.inputQuantity.toLocaleString('en-US')} ${a.inputUnit ?? ''}`.trim() : '' };
   }
   const items = a.inputsUsed?.items;
   if (Array.isArray(items) && items.length) {

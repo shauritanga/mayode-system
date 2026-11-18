@@ -66,8 +66,8 @@ export default function FarmerInsurancePage() {
                 <strong>{policy.productType?.replaceAll('_', ' ')}</strong>
                 <p>
                   {policy.provider?.name || 'Insurer'} · Sum insured{' '}
-                  {Number(policy.sumInsured).toLocaleString()} · Premium{' '}
-                  {Number(policy.premiumAmount).toLocaleString()}
+                  {Number(policy.sumInsured).toLocaleString('en-US')} · Premium{' '}
+                  {Number(policy.premiumAmount).toLocaleString('en-US')}
                 </p>
               </div>
               <span
@@ -97,9 +97,9 @@ export default function FarmerInsurancePage() {
                         </strong>
                         <p>
                           {claim.description || 'No description'} · Claimed{' '}
-                          {Number(claim.claimedAmount).toLocaleString()}
-                          {claim.approvedAmount != null && <> · Approved {Number(claim.approvedAmount).toLocaleString()}</>}
-                          {claim.paidAmount ? <> · Paid {Number(claim.paidAmount).toLocaleString()}</> : null}
+                          {Number(claim.claimedAmount).toLocaleString('en-US')}
+                          {claim.approvedAmount != null && <> · Approved {Number(claim.approvedAmount).toLocaleString('en-US')}</>}
+                          {claim.paidAmount ? <> · Paid {Number(claim.paidAmount).toLocaleString('en-US')}</> : null}
                         </p>
                         {claim.decisionNote && <p>Insurer’s note: {claim.decisionNote}</p>}
                       </div>

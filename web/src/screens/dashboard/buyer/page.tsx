@@ -6,11 +6,11 @@ import { buyerPortalApi } from '@/lib/api';
 import RiceTypeSelect from '@/components/RiceTypeSelect';
 
 function money(n: number) {
-  return `TZS ${Math.round(n || 0).toLocaleString()}`;
+  return `TZS ${Math.round(n || 0).toLocaleString('en-US')}`;
 }
 
 function kg(n: number) {
-  return `${Math.round(n || 0).toLocaleString()} kg`;
+  return `${Math.round(n || 0).toLocaleString('en-US')} kg`;
 }
 
 export default function BuyerPage() {
@@ -245,7 +245,7 @@ export default function BuyerPage() {
                   >
                     <span>
                       {order.riceVariety || 'Any variety'} ·{' '}
-                      {Number(order.quantityRequiredKg).toLocaleString()} kg
+                      {Number(order.quantityRequiredKg).toLocaleString('en-US')} kg
                       {order.qualityRequirements
                         ? ` · ${order.qualityRequirements}`
                         : ''}
@@ -341,7 +341,7 @@ export default function BuyerPage() {
               </strong>
               <p className="muted" style={{ margin: '6px 0 12px' }}>
                 {trace.sourceRecords?.length || 0} source inventory records ·{' '}
-                {Number(trace.lot?.totalWeightKg || 0).toLocaleString()} kg
+                {Number(trace.lot?.totalWeightKg || 0).toLocaleString('en-US')} kg
               </p>
               {trace.lot?.sorterQuality && (
                 <div

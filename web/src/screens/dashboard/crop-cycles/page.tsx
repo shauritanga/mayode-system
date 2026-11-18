@@ -115,9 +115,9 @@ export default function CropCyclesPage() {
       <div className="role-grid" style={{ marginBottom: 16 }}>
         <MetricTile label="Crop seasons" value={cycles.length} hint={`${distinct(cycles.map((c) => c.season)).length} seasons`} tone="green" />
         <MetricTile label="Active crops" value={active.length} hint={`${cycles.filter((c) => c.status === 'PLANNED').length} planned`} tone="blue" />
-        <MetricTile label="Area planted (active)" value={`${sum(active, 'areaPlantedHa').toLocaleString(undefined, { maximumFractionDigits: 1 })} ha`} hint="Across active crops" tone="purple" />
-        <MetricTile label="Expected yield" value={`${Math.round(sum(cycles.filter((c) => ['ACTIVE', 'PLANNED'].includes(c.status)), 'estimatedYieldKg') / 1000).toLocaleString()} t`} hint="Planned + active crops" tone="gold" />
-        <MetricTile label="Actual yield" value={`${Math.round(sum(cycles, 'actualYieldKg') / 1000).toLocaleString()} t`} hint="Recorded harvests" tone="green" />
+        <MetricTile label="Area planted (active)" value={`${sum(active, 'areaPlantedHa').toLocaleString('en-US', { maximumFractionDigits: 1 })} ha`} hint="Across active crops" tone="purple" />
+        <MetricTile label="Expected yield" value={`${Math.round(sum(cycles.filter((c) => ['ACTIVE', 'PLANNED'].includes(c.status)), 'estimatedYieldKg') / 1000).toLocaleString('en-US')} t`} hint="Planned + active crops" tone="gold" />
+        <MetricTile label="Actual yield" value={`${Math.round(sum(cycles, 'actualYieldKg') / 1000).toLocaleString('en-US')} t`} hint="Recorded harvests" tone="green" />
       </div>
 
       <section className="glass-card" style={{ padding: 16, marginBottom: 16 }}>
@@ -212,7 +212,7 @@ export default function CropCyclesPage() {
         {!loading && filtered.length > 0 && (
           <div className="farmers-footer">
             <span className="farmers-range">
-              Showing <strong>{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}</strong> of <strong>{filtered.length.toLocaleString()}</strong>
+              Showing <strong>{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}</strong> of <strong>{filtered.length.toLocaleString('en-US')}</strong>
             </span>
             {totalPages > 1 && (
               <div className="pagination">

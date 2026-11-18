@@ -10,6 +10,7 @@ import { useSchemeScope } from '@/screens/dashboard/irrigation/useSchemeScope';
 import { useAuthStore } from '@/store/auth.store';
 import { ConfirmDialog, Empty, Field, LoadError, Notice, PageHeader, StatCard, TableSkeleton, Tabs, errMsg, fmtDate, fmtNum, todayISO, useApi, useCan, useDebounced } from '@/screens/dashboard/irrigation/ui';
 
+import MoneyInput from '@/components/MoneyInput';
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 const POSITION: Record<string, string> = { BLOCK_LEADER: 'Block leader', CANAL_LEADER: 'Canal leader' };
 
@@ -152,7 +153,7 @@ function RecordModal({ onClose, onDone }: { onClose: () => void; onDone: (m: str
             <Field label="Half bags (Vipeto)" hint={`${per} half bags (Vipeto) = 1 bag`}><input type="number" min={0} step="any" className="input-field" value={baskets} onChange={(e) => setBaskets(e.target.value)} placeholder="Number of Vipeto" /></Field>
             <Field label="Bags" hint="Worked out from the Vipeto"><input className="input-field" readOnly tabIndex={-1} value={Number(baskets) > 0 ? fmtNum(totalBags, 2) : ''} placeholder="Automatic" style={{ background: 'var(--surface-2, rgba(127,127,127,.1))' }} /></Field>
             <Field label="Kilograms (optional)"><input type="number" min={0} className="input-field" value={kg} onChange={(e) => setKg(e.target.value)} /></Field>
-            <Field label="Amount paid (TZS) *"><input type="number" min={0} className="input-field" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Enter amount" /></Field>
+            <Field label="Amount paid (TZS) *"><MoneyInput min={0} className="input-field" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Enter amount" /></Field>
           </div>
           <div style={{ marginTop: 14 }}><Field label="Note"><input className="input-field" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" /></Field></div>
           <div style={{ ...card, marginTop: 14 }}>
@@ -286,7 +287,7 @@ function Combines() {
           <div className="muted" style={{ fontSize: 12.5, margin: '2px 0 10px' }}>The combine fills half bags (Vipeto) first. Say how many half bags (Vipeto) make one bag, so the bags are worked out automatically. The price of a bag gives each hectare’s income.</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 10, alignItems: 'end' }}>
             <Field label="Half Bags (Vipeto) in one bag"><input type="number" min={0.1} step="any" className="input-field" placeholder={String(s.basketsPerBag)} value={bpb} onChange={(e) => setBpb(e.target.value)} /></Field>
-            <Field label="Price of one bag (TZS)"><input type="number" min={0} className="input-field" placeholder={s.pricePerBag ? String(s.pricePerBag) : 'Not set'} value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
+            <Field label="Price of one bag (TZS)"><MoneyInput min={0} className="input-field" placeholder={s.pricePerBag ? String(s.pricePerBag) : 'Not set'} value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
             <button type="button" className="btn-primary" disabled={!bpb && !price} onClick={saveSettings}>Save</button>
           </div>
         </section>

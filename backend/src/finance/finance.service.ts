@@ -87,7 +87,7 @@ export class FinanceService {
       cropCycle.farmerId,
       'expense.added',
       `Recorded expense: ${dto.itemName}`,
-      `TZS ${dto.totalCost.toLocaleString()} · ${cropCycle.farm.farmCode}`,
+      `TZS ${dto.totalCost.toLocaleString('en-US')} · ${cropCycle.farm.farmCode}`,
       CATEGORY_ICONS[dto.category] ?? '💵',
       {
         item: dto.itemName,
@@ -142,7 +142,7 @@ export class FinanceService {
       cropCycle.farmerId,
       'revenue.added',
       `Sale recorded: ${dto.quantityKg}kg`,
-      `TZS ${dto.totalRevenue.toLocaleString()} · ${cropCycle.farm.farmCode}`,
+      `TZS ${dto.totalRevenue.toLocaleString('en-US')} · ${cropCycle.farm.farmCode}`,
       '💰',
       {
         quantityKg: dto.quantityKg,

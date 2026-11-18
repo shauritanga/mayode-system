@@ -10,11 +10,12 @@ import { dateTime, day, kg } from '@/lib/ops';
 import { downloadCsv } from '@/lib/download';
 import { DataTable, ErrorNote, Field, FormGrid, Loading, Toolbar, useLoad } from './ui';
 
+import MoneyInput from '@/components/MoneyInput';
 const CLASS_LABEL: Record<string, string> = { INPUT: 'Farm input', FUEL: 'Fuel', PACKAGING: 'Packaging bags', PADDY: 'Paddy', RICE: 'Rice', BYPRODUCT: 'By-product' };
 const MOVE_LABEL: Record<string, string> = { IN: 'Received', OUT: 'Used / given out', ADJUSTMENT: 'Correction', TRANSFER_OUT: 'Moved out', TRANSFER_IN: 'Moved in', WRITE_OFF: 'Written off', COUNT_ADJUSTMENT: 'Count correction' };
 const REASONS: [string, string][] = [['USED', 'Used (fuel, bags, other)'], ['DAMAGED', 'Damaged'], ['EXPIRED', 'Expired'], ['LOST', 'Lost or stolen'], ['FOUND', 'Found (add)'], ['COUNT_CORRECTION', 'Count correction'], ['OTHER', 'Other (explain)']];
 const SOURCES: [string, string][] = [['PURCHASE', 'Bought from a supplier'], ['DIRECT', 'Delivered / brought in'], ['DONATION', 'Donation'], ['OPENING', 'Stock already here (opening balance)']];
-const n3 = (v: number) => (Math.round(v * 1000) / 1000).toLocaleString();
+const n3 = (v: number) => (Math.round(v * 1000) / 1000).toLocaleString('en-US');
 
 const card: React.CSSProperties = { background: 'var(--bg-elevated, rgba(127,127,127,.08))', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px 16px' };
 const errOf = (e: unknown) => apiErrorMessage(e, 'That did not work.');
@@ -64,7 +65,7 @@ export function InputReceivePanel({ canReceive, onDone, defaultWarehouseId }: { 
             {needsWho && <Field label="Delivery note / reference"><input className="input-field" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Needed if no supplier name" /></Field>}
             <Field label="Batch name" hint="Optional. Leave empty and it is numbered for you (Batch 1, Batch 2…)"><input className="input-field" maxLength={60} value={batchNo} onChange={(e) => setBatchNo(e.target.value)} placeholder="e.g. Batch 3 or the maker's lot number" /></Field>
             <Field label="Expiry date" hint="Optional. Shown in Batches so you can use the oldest first"><input className="input-field" type="date" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} /></Field>
-            <Field label="Cost per unit (TZS)" hint="Optional"><input className="input-field" type="number" min={0} step="any" value={cost} onChange={(e) => setCost(e.target.value)} /></Field>
+            <Field label="Cost per unit (TZS)" hint="Optional"><MoneyInput className="input-field" min={0} value={cost} onChange={(e) => setCost(e.target.value)} /></Field>
             <Field label="Note" hint="Optional"><input className="input-field" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
           </FormGrid>
           {chosen && Number(qty) > 0 && <div style={{ ...card, marginTop: 14, fontSize: 13 }}>After this, <strong>{chosen.name}</strong> in {whName}: <strong>{n3((stock.data?.data ?? []).filter((r: any) => r.itemId === chosen.itemId && r.warehouseId === wh).reduce((t: number, r: any) => t + r.balance, 0) + Number(qty))} {chosen.unit}</strong></div>}
@@ -187,7 +188,7 @@ export function AllStockPanel({ canRice, canInputs, canAdjust, onChanged, fixedW
             { header: 'Kind', render: (r) => CLASS_LABEL[r.kind] ?? r.kind },
             { header: 'Warehouse', render: (r) => r.warehouse },
             { header: 'In stock', align: 'right', render: (r) => <strong>{r.unit === 'kg' ? kg(r.balance) : `${n3(r.balance)} ${r.unit}`}</strong> },
-            { header: 'Value', align: 'right', render: (r) => (r.value != null && r.value > 0 ? `TZS ${Math.round(r.value).toLocaleString()}` : '—') },
+            { header: 'Value', align: 'right', render: (r) => (r.value != null && r.value > 0 ? `TZS ${Math.round(r.value).toLocaleString('en-US')}` : '—') },
             { header: '', align: 'right', render: (r) => r.input ? <span style={{ whiteSpace: 'nowrap' }}><button type="button" className="btn-secondary" onClick={() => setHistory(r.input)}>History</button>{canAdjust && r.warehouseId && r.balance > 0 && <> <button type="button" className="btn-secondary" onClick={() => setFix(r.input)}>Correct / move</button></>}</span> : <span className="muted" style={{ fontSize: 12 }}>See Rice batches and History</span> },
           ]} />
       )}

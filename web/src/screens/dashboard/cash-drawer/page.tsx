@@ -6,6 +6,7 @@ import { cashDrawerApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { ConfirmDialog, Empty, Field, LoadError, Notice, PageHeader, StatCard, TableSkeleton, errMsg, fmtDate, todayISO, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 
+import MoneyInput from '@/components/MoneyInput';
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 
 function CloseDay({ onDone }: { onDone: (m: string) => void }) {
@@ -40,7 +41,7 @@ function CloseDay({ onDone }: { onDone: (m: string) => void }) {
               <div className="muted" style={{ fontSize: 12.5, margin: '2px 0 10px' }}>Count the cash in the drawer and enter it. Mobile money and bank are not counted.</div>
               {error && <Notice tone="error">{error}</Notice>}
               <div style={{ display: 'grid', gap: 10 }}>
-                <Field label="Cash counted (TZS)"><input type="number" min={0} className="input-field" value={counted} onChange={(e) => setCounted(e.target.value)} /></Field>
+                <Field label="Cash counted (TZS)"><MoneyInput min={0} className="input-field" value={counted} onChange={(e) => setCounted(e.target.value)} /></Field>
                 {counted !== '' && <div style={{ fontSize: 13 }}>{diff === 0 ? <span className="badge badge-green">Matches</span> : <span className="badge badge-red">{diff < 0 ? 'Short' : 'Over'} by {tzs(Math.abs(diff))}</span>}</div>}
                 {diff !== 0 && <Field label="Explain the difference *"><input className="input-field" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} /></Field>}
                 <div><button type="button" className="btn-primary" disabled={busy || counted === ''} onClick={save}>{busy ? 'Closing…' : 'Close the day and send to the Accountant'}</button></div>

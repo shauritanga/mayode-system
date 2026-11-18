@@ -14,6 +14,7 @@ import { WarehouseStock } from './WarehouseStock';
 import { FarmerPicker } from '@/screens/dashboard/dues/page';
 import { ConfirmDialog, Empty, Field, LoadError, Notice, PageHeader, StatCard, TableSkeleton, Tabs, errMsg, fmtDate, todayISO, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 
+import MoneyInput from '@/components/MoneyInput';
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 const card: React.CSSProperties = { background: 'var(--bg-elevated, rgba(127,127,127,.08))', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '12px 14px' };
 const row2: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px 16px', alignItems: 'start' };
@@ -73,7 +74,7 @@ function IssueModal({ items, onClose, onDone, canSetup }: { items: any[]; onClos
         )}
         <div style={{ ...row2, marginTop: 14 }}>
           <Field label={`Quantity${item ? ` (${item.unit})` : ''} *`}><input type="number" min={0} step="any" className="input-field" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="Enter quantity" /></Field>
-          <Field label="Price per unit (TZS)" hint={item?.unitCost ? `Leave empty for ${tzs(item.unitCost)}` : item ? 'Required: this input has no set price' : undefined}><input type="number" min={0} className="input-field" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
+          <Field label="Price per unit (TZS)" hint={item?.unitCost ? `Leave empty for ${tzs(item.unitCost)}` : item ? 'Required: this input has no set price' : undefined}><MoneyInput min={0} className="input-field" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
           {warehouses.length > 1 && <Field label="Take from warehouse" hint="Leave as it is to use the main store first"><select className="input-field" value={fromWh} onChange={(e) => setFromWh(e.target.value)}><option value="">Main store first</option>{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>}
           <Field label="Pay by" hint="Optional."><input type="date" className="input-field" min={todayISO()} value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
           <Field label="Note"><input className="input-field" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" /></Field>

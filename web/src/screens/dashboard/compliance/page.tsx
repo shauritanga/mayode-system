@@ -39,7 +39,7 @@ type AuditPack = {
   }>;
 };
 
-const money = (value: number) => `TZS ${Math.round(value || 0).toLocaleString()}`;
+const money = (value: number) => `TZS ${Math.round(value || 0).toLocaleString('en-US')}`;
 
 export default function CompliancePage() {
   const [summary, setSummary] = useState<Compliance | null>(null);
@@ -58,9 +58,9 @@ export default function CompliancePage() {
     ['Average farmer income', money(summary.averageFarmerIncome), 'Revenue ÷ registered farmers'],
     ['Fairtrade premium fund', money(summary.premiumFundBalance), 'Income less recorded fund expenditure'],
     ['Premium earned', money(summary.fairtradePremiumEarned), 'From certified cooperative sales'],
-    ['Registered farmers', summary.totalFarmers.toLocaleString(), 'Membership baseline'],
+    ['Registered farmers', summary.totalFarmers.toLocaleString('en-US'), 'Membership baseline'],
     ['Membership growth', `${summary.membershipGrowthPercent >= 0 ? '+' : ''}${summary.membershipGrowthPercent.toFixed(1)}%`, `${summary.newMembers} new members in the last 30 days`],
-    ['Farm area', `${summary.totalHectares.toLocaleString()} ha`, 'Production coverage'],
+    ['Farm area', `${summary.totalHectares.toLocaleString('en-US')} ha`, 'Production coverage'],
     ['Cooperative revenue', money(summary.totalRevenue), 'Recorded revenue allocation'],
   ] : [];
   const gaps = auditPack?.complianceGaps;
@@ -93,7 +93,7 @@ export default function CompliancePage() {
             ['Incomplete quality checks', gaps?.incompleteHarvestQualityChecks ?? 0, 'Missing harvest/drying/bagging/warehouse measurements'],
             ['Uncertified buyer sales', gaps?.uncertifiedBuyerSales ?? 0, 'Sales where buyer certification is false'],
             ['Unverified source farms', gaps?.unverifiedSourceFarms ?? 0, 'Inventory records tied to unverified farms'],
-          ].map(([label, value, sub]) => <MetricTile key={label} label={String(label)} value={Number(value).toLocaleString()} hint={String(sub)} />)}
+          ].map(([label, value, sub]) => <MetricTile key={label} label={String(label)} value={Number(value).toLocaleString('en-US')} hint={String(sub)} />)}
         </div>
       </section>
 
@@ -114,7 +114,7 @@ export default function CompliancePage() {
             ['Votes', auditPack.governance.voteCount],
             ['Vote responses', auditPack.governance.voteResponseCount],
             ['Projects', auditPack.governance.communityProjectCount],
-          ].map(([label, value]) => <MetricTile key={label} label={String(label)} value={Number(value).toLocaleString()} />)}
+          ].map(([label, value]) => <MetricTile key={label} label={String(label)} value={Number(value).toLocaleString('en-US')} />)}
         </div>
       </section>
 
@@ -132,8 +132,8 @@ export default function CompliancePage() {
               <td>{sale.invoiceNumber}</td>
               <td>{sale.buyer.name} {sale.buyer.isCertified ? '✓' : '⚠'}</td>
               <td>{sale.lotNumber}</td>
-              <td>{Number(sale.quantityKg).toLocaleString()} kg</td>
-              <td>{sale.sourceFarmers.map((farmer) => `${farmer.controlNumber} ${farmer.quantityKg.toLocaleString()}kg`).join(', ') || `${sale.sourceInventoryCount} inventory records`}</td>
+              <td>{Number(sale.quantityKg).toLocaleString('en-US')} kg</td>
+              <td>{sale.sourceFarmers.map((farmer) => `${farmer.controlNumber} ${farmer.quantityKg.toLocaleString('en-US')}kg`).join(', ') || `${sale.sourceInventoryCount} inventory records`}</td>
             </tr>)}</tbody>
           </table>
         </div>

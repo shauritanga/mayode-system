@@ -88,9 +88,9 @@ export default function FarmReportScreen() {
         ) : (
           <>
             <Section title={t('yieldAndValue')}>
-              <Row label={t('potentialYield')} value={`${report.potentialYieldKg?.toLocaleString()} kg`} />
-              <Row label={t('recordedYield')} value={`${(report.actualYieldKg ?? 0).toLocaleString()} kg`} />
-              <Row label={t('estimatedValue')} value={`TZS ${report.estimatedValueTzs?.toLocaleString()}`} />
+              <Row label={t('potentialYield')} value={`${report.potentialYieldKg?.toLocaleString('en-US')} kg`} />
+              <Row label={t('recordedYield')} value={`${(report.actualYieldKg ?? 0).toLocaleString('en-US')} kg`} />
+              <Row label={t('estimatedValue')} value={`TZS ${report.estimatedValueTzs?.toLocaleString('en-US')}`} />
               <Row label={t('farmCondition')} value={report.condition ?? '—'} />
             </Section>
 

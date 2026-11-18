@@ -45,7 +45,7 @@ const LinkBtn = ({ onClick, children }: { onClick: () => void; children: React.R
   <button type="button" onClick={onClick} style={{ background: 'none', border: 0, padding: 0, font: 'inherit', color: 'var(--green-600, var(--accent))', fontWeight: 600, cursor: 'pointer' }}>{children}</button>
 );
 
-const num = (n?: number | null) => Math.round(n || 0).toLocaleString();
+const num = (n?: number | null) => Math.round(n || 0).toLocaleString('en-US');
 
 export default function OpsWarehousePage() {
   const params = useParams<{ slug?: string[] }>();

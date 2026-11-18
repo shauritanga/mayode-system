@@ -192,16 +192,16 @@ export default function MamcosDetailPage() {
         {[
           { label: 'Farmers', value: mamcos.farmers.length, color: 'var(--accent)' },
           { label: 'Farms', value: mamcos.farms.length, color: 'var(--blue-500)' },
-          { label: 'Registered farm area', value: mamcos.productionSummary ? `${mamcos.productionSummary.totalRegisteredHectares.toLocaleString()} ha` : '—', color: 'var(--gold-400)' },
+          { label: 'Registered farm area', value: mamcos.productionSummary ? `${mamcos.productionSummary.totalRegisteredHectares.toLocaleString('en-US')} ha` : '—', color: 'var(--gold-400)' },
           {
             label: 'Total yield',
             value: mamcos.productionSummary
-              ? `${(mamcos.productionSummary.totalActualYieldKg || mamcos.productionSummary.totalEstimatedYieldKg).toLocaleString()} kg${mamcos.productionSummary.totalActualYieldKg ? '' : ' (est.)'}`
+              ? `${(mamcos.productionSummary.totalActualYieldKg || mamcos.productionSummary.totalEstimatedYieldKg).toLocaleString('en-US')} kg${mamcos.productionSummary.totalActualYieldKg ? '' : ' (est.)'}`
               : '—',
             color: 'var(--green-400)',
           },
-          { label: 'Rice aggregated to date', value: mamcos.productionSummary ? `${mamcos.productionSummary.totalRiceAggregatedKg.toLocaleString()} kg` : '—', color: 'var(--purple-500)' },
-          { label: 'Aggregation capacity', value: mamcos.productionSummary?.totalAggregationCapacityKg ? `${mamcos.productionSummary.totalAggregationCapacityKg.toLocaleString()} kg` : '—', color: 'var(--gold-400)' },
+          { label: 'Rice aggregated to date', value: mamcos.productionSummary ? `${mamcos.productionSummary.totalRiceAggregatedKg.toLocaleString('en-US')} kg` : '—', color: 'var(--purple-500)' },
+          { label: 'Aggregation capacity', value: mamcos.productionSummary?.totalAggregationCapacityKg ? `${mamcos.productionSummary.totalAggregationCapacityKg.toLocaleString('en-US')} kg` : '—', color: 'var(--gold-400)' },
           { label: 'District', value: mamcos.district || '—', color: 'var(--neutral-400)' },
         ].map(s => (
           <MetricTile key={s.label} label={s.label} value={s.value} tone={toneFromColor(s.color)} />
@@ -361,7 +361,7 @@ export default function MamcosDetailPage() {
             <div style={{ padding: '10px 18px', display: 'grid', gap: '8px' }}>
               {mamcos.aggregationCentres.map((c) => (
                 <div key={c.id} style={{ fontSize: '13px', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{c.name}{c.location ? ` · ${c.location}` : ''}{c.capacityKg ? ` · ${c.capacityKg.toLocaleString()} kg capacity` : ''}</span>
+                  <span>{c.name}{c.location ? ` · ${c.location}` : ''}{c.capacityKg ? ` · ${c.capacityKg.toLocaleString('en-US')} kg capacity` : ''}</span>
                   <span className={`badge ${c.isActive ? 'badge-green' : 'badge-gray'}`}>{c.isActive ? 'Active' : 'Inactive'}</span>
                 </div>
               ))}

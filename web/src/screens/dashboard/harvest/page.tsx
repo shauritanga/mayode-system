@@ -7,6 +7,7 @@ import { harvestApi } from '@/lib/api';
 import { farmId } from '@/lib/farm-id';
 import { useAuthStore } from '@/store/auth.store';
 import { Arrivals, Incidents, PassCheck, Reconciliation } from './Gate';
+import MoneyInput from '@/components/MoneyInput';
 import {
   ConfirmDialog, Empty, Field, Filters, FormGrid, LoadError, Notice, PageHeader, StatCard, TableSkeleton, Tabs, errMsg, fmtDate, useApi, useCan,
 } from '@/screens/dashboard/irrigation/ui';
@@ -229,7 +230,7 @@ function ProposeModal({ canals, blocks, onClose, onSaved }: { canals: any[]; blo
           {canals.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></Field>}
         {form.scope === 'BLOCK' && <Field label="Block" wide><select className="input-field" value={form.blockId || blocks[0]?.id || ''} onChange={(e) => setForm({ ...form, blockId: e.target.value })}>
           {blocks.map((b) => <option key={b.id} value={b.id}>{farmId(b.code)}</option>)}</select></Field>}
-        <Field label="Rate per hectare (TZS) *" wide><input className="input-field" inputMode="decimal" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value.replace(/[^\d.]/g, '') })} placeholder="e.g. 50000" /></Field>
+        <Field label="Rate per hectare (TZS) *" wide><MoneyInput className="input-field" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value.replace(/[^\d.]/g, '') })} placeholder="e.g. 50000" /></Field>
         <Field label="Note" wide><input className="input-field" maxLength={500} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Why this rate (optional)" /></Field>
       </FormGrid>
     </Modal>

@@ -81,8 +81,8 @@ export default function CreditProfileView({ applicationId, farmerId }: { applica
       <Section title="Outlook for this loan">
         <Grid>
           <Stat label="Farm size (social ha)" value={p.outlook.farmHa} />
-          <Stat label="Average yield (kg/ha)" value={p.outlook.yieldPerHa?.toLocaleString()} />
-          <Stat label="Estimated yield" value={p.outlook.estimatedYieldKg ? `${p.outlook.estimatedYieldKg.toLocaleString()} kg` : null} />
+          <Stat label="Average yield (kg/ha)" value={p.outlook.yieldPerHa?.toLocaleString('en-US')} />
+          <Stat label="Estimated yield" value={p.outlook.estimatedYieldKg ? `${p.outlook.estimatedYieldKg.toLocaleString('en-US')} kg` : null} />
           <Stat label="Expected revenue" value={tzs(p.outlook.expectedRevenue)} />
           <Stat label="Indicative borrowing limit" value={tzs(p.outlook.indicativeLimit)} />
         </Grid>
@@ -103,14 +103,14 @@ export default function CreditProfileView({ applicationId, farmerId }: { applica
         <Grid>
           <Stat label="Seasons" value={p.cropPerformance.seasons} />
           <Stat label="Harvests recorded" value={p.cropPerformance.harvests} />
-          <Stat label="Average kg/ha" value={p.cropPerformance.avgYieldPerHa?.toLocaleString()} />
+          <Stat label="Average kg/ha" value={p.cropPerformance.avgYieldPerHa?.toLocaleString('en-US')} />
           <Stat label="Harvest vs estimate" value={p.cropPerformance.vsEstimatePct == null ? null : `${p.cropPerformance.vsEstimatePct > 0 ? '+' : ''}${p.cropPerformance.vsEstimatePct}%`} />
         </Grid>
         {p.production.length > 0 && (
           <div style={{ overflowX: 'auto', marginTop: 8 }}>
             <table className="data-table"><thead><tr><th>Season</th><th>Variety</th><th>Area (ha)</th><th>Estimated kg</th><th>Harvested kg</th><th>kg/ha</th><th>Status</th></tr></thead>
               <tbody>{p.production.slice(0, 8).map((r: any, i: number) => (
-                <tr key={i}><td>{r.season}</td><td>{r.variety ?? '—'}</td><td>{r.areaHa ?? '—'}</td><td>{r.estimatedKg?.toLocaleString() ?? '—'}</td><td>{r.actualKg?.toLocaleString() ?? '—'}</td><td>{r.yieldPerHa?.toLocaleString() ?? '—'}</td><td>{String(r.status).toLowerCase()}</td></tr>
+                <tr key={i}><td>{r.season}</td><td>{r.variety ?? '—'}</td><td>{r.areaHa ?? '—'}</td><td>{r.estimatedKg?.toLocaleString('en-US') ?? '—'}</td><td>{r.actualKg?.toLocaleString('en-US') ?? '—'}</td><td>{r.yieldPerHa?.toLocaleString('en-US') ?? '—'}</td><td>{String(r.status).toLowerCase()}</td></tr>
               ))}</tbody></table>
           </div>
         )}
@@ -118,7 +118,7 @@ export default function CreditProfileView({ applicationId, farmerId }: { applica
 
       <Section title="Sales history">
         <Grid>
-          <Stat label="Rice sold" value={`${p.sales.totalKg.toLocaleString()} kg`} />
+          <Stat label="Rice sold" value={`${p.sales.totalKg.toLocaleString('en-US')} kg`} />
           <Stat label="Sales value" value={tzs(p.sales.totalValue)} />
           <Stat label="Average price/kg" value={tzs(p.sales.avgPricePerKg)} />
         </Grid>

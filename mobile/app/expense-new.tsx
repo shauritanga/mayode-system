@@ -13,6 +13,7 @@ import { SearchableSelect } from '../src/components/SearchableSelect';
 import { useI18n } from '../src/i18n';
 
 
+import MoneyInput, { MoneyAware } from '../src/components/MoneyInput';
 const CATEGORIES = [
   { key: 'SEEDS', labelKey: 'costSeeds', icon: '🌱' },
   { key: 'FERTILIZER', labelKey: 'costFertilizer', icon: '🧪' },
@@ -187,8 +188,9 @@ export default function ExpenseNew() {
             </View>
           </View>
 
-          <Field label={t('unitPriceLabel')} value={unitPrice} onChangeText={setUnitPrice} keyboardType="decimal-pad" />
+          <Field money label={t('unitPriceLabel')} value={unitPrice} onChangeText={setUnitPrice} keyboardType="decimal-pad" />
           <Field
+            money
             label={t('totalCostLabel')}
             value={totalCost}
             onChangeText={(v: string) => { setTotalEdited(true); setTotalCost(v); }}
@@ -263,7 +265,7 @@ function Field({ label, ...props }: any) {
   return (
     <View style={{ marginBottom: 12 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput style={styles.input} placeholderTextColor="#9CA3AF" {...props} />
+      <MoneyAware style={styles.input} placeholderTextColor="#9CA3AF" {...props} />
     </View>
   );
 }

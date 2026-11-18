@@ -6,6 +6,7 @@ import { farmsApi, marketplaceApi } from '../src/lib/data';
 import { useAuthStore } from '../src/store/auth.store';
 import { useI18n } from '../src/i18n';
 
+import MoneyInput, { MoneyAware } from '../src/components/MoneyInput';
 const DEAL_TYPES = ['STANDARD', 'FLASH_DEAL', 'RELATIONSHIP'] as const;
 
 export default function LandListingNew() {
@@ -143,7 +144,7 @@ export default function LandListingNew() {
         {selectedFarm && (
           <View style={styles.card}>
             <Text style={styles.fieldLabel}>{t('mlaxAskingPrice')}</Text>
-            <TextInput
+            <MoneyInput
               style={styles.input}
               keyboardType="numeric"
               value={askingPrice}
@@ -156,7 +157,7 @@ export default function LandListingNew() {
                 styles.gaugeText,
                 suggested.marketGauge === 'above' ? styles.gaugeRed : styles.gaugeGreen,
               ]}>
-                {t('mlaxSuggestedPrice')}: {suggested.suggestedPrice.toLocaleString()} TZS — {t(`mlaxMarketGauge${suggested.marketGauge[0].toUpperCase()}${suggested.marketGauge.slice(1)}` as any)}
+                {t('mlaxSuggestedPrice')}: {suggested.suggestedPrice.toLocaleString('en-US')} TZS — {t(`mlaxMarketGauge${suggested.marketGauge[0].toUpperCase()}${suggested.marketGauge.slice(1)}` as any)}
               </Text>
             )}
 
@@ -192,7 +193,7 @@ export default function LandListingNew() {
             {isFlashDeal && (
               <>
                 <Text style={styles.fieldLabel}>{t('mlaxAutoDropPrice')}</Text>
-                <TextInput
+                <MoneyInput
                   style={styles.input}
                   keyboardType="numeric"
                   value={autoDropPrice}

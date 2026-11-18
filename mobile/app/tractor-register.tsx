@@ -5,6 +5,7 @@ import { Stack, useRouter } from 'expo-router';
 import { marketplaceApi } from '../src/lib/data';
 import { useI18n } from '../src/i18n';
 
+import MoneyInput, { MoneyAware } from '../src/components/MoneyInput';
 export default function TractorRegister() {
   const router = useRouter();
   const { t } = useI18n();
@@ -66,7 +67,7 @@ export default function TractorRegister() {
           <Field label={t('mlaxTractorRegNo')} value={registrationNo} onChangeText={setRegistrationNo} placeholder="T123ABC" />
           <Field label={t('mlaxTractorModel')} value={model} onChangeText={setModel} />
           <Field label={t('mlaxTractorHp')} value={horsePower} onChangeText={setHorsePower} keyboardType="numeric" />
-          <Field label={t('mlaxTractorPrice')} value={pricePerHectare} onChangeText={setPricePerHectare} keyboardType="numeric" placeholder="60000" />
+          <Field money label={t('mlaxTractorPrice')} value={pricePerHectare} onChangeText={setPricePerHectare} keyboardType="numeric" placeholder="60000" />
         </View>
 
         <TouchableOpacity style={[styles.submitBtn, submitting && { opacity: 0.6 }]} onPress={submit} disabled={submitting}>
@@ -81,7 +82,7 @@ function Field({ label, ...props }: any) {
   return (
     <View style={{ marginBottom: 12 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput style={styles.input} placeholderTextColor="#9CA3AF" {...props} />
+      <MoneyAware style={styles.input} placeholderTextColor="#9CA3AF" {...props} />
     </View>
   );
 }

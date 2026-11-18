@@ -5,6 +5,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { marketplaceApi } from '../src/lib/data';
 import { useI18n } from '../src/i18n';
 
+import MoneyInput, { MoneyAware } from '../src/components/MoneyInput';
 export default function SubLeaseRequest() {
   const { listingId, renterId } = useLocalSearchParams<{ listingId: string; renterId: string }>();
   const router = useRouter();
@@ -37,7 +38,7 @@ export default function SubLeaseRequest() {
         <View style={styles.card}>
           <Text style={styles.hint}>{t('mlaxSubLeaseHint')}</Text>
           <Text style={styles.fieldLabel}>{t('mlaxSubLeaseNewPrice')}</Text>
-          <TextInput
+          <MoneyInput
             style={styles.input}
             keyboardType="numeric"
             value={newAskingPrice}

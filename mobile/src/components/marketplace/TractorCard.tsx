@@ -26,7 +26,7 @@ export function TractorCard({ tractor, onBook }: TractorCardProps) {
       <View style={styles.tractorDetails}>
         <Text style={styles.tractorDetailText}>📍 {tractor.location || t('locationUnknown')}</Text>
         <Text style={styles.tractorDetailText}>⚡ {tractor.horsePower || '—'} HP</Text>
-        <Text style={styles.tractorPriceText}>{tractor.pricePerHectare ? `${Number(tractor.pricePerHectare).toLocaleString()} TZS/ha` : '—'}</Text>
+        <Text style={styles.tractorPriceText}>{tractor.pricePerHectare ? `${Number(tractor.pricePerHectare).toLocaleString('en-US')} TZS/ha` : '—'}</Text>
       </View>
 
       {tractor.isAvailable && (

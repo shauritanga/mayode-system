@@ -38,7 +38,7 @@ export default function ClaimInspectModal({ claim, onClose, onSaved }: { claim: 
   };
 
   return (
-    <Modal title="Claim inspection" subtitle={`Claimed TZS ${claim.claimedAmount.toLocaleString()}. The insurer sees this when deciding.`} onClose={onClose}
+    <Modal title="Claim inspection" subtitle={`Claimed TZS ${claim.claimedAmount.toLocaleString('en-US')}. The insurer sees this when deciding.`} onClose={onClose}
       footer={<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={busy || uploading || !notes.trim()} onClick={save}>{busy ? 'Saving…' : 'Save inspection'}</button></>}>
       {error && <div className="alert-box alert-danger" style={{ marginBottom: 10 }}>{error}</div>}
       <div style={{ display: 'grid', gap: 12 }}>

@@ -8,6 +8,7 @@ import { farmId } from '@/lib/farm-id';
 import { useAuthStore } from '@/store/auth.store';
 import { Empty, Field, LoadError, Notice, PageHeader, StatCard, TableSkeleton, errMsg, fmtDate, todayISO, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 
+import MoneyInput from '@/components/MoneyInput';
 const TARGETS: [string, string][] = [['CANAL', 'Canal'], ['BLOCK', 'Block'], ['GATE', 'Water gate'], ['EQUIPMENT', 'Equipment'], ['OTHER', 'Other']];
 const STATE: Record<string, [string, string]> = { OVERDUE: ['badge-red', 'Overdue'], DUE_SOON: ['badge-gold', 'Due soon'], OK: ['badge-green', 'On track'], STOPPED: ['badge-gray', 'Stopped'] };
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
@@ -60,7 +61,7 @@ function DoneModal({ row, onClose, onDone }: { row: any; onClose: () => void; on
         {error && <Notice tone="error">{error}</Notice>}
         <Field label="Done on"><input type="date" className="input-field" max={todayISO()} value={doneOn} onChange={(e) => setDoneOn(e.target.value)} /></Field>
         <Field label="What was done"><input className="input-field" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-        <Field label="Cost (TZS)" hint="Optional."><input type="number" min={0} className="input-field" value={cost} onChange={(e) => setCost(e.target.value)} /></Field>
+        <Field label="Cost (TZS)" hint="Optional."><MoneyInput min={0} className="input-field" value={cost} onChange={(e) => setCost(e.target.value)} /></Field>
       </div>
     </Modal>
   );

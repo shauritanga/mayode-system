@@ -104,7 +104,7 @@ export function SalesView({ embedded = false }: { embedded?: boolean }) {
           { label: 'Sales', value: sales.length, color: 'var(--blue-500)' },
           {
             label: 'Total revenue',
-            value: `TZS ${Math.round(totalRevenue).toLocaleString()}`,
+            value: `TZS ${Math.round(totalRevenue).toLocaleString('en-US')}`,
             color: 'var(--accent)',
           },
           { label: 'Pending payment', value: pendingSales, color: 'var(--gold-400)' },
@@ -165,7 +165,7 @@ export function SalesView({ embedded = false }: { embedded?: boolean }) {
                       {sale.lot.lotNumber}
                     </Link>
                   </td>
-                  <td>TZS {Math.round(sale.totalRevenue).toLocaleString()}</td>
+                  <td>TZS {Math.round(sale.totalRevenue).toLocaleString('en-US')}</td>
                   <td>{sale._count.apportionments}</td>
                   <td>
                     <span

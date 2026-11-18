@@ -419,7 +419,7 @@ function FarmsList() {
         {!loading && view === 'list' && filtered.length > 0 && (
           <div className="farmers-footer">
             <span className="farmers-range">
-              Showing <strong>{rangeStart}–{rangeEnd}</strong> of <strong>{filtered.length.toLocaleString()}</strong>
+              Showing <strong>{rangeStart}–{rangeEnd}</strong> of <strong>{filtered.length.toLocaleString('en-US')}</strong>
             </span>
             {totalPages > 1 && (
               <div className="pagination">

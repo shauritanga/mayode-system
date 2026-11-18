@@ -196,7 +196,7 @@ export class DispatchService {
         if (free > 0) await tx.orderAllocation.update({ where: { id: a.id }, data: { releasedKg: a.releasedKg + free } });
       }
       await tx.opsOrder.update({ where: { id: orderId }, data: { status: 'COMPLETED', fulfilState: 'DISPATCHED', shortageNote: `Closed short: ${reason.trim()}` } });
-      await tx.opsOrderEvent.create({ data: { orderId, type: 'order.closed_short', actorUserId: actor.id, note: `${reason.trim()} (refund due about TZS ${refundDue.toLocaleString()})` } });
+      await tx.opsOrderEvent.create({ data: { orderId, type: 'order.closed_short', actorUserId: actor.id, note: `${reason.trim()} (refund due about TZS ${refundDue.toLocaleString('en-US')})` } });
       return { refundDue };
     });
     return { ...out, order: await this.prepareView(orderId, actor) };

@@ -43,13 +43,13 @@ const DISPLAY_GROUPS = [
 
 const slug = (label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 const titleCase = (value: string) => value.split('-').map((part) => part ? part[0].toUpperCase() + part.slice(1) : '').join(' ');
-const formatTzs = (value: number) => new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', maximumFractionDigits: 0 }).format(Number(value) || 0);
+const formatTzs = (value: number) => `TZS ${Math.round(Number(value) || 0).toLocaleString('en-US')}`;
 const todayEAT = () => new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 const unwrap = (data: any): any[] => Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : data && typeof data === 'object' ? [data] : [];
 const scalar = (value: any): string => {
   if (value == null || value === '') return '—';
   if (typeof value === 'object') return Array.isArray(value) ? `${value.length} records` : value.name || value.label || value.invoiceNumber || value.controlNumber || 'Details';
-  if (typeof value === 'number') return value.toLocaleString();
+  if (typeof value === 'number') return value.toLocaleString('en-US');
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
     const parts = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Africa/Dar_es_Salaam', day: '2-digit', month: '2-digit', year: 'numeric',
@@ -775,7 +775,7 @@ function FarmerProcurementSection({ rows }: { rows: ProcurementPayable[] }) {
     <div className="section-toolbar"><strong>Unpaid procurement owed to farmers</strong><strong>{formatTzs(rows.reduce((sum, row) => sum + row.amountOwed, 0))}</strong></div>
     {!rows.length ? <div className="muted" style={{ padding: 18 }}>No unpaid procurement balances.</div> : <div style={{ overflowX: 'auto' }}><table className="data-table">
       <thead><tr><th>Delivery date</th><th>Farmer</th><th>Control number</th><th>Delivery</th><th className="num">Weight (kg)</th><th className="num">Purchase value</th><th className="num">Paid</th><th className="num">Outstanding</th></tr></thead>
-      <tbody>{rows.map((row) => <tr key={row.id}><td>{scalar(row.receivedDate)}</td><td>{row.farmer.firstName} {row.farmer.lastName}</td><td>{row.farmer.controlNumber}</td><td>{row.trackingCode}</td><td className="num">{Number(row.weightKg).toLocaleString()}</td><td className="num">{formatTzs(row.totalValue)}</td><td className="num">{formatTzs(row.amountPaid)}</td><td className="num">{formatTzs(row.amountOwed)}</td></tr>)}</tbody>
+      <tbody>{rows.map((row) => <tr key={row.id}><td>{scalar(row.receivedDate)}</td><td>{row.farmer.firstName} {row.farmer.lastName}</td><td>{row.farmer.controlNumber}</td><td>{row.trackingCode}</td><td className="num">{Number(row.weightKg).toLocaleString('en-US')}</td><td className="num">{formatTzs(row.totalValue)}</td><td className="num">{formatTzs(row.amountPaid)}</td><td className="num">{formatTzs(row.amountOwed)}</td></tr>)}</tbody>
     </table></div>}
   </section>;
 }

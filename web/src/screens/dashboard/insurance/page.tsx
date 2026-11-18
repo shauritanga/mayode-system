@@ -111,7 +111,7 @@ function PoliciesAndClaims() {
         label: 'Paid',
         reached: status === 'PAID',
         at: claim.paidAt,
-        note: claim.paidAmount != null ? `TZS ${claim.paidAmount.toLocaleString()}` : null,
+        note: claim.paidAmount != null ? `TZS ${claim.paidAmount.toLocaleString('en-US')}` : null,
       },
     ];
   };
@@ -217,7 +217,7 @@ function PoliciesAndClaims() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         {[
           { label: 'Active policies', value: activePolicies, color: 'var(--accent)' },
-          { label: 'Total sum insured', value: `TZS ${totalSumInsured.toLocaleString()}`, color: 'var(--gold-400)' },
+          { label: 'Total sum insured', value: `TZS ${totalSumInsured.toLocaleString('en-US')}`, color: 'var(--gold-400)' },
           { label: 'Pending claims', value: pendingClaims, color: 'var(--red-400)' },
           { label: 'Providers', value: providers.length, color: 'var(--purple-500)' },
         ].map((s) => (
@@ -281,9 +281,9 @@ function PoliciesAndClaims() {
                     <td style={{ fontSize: '13px', color: 'var(--neutral-400)' }}>{p.provider?.name || '—'}</td>
                     <td style={{ fontSize: '12px', color: 'var(--neutral-400)' }}>{p.productType.replace(/_/g, ' ')}</td>
                     <td>{p.insuredAreaHectares}</td>
-                    <td>TZS {p.sumInsured.toLocaleString()}</td>
-                    <td>TZS {p.premiumAmount.toLocaleString()}</td>
-                    <td>{p.premiumPaidAmount >= p.premiumAmount ? <span className="badge badge-green">Paid</span> : p.premiumPaidAmount > 0 ? <span className="badge badge-blue">TZS {p.premiumPaidAmount.toLocaleString()}</span> : <span className="badge badge-gold">Unpaid</span>}</td>
+                    <td>TZS {p.sumInsured.toLocaleString('en-US')}</td>
+                    <td>TZS {p.premiumAmount.toLocaleString('en-US')}</td>
+                    <td>{p.premiumPaidAmount >= p.premiumAmount ? <span className="badge badge-green">Paid</span> : p.premiumPaidAmount > 0 ? <span className="badge badge-blue">TZS {p.premiumPaidAmount.toLocaleString('en-US')}</span> : <span className="badge badge-gold">Unpaid</span>}</td>
                     <td>
                       <select
                         className="input-field"
@@ -334,9 +334,9 @@ function PoliciesAndClaims() {
                       <td style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{c.policy?.farmer ? `${c.policy.farmer.firstName} ${c.policy.farmer.lastName}` : '—'}</td>
                       <td style={{ fontSize: '13px', color: 'var(--neutral-400)' }}>{c.policy?.provider?.name || '—'}</td>
                       <td style={{ fontSize: '13px', color: 'var(--neutral-400)' }}>{c.incidentType}</td>
-                      <td>TZS {c.claimedAmount.toLocaleString()}</td>
-                      <td>{c.approvedAmount != null ? `TZS ${c.approvedAmount.toLocaleString()}` : '—'}</td>
-                      <td>{c.paidAmount ? `TZS ${c.paidAmount.toLocaleString()}` : '—'}{c.paymentStatus && c.paymentStatus !== 'NOT_DUE' && <div><span className={`badge ${CLAIM_PAY[c.paymentStatus]?.[0] ?? 'badge-gray'}`}>{CLAIM_PAY[c.paymentStatus]?.[1] ?? c.paymentStatus}</span></div>}</td>
+                      <td>TZS {c.claimedAmount.toLocaleString('en-US')}</td>
+                      <td>{c.approvedAmount != null ? `TZS ${c.approvedAmount.toLocaleString('en-US')}` : '—'}</td>
+                      <td>{c.paidAmount ? `TZS ${c.paidAmount.toLocaleString('en-US')}` : '—'}{c.paymentStatus && c.paymentStatus !== 'NOT_DUE' && <div><span className={`badge ${CLAIM_PAY[c.paymentStatus]?.[0] ?? 'badge-gray'}`}>{CLAIM_PAY[c.paymentStatus]?.[1] ?? c.paymentStatus}</span></div>}</td>
                       <td><span className={`badge ${c.status === 'REJECTED' ? 'badge-red' : c.status === 'PAID' || c.status === 'APPROVED' ? 'badge-green' : c.status === 'INSPECTING' ? 'badge-gold' : 'badge-blue'}`}>{c.status.toLowerCase()}</span></td>
                       <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <button className="btn-secondary" style={{ fontSize: '11px', padding: '4px 8px' }} disabled={statusSavingId === c.id} onClick={() => setInspecting(c)}>
@@ -486,7 +486,7 @@ function PolicyPremiumModal({ policy, onClose, onSaved }: { policy: Policy; onCl
     finally { setBusy(false); }
   };
   return (
-    <Modal title="Record premium paid" subtitle={`Premium due TZS ${policy.premiumAmount.toLocaleString()} · paid so far TZS ${policy.premiumPaidAmount.toLocaleString()}`} onClose={onClose}
+    <Modal title="Record premium paid" subtitle={`Premium due TZS ${policy.premiumAmount.toLocaleString('en-US')} · paid so far TZS ${policy.premiumPaidAmount.toLocaleString('en-US')}`} onClose={onClose}
       footer={<><button className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button><button className="btn-primary" onClick={save} disabled={busy || !Number(amount)}>{busy ? 'Saving…' : 'Record'}</button></>}>
       {error && <div className="alert-box alert-danger" style={{ marginBottom: 10 }}>{error}</div>}
       <div style={{ display: 'grid', gap: 12 }}>

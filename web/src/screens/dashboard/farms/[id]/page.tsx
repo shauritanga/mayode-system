@@ -304,8 +304,8 @@ export default function FarmDetailPage() {
                     <td>{c.growthStage ? stageLabel(c.growthStage) : '—'}</td>
                     <td>{dateFmt(c.plantingDate)}</td>
                     <td>{dateFmt(c.expectedHarvest)}</td>
-                    <td className="num">{c.estimatedYieldKg?.toLocaleString() ?? '—'}</td>
-                    <td className="num">{c.actualYieldKg?.toLocaleString() ?? '—'}</td>
+                    <td className="num">{c.estimatedYieldKg?.toLocaleString('en-US') ?? '—'}</td>
+                    <td className="num">{c.actualYieldKg?.toLocaleString('en-US') ?? '—'}</td>
                     <td>{String(c.status)}</td>
                   </tr>
                 ))}

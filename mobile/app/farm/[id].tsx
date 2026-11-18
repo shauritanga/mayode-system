@@ -451,7 +451,7 @@ export default function FarmDetail() {
                 <Attr label={t('cropCycles')} value={`${prod.cropCycles}`} />
                 <Attr label={t('totalYield')} value={`${prod.totalYieldKg ?? 0} kg`} />
                 <Attr label={t('yieldPerAcre')} value={prod.yieldPerAcre != null ? `${prod.yieldPerAcre} kg` : '—'} />
-                <Attr label={t('netProfit')} value={`TZS ${(prod.netProfit ?? 0).toLocaleString()}`} />
+                <Attr label={t('netProfit')} value={`TZS ${(prod.netProfit ?? 0).toLocaleString('en-US')}`} />
               </View>
             </View>
           )

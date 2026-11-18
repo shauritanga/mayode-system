@@ -52,7 +52,7 @@ const FORMATS: { id: Format; label: string }[] = [
   { id: 'csv', label: 'CSV' },
 ];
 
-const num = (n: number) => n.toLocaleString();
+const num = (n: number) => n.toLocaleString('en-US');
 function formatValue(value: unknown, type: ColumnType = 'text'): string {
   if (value === '' || value === null || value === undefined) return '—';
   if (type === 'currency' && typeof value === 'number') return `TZS ${num(Math.round(value))}`;

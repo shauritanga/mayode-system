@@ -207,7 +207,7 @@ export default function MembershipScreen() {
               <View style={styles.planHeader}>
                 <Text style={styles.planName}>{plan.name}</Text>
                 <View style={styles.priceChip}>
-                  <Text style={styles.priceText}>TZS {plan.priceTzs.toLocaleString()}</Text>
+                  <Text style={styles.priceText}>TZS {plan.priceTzs.toLocaleString('en-US')}</Text>
                   <Text style={styles.priceUnit}>{t('perSeason')}</Text>
                 </View>
               </View>
@@ -237,7 +237,7 @@ export default function MembershipScreen() {
                 <Text style={styles.modalTitle}>{t('payWithMobileMoney')}</Text>
                 {!!payPlan && (
                   <Text style={styles.modalPlan}>
-                    {payPlan.name} · TZS {payPlan.priceTzs.toLocaleString()}
+                    {payPlan.name} · TZS {payPlan.priceTzs.toLocaleString('en-US')}
                   </Text>
                 )}
                 <Text style={styles.modalLabel}>{t('mobileMoneyNumber')}</Text>
@@ -258,7 +258,7 @@ export default function MembershipScreen() {
                 >
                   {submitting
                     ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.payBtnText}>{t('payAmount', { amount: (payPlan?.priceTzs ?? 0).toLocaleString() })}</Text>}
+                    : <Text style={styles.payBtnText}>{t('payAmount', { amount: (payPlan?.priceTzs ?? 0).toLocaleString('en-US') })}</Text>}
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.cancelBtn} onPress={closePay}>
                   <Text style={styles.cancelText}>{t('cancel')}</Text>

@@ -63,4 +63,4 @@ export const statusBadgeClass = (status: string) =>
 export const fmtDate = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString('en-TZ', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
-export const fmtKg = (n?: number | null) => (n || n === 0 ? `${Math.round(n).toLocaleString()} kg` : '—');
+export const fmtKg = (n?: number | null) => (n || n === 0 ? `${Math.round(n).toLocaleString('en-US')} kg` : '—');

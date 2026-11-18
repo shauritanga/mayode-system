@@ -217,7 +217,7 @@ export class BillingService {
 
   private async afterPayment(order: { id: string; reference: string; mamcosId: string | null; createdByUserId: string; paymentStatus: string }, amount: number, confirmed: boolean) {
     const title = confirmed ? (order.paymentStatus === 'PAID' ? 'Payment confirmed — order fully paid' : 'Payment confirmed') : 'Payment rejected';
-    const note = { type: confirmed ? 'OPS_PAYMENT_CONFIRMED' : 'OPS_PAYMENT_REJECTED', title, body: `${order.reference}: TZS ${Math.round(amount).toLocaleString()}`, data: { orderId: order.id } as Prisma.InputJsonValue };
+    const note = { type: confirmed ? 'OPS_PAYMENT_CONFIRMED' : 'OPS_PAYMENT_REJECTED', title, body: `${order.reference}: TZS ${Math.round(amount).toLocaleString('en-US')}`, data: { orderId: order.id } as Prisma.InputJsonValue };
     await this.notify.tellPermission('ops_payments', 'VIEW', order.mamcosId, note, [order.createdByUserId]);
   }
 
@@ -232,7 +232,7 @@ export class BillingService {
       if (inv.status === 'VOID') throw new ConflictException('This invoice is void');
       const balance = r2(inv.total - inv.amountPaid);
       if (balance <= 0) throw new ConflictException('This invoice is already fully paid');
-      if (dto.amount > balance + TOLERANCE) throw new BadRequestException(`That is more than the balance of TZS ${balance.toLocaleString()}`);
+      if (dto.amount > balance + TOLERANCE) throw new BadRequestException(`That is more than the balance of TZS ${balance.toLocaleString('en-US')}`);
       try {
         await tx.opsPayment.create({
           data: {
@@ -245,7 +245,7 @@ export class BillingService {
         throw e;
       }
       const t = await this.applyTotals(tx, invoiceId);
-      await tx.opsOrderEvent.create({ data: { orderId: inv.orderId, type: 'payment.confirmed', actorUserId: actor.id, note: `TZS ${dto.amount.toLocaleString()} (${reference})` } });
+      await tx.opsOrderEvent.create({ data: { orderId: inv.orderId, type: 'payment.confirmed', actorUserId: actor.id, note: `TZS ${dto.amount.toLocaleString('en-US')} (${reference})` } });
       return t;
     });
     await this.afterPayment(out.order, dto.amount, true);
@@ -260,7 +260,7 @@ export class BillingService {
     const balance = r2(inv.total - inv.amountPaid);
     const amount = dto.amount ?? balance;
     if (balance <= 0) throw new ConflictException('This invoice is already fully paid');
-    if (amount > balance + TOLERANCE) throw new BadRequestException(`That is more than the balance of TZS ${balance.toLocaleString()}`);
+    if (amount > balance + TOLERANCE) throw new BadRequestException(`That is more than the balance of TZS ${balance.toLocaleString('en-US')}`);
     const attempt = (await this.prisma.opsPayment.count({ where: { invoiceId, provider: 'CLICKPESA' } })) + 1;
     const orderReference = `${inv.invoiceNumber.replace(/[^A-Za-z0-9]/g, '')}A${attempt}`;
     const push = await this.clickPesa.initiateUssdPush({ amount: String(amount), orderReference, phoneNumber: dto.phoneNumber });
@@ -297,7 +297,7 @@ export class BillingService {
       const claimed = await tx.opsPayment.updateMany({ where: { id: pay.id, status: 'PENDING' }, data: { status: 'CONFIRMED', paidAt: new Date(), rawPayload: remote as unknown as Prisma.InputJsonValue } });
       if (!claimed.count) return null;
       const t = await this.applyTotals(tx, pay.invoiceId);
-      await tx.opsOrderEvent.create({ data: { orderId: pay.orderId, type: 'payment.confirmed', actorUserId: null, note: `TZS ${pay.amount.toLocaleString()} (ClickPesa ${orderReference})` } });
+      await tx.opsOrderEvent.create({ data: { orderId: pay.orderId, type: 'payment.confirmed', actorUserId: null, note: `TZS ${pay.amount.toLocaleString('en-US')} (ClickPesa ${orderReference})` } });
       return t;
     });
     if (out) await this.afterPayment(out.order, pay.amount, true);
@@ -343,7 +343,7 @@ export class BillingService {
       const claimed = await tx.opsPayment.updateMany({ where: { id: paymentId, status: 'PENDING' }, data: { status: 'CONFIRMED', paidAt: new Date(), confirmedByUserId: actor.id, source: 'MANUAL' } });
       if (!claimed.count) throw new ConflictException('Only a pending payment can be confirmed');
       const t = await this.applyTotals(tx, p.invoiceId);
-      await tx.opsOrderEvent.create({ data: { orderId: p.orderId, type: 'payment.confirmed', actorUserId: actor.id, note: `TZS ${p.amount.toLocaleString()} (${p.providerReference})` } });
+      await tx.opsOrderEvent.create({ data: { orderId: p.orderId, type: 'payment.confirmed', actorUserId: actor.id, note: `TZS ${p.amount.toLocaleString('en-US')} (${p.providerReference})` } });
       return t;
     });
     await this.afterPayment(out.order, p.amount, true);
@@ -387,7 +387,7 @@ export class BillingService {
         }
         if (body.amount! > balance + TOLERANCE) this.logger.warn(`Callback ${body.reference} exceeds the invoice balance`);
         const t = await this.applyTotals(tx, inv.id);
-        await tx.opsOrderEvent.create({ data: { orderId: inv.orderId, type: 'payment.confirmed', actorUserId: null, note: `TZS ${body.amount!.toLocaleString()} (${provider} ${body.reference})` } });
+        await tx.opsOrderEvent.create({ data: { orderId: inv.orderId, type: 'payment.confirmed', actorUserId: null, note: `TZS ${body.amount!.toLocaleString('en-US')} (${provider} ${body.reference})` } });
         return t;
       });
     if (out) await this.afterPayment(out.order, body.amount, true);

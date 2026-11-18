@@ -130,7 +130,7 @@ export default function WarehouseDispatchPanel() {
               </div>
               <p className="muted" style={{ marginTop: 6 }}>
                 {result.buyer?.name || 'Unknown buyer'}
-                {result.riceVariety ? ` · ${result.riceVariety}` : ''} · {result.quantityKg.toLocaleString()} kg
+                {result.riceVariety ? ` · ${result.riceVariety}` : ''} · {result.quantityKg.toLocaleString('en-US')} kg
                 {result.packaging ? ` · ${result.packaging}` : ''}
               </p>
               {(result.buyer?.contactPerson || result.buyer?.contactPhone) && (
@@ -160,7 +160,7 @@ export default function WarehouseDispatchPanel() {
               </p>
               <p className="muted" style={{ marginTop: 6, fontSize: 13 }}>
                 {result.dispatch.transportMode === 'MAYODE_ARRANGED'
-                  ? `MAYODE-arranged transport${result.dispatch.transportFee ? ` · fee paid: ${result.dispatch.transportFee.toLocaleString()}` : ''}`
+                  ? `MAYODE-arranged transport${result.dispatch.transportFee ? ` · fee paid: ${result.dispatch.transportFee.toLocaleString('en-US')}` : ''}`
                   : "Buyer's own vehicle"}
                 {' · '}Vehicle {result.dispatch.vehiclePlateNumber} · Driver {result.dispatch.driverName} ({result.dispatch.driverPhone})
               </p>

@@ -15,7 +15,7 @@ type Ctx =
   | { kind: 'staff'; tenant: string | null; isSuper: boolean };
 
 const OPEN = ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED'] as const;
-const fmt = (n: number) => `TZS ${Math.round(n).toLocaleString()}`;
+const fmt = (n: number) => `TZS ${Math.round(n).toLocaleString('en-US')}`;
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 @Injectable()

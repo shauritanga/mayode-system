@@ -18,7 +18,7 @@ function parseNumericValue(value: string | number): { prefix: string; num: numbe
 }
 
 function format(num: number, decimals: number) {
-  return num.toLocaleString(undefined, {
+  return num.toLocaleString('en-US', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });

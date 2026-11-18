@@ -8,7 +8,7 @@ import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 import MoneyInput from '@/components/MoneyInput';
 
-export const tzs = (n: number) => new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', maximumFractionDigits: 2 }).format(Number(n) || 0);
+export const tzs = (n: number) => `TZS ${(Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 export const today = () => new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
 export const errText = (e: any, fallback: string) => {
   const m = e?.response?.data?.message;

@@ -5,6 +5,7 @@ import { Stack, useFocusEffect } from 'expo-router';
 import { creditApi } from '../src/lib/api';
 import { useI18n } from '../src/i18n';
 
+import MoneyInput, { MoneyAware } from '../src/components/MoneyInput';
 const PURPOSES = ['SEED_AND_INPUTS', 'LAND_PREPARATION', 'LABOUR', 'EQUIPMENT', 'IRRIGATION', 'HARVEST_AND_TRANSPORT', 'WORKING_CAPITAL', 'OTHER'] as const;
 const STATUS_KEY: Record<string, string> = {
   SUBMITTED: 'loanStatusSubmitted', UNDER_REVIEW: 'loanStatusUnderReview', APPROVED: 'loanStatusApproved',
@@ -13,7 +14,7 @@ const STATUS_KEY: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = {
   SUBMITTED: '#3B82F6', UNDER_REVIEW: '#F59E0B', APPROVED: '#10B981', REJECTED: '#EF4444', DISBURSED: '#10B981', WITHDRAWN: '#9CA3AF',
 };
-const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${Math.round(n).toLocaleString()}`);
+const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${Math.round(n).toLocaleString('en-US')}`);
 const day = (v?: string | null) => (v ? new Date(v).toLocaleDateString() : '—');
 
 interface Application {
@@ -97,7 +98,7 @@ export default function LoansScreen() {
               ))}
             </View>
             <Text style={styles.label}>{t('loanAmountNeeded')}</Text>
-            <TextInput style={styles.input} keyboardType="numeric" value={form.amount} onChangeText={(v) => setForm({ ...form, amount: v.replace(/[^0-9]/g, '') })} />
+            <MoneyInput style={styles.input} keyboardType="numeric" value={form.amount} onChangeText={(v) => setForm({ ...form, amount: v.replace(/[^0-9]/g, '') })} />
             <Text style={styles.label}>{t('loanRepayMonths')}</Text>
             <TextInput style={styles.input} keyboardType="numeric" value={form.months} onChangeText={(v) => setForm({ ...form, months: v.replace(/[^0-9]/g, '') })} />
             <Text style={styles.label}>{t('loanPurposeLabel')}</Text>

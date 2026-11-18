@@ -314,7 +314,7 @@ export class MarketplaceService {
     if (listing.owner.user?.phone) {
       await this.sms.send(
         listing.owner.user.phone,
-        `MAYODE: Your farm ${listing.farm.farmCode} is now listed on M-LAX for ${askingPrice.toLocaleString()} TZS. We'll notify you when a renter deposits funds.`,
+        `MAYODE: Your farm ${listing.farm.farmCode} is now listed on M-LAX for ${askingPrice.toLocaleString('en-US')} TZS. We'll notify you when a renter deposits funds.`,
         'mlax_listing_live',
       );
     }
@@ -1342,7 +1342,7 @@ export class MarketplaceService {
     if (listing.owner.user?.phone) {
       await this.sms.send(
         listing.owner.user.phone,
-        `MAYODE: Year ${year} rent for ${listing.farm.farmCode} has been paid (${amount.toLocaleString()} TZS). Payout is on the way.`,
+        `MAYODE: Year ${year} rent for ${listing.farm.farmCode} has been paid (${amount.toLocaleString('en-US')} TZS). Payout is on the way.`,
         'mlax_installment_paid',
       );
     }
@@ -1683,7 +1683,7 @@ export class MarketplaceService {
       if (recipientPhone) {
         await this.sms.send(
           recipientPhone,
-          `MAYODE: Your M-LAX payout of ${escrow.amount.toLocaleString()} TZS has been sent to your mobile money.`,
+          `MAYODE: Your M-LAX payout of ${escrow.amount.toLocaleString('en-US')} TZS has been sent to your mobile money.`,
           'mlax_payout_success',
         );
       }
@@ -1809,7 +1809,7 @@ export class MarketplaceService {
     if (listing.owner.user?.phone) {
       await this.sms.send(
         listing.owner.user.phone,
-        `MAYODE: You've received an offer of ${offerAmount.toLocaleString()} TZS for ${listing.farm.farmCode} (asking ${listing.askingPrice.toLocaleString()}). Review it in the M-LAX app.`,
+        `MAYODE: You've received an offer of ${offerAmount.toLocaleString('en-US')} TZS for ${listing.farm.farmCode} (asking ${listing.askingPrice.toLocaleString('en-US')}). Review it in the M-LAX app.`,
         'mlax_offer_received',
       );
     }
@@ -1874,10 +1874,10 @@ export class MarketplaceService {
     if (farmerPhone) {
       const message =
         dto.action === 'accept'
-          ? `MAYODE: Your offer of ${offer.offerAmount.toLocaleString()} TZS was accepted! Deposit that amount in the app to secure the lease.`
+          ? `MAYODE: Your offer of ${offer.offerAmount.toLocaleString('en-US')} TZS was accepted! Deposit that amount in the app to secure the lease.`
           : dto.action === 'reject'
             ? 'MAYODE: Your offer was declined by the owner.'
-            : `MAYODE: The owner countered your offer with ${dto.counterAmount!.toLocaleString()} TZS. Review it in the M-LAX app.`;
+            : `MAYODE: The owner countered your offer with ${dto.counterAmount!.toLocaleString('en-US')} TZS. Review it in the M-LAX app.`;
       await this.sms.send(farmerPhone, message, 'mlax_offer_decision');
     }
     return updated;
@@ -2230,7 +2230,7 @@ export class MarketplaceService {
     if (farmer?.user?.phone) {
       await this.sms.send(
         farmer.user.phone,
-        `MAYODE: You've been issued ${dto.amountTzs.toLocaleString()} TZS in M-LAX input credit (seeds/fertilizer). Repay at harvest.`,
+        `MAYODE: You've been issued ${dto.amountTzs.toLocaleString('en-US')} TZS in M-LAX input credit (seeds/fertilizer). Repay at harvest.`,
         'mlax_input_credit_issued',
       );
     }
@@ -2444,7 +2444,7 @@ export class MarketplaceService {
       if (listing.owner.user?.phone) {
         await this.sms.send(
           listing.owner.user.phone,
-          `MAYODE: Your Flash Deal listing for ${listing.farm.farmCode} had no renters yet, so we've dropped the price to ${newPrice.toLocaleString()} TZS to help it rent faster.`,
+          `MAYODE: Your Flash Deal listing for ${listing.farm.farmCode} had no renters yet, so we've dropped the price to ${newPrice.toLocaleString('en-US')} TZS to help it rent faster.`,
           'mlax_flash_deal_dropped',
         );
       }

@@ -7,6 +7,7 @@ import { inputStockApi, purchaseOrdersApi, suppliersApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { ConfirmDialog, Empty, Field, LoadError, Notice, PageHeader, TableSkeleton, errMsg, fmtDate, todayISO, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 
+import MoneyInput from '@/components/MoneyInput';
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 const TONE: Record<string, string> = { DRAFT: 'badge-gray', APPROVED: 'badge-blue', PARTIALLY_RECEIVED: 'badge-gold', RECEIVED: 'badge-green', CANCELLED: 'badge-red' };
 const LABEL: Record<string, string> = { DRAFT: 'Waiting for the Manager', APPROVED: 'Approved: goods awaited', PARTIALLY_RECEIVED: 'Part delivered', RECEIVED: 'Fully delivered', CANCELLED: 'Cancelled' };
@@ -44,7 +45,7 @@ function NewOrder({ onClose, onDone }: { onClose: () => void; onDone: (m: string
             <Field label={i === 0 ? 'Item' : ''}><input className="input-field" value={l.itemName} onChange={(e) => set(i, { itemName: e.target.value })} /></Field>
             <Field label={i === 0 ? 'Unit' : ''}><input className="input-field" value={l.unit} onChange={(e) => set(i, { unit: e.target.value })} /></Field>
             <Field label={i === 0 ? 'Qty' : ''}><input type="number" min={0} step="any" className="input-field" value={l.quantity} onChange={(e) => set(i, { quantity: e.target.value })} /></Field>
-            <Field label={i === 0 ? 'Unit price' : ''}><input type="number" min={0} className="input-field" value={l.unitPrice} onChange={(e) => set(i, { unitPrice: e.target.value })} /></Field>
+            <Field label={i === 0 ? 'Unit price' : ''}><MoneyInput min={0} className="input-field" value={l.unitPrice} onChange={(e) => set(i, { unitPrice: e.target.value })} /></Field>
             <button type="button" className="btn-secondary" aria-label="Remove line" disabled={lines.length === 1} onClick={() => setLines((p) => p.filter((_, k) => k !== i))}>✕</button>
           </div>
         ))}

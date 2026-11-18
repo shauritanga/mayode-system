@@ -8,6 +8,7 @@ import { farmId } from '@/lib/farm-id';
 import { useAuthStore } from '@/store/auth.store';
 import { ConfirmDialog, Empty, Field, LoadError, Notice, PageHeader, StatusBadge, TableSkeleton, Tabs, errMsg, fmtDate, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 
+import MoneyInput from '@/components/MoneyInput';
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 const clock = (v?: string | null) => (v ? new Date(v).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
 const localInput = (hours: number) => { const d = new Date(Date.now() + hours * 3_600_000); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
@@ -59,7 +60,7 @@ function NewTender({ onClose, onDone }: { onClose: () => void; onDone: (id: stri
         <Field label="Title *"><input className="input-field" maxLength={200} value={f.title} onChange={(e) => set('title', e.target.value)} placeholder="e.g. Desilting of Canal 3, blocks 4 to 8" autoFocus /></Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="Kind of work"><select className="input-field" value={f.category} onChange={(e) => set('category', e.target.value)}>{Object.entries(CATEGORY).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
-          <Field label="Budget ceiling (TZS) *" hint="Bids above this are not accepted."><input className="input-field" inputMode="decimal" value={f.budgetCeiling} onChange={(e) => set('budgetCeiling', e.target.value.replace(/[^\d.]/g, ''))} /></Field>
+          <Field label="Budget ceiling (TZS) *" hint="Bids above this are not accepted."><MoneyInput className="input-field" value={f.budgetCeiling} onChange={(e) => set('budgetCeiling', e.target.value.replace(/[^\d.]/g, ''))} /></Field>
         </div>
         <Field label="Scope of work *"><textarea className="input-field" rows={4} maxLength={8000} value={f.scope} onChange={(e) => set('scope', e.target.value)} placeholder="What must be done, where, to what standard." /></Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

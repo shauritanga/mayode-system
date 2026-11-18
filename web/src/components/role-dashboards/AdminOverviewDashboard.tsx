@@ -251,10 +251,10 @@ export default function AdminOverviewDashboard() {
   // Whole tons would show 0 for anything under half a ton, so small totals are shown in kg or one decimal.
   const totalProductionLabel =
     totalProductionKgShown < 1000
-      ? `${Math.round(totalProductionKgShown).toLocaleString()} kg`
+      ? `${Math.round(totalProductionKgShown).toLocaleString('en-US')} kg`
       : totalProductionKgShown < 10000
         ? `${(totalProductionKgShown / 1000).toFixed(1)} tons`
-        : `${Math.round(totalProductionKgShown / 1000).toLocaleString()} tons`;
+        : `${Math.round(totalProductionKgShown / 1000).toLocaleString('en-US')} tons`;
   const hasProduction = productionLegend.some((r) => r.value > 0);
 
   const productionRays = useMemo(() => {
@@ -539,7 +539,7 @@ export default function AdminOverviewDashboard() {
               <div>
                 <span className="fv-metric-label">Total Land Area</span>
                 <strong className="fv-metric-value">
-                  {loading ? '—' : <CountUpValue value={`${totalLandHa.toLocaleString()} ha`} />}
+                  {loading ? '—' : <CountUpValue value={`${totalLandHa.toLocaleString('en-US')} ha`} />}
                 </strong>
                 <small className="fv-metric-delta is-up">+{landDeltaPct}% farms verified</small>
               </div>
@@ -755,7 +755,7 @@ export default function AdminOverviewDashboard() {
                     />
                   </span>
                   <span className="fv-harvest-name">{row.name}</span>
-                  <strong>{row.tons.toLocaleString()} tons</strong>
+                  <strong>{row.tons.toLocaleString('en-US')} tons</strong>
                 </li>
               ))
             )}

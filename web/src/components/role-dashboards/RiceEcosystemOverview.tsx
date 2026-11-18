@@ -53,8 +53,8 @@ const tooltipStyle = {
 };
 const axisTick = { fill: 'var(--neutral-500)', fontSize: 12 };
 
-const tons = (kg: number) => `${Math.round((kg || 0) / 1000).toLocaleString()} t`;
-const num = (n: number) => (n || 0).toLocaleString();
+const tons = (kg: number) => `${Math.round((kg || 0) / 1000).toLocaleString('en-US')} t`;
+const num = (n: number) => (n || 0).toLocaleString('en-US');
 const pct = (part: number, whole: number) =>
   whole ? `${Math.round((part / whole) * 100)}% of farmers` : 'No farmers yet';
 const label = (s: string) => s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ');

@@ -22,7 +22,7 @@ function FarmerShell({ children }: { children: ReactNode }) {
     <div className="role-grid">
       <MetricTile label="Registered farms" value={farms.length || (loading ? '—' : 0)} hint="Linked to your profile" />
       <MetricTile label="Crop cycles" value={cycles.length || 0} hint="Seasonal production records" tone="blue" />
-      <MetricTile label="Total yield" value={`${Math.round(production?.totalYieldKg || 0).toLocaleString()} kg`} hint={`${production?.harvestedCycles || 0} harvested cycles`} tone="gold" />
+      <MetricTile label="Total yield" value={`${Math.round(production?.totalYieldKg || 0).toLocaleString('en-US')} kg`} hint={`${production?.harvestedCycles || 0} harvested cycles`} tone="gold" />
       <MetricTile label="Net farm income" value={finance ? money(finance.netProfit) : '—'} hint="Revenue less costs" tone={finance?.netProfit >= 0 ? 'green' : 'red'} />
       <MetricTile label="Premium contribution" value={finance ? money(finance.premiumContribution) : '—'} hint="Allocated from cooperative sales" tone="purple" />
       <MetricTile label="Open alerts" value={alerts.filter((alert) => alert.status !== 'COMPLETED').length} hint="Recommendations and reminders" tone="red" />

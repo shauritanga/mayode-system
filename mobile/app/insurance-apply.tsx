@@ -5,10 +5,11 @@ import { Stack, useFocusEffect } from 'expo-router';
 import { insuranceApplicationsApi as api } from '../src/lib/api';
 import { useI18n } from '../src/i18n';
 
+import MoneyInput, { MoneyAware } from '../src/components/MoneyInput';
 const PRODUCTS = ['AREA_YIELD', 'WEATHER_INDEX', 'MULTI_PERIL', 'INPUT_INSURANCE', 'CREDIT_LINKED'] as const;
 const STATUS_COLOR: Record<string, string> = { SUBMITTED: '#3B82F6', UNDER_REVIEW: '#F59E0B', APPROVED: '#10B981', REJECTED: '#EF4444', ACTIVATED: '#10B981', WITHDRAWN: '#9CA3AF' };
 const RISK_COLOR: Record<string, string> = { LOW: '#10B981', MEDIUM: '#F59E0B', HIGH: '#EF4444' };
-const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${Math.round(n).toLocaleString()}`);
+const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${Math.round(n).toLocaleString('en-US')}`);
 const day = (v?: string | null) => (v ? new Date(v).toLocaleDateString() : '—');
 
 export default function InsuranceApplyScreen() {
@@ -87,7 +88,7 @@ export default function InsuranceApplyScreen() {
             <Text style={styles.label}>{t('insuranceAreaHa')}</Text>
             <TextInput style={styles.input} keyboardType="decimal-pad" value={form.area} onChangeText={(v) => setForm({ ...form, area: v.replace(/[^0-9.]/g, '') })} />
             <Text style={styles.label}>{t('insuranceSumWanted')}</Text>
-            <TextInput style={styles.input} keyboardType="numeric" value={form.sum} onChangeText={(v) => setForm({ ...form, sum: v.replace(/[^0-9]/g, '') })} />
+            <MoneyInput style={styles.input} keyboardType="numeric" value={form.sum} onChangeText={(v) => setForm({ ...form, sum: v.replace(/[^0-9]/g, '') })} />
             {suggested != null && (
               <TouchableOpacity onPress={() => setForm({ ...form, sum: String(suggested) })}><Text style={styles.link}>{t('insuranceSuggested')}: {tzs(suggested)}</Text></TouchableOpacity>
             )}

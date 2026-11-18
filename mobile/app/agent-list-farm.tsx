@@ -5,6 +5,7 @@ import { Stack, useRouter } from 'expo-router';
 import { farmersApi, farmsApi, marketplaceApi } from '../src/lib/data';
 import { useI18n } from '../src/i18n';
 
+import MoneyInput, { MoneyAware } from '../src/components/MoneyInput';
 const DEAL_TYPES = ['STANDARD', 'FLASH_DEAL'] as const;
 
 /**
@@ -135,7 +136,7 @@ export default function AgentListFarm() {
           <View style={styles.card}>
             <Text style={styles.farmerName}>{selectedFarm.farmCode}</Text>
             <Text style={styles.fieldLabel}>{t('mlaxAskingPrice')}</Text>
-            <TextInput
+            <MoneyInput
               style={styles.input}
               keyboardType="numeric"
               value={askingPrice}

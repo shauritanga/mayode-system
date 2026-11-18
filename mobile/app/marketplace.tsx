@@ -271,7 +271,7 @@ export default function MarketplaceScreen() {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>{t('estimatedCost')}:</Text>
                     <Text style={[styles.detailVal, { color: '#059669', fontWeight: '800' }]}>
-                      TZS {Math.round(b.totalPrice).toLocaleString()}
+                      TZS {Math.round(b.totalPrice).toLocaleString('en-US')}
                     </Text>
                   </View>
                 </View>
@@ -329,7 +329,7 @@ export default function MarketplaceScreen() {
               </View>
 
               <Text style={styles.modalSub}>
-                {bookingTractor.model} · {bookingTractor.registrationNo} (TZS {Number(baseRate).toLocaleString()}/ha)
+                {bookingTractor.model} · {bookingTractor.registrationNo} (TZS {Number(baseRate).toLocaleString('en-US')}/ha)
               </Text>
 
               {/* Select Farm */}
@@ -390,7 +390,7 @@ export default function MarketplaceScreen() {
                 <View style={styles.calcRow}>
                   <Text style={styles.calcLabel}>{t('estimatedCost')}:</Text>
                   <Text style={[styles.calcVal, { color: '#059669', fontSize: 16, fontWeight: '800' }]}>
-                    TZS {totalCost.toLocaleString()}
+                    TZS {totalCost.toLocaleString('en-US')}
                   </Text>
                 </View>
                 <Text style={styles.calcNote}>{t('platformCommissionNote')}</Text>

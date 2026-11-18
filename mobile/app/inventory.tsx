@@ -121,11 +121,11 @@ export default function InventoryScreen() {
         {summary && (
           <View style={styles.summaryRow}>
             <View style={styles.stat}>
-              <Text style={styles.statValue}>{Math.round(summary.inWarehouseKg).toLocaleString()}</Text>
+              <Text style={styles.statValue}>{Math.round(summary.inWarehouseKg).toLocaleString('en-US')}</Text>
               <Text style={styles.statLabel}>{t('inWarehouseKg')}</Text>
             </View>
             <View style={styles.stat}>
-              <Text style={styles.statValue}>{Math.round(summary.batchedOrSoldKg).toLocaleString()}</Text>
+              <Text style={styles.statValue}>{Math.round(summary.batchedOrSoldKg).toLocaleString('en-US')}</Text>
               <Text style={styles.statLabel}>{t('batchedSoldKg')}</Text>
             </View>
             <View style={styles.stat}>

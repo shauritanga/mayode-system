@@ -14,6 +14,7 @@ import { useAuthStore } from '@/store/auth.store';
 import Modal from '@/components/Modal';
 import { MetricTile, MetricTileSkeleton, TableSkeleton } from '@/components/role-dashboards/DashboardPrimitives';
 
+import MoneyInput from '@/components/MoneyInput';
 const PAGE_SIZE = 10;
 
 interface Plan {
@@ -278,7 +279,7 @@ export default function MembershipsPage() {
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
             <Field label="Plan name *" value={form.name} onChange={(v) => set('name', v)} placeholder="Season Premium" />
-            <Field label="Price (TZS) *" value={form.priceTzs} onChange={(v) => set('priceTzs', v)} placeholder="15000" />
+            <Field money label="Price (TZS) *" value={form.priceTzs} onChange={(v) => set('priceTzs', v)} placeholder="15000" />
             <div>
               <label style={labelStyle}>Duration type</label>
               <select className="input-field" value={form.durationType} onChange={(e) => set('durationType', e.target.value)}>
@@ -470,7 +471,7 @@ export default function MembershipsPage() {
                 {plans.map((p) => (
                   <tr key={p.id}>
                     <td style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>{p.name}</td>
-                    <td className="farmers-cell">{p.priceTzs.toLocaleString()} TZS</td>
+                    <td className="farmers-cell">{p.priceTzs.toLocaleString('en-US')} TZS</td>
                     <td className="farmers-cell">{p.durationType}</td>
                     <td className="farmers-cell">{(p.features || []).join(', ') || '—'}</td>
                     <td>{p.isActive ? <span className="badge badge-green">Active</span> : <span className="badge badge-gray">Inactive</span>}</td>
@@ -484,7 +485,7 @@ export default function MembershipsPage() {
         {!loading && tab === 'members' && filtered.length > 0 && (
           <div className="farmers-footer">
             <span className="farmers-range">
-              Showing <strong>{rangeStart}–{rangeEnd}</strong> of <strong>{filtered.length.toLocaleString()}</strong>
+              Showing <strong>{rangeStart}–{rangeEnd}</strong> of <strong>{filtered.length.toLocaleString('en-US')}</strong>
             </span>
             {totalPages > 1 && (
               <div className="pagination">
@@ -529,11 +530,11 @@ export default function MembershipsPage() {
 
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: 'var(--neutral-400)', marginBottom: '5px', fontWeight: 600 };
 
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+function Field({ label, value, onChange, placeholder, money }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; money?: boolean }) {
   return (
     <div>
       <label style={labelStyle}>{label}</label>
-      <input className="input-field" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+      {money ? <MoneyInput className="input-field" min={0} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /> : <input className="input-field" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />}
     </div>
   );
 }

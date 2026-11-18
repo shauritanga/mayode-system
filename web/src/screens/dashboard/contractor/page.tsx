@@ -6,6 +6,7 @@ import Modal from '@/components/Modal';
 import { contractorApi, uploadsApi } from '@/lib/api';
 import { Empty, Field, LoadError, Notice, PageHeader, TableSkeleton, Tabs, errMsg, useApi } from '@/screens/dashboard/irrigation/ui';
 
+import MoneyInput from '@/components/MoneyInput';
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
 const clock = (v?: string | null) => (v ? new Date(v).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
 const CATEGORY: Record<string, string> = { CANAL_CLEARING: 'Canal clearing', DESILTING: 'Desilting', ROAD_GRADING: 'Road grading', DRAINAGE_REPAIR: 'Drainage repair', OTHER: 'Other' };
@@ -39,7 +40,7 @@ function BidDialog({ tender, onClose, onDone }: { tender: any; onClose: () => vo
         {error && <Notice tone="error">{error}</Notice>}
         <div className="muted" style={{ fontSize: 13 }}>Budget ceiling {tzs(tender.budgetCeiling)}. Scored on price ({tender.criteria.price}), equipment ({tender.criteria.equipment}), experience ({tender.criteria.experience}) and past performance on MAYOData ({tender.criteria.performance}). Nobody sees your name while the bids are scored.</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-          <Field label="Your price (TZS) *"><input className="input-field" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ''))} /></Field>
+          <Field label="Your price (TZS) *"><MoneyInput className="input-field" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ''))} /></Field>
           <Field label="Machines you offer" hint={`The work needs ${tender.requiredEquipment}`}><input type="number" min={0} className="input-field" value={equipment} onChange={(e) => setEquipment(e.target.value)} /></Field>
           <Field label="Days to finish *"><input type="number" min={1} className="input-field" value={days} onChange={(e) => setDays(e.target.value)} /></Field>
         </div>

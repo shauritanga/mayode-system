@@ -6,7 +6,7 @@ import { inputApplicationsApi as api } from '../src/lib/api';
 import { useI18n } from '../src/i18n';
 
 const STATUS_COLOR: Record<string, string> = { SUBMITTED: '#F59E0B', READY: '#3B82F6', COLLECTED: '#10B981', PROCESSING: '#F59E0B', PARTLY_ISSUED: '#F59E0B', APPROVED: '#10B981', REJECTED: '#EF4444', WITHDRAWN: '#9CA3AF' };
-const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${Math.round(n).toLocaleString()}`);
+const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${Math.round(n).toLocaleString('en-US')}`);
 const day = (v?: string | null) => (v ? new Date(v).toLocaleDateString() : '—');
 
 type Opts = { hectares: { farmId: string; areaHectares: number }[]; items: { id: string; name: string; typeName: string; unit: string; unitPrice: number; inStock: number }[]; terms: { version: string; lines: string[] }; blocked: string | null };

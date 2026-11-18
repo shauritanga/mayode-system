@@ -9,7 +9,7 @@ import { ACTIVITY_TYPES, activityInputs, activityLabel } from '@/lib/activity-ty
 import { toCsv } from '@/lib/farm-format';
 
 const PAGE_SIZE = 15;
-const money = (n?: number | null) => (n || n === 0 ? `TZS ${Math.round(n).toLocaleString()}` : '—');
+const money = (n?: number | null) => (n || n === 0 ? `TZS ${Math.round(n).toLocaleString('en-US')}` : '—');
 const officerName = (a: any) => (a.fieldOfficer ? `${a.fieldOfficer.firstName} ${a.fieldOfficer.lastName}` : '');
 const farmerName = (a: any) => (a.cropCycle?.farmer ? `${a.cropCycle.farmer.firstName} ${a.cropCycle.farmer.lastName}` : '');
 
@@ -223,7 +223,7 @@ export default function ActivitiesPage() {
         {!loading && !loadError && filtered.length > 0 && (
           <div className="farmers-footer">
             <span className="farmers-range">
-              Showing <strong>{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}</strong> of <strong>{filtered.length.toLocaleString()}</strong>
+              Showing <strong>{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}</strong> of <strong>{filtered.length.toLocaleString('en-US')}</strong>
             </span>
             {totalPages > 1 && (
               <div className="pagination">

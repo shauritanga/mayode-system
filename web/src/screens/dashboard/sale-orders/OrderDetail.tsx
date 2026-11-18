@@ -86,7 +86,7 @@ const EVENT_LABEL: Record<string, string> = {
 const MODE_LABEL: Record<string, string> = { BUYER_PICKUP: 'Buyer’s own truck', OWN_FLEET: 'Our vehicle', HIRED: 'Hired transporter' };
 const LOAD_LABEL: Record<string, string> = { ASSIGNED: 'Loaded', IN_TRANSIT: 'On the road', DELIVERED: 'Delivered', CANCELLED: 'Cancelled' };
 
-const money = (n: number) => `TZS ${Math.round(n).toLocaleString()}`;
+const money = (n: number) => `TZS ${Math.round(n).toLocaleString('en-US')}`;
 const kg = (n: number) => `${Math.round(n * 100) / 100} kg`;
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 

@@ -12,7 +12,7 @@ import { fmtHa } from '@/lib/farm-format';
 import { IRRIGATION_TYPES, PRODUCTION_METHODS, fmtDate, fmtKg, stageIndex, stageLabel, statusBadgeClass } from '@/lib/crop-stages';
 
 const h3: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 14px' };
-const money = (n?: number | null) => `TZS ${Math.round(n || 0).toLocaleString()}`;
+const money = (n?: number | null) => `TZS ${Math.round(n || 0).toLocaleString('en-US')}`;
 
 function Attr({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -105,8 +105,8 @@ export default function CropCycleDetailPage() {
           <Attr label="Crop status" value={cycle.status} />
           <Attr label="Expected yield" value={fmtKg(cycle.estimatedYieldKg)} />
           <Attr label="Actual yield" value={fmtKg(cycle.actualYieldKg)} />
-          <Attr label="Expected yield per ha" value={expectedPerHa ? `${expectedPerHa.toLocaleString()} kg/ha` : undefined} />
-          <Attr label="Actual yield per ha" value={yieldPerHa ? `${yieldPerHa.toLocaleString()} kg/ha` : undefined} />
+          <Attr label="Expected yield per ha" value={expectedPerHa ? `${expectedPerHa.toLocaleString('en-US')} kg/ha` : undefined} />
+          <Attr label="Actual yield per ha" value={yieldPerHa ? `${yieldPerHa.toLocaleString('en-US')} kg/ha` : undefined} />
         </div>
       </div>
 

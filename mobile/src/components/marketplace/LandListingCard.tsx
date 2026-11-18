@@ -28,7 +28,7 @@ export function LandListingCard({ listing: l, onPress }: LandListingCardProps) {
       <View style={styles.priceBox}>
         <Text style={styles.priceLabel}>{t('askingPrice')}</Text>
         {/* A private deal's price is for the owner and the renter who entered the code. */}
-        <Text style={styles.priceValue}>{l.priceHidden || l.askingPrice == null ? '🔒' : `${Number(l.askingPrice).toLocaleString()} TZS`}</Text>
+        <Text style={styles.priceValue}>{l.priceHidden || l.askingPrice == null ? '🔒' : `${Number(l.askingPrice).toLocaleString('en-US')} TZS`}</Text>
       </View>
 
       <View style={styles.cardFooter}>

@@ -137,7 +137,7 @@ export default function DeliveryDetailModal({
                 <div style={{ marginTop: 16 }}>
                   <label style={labelStyle}>Record a payment to the farmer (TZS)</label>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <MoneyInput className="input-field" min="1" step="any" placeholder={`up to ${Math.round(owed).toLocaleString()}`} value={pay} onChange={(e) => setPay(e.target.value)} />
+                    <MoneyInput className="input-field" min="1" step="any" placeholder={`up to ${Math.round(owed).toLocaleString('en-US')}`} value={pay} onChange={(e) => setPay(e.target.value)} />
                     <button className="btn-primary" style={{ fontSize: 12, whiteSpace: 'nowrap' }} disabled={busy || !(Number(pay) > 0)} onClick={savePayment}>Record payment</button>
                     <button className="btn-secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }} disabled={busy} onClick={() => setPay(String(owed))}>Pay all</button>
                   </div>

@@ -233,5 +233,5 @@ export function EmptyState({ children }: { children: ReactNode }) {
 }
 
 export function money(value?: number | null) {
-  return `TZS ${Math.round(value || 0).toLocaleString()}`;
+  return `TZS ${Math.round(value || 0).toLocaleString('en-US')}`;
 }

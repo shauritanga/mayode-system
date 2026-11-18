@@ -11,7 +11,7 @@ import {
 import { ApproveInsuranceApplicationDto, RecordPremiumDto, RejectInsuranceApplicationDto, SubmitInsuranceApplicationDto } from './dto/insurance-application.dto';
 
 const OPEN = ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED'] as const;
-const fmt = (n: number) => `TZS ${Math.round(n).toLocaleString()}`;
+const fmt = (n: number) => `TZS ${Math.round(n).toLocaleString('en-US')}`;
 const MONTH = 30 * 86_400_000;
 
 @Injectable()

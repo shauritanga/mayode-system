@@ -11,6 +11,7 @@ import { Shield01Icon, Add01Icon } from '@hugeicons/core-free-icons';
 import { insuranceApi } from '../src/lib/data';
 import { useI18n } from '../src/i18n';
 
+import MoneyInput, { MoneyAware } from '../src/components/MoneyInput';
 interface Claim {
   id: string;
   incidentType: string;
@@ -183,7 +184,7 @@ export default function InsuranceScreen() {
                   {policy.riceVariety ? ` · ${policy.riceVariety}` : ''}
                 </Text>
                 <Text style={styles.meta}>
-                  {t('sumInsured')}: TZS {Math.round(policy.sumInsured).toLocaleString()} · {t('premium')}: TZS {Math.round(policy.premiumAmount).toLocaleString()}
+                  {t('sumInsured')}: TZS {Math.round(policy.sumInsured).toLocaleString('en-US')} · {t('premium')}: TZS {Math.round(policy.premiumAmount).toLocaleString('en-US')}
                 </Text>
                 <Text style={styles.meta}>
                   {t('insuredArea')}: {policy.insuredAreaHectares} ha
@@ -196,7 +197,7 @@ export default function InsuranceScreen() {
                       <View key={claim.id} style={styles.claimCard}>
                         <View style={styles.cardTop}>
                           <Text style={styles.claimTitle}>{claim.incidentType}</Text>
-                          <Text style={styles.claimAmount}>TZS {Math.round(claim.claimedAmount).toLocaleString()}</Text>
+                          <Text style={styles.claimAmount}>TZS {Math.round(claim.claimedAmount).toLocaleString('en-US')}</Text>
                         </View>
                         {!!claim.description && <Text style={styles.meta}>{claim.description}</Text>}
                         <ClaimTimeline claim={claim} />
@@ -252,7 +253,7 @@ export default function InsuranceScreen() {
               onChangeText={(value) => setForm((c) => ({ ...c, description: value }))}
             />
             <Text style={styles.label}>{t('claimedAmount')}</Text>
-            <TextInput
+            <MoneyInput
               style={styles.input}
               keyboardType="numeric"
               value={form.claimedAmount}

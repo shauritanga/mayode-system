@@ -32,7 +32,8 @@ function formatNumber(value: unknown, language: Language): string {
   const n = Number(value);
   if (!Number.isFinite(n)) return '';
   try {
-    return n.toLocaleString(language === 'sw' ? 'sw-TZ' : 'en-US');
+    // Commas for thousands in every language, so Swahili screens read the same as English ones.
+    return n.toLocaleString('en-US');
   } catch {
     return String(n);
   }

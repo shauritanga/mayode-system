@@ -175,7 +175,7 @@ export class SmsService {
   }) {
     return this.send(
       input.phone,
-      `MAYODE: Sale ${input.invoiceNumber}. Gross TZS ${input.grossAmount.toLocaleString()}, loan repayment TZS ${input.loanDeduction.toLocaleString()}, net payment TZS ${input.netAmount.toLocaleString()}.`,
+      `MAYODE: Sale ${input.invoiceNumber}. Gross TZS ${input.grossAmount.toLocaleString('en-US')}, loan repayment TZS ${input.loanDeduction.toLocaleString('en-US')}, net payment TZS ${input.netAmount.toLocaleString('en-US')}.`,
       'payment_breakdown',
     );
   }

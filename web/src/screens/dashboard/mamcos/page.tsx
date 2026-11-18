@@ -46,7 +46,7 @@ const STATUS_OPTIONS = [
 
 function formatHectares(ha?: number): string {
   if (ha === undefined || ha === null || Number.isNaN(ha)) return '—';
-  return `${ha.toLocaleString(undefined, { maximumFractionDigits: 2 })} ha`;
+  return `${ha.toLocaleString('en-US', { maximumFractionDigits: 2 })} ha`;
 }
 
 function pageNumbers(page: number, totalPages: number): (number | '…')[] {
@@ -441,7 +441,7 @@ export default function MamcosPage() {
         {!loading && filtered.length > 0 && (
           <div className="farmers-footer">
             <span className="farmers-range">
-              Showing <strong>{rangeStart}–{rangeEnd}</strong> of <strong>{filtered.length.toLocaleString()}</strong>
+              Showing <strong>{rangeStart}–{rangeEnd}</strong> of <strong>{filtered.length.toLocaleString('en-US')}</strong>
             </span>
             {totalPages > 1 && (
               <div className="pagination">

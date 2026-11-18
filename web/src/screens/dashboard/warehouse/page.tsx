@@ -27,7 +27,7 @@ type Dialog =
   | { kind: 'receive' | 'adjust' | 'keepers' | 'lot'; warehouse: Warehouse }
   | null;
 
-const kg = (n: number) => `${n.toLocaleString()} kg`;
+const kg = (n: number) => `${n.toLocaleString('en-US')} kg`;
 
 /** The warehouse counter and warehouse list. `embedded` drops the page heading when shown as a tab of the Warehouse page; `setupOnly` also hides the counter actions (receiving and corrections now have their own pages). */
 export function WarehouseView({ embedded = false, setupOnly = false }: { embedded?: boolean; setupOnly?: boolean }) {
@@ -186,14 +186,14 @@ function Receive({ warehouse, onClose, onDone }: { warehouse: Warehouse; onClose
   return (
     <Modal title={`Receive harvest into ${warehouse.name}`} subtitle="Pick the deliveries you have weighed in, or enter a counted quantity." onClose={onClose} width="580px" footer={<>
       <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-      <button type="submit" form="wh-recv" className="btn-primary" disabled={saving || (!picked.length && !manual)}>{saving ? 'Saving…' : picked.length ? `Receive ${total.toLocaleString()} kg` : 'Receive'}</button></>}>
+      <button type="submit" form="wh-recv" className="btn-primary" disabled={saving || (!picked.length && !manual)}>{saving ? 'Saving…' : picked.length ? `Receive ${total.toLocaleString('en-US')} kg` : 'Receive'}</button></>}>
       <form id="wh-recv" className="ua-form" autoComplete="off" onSubmit={(e) => { e.preventDefault(); submit(() => warehousesApi.receive(warehouse.id, picked.length ? { inventoryRecordIds: picked, note: note || undefined } : { quantityKg: Number(manual), note: note || undefined }), 'Could not receive the stock'); }}>
         {loadError && <div className="ua-form-error">{loadError}</div>}
         <div className="so-records">
           {records.length === 0 ? <div className="ua-hint">No delivered harvest is waiting to be received.</div> : records.map((r) => (
             <label key={r.id} className="so-record">
               <input type="checkbox" checked={picked.includes(r.id)} onChange={() => toggle(r.id)} />
-              <span><b>{r.trackingCode}</b> · {r.weightKg.toLocaleString()} kg{r.qualityGrade ? ` · grade ${r.qualityGrade}` : ''}{r.farmer ? ` · ${r.farmer.firstName ?? ''} ${r.farmer.lastName ?? ''}` : ''}</span>
+              <span><b>{r.trackingCode}</b> · {r.weightKg.toLocaleString('en-US')} kg{r.qualityGrade ? ` · grade ${r.qualityGrade}` : ''}{r.farmer ? ` · ${r.farmer.firstName ?? ''} ${r.farmer.lastName ?? ''}` : ''}</span>
             </label>
           ))}
         </div>

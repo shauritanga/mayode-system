@@ -1,5 +1,5 @@
-export const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${(Math.round(n * 100) / 100).toLocaleString()}`);
-export const kg = (n?: number | null) => (n == null ? '—' : `${(Math.round(n * 1000) / 1000).toLocaleString()} kg`);
+export const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${(Math.round(n * 100) / 100).toLocaleString('en-US')}`);
+export const kg = (n?: number | null) => (n == null ? '—' : `${(Math.round(n * 1000) / 1000).toLocaleString('en-US')} kg`);
 export const day = (v?: string | Date | null) => (v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
 export const dateTime = (v?: string | Date | null) => (v ? new Date(v).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
 export const label = (v?: string | null) => (v ? v.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : '—');

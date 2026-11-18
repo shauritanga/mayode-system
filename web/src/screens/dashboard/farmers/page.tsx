@@ -453,7 +453,7 @@ export default function FarmersPage({ embedded = false }: { embedded?: boolean }
         {!loading && pagination && pagination.total > 0 && (
           <div className="farmers-footer">
             <span className="farmers-range">
-              Showing <strong>{rangeStart}–{rangeEnd}</strong> of <strong>{pagination.total.toLocaleString()}</strong>
+              Showing <strong>{rangeStart}–{rangeEnd}</strong> of <strong>{pagination.total.toLocaleString('en-US')}</strong>
             </span>
             <div className="pagination">
               <button

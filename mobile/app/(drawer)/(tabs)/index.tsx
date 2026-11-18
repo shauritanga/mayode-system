@@ -280,7 +280,7 @@ function FarmerDashboardTab() {
             />
             <View style={styles.homeStatDivider} />
             <HomeStat
-              value={yieldKg == null ? '—' : `${yieldKg.toLocaleString()} kg`}
+              value={yieldKg == null ? '—' : `${yieldKg.toLocaleString('en-US')} kg`}
               label={t('totalYield')}
               onPress={() => router.push('/finances')}
             />

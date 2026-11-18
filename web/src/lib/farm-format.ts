@@ -49,7 +49,7 @@ export function totalPlotHectares(farm: FarmLike) {
   return acresToHectares((farm.plots || []).reduce((sum, p) => sum + (p.sizeAcres || 0), 0));
 }
 
-export const fmtHa = (n?: number | null) => `${(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} ha`;
+export const fmtHa = (n?: number | null) => `${(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 })} ha`;
 
 export const fmtCoord = (lat?: number | null, lng?: number | null) =>
   lat != null && lng != null ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : '—';

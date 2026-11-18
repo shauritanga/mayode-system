@@ -28,6 +28,10 @@ const tooltipStyle = {
 
 const axisTick = { fill: 'var(--neutral-500)', fontSize: 12 };
 
+/** Numbers on axes and in tooltips always carry thousands commas, whatever the viewer's locale. */
+const group = (v: unknown) => (typeof v === 'number' ? v.toLocaleString('en-US') : (v as string));
+const tipFormat = (v: unknown) => group(v) as never;
+
 export const CHART_PALETTE = [
   'var(--green-500)',
   'var(--gold-400)',
@@ -91,8 +95,8 @@ export function TrendAreaChart({
         </defs>
         <CartesianGrid stroke="var(--border)" strokeDasharray="3 5" vertical={false} />
         <XAxis dataKey={xKey} tick={axisTick} axisLine={{ stroke: 'var(--border)' }} tickLine={false} />
-        <YAxis tick={axisTick} axisLine={false} tickLine={false} width={54} />
-        <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: 'var(--border)' }} />
+        <YAxis tick={axisTick} axisLine={false} tickLine={false} width={54} tickFormatter={group} />
+        <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: 'var(--border)' }} formatter={tipFormat} />
         {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12, color: 'var(--neutral-500)' }} />}
         {series.map((s) => (
           <Area
@@ -140,7 +144,7 @@ export function DonutBreakdown({
               <Cell key={entry.name} fill={colors[i % colors.length]} />
             ))}
           </Pie>
-          <Tooltip contentStyle={tooltipStyle} />
+          <Tooltip contentStyle={tooltipStyle} formatter={tipFormat} />
         </PieChart>
       </ResponsiveContainer>
       <ul className="donut-legend">
@@ -149,7 +153,7 @@ export function DonutBreakdown({
             <span className="donut-legend-dot" style={{ background: colors[i % colors.length] }} />
             <span className="donut-legend-label">{entry.name}</span>
             <span className="donut-legend-value">
-              {entry.value.toLocaleString()} · {total ? Math.round((entry.value / total) * 100) : 0}%
+              {entry.value.toLocaleString('en-US')} · {total ? Math.round((entry.value / total) * 100) : 0}%
             </span>
           </li>
         ))}
@@ -175,8 +179,8 @@ export function GroupedBarChart({
       <BarChart data={data} margin={{ top: 6, right: 8, left: -12, bottom: 0 }}>
         <CartesianGrid stroke="var(--border)" strokeDasharray="3 5" vertical={false} />
         <XAxis dataKey={xKey} tick={axisTick} axisLine={{ stroke: 'var(--border)' }} tickLine={false} />
-        <YAxis tick={axisTick} axisLine={false} tickLine={false} width={54} />
-        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--hover-tint-2)' }} />
+        <YAxis tick={axisTick} axisLine={false} tickLine={false} width={54} tickFormatter={group} />
+        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--hover-tint-2)' }} formatter={tipFormat} />
         {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
         {series.map((s) => (
           <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[6, 6, 0, 0]} maxBarSize={36} />
@@ -205,7 +209,7 @@ export function HorizontalBarChart({
         barCategoryGap={12}
       >
         <CartesianGrid stroke="var(--border)" strokeDasharray="3 5" horizontal={false} />
-        <XAxis type="number" tick={axisTick} axisLine={false} tickLine={false} />
+        <XAxis type="number" tick={axisTick} axisLine={false} tickLine={false} tickFormatter={group} />
         <YAxis
           type="category"
           dataKey="name"
@@ -214,7 +218,7 @@ export function HorizontalBarChart({
           tickLine={false}
           width={110}
         />
-        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--hover-tint-2)' }} />
+        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--hover-tint-2)' }} formatter={tipFormat} />
         <Bar dataKey="value" fill={color} radius={[0, 8, 8, 0]} maxBarSize={22} />
       </BarChart>
     </ResponsiveContainer>

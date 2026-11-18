@@ -1,4 +1,4 @@
-export const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${Math.round(n).toLocaleString()}`);
+export const tzs = (n?: number | null) => (n == null ? '—' : `TZS ${Math.round(n).toLocaleString('en-US')}`);
 export const kgs = (n?: number | null) => (n == null ? '—' : `${Math.round(n * 10) / 10} kg`.replace(/\B(?=(\d{3})+(?!\d))/g, ','));
 
 export const PAYMENT_LABELS: Record<string, string> = { UNPAID: 'Unpaid', PARTIAL: 'Part paid', PAID: 'Paid' };

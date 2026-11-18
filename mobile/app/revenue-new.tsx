@@ -11,6 +11,7 @@ import { financeApi, buyersApi } from '../src/lib/data';
 import { SearchableSelect } from '../src/components/SearchableSelect';
 import { useI18n } from '../src/i18n';
 
+import MoneyInput, { MoneyAware } from '../src/components/MoneyInput';
 const REVENUE_TYPES = [
   { key: 'FAIRTRADE_SALE', labelKey: 'revenueFairtrade', icon: '🌍' },
   { key: 'CONVENTIONAL_SALE', labelKey: 'revenueConventional', icon: '🌾' },
@@ -138,14 +139,15 @@ export default function RevenueNew() {
           />
 
           <Field label={t('quantitySoldKg')} value={quantityKg} onChangeText={setQuantityKg} keyboardType="decimal-pad" />
-          <Field label={t('pricePerKg')} value={pricePerKg} onChangeText={setPricePerKg} keyboardType="decimal-pad" />
+          <Field money label={t('pricePerKg')} value={pricePerKg} onChangeText={setPricePerKg} keyboardType="decimal-pad" />
           <Field
+            money
             label={t('totalRevenueLabel')}
             value={totalRevenue}
             onChangeText={(v: string) => { setTotalEdited(true); setTotalRevenue(v); }}
             keyboardType="decimal-pad"
           />
-          <Field label={t('fairtradePremiumLabel')} value={fairtradePremium} onChangeText={setFairtradePremium} keyboardType="decimal-pad" />
+          <Field money label={t('fairtradePremiumLabel')} value={fairtradePremium} onChangeText={setFairtradePremium} keyboardType="decimal-pad" />
 
           {buyerNames.length > 0 && (
             <SearchableSelect
@@ -187,7 +189,7 @@ function Field({ label, ...props }: any) {
   return (
     <View style={{ marginBottom: 12 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput style={styles.input} placeholderTextColor="#9CA3AF" {...props} />
+      <MoneyAware style={styles.input} placeholderTextColor="#9CA3AF" {...props} />
     </View>
   );
 }

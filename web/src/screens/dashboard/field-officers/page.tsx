@@ -38,7 +38,7 @@ export default function FieldOfficersPage() {
 
   const set = (key: keyof Filters, value: string) => { setFilters((f) => ({ ...f, [key]: value })); setPage(1); };
   const rank = RANK_MEASURES.find((m) => m.key === measure)!;
-  const fmt = (n: number) => (rank.format ? rank.format(n) : n.toLocaleString());
+  const fmt = (n: number) => (rank.format ? rank.format(n) : n.toLocaleString('en-US'));
 
   const filtered = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
@@ -109,9 +109,9 @@ export default function FieldOfficersPage() {
 
       <div className="role-grid" style={{ marginBottom: 16 }}>
         <MetricTile label="Field officers" value={officers.length} hint={`${officers.filter((o) => o.isActive).length} active`} tone="green" />
-        <MetricTile label="Farmers assigned" value={sum((o) => o.farmersAssigned).toLocaleString()} hint={`${sum((o) => o.farmersRegistered).toLocaleString()} registered by officers`} tone="blue" />
-        <MetricTile label="Visits completed" value={sum((o) => o.visitsCompleted).toLocaleString()} hint="All time" tone="purple" />
-        <MetricTile label="Pending tasks" value={sum((o) => o.pendingTasks).toLocaleString()} hint="Verifications and follow-ups" tone="gold" />
+        <MetricTile label="Farmers assigned" value={sum((o) => o.farmersAssigned).toLocaleString('en-US')} hint={`${sum((o) => o.farmersRegistered).toLocaleString('en-US')} registered by officers`} tone="blue" />
+        <MetricTile label="Visits completed" value={sum((o) => o.visitsCompleted).toLocaleString('en-US')} hint="All time" tone="purple" />
+        <MetricTile label="Pending tasks" value={sum((o) => o.pendingTasks).toLocaleString('en-US')} hint="Verifications and follow-ups" tone="gold" />
         <MetricTile label="Avg data completeness" value={avgCompleteness == null ? '—' : `${avgCompleteness}%`} hint="Records officers registered" tone="red" />
       </div>
 
@@ -196,10 +196,10 @@ export default function FieldOfficersPage() {
                       </td>
                       <td style={{ fontSize: 12 }}>{o.phone}</td>
                       <td style={{ fontSize: 12 }}>{[o.region, o.district].filter(Boolean).join(' / ') || '—'}</td>
-                      <td className="num">{o.farmersAssigned.toLocaleString()}</td>
-                      <td className="num">{o.farmsAssigned.toLocaleString()}</td>
+                      <td className="num">{o.farmersAssigned.toLocaleString('en-US')}</td>
+                      <td className="num">{o.farmsAssigned.toLocaleString('en-US')}</td>
                       <td className="num" title="Farmers registered / farms mapped">{o.farmersRegistered} / {o.farmsMapped}</td>
-                      <td className="num">{o.visitsCompleted.toLocaleString()}</td>
+                      <td className="num">{o.visitsCompleted.toLocaleString('en-US')}</td>
                       <td className="num" title={`${o.pendingBreakdown.farmerVerifications} farmer verifications, ${o.pendingBreakdown.farmVerifications} farm verifications, ${o.pendingBreakdown.overdueVisits} overdue visits`}>{o.pendingTasks}</td>
                       <td className="num">{o.dataCompleteness == null ? '—' : `${o.dataCompleteness}%`}</td>
                       <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
@@ -218,7 +218,7 @@ export default function FieldOfficersPage() {
         {!loading && !error && filtered.length > 0 && (
           <div className="farmers-footer">
             <span className="farmers-range">
-              Showing <strong>{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}</strong> of <strong>{filtered.length.toLocaleString()}</strong>
+              Showing <strong>{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}</strong> of <strong>{filtered.length.toLocaleString('en-US')}</strong>
             </span>
             {totalPages > 1 && (
               <div className="pagination">

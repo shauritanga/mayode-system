@@ -42,7 +42,7 @@ export default function OpsFarmPage() {
 
 const START_KEY = 'mayode.farms.startHereDismissed';
 const readDismissed = () => { try { return localStorage.getItem(START_KEY) === '1'; } catch { return false; } };
-const num = (n?: number | null) => (n || 0).toLocaleString();
+const num = (n?: number | null) => (n || 0).toLocaleString('en-US');
 
 const LinkBtn = ({ onClick, children }: { onClick: () => void; children: React.ReactNode }) => (
   <button type="button" onClick={onClick} style={{ background: 'none', border: 0, padding: 0, font: 'inherit', color: 'var(--green-600, var(--accent))', fontWeight: 600, cursor: 'pointer' }}>{children}</button>

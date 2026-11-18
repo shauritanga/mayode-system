@@ -152,7 +152,7 @@ export default function FinancesScreen() {
 }
 
 function Stat({ label, value, highlight, raw, unit }: { label: string; value: any; highlight?: boolean; raw?: boolean; unit?: string }) {
-  const display = raw ? `${value ?? '—'}${unit ?? ''}` : `${Number(value ?? 0).toLocaleString()} TZS`;
+  const display = raw ? `${value ?? '—'}${unit ?? ''}` : `${Number(value ?? 0).toLocaleString('en-US')} TZS`;
   return (
     <View style={styles.stat}>
       <Text style={[styles.statValue, highlight && { color: '#047857' }]}>{display}</Text>

@@ -7,8 +7,8 @@ import { EmptyState, MetricTile, money } from '@/components/role-dashboards/Dash
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthLabel = (key: string) => `${MONTH_NAMES[Number(key.slice(5, 7)) - 1]} ${key.slice(2, 4)}`;
-const tons = (kg: number) => `${(Math.round((kg || 0) / 100) / 10).toLocaleString()} t`;
-const num = (n: number) => (n || 0).toLocaleString();
+const tons = (kg: number) => `${(Math.round((kg || 0) / 100) / 10).toLocaleString('en-US')} t`;
+const num = (n: number) => (n || 0).toLocaleString('en-US');
 const label = (s: string) => s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ');
 
 const SEVERITY_TONE: Record<string, string> = { HIGH: 'badge-gold', MEDIUM: 'badge-blue', LOW: 'badge-green' };

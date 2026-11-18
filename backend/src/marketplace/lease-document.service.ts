@@ -100,10 +100,10 @@ export class LeaseDocumentService {
       doc.fontSize(11).font('Helvetica');
       doc.text(`Deal type: ${listing.dealType}`);
       doc.text(
-        `Agreed price: ${(listing.finalPrice ?? listing.askingPrice).toLocaleString()} TZS`,
+        `Agreed price: ${(listing.finalPrice ?? listing.askingPrice).toLocaleString('en-US')} TZS`,
       );
       doc.text(
-        `MAYODE commission: ${(listing.commissionAmount ?? 0).toLocaleString()} TZS`,
+        `MAYODE commission: ${(listing.commissionAmount ?? 0).toLocaleString('en-US')} TZS`,
       );
       doc.text(`Duration: ${listing.leaseDurationMonths} month(s)`);
       if (listing.leaseStartDate)

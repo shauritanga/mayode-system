@@ -157,7 +157,7 @@ export default function BuyerOrdersPage({ embedded = false }: { embedded?: boole
                     <tr key={order.id}>
                       <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{order.buyer?.name || '—'}</td>
                       <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{order.riceVariety || '—'}</td>
-                      <td style={{ fontWeight: 700 }}>{order.quantityRequiredKg.toLocaleString()} kg</td>
+                      <td style={{ fontWeight: 700 }}>{order.quantityRequiredKg.toLocaleString('en-US')} kg</td>
                       <td>{order.offeredPricePerKg ? tzs(order.offeredPricePerKg) : '—'}</td>
                       <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{[order.qualityGrade && `Grade ${order.qualityGrade}`, order.qualityRequirements].filter(Boolean).join(' · ') || '—'}</td>
                       <td style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>{order.deliveryLocation || '—'}</td>

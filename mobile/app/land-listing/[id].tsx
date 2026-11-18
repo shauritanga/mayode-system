@@ -7,6 +7,7 @@ import { API_BASE_URL } from '../../src/lib/api';
 import { useAuthStore } from '../../src/store/auth.store';
 import { useI18n } from '../../src/i18n';
 
+import MoneyInput, { MoneyAware } from '../../src/components/MoneyInput';
 export default function LandListingDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -204,7 +205,7 @@ export default function LandListingDetail() {
     setBusy(true);
     try {
       const res = await marketplaceApi.payInstallment(id, { renterId: farmerId });
-      Alert.alert(t('mlaxPayInstallment'), t('mlaxInstallmentPaid', { amount: String(res.data?.amountDue ?? '') }));
+      Alert.alert(t('mlaxPayInstallment'), t('mlaxInstallmentPaid', { amount: Number(res.data?.amountDue ?? 0).toLocaleString('en-US') }));
       load();
     } catch (e: any) {
       Alert.alert(t('mlaxPayInstallment'), e?.response?.data?.message || String(e?.message ?? e));
@@ -261,7 +262,7 @@ export default function LandListingDetail() {
           )}
           <View style={styles.priceBox}>
             <Text style={styles.priceLabel}>{t('askingPrice')}</Text>
-            <Text style={styles.priceValue}>{listing.priceHidden || listing.askingPrice == null ? '🔒' : `${Number(listing.askingPrice).toLocaleString()} TZS`}</Text>
+            <Text style={styles.priceValue}>{listing.priceHidden || listing.askingPrice == null ? '🔒' : `${Number(listing.askingPrice).toLocaleString('en-US')} TZS`}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>{t('mlaxDealType')}</Text>
@@ -343,7 +344,7 @@ export default function LandListingDetail() {
         {listing.leaseStatus === 'DRAFT' && !isOwner && !locked && farmerId && (
           <View style={styles.card}>
             <Text style={styles.fieldLabel}>{t('mlaxDepositAmount')}</Text>
-            <TextInput
+            <MoneyInput
               style={styles.input}
               keyboardType="numeric"
               value={depositAmount}
@@ -368,7 +369,7 @@ export default function LandListingDetail() {
         {listing.leaseStatus === 'DRAFT' && !isOwner && !locked && farmerId && (
           <View style={styles.card}>
             <Text style={styles.fieldLabel}>{t('mlaxMakeOffer')}</Text>
-            <TextInput
+            <MoneyInput
               style={styles.input}
               keyboardType="numeric"
               value={newOfferAmount}
@@ -381,7 +382,7 @@ export default function LandListingDetail() {
             </TouchableOpacity>
             {offers.filter((o) => o.farmerId === farmerId && o.status === 'COUNTERED').map((o) => (
               <View key={o.id} style={styles.offerRow}>
-                <Text style={styles.offerText}>{t('mlaxCounterReceived', { amount: Number(o.counterAmount).toLocaleString() })}</Text>
+                <Text style={styles.offerText}>{t('mlaxCounterReceived', { amount: Number(o.counterAmount).toLocaleString('en-US') })}</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity style={styles.smallBtn} onPress={() => respondToCounter(o.id, true)}><Text style={styles.smallBtnText}>{t('accept')}</Text></TouchableOpacity>
                   <TouchableOpacity style={styles.smallBtnSecondary} onPress={() => respondToCounter(o.id, false)}><Text style={styles.smallBtnSecondaryText}>{t('decline')}</Text></TouchableOpacity>
@@ -396,12 +397,12 @@ export default function LandListingDetail() {
             <Text style={styles.fieldLabel}>{t('mlaxOffersReceived')}</Text>
             {offers.filter((o) => o.status === 'PENDING').map((o) => (
               <View key={o.id} style={styles.offerRow}>
-                <Text style={styles.offerText}>{Number(o.offerAmount).toLocaleString()} TZS</Text>
+                <Text style={styles.offerText}>{Number(o.offerAmount).toLocaleString('en-US')} TZS</Text>
                 <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
                   <TouchableOpacity style={styles.smallBtn} onPress={() => respondToOffer(o.id, 'accept')}><Text style={styles.smallBtnText}>{t('accept')}</Text></TouchableOpacity>
                   <TouchableOpacity style={styles.smallBtnSecondary} onPress={() => respondToOffer(o.id, 'reject')}><Text style={styles.smallBtnSecondaryText}>{t('decline')}</Text></TouchableOpacity>
                 </View>
-                <TextInput
+                <MoneyInput
                   style={[styles.input, { marginTop: 8 }]}
                   keyboardType="numeric"
                   placeholder={t('mlaxCounterAmount')}
@@ -457,7 +458,7 @@ export default function LandListingDetail() {
             {(rentSchedule.years ?? []).map((y: any) => (
               <View key={y.year} style={styles.detailRow}>
                 <Text style={styles.detailLabel}>{t('mlaxYear', { year: String(y.year) })}</Text>
-                <Text style={styles.detailValue}>{Number(y.amount).toLocaleString()} TZS {y.paid ? '✓' : ''}</Text>
+                <Text style={styles.detailValue}>{Number(y.amount).toLocaleString('en-US')} TZS {y.paid ? '✓' : ''}</Text>
               </View>
             ))}
             {isRenter && listing.paymentPlan === 'ANNUAL' && rentSchedule.lastInstallmentYear < (rentSchedule.years?.length ?? 0) && (
@@ -478,7 +479,7 @@ export default function LandListingDetail() {
               placeholder={t('mlaxImprovementDescPlaceholder')}
               placeholderTextColor="#9CA3AF"
             />
-            <TextInput
+            <MoneyInput
               style={[styles.input, { marginTop: 8 }]}
               keyboardType="numeric"
               value={improvementAmount}

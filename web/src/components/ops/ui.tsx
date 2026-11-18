@@ -61,7 +61,7 @@ export function DataTable<T>({ rows, columns, rowKey, empty = 'Nothing to show.'
         </table>
       </div>
       {pageSize > 0 && rows.length > pageSize && <div className="ops-table-pagination" aria-label="Table pagination">
-        <span>Showing <strong>{firstItem}–{lastItem}</strong> of <strong>{rows.length.toLocaleString()}</strong> records</span>
+        <span>Showing <strong>{firstItem}–{lastItem}</strong> of <strong>{rows.length.toLocaleString('en-US')}</strong> records</span>
         <div className="ops-table-pagination-controls"><button type="button" className="btn-secondary" disabled={activePage === 0} onClick={() => setPage(activePage - 1)}>Previous</button><span>Page {activePage + 1} of {pageCount}</span><button type="button" className="btn-secondary" disabled={activePage >= pageCount - 1} onClick={() => setPage(activePage + 1)}>Next</button></div>
       </div>}
     </div>

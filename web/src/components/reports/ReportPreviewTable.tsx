@@ -25,7 +25,7 @@ function Cell({ value, type }: { value: unknown; type?: ReportColumn['type'] }) 
   if (type === 'number' || (typeof value === 'number' && type !== 'enum')) {
     const num = typeof value === 'number' ? value : Number(value);
     if (!Number.isNaN(num)) {
-      return <span style={{ fontVariantNumeric: 'tabular-nums' }}>{num.toLocaleString()}</span>;
+      return <span style={{ fontVariantNumeric: 'tabular-nums' }}>{num.toLocaleString('en-US')}</span>;
     }
   }
   const text = String(value);
@@ -91,9 +91,9 @@ export default function ReportPreviewTable({
         }}
       >
         <span>
-          Showing <strong style={{ color: 'var(--text-2)' }}>{rows.length.toLocaleString()}</strong>
+          Showing <strong style={{ color: 'var(--text-2)' }}>{rows.length.toLocaleString('en-US')}</strong>
           {total !== undefined && total > rows.length && (
-            <> of <strong style={{ color: 'var(--text-2)' }}>{total.toLocaleString()}</strong> matching records — export includes up to 10,000</>
+            <> of <strong style={{ color: 'var(--text-2)' }}>{total.toLocaleString('en-US')}</strong> matching records — export includes up to 10,000</>
           )}
           {total !== undefined && total <= rows.length && <> records</>}
         </span>

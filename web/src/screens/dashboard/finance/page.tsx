@@ -202,7 +202,7 @@ function OverviewTab() {
               ['Receivables', statements.receivablesTotal, 'Open buyer invoices'],
               ['Payables', statements.payablesTotal, 'Open supplier bills'],
             ].map(([label, value, sub]) => (
-              <MetricTile key={String(label)} label={String(label)} value={`TZS ${Math.round(Number(value || 0)).toLocaleString()}`} hint={String(sub)} />
+              <MetricTile key={String(label)} label={String(label)} value={`TZS ${Math.round(Number(value || 0)).toLocaleString('en-US')}`} hint={String(sub)} />
             ))}
           </div>
           <div className="table-panel" style={{ marginTop: 16 }}>
@@ -215,7 +215,7 @@ function OverviewTab() {
                 ['Return on assets', statements.ratios?.profitability?.returnOnAssets, 'Net surplus / assets'],
                 ['Debt-to-equity', statements.ratios?.solvency?.debtToEquityRatio, 'Liabilities / owners’ equity'],
               ].map(([label, value, sub]) => (
-                <MetricTile key={String(label)} label={String(label)} value={value == null ? '—' : Number(value).toFixed(2)} hint={String(sub)} />
+                <MetricTile key={String(label)} label={String(label)} value={value == null ? '—' : Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} hint={String(sub)} />
               ))}
             </div>
           </div>
@@ -226,17 +226,17 @@ function OverviewTab() {
         <div className="animate-fade-in">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
             {[
-              { label: 'Total Revenue', value: `${Number(summary.totalRevenue).toLocaleString()} TZS`, color: 'var(--accent)', icon: '📈' },
-              { label: 'Total Costs', value: `${Number(summary.totalCosts).toLocaleString()} TZS`, color: 'var(--red-500)', icon: '📉' },
+              { label: 'Total Revenue', value: `${Number(summary.totalRevenue).toLocaleString('en-US')} TZS`, color: 'var(--accent)', icon: '📈' },
+              { label: 'Total Costs', value: `${Number(summary.totalCosts).toLocaleString('en-US')} TZS`, color: 'var(--red-500)', icon: '📉' },
               {
                 label: 'Net Profit / Loss',
-                value: `${summary.netProfit >= 0 ? '+' : ''}${Number(summary.netProfit).toLocaleString()} TZS`,
+                value: `${summary.netProfit >= 0 ? '+' : ''}${Number(summary.netProfit).toLocaleString('en-US')} TZS`,
                 color: isProfit ? 'var(--accent)' : 'var(--red-500)',
                 icon: isProfit ? '✅' : '⚠️',
               },
-              { label: 'Total Yield', value: summary.totalYieldKg ? `${summary.totalYieldKg.toFixed(0)} kg` : '—', color: 'var(--gold-400)', icon: '🌾' },
-              { label: 'Cost per kg', value: summary.costPerKg ? `${summary.costPerKg.toFixed(0)} TZS` : '—', color: 'var(--neutral-400)', icon: '⚖️' },
-              { label: 'Revenue per kg', value: summary.revenuePerKg ? `${summary.revenuePerKg.toFixed(0)} TZS` : '—', color: 'var(--green-400)', icon: '💰' },
+              { label: 'Total Yield', value: summary.totalYieldKg ? `${Math.round(summary.totalYieldKg).toLocaleString('en-US')} kg` : '—', color: 'var(--gold-400)', icon: '🌾' },
+              { label: 'Cost per kg', value: summary.costPerKg ? `${Math.round(summary.costPerKg).toLocaleString('en-US')} TZS` : '—', color: 'var(--neutral-400)', icon: '⚖️' },
+              { label: 'Revenue per kg', value: summary.revenuePerKg ? `${Math.round(summary.revenuePerKg).toLocaleString('en-US')} TZS` : '—', color: 'var(--green-400)', icon: '💰' },
             ].map(stat => (
               <MetricTile key={stat.label} label={stat.label} value={stat.value} tone={toneFromColor(stat.color)} />
             ))}
@@ -253,8 +253,8 @@ function OverviewTab() {
             </div>
             <div style={{ fontSize: '13px', color: 'var(--neutral-400)' }}>
               {isProfit
-                ? `This farmer has generated a net profit of ${Number(summary.netProfit).toLocaleString()} TZS across all crop cycles.`
-                : `This farmer has incurred a net loss of ${Math.abs(summary.netProfit).toLocaleString()} TZS. Review input costs and yield performance.`}
+                ? `This farmer has generated a net profit of ${Number(summary.netProfit).toLocaleString('en-US')} TZS across all crop cycles.`
+                : `This farmer has incurred a net loss of ${Math.abs(summary.netProfit).toLocaleString('en-US')} TZS. Review input costs and yield performance.`}
             </div>
           </div>
         </div>
@@ -293,7 +293,7 @@ function OverviewTab() {
                     <td style={{ fontSize: '12px', color: 'var(--neutral-400)' }}>{cost.cropCycle?.farmer ? `${cost.cropCycle.farmer.firstName} ${cost.cropCycle.farmer.lastName}` : '—'}</td>
                     <td style={{ fontSize: '12px' }}>{cost.category}</td>
                     <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{cost.itemName}</td>
-                    <td style={{ fontWeight: 700 }}>{Number(cost.totalCost).toLocaleString()} TZS</td>
+                    <td style={{ fontWeight: 700 }}>{Number(cost.totalCost).toLocaleString('en-US')} TZS</td>
                     <td style={{ fontSize: '12px', color: 'var(--neutral-400)' }}>{cost.supplierRecord?.name || cost.supplier || '—'}</td>
                     <td>{paymentStatusBadge(cost.paymentStatus)}</td>
                     <td>{cost.loanRecordId ? <span className="badge badge-blue">Loan-linked</span> : <span style={{ color: 'var(--neutral-600)', fontSize: '12px' }}>—</span>}</td>
@@ -345,8 +345,8 @@ function LedgerTab() {
       ) : (
         <>
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-            <div style={{ flex: 1 }}><MetricTile label="Total debit" value={`TZS ${Number(trial?.totalDebit || 0).toLocaleString()}`} /></div>
-            <div style={{ flex: 1 }}><MetricTile label="Total credit" value={`TZS ${Number(trial?.totalCredit || 0).toLocaleString()}`} /></div>
+            <div style={{ flex: 1 }}><MetricTile label="Total debit" value={`TZS ${Number(trial?.totalDebit || 0).toLocaleString('en-US')}`} /></div>
+            <div style={{ flex: 1 }}><MetricTile label="Total credit" value={`TZS ${Number(trial?.totalCredit || 0).toLocaleString('en-US')}`} /></div>
             <div style={{ flex: 1 }}><MetricTile label="Balanced" value={trial?.balanced ? 'Yes' : 'No'} tone={trial?.balanced ? 'green' : 'red'} /></div>
           </div>
           <div className="glass-card" style={{ overflow: 'hidden' }}>
@@ -360,8 +360,8 @@ function LedgerTab() {
                     <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{line.code}</td>
                     <td style={{ fontWeight: 600 }}>{line.name}</td>
                     <td><span className="badge badge-gray">{line.type}</span></td>
-                    <td className="num">{Number(line.debit).toLocaleString()}</td>
-                    <td className="num">{Number(line.credit).toLocaleString()}</td>
+                    <td className="num">{Number(line.debit).toLocaleString('en-US')}</td>
+                    <td className="num">{Number(line.credit).toLocaleString('en-US')}</td>
                   </tr>
                 ))}
                 {(!trial?.lines || trial.lines.length === 0) && (
@@ -457,7 +457,7 @@ function ReceivablesTab() {
                   <tr key={inv.id}>
                     <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.invoiceNumber}</td>
                     <td>{inv.buyer?.name || '—'}</td>
-                    <td className="num">{Number(inv.amount).toLocaleString()} TZS</td>
+                    <td className="num">{Number(inv.amount).toLocaleString('en-US')} TZS</td>
                     <td style={{ fontSize: 12 }}>
                       {new Date(inv.dueDate).toLocaleDateString()}
                       <div style={{ color: days < 0 ? 'var(--red-400)' : 'var(--neutral-500)' }}>
@@ -578,7 +578,7 @@ function PayablesTab() {
                 <tr key={bill.id}>
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{bill.billNumber}</td>
                   <td>{bill.supplierRef?.name || bill.supplier}</td>
-                  <td className="num">{Number(bill.amount).toLocaleString()} TZS</td>
+                  <td className="num">{Number(bill.amount).toLocaleString('en-US')} TZS</td>
                   <td style={{ fontSize: 12 }}>{new Date(bill.dueDate).toLocaleDateString()}</td>
                   <td>{invoiceStatusBadge(bill.status)}</td>
                   <td>
@@ -708,10 +708,10 @@ function BudgetsTab() {
                 {detail.lines.map((l) => (
                   <tr key={l.id}>
                     <td>{l.account?.name}</td>
-                    <td className="num">{Number(l.amount).toLocaleString()}</td>
-                    <td className="num">{Number(l.actual || 0).toLocaleString()}</td>
+                    <td className="num">{Number(l.amount).toLocaleString('en-US')}</td>
+                    <td className="num">{Number(l.actual || 0).toLocaleString('en-US')}</td>
                     <td className="num" style={{ color: (l.variance ?? 0) < 0 ? 'var(--red-400)' : 'var(--green-400)' }}>
-                      {Number(l.variance || 0).toLocaleString()}
+                      {Number(l.variance || 0).toLocaleString('en-US')}
                     </td>
                   </tr>
                 ))}
@@ -879,8 +879,8 @@ function LoansTab() {
                     <tr key={loan.id}>
                       <td>{loan.farmer ? `${loan.farmer.firstName} ${loan.farmer.lastName}` : '—'}</td>
                       <td>{loan.lender?.name || loan.lenderName}</td>
-                      <td className="num">{Number(loan.originalAmount).toLocaleString()}</td>
-                      <td className="num">{Number(loan.amountOwed).toLocaleString()}</td>
+                      <td className="num">{Number(loan.originalAmount).toLocaleString('en-US')}</td>
+                      <td className="num">{Number(loan.amountOwed).toLocaleString('en-US')}</td>
                       <td className="num">{loan.autoDeductPercent ?? '—'}</td>
                       <td><span className={`badge ${loan.isActive ? 'badge-green' : 'badge-gray'}`}>{loan.isActive ? 'Active' : 'Closed'}</span></td>
                     </tr>

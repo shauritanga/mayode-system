@@ -117,7 +117,7 @@ export default function NewDocModal({ kind, existing, fromQuotation, onClose, on
                         <option value="">Choose product…</option>
                         {products.map((p2) => <option key={p2.id} value={p2.id}>{p2.name}{p2.brand ? ` · ${p2.brand}` : ''}{p2.packSizeKg ? ` · ${p2.packSizeKg} kg` : ''}</option>)}
                       </select>
-                      {p && have != null && <div style={{ fontSize: 11, color: needKg > have ? 'var(--red-500)' : 'var(--neutral-500)' }}>{have.toLocaleString()} kg available{needKg > have ? ` — short by ${(needKg - have).toLocaleString()} kg` : ''}</div>}
+                      {p && have != null && <div style={{ fontSize: 11, color: needKg > have ? 'var(--red-500)' : 'var(--neutral-500)' }}>{have.toLocaleString('en-US')} kg available{needKg > have ? ` — short by ${(needKg - have).toLocaleString('en-US')} kg` : ''}</div>}
                     </td>
                     <td><input className="input-field" style={{ width: 90, textAlign: 'right' }} type="number" min="0" step="any" value={l.quantity} onChange={(e) => set(i, 'quantity', e.target.value)} /><div style={{ fontSize: 11, color: 'var(--neutral-500)', textAlign: 'right' }}>{p?.unit ?? ''}</div></td>
                     <td><MoneyInput className="input-field" style={{ width: 110, textAlign: 'right' }} min="0" value={l.unitPrice} onChange={(e) => set(i, 'unitPrice', e.target.value)} /></td>

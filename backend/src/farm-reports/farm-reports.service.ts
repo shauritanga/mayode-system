@@ -257,7 +257,7 @@ function renderReportHtml(r: any): string {
       /[&<>]/g,
       (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string,
     );
-  const tzs = (v: number) => `TZS ${Number(v).toLocaleString()}`;
+  const tzs = (v: number) => `TZS ${Number(v).toLocaleString('en-US')}`;
 
   if (r.locked) {
     return `<!doctype html><html><head><meta charset="utf-8"><title>Farm report — ${esc(r.farmCode)}</title></head>

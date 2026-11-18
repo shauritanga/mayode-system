@@ -166,7 +166,7 @@ export default function TraceabilityClient() {
                 {trace.buyer
                   ? `${trace.buyer.name}${trace.buyer.isCertified ? ' (Fairtrade certified)' : ''}`
                   : 'No buyer sale yet'}
-                {trace.lot ? ` · ${trace.lot.totalWeightKg.toLocaleString()} kg lot` : ''}
+                {trace.lot ? ` · ${trace.lot.totalWeightKg.toLocaleString('en-US')} kg lot` : ''}
                 {trace.lot?.riceVariety ? ` · ${trace.lot.riceVariety}` : ''}
               </p>
             </div>
@@ -231,9 +231,9 @@ export default function TraceabilityClient() {
                     {row.farmer
                       ? `${row.farmer.firstName} ${row.farmer.lastName} (${row.farmer.controlNumber})`
                       : 'Farmer'}{' '}
-                    · {row.quantityKg} kg · TZS {Math.round(row.grossAmount).toLocaleString()}
+                    · {row.quantityKg} kg · TZS {Math.round(row.grossAmount).toLocaleString('en-US')}
                     {row.fairtradePremium
-                      ? ` + premium ${Math.round(row.fairtradePremium).toLocaleString()}`
+                      ? ` + premium ${Math.round(row.fairtradePremium).toLocaleString('en-US')}`
                       : ''}
                   </div>
                 ))}

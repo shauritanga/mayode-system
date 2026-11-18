@@ -231,7 +231,7 @@ export default function FinancialProviderDashboardPage() {
             />
             <MetricTile
               label="Total yield"
-              value={`${Math.round(profile.production?.totalYieldKg || 0).toLocaleString()} kg`}
+              value={`${Math.round(profile.production?.totalYieldKg || 0).toLocaleString('en-US')} kg`}
               hint={`${profile.production?.harvestedCycles || 0} harvested cycles`}
               tone="blue"
             />
