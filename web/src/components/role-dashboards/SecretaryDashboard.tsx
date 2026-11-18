@@ -98,7 +98,7 @@ export function SecretaryDashboard() {
             <AllocationSummary distribution={o.blockDistribution} />
           </div>
           <div className="ov-mid">
-            <PaddyReceivedTrend data={showOrders ? paddy.data : null} />
+            {showOrders ? <PaddyReceivedTrend data={paddy.data} /> : <div />}
             <div className="ov-stack">
               <CoverageGauge totals={o.totals} />
               {(showOrders || showContributions) && <MoneySnapshot showSales={showOrders} showContributions={showContributions} salesData={commercial.data} contributionsData={contributions.data} />}
