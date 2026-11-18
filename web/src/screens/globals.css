@@ -3777,4 +3777,6 @@ a.farmers-name { display: block; cursor: pointer; }
 .page-loader { background: var(--bg); backdrop-filter: none; }
 
 /* The loader covers the page content only; the sidebar and header stay usable. */
-.shell-content > .page-loader { position: absolute; inset: 0; z-index: 30; align-items: flex-start; padding-top: 28vh; }
+.shell-content > .page-loader { position: absolute; inset: 0; z-index: 30; align-items: center; justify-content: center; }
+.shell-content > .page-loader .page-loader-spinner { width: 30px; height: 30px; position: sticky; top: calc(50dvh - 60px); }
+.shell-content > .page-loader .page-loader-spinner i { width: 3px; height: 8px; margin: -4px 0 0 -1.5px; transform: rotate(calc(var(--i) * 45deg)) translateY(-11px); }
