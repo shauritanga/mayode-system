@@ -237,21 +237,28 @@ export function AllocationSummary({ distribution }: { distribution: { full: numb
   );
 }
 
-/** Paddy received into the warehouses in each of the last 12 months. */
-export function PaddyReceivedTrend({ data }: { data: any }) {
-  const months: { label: string; kg: number }[] = data?.months ?? [];
-  const tonnes = (data?.peak?.kg ?? 0) >= 10000;
-  const chart = months.map((m) => ({ month: m.label, kg: tonnes ? Math.round(m.kg / 100) / 10 : Math.round(m.kg) }));
+/** Money received in each of the last 12 months: sales payments, dues and fees, member contributions. */
+export function PaymentsTrend({ data }: { data: any }) {
+  const months: any[] = data?.months ?? [];
+  const wanted = [
+    { key: 'sales', label: 'Sales payments', color: 'var(--green-500)' },
+    { key: 'dues', label: 'Dues & fees', color: 'var(--blue-500)' },
+    { key: 'contributions', label: 'Contributions', color: 'var(--gold-400)' },
+  ].filter((x) => data?.series?.[x.key]);
+  const peak = Math.max(0, ...months.map((m) => wanted.reduce((n, x) => n + (m[x.key] || 0), 0)));
+  const unit = peak >= 1_000_000 ? 1_000_000 : peak >= 10_000 ? 1_000 : 1;
+  const unitLabel = unit === 1_000_000 ? 'TZS millions' : unit === 1_000 ? 'TZS thousands' : 'TZS';
+  const chart = months.map((m) => Object.fromEntries([['month', m.label], ...wanted.map((x) => [x.key, Math.round(((m[x.key] || 0) / unit) * 10) / 10])]));
+  const total = wanted.reduce((n, x) => n + months.reduce((a, m) => a + (m[x.key] || 0), 0), 0);
   return (
     <section className="ov-card">
-      <h2 className="ov-title">Paddy received, last 12 months</h2>
-      {!data?.totalKg ? <Empty>No paddy has been received in the last 12 months.</Empty> : (
+      <h2 className="ov-title">Payments received, last 12 months</h2>
+      {!wanted.length || !total ? <Empty>No payments have been received in the last 12 months.</Empty> : (
         <>
           <p className="muted" style={{ fontSize: 12, margin: '-6px 0 8px' }}>
-            {tonnes ? `${(data.totalKg / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 })} tonnes` : kg(data.totalKg)} in total
-            {data.peak ? ` · busiest month ${data.peak.label} (${kg(data.peak.kg)})` : ''}
+            {tzs(total)} in total{data.peak ? ` · busiest month ${data.peak.label} (${tzs(data.peak.amount)})` : ''} · chart in {unitLabel}
           </p>
-          <TrendAreaChart data={chart} xKey="month" series={[{ key: 'kg', label: tonnes ? 'Tonnes' : 'kg', color: 'var(--green-500)' }]} height={230} />
+          <TrendAreaChart data={chart} xKey="month" series={wanted.map((x) => ({ key: x.key, label: x.label, color: x.color }))} height={230} />
         </>
       )}
     </section>

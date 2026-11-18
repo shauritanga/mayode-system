@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Actor, scope } from './ops-common';
+import { hasGrant } from '../auth/role-access';
 import { r2, r3 } from './ops-rules';
 import { StockService } from './stock.service';
 import { ReceivingService } from './receiving.service';
@@ -60,35 +61,43 @@ export class OpsReportsService {
   // ---------- dashboards ----------
 
   /**
-   * Paddy received into the warehouses in each of the last 12 months (this month included), for the dashboard chart.
-   * Counts confirmed paddy receipts, net of what was rejected; months with nothing are 0 so the line has no gaps.
-   * Months follow East Africa time (UTC+3, no daylight saving).
+   * Money received in each of the last 12 months (this month included), for the dashboard chart: sales payments, dues and
+   * fees, and member contributions. A series is included only when the caller may see that area (reports, dues, accounting).
+   * Months follow East Africa time (UTC+3, no daylight saving); months with nothing are 0 so the line has no gaps.
    */
-  async paddyByMonth(actor: Actor, now = new Date()) {
+  async paymentsByMonth(actor: Actor & { customRole?: any }, now = new Date()) {
     const EAT = 3 * 3600_000;
     const local = new Date(now.getTime() + EAT);
     const keyOf = (y: number, m: number) => `${y}-${String(m + 1).padStart(2, '0')}`;
-    const months: { month: string; label: string; kg: number }[] = [];
+    const months: { month: string; label: string; sales: number; dues: number; contributions: number }[] = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth() - i, 1));
-      months.push({ month: keyOf(d.getUTCFullYear(), d.getUTCMonth()), label: d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' }), kg: 0 });
+      months.push({ month: keyOf(d.getUTCFullYear(), d.getUTCMonth()), label: d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' }), sales: 0, dues: 0, contributions: 0 });
     }
     const first = months[0].month.split('-').map(Number);
     const from = new Date(Date.UTC(first[0], first[1] - 1, 1) - EAT);
-    const receipts = await this.prisma.goodsReceipt.findMany({
-      where: { ...scope(actor), status: 'CONFIRMED', product: { category: 'PADDY' }, receivedAt: { gte: from } },
-      select: { receivedAt: true, grossKg: true, rejectedKg: true },
-    });
     const byKey = new Map(months.map((m) => [m.month, m]));
-    for (const r of receipts) {
-      const d = new Date(r.receivedAt.getTime() + EAT);
+    const add = (when: Date, field: 'sales' | 'dues' | 'contributions', amount: number) => {
+      const d = new Date(when.getTime() + EAT);
       const row = byKey.get(keyOf(d.getUTCFullYear(), d.getUTCMonth()));
-      if (row) row.kg += Math.max(0, (r.grossKg || 0) - (r.rejectedKg || 0));
-    }
-    for (const m of months) m.kg = r2(m.kg);
-    const totalKg = r2(months.reduce((n, m) => n + m.kg, 0));
-    const top = months.reduce((a, b) => (b.kg > a.kg ? b : a), months[0]);
-    return { months, totalKg, peak: top.kg > 0 ? { label: top.label, kg: top.kg } : null };
+      if (row) row[field] += Number(amount) || 0;
+    };
+    const mine = actor.role === 'SUPER_ADMIN' ? {} : { mamcosId: actor.mamcosId ?? '__none__' };
+    const can = (resource: string) => hasGrant(actor as any, resource, 'VIEW');
+    const series = { sales: can('ops_reports'), dues: can('dues'), contributions: can('accounting') };
+    const [sales, dues, contributions] = await Promise.all([
+      series.sales ? this.prisma.opsPayment.findMany({ where: { ...scope(actor), status: 'CONFIRMED', paidAt: { gte: from } }, select: { paidAt: true, amount: true } }) : [],
+      series.dues ? this.prisma.duePayment.findMany({ where: { ...mine, voidedAt: null, paidOn: { gte: from } }, select: { paidOn: true, amount: true } }) : [],
+      series.contributions ? this.prisma.memberContribution.findMany({ where: { ...mine, contributionDate: { gte: from } }, select: { contributionDate: true, amount: true } }) : [],
+    ]);
+    for (const r of sales as any[]) if (r.paidAt) add(r.paidAt, 'sales', r.amount);
+    for (const r of dues as any[]) add(r.paidOn, 'dues', r.amount);
+    for (const r of contributions as any[]) add(r.contributionDate, 'contributions', r.amount);
+    for (const m of months) { m.sales = r2(m.sales); m.dues = r2(m.dues); m.contributions = r2(m.contributions); }
+    const total = (m: (typeof months)[number]) => m.sales + m.dues + m.contributions;
+    const totalAmount = r2(months.reduce((n, m) => n + total(m), 0));
+    const top = months.reduce((x, y) => (total(y) > total(x) ? y : x), months[0]);
+    return { months, series, totalAmount, peak: total(top) > 0 ? { label: top.label, amount: r2(total(top)) } : null };
   }
 
   async commercial(actor: Actor, r: Range) {
