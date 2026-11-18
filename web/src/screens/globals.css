@@ -3781,7 +3781,11 @@ a.farmers-name { display: block; cursor: pointer; }
 .shell-content > .page-loader .page-loader-spinner { width: 30px; height: 30px; position: sticky; top: calc(50dvh - 60px); }
 .shell-content > .page-loader .page-loader-spinner i { width: 3px; height: 8px; margin: -4px 0 0 -1.5px; transform: rotate(calc(var(--i) * 45deg)) translateY(-11px); }
 
-/* A card beside a taller column grows its chart to fill the card instead of leaving blank space. */
+/* A card beside a taller column keeps its chart at a fixed height; the summary strip sits at the bottom of the card. */
 .ov-fill { display: flex; flex-direction: column; }
 .ov-fill > .chart-empty-state { flex: 1; }
-.ov-chart-fill { flex: 1; min-height: 230px; }
+.ov-foot { margin-top: auto; padding-top: 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; border-top: 1px solid var(--border-subtle); }
+.ov-foot span { display: block; font-size: 0.72rem; color: var(--text-3); }
+.ov-foot strong { font-size: 0.95rem; color: var(--text-1); }
+.ov-foot strong.ov-up { color: var(--green-500); }
+.ov-foot strong.ov-down { color: var(--red-400); }

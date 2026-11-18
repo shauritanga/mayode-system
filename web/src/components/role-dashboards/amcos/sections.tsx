@@ -250,6 +250,10 @@ export function PaymentsTrend({ data }: { data: any }) {
   const unitLabel = unit === 1_000_000 ? 'TZS millions' : unit === 1_000 ? 'TZS thousands' : 'TZS';
   const chart = months.map((m) => Object.fromEntries([['month', m.label], ...wanted.map((x) => [x.key, Math.round(((m[x.key] || 0) / unit) * 10) / 10])]));
   const total = wanted.reduce((n, x) => n + months.reduce((a, m) => a + (m[x.key] || 0), 0), 0);
+  const sumOf = (m: any) => wanted.reduce((n, x) => n + (m?.[x.key] || 0), 0);
+  const thisMonth = sumOf(months[months.length - 1]);
+  const lastMonth = sumOf(months[months.length - 2]);
+  const change = lastMonth > 0 ? Math.round(((thisMonth - lastMonth) / lastMonth) * 100) : null;
   return (
     <section className="ov-card ov-fill">
       <h2 className="ov-title">Payments received, last 12 months</h2>
@@ -258,7 +262,13 @@ export function PaymentsTrend({ data }: { data: any }) {
           <p className="muted" style={{ fontSize: 12, margin: '-6px 0 8px' }}>
             {tzs(total)} in total{data.peak ? ` · busiest month ${data.peak.label} (${tzs(data.peak.amount)})` : ''} · chart in {unitLabel}
           </p>
-          <div className="ov-chart-fill"><TrendAreaChart data={chart} xKey="month" series={wanted.map((x) => ({ key: x.key, label: x.label, color: x.color }))} height="100%" /></div>
+          <TrendAreaChart data={chart} xKey="month" series={wanted.map((x) => ({ key: x.key, label: x.label, color: x.color }))} height={230} />
+          <div className="ov-foot">
+            {[['This month', thisMonth], ['Last month', lastMonth]].map(([label, value]) => (
+              <div key={label as string}><span>{label}</span><strong>{tzs(value as number)}</strong></div>
+            ))}
+            <div><span>Change</span><strong className={change == null ? '' : change >= 0 ? 'ov-up' : 'ov-down'}>{change == null ? '—' : `${change >= 0 ? '+' : ''}${change}%`}</strong></div>
+          </div>
         </>
       )}
     </section>
