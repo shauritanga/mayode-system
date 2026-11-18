@@ -113,9 +113,11 @@ export function TrendAreaChart({
 export function DonutBreakdown({
   data,
   height = 240,
+  colors = CHART_PALETTE,
 }: {
   data: { name: string; value: number }[];
   height?: number;
+  colors?: string[];
 }) {
   const filtered = data.filter((d) => d.value > 0);
   if (!filtered.length) return <ChartEmptyState>No data yet.</ChartEmptyState>;
@@ -135,7 +137,7 @@ export function DonutBreakdown({
             strokeWidth={2}
           >
             {filtered.map((entry, i) => (
-              <Cell key={entry.name} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
+              <Cell key={entry.name} fill={colors[i % colors.length]} />
             ))}
           </Pie>
           <Tooltip contentStyle={tooltipStyle} />
@@ -144,7 +146,7 @@ export function DonutBreakdown({
       <ul className="donut-legend">
         {filtered.map((entry, i) => (
           <li key={entry.name}>
-            <span className="donut-legend-dot" style={{ background: CHART_PALETTE[i % CHART_PALETTE.length] }} />
+            <span className="donut-legend-dot" style={{ background: colors[i % colors.length] }} />
             <span className="donut-legend-label">{entry.name}</span>
             <span className="donut-legend-value">
               {entry.value.toLocaleString()} · {total ? Math.round((entry.value / total) * 100) : 0}%

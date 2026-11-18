@@ -228,7 +228,7 @@ export function AllocationSummary({ distribution }: { distribution: { full: numb
   return (
     <section className="ov-card">
       <h2 className="ov-title">Block allocation summary</h2>
-      <DonutBreakdown height={170} data={[
+      <DonutBreakdown height={170} colors={['var(--green-500)', 'var(--blue-500)', 'var(--blue-400)']} data={[
         { name: 'Fully allocated', value: distribution.full },
         { name: 'Partly allocated', value: distribution.partial },
         { name: 'Not allocated', value: distribution.none },

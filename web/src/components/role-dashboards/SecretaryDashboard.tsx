@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { BASE, LoadError, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 import {
   AllocationSummary, AttentionRow, AttentionTable, CanalPerformance, CoverageGauge,
-  IrrigationActivity, LeadershipWatch, MembersApprovals, MoneySnapshot, OrdersAndStock, OverviewKpis, PaymentsTrend,
+  LeadershipWatch, MembersApprovals, MoneySnapshot, OrdersAndStock, OverviewKpis, PaymentsTrend,
 } from './amcos/sections';
 
 /**
@@ -107,9 +107,8 @@ export function SecretaryDashboard() {
           <CanalPerformance canals={o.canals} />
           <div className="dash-two-col">
             <MembersApprovals totals={o.totals} />
-            {leadership.data?.totals ? <LeadershipWatch data={leadership.data} /> : <IrrigationActivity events={o.recent} />}
+            {leadership.data?.totals && <LeadershipWatch data={leadership.data} />}
           </div>
-          {leadership.data?.totals && <IrrigationActivity events={o.recent} />}
         </>
       )}
 
