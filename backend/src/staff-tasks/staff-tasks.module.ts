@@ -16,7 +16,7 @@ import { InputSetupService } from './input-setup.service';
 
 @Module({
   imports: [AccountingModule, InputStockModule, CreditInterestModule, NotificationsModule],
-  controllers: [InputSetupController, CashDrawerController, InputDistributionController, PurchaseOrdersController, MaintenanceController, ComplianceReportController],
+  controllers: [InputSetupController, CashDrawerController, InputDistributionController, InputApplicationsController, InputWarehouseController, PurchaseOrdersController, MaintenanceController, ComplianceReportController],
   providers: [InputApplicationsService, InputWarehouseService, InputWarehouseScheduler, CashDrawerService, InputDistributionService, PurchaseOrdersService, MaintenanceService, ComplianceReportService, InputSetupService],
 })
 export class StaffTasksModule {}
