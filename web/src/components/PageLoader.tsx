@@ -5,9 +5,12 @@ import { usePathname } from 'next/navigation';
 const SHOW_AFTER_MS = 250; // quick page changes finish before this, so they never flash
 const GIVE_UP_AFTER_MS = 60_000;
 
+/** Anything a screen draws while it waits for its data. The loader stands in for all of it, so these are hidden (see globals.css). */
+const WAITING = '.skeleton, .ua-skel, .farmers-skeleton';
+
 /**
- * Dims the page and shows a ring while moving to another page is taking time. Starts when an in-app link to a
- * different page is clicked and stops when the new page's address arrives. Clicks are blocked while it shows.
+ * Dims the page and shows a ring while a page is taking time: after an in-app link is clicked until the new page
+ * arrives, and whenever a screen is still waiting for its data. Clicks are blocked while it shows.
  */
 export default function PageLoader() {
   const pathname = usePathname();
@@ -23,7 +26,12 @@ export default function PageLoader() {
   };
 
   // The new page has arrived.
-  useEffect(() => { hide(); }, [pathname]);
+  useEffect(() => {
+    hide();
+    // ...but if that page is itself still waiting for data, keep covering it.
+    const t = window.setTimeout(() => { if (document.querySelector(WAITING)) setVisible(true); }, SHOW_AFTER_MS);
+    return () => window.clearTimeout(t);
+  }, [pathname]);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -37,7 +45,22 @@ export default function PageLoader() {
       giveUpTimer.current = window.setTimeout(hide, GIVE_UP_AFTER_MS);
     };
     document.addEventListener('click', onClick);
-    return () => { document.removeEventListener('click', onClick); hide(); };
+
+    // A screen that is still waiting for its data counts too; shown only if the wait outlasts SHOW_AFTER_MS.
+    let waitTimer: number | null = null;
+    let waiting = false;
+    const check = () => {
+      const now = !!document.querySelector(WAITING);
+      if (now === waiting) return;
+      waiting = now;
+      if (waitTimer) { window.clearTimeout(waitTimer); waitTimer = null; }
+      if (now) waitTimer = window.setTimeout(() => setVisible(true), SHOW_AFTER_MS);
+      else if (!showTimer.current) setVisible(false);
+    };
+    const observer = new MutationObserver(check);
+    observer.observe(document.body, { childList: true, subtree: true });
+    check();
+    return () => { document.removeEventListener('click', onClick); observer.disconnect(); if (waitTimer) window.clearTimeout(waitTimer); hide(); };
   }, []);
 
   if (!visible) return null;

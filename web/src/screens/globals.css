@@ -3768,3 +3768,6 @@ a.farmers-name { display: block; cursor: pointer; }
 @keyframes pageLoaderIn { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .page-loader { backdrop-filter: none; } .page-loader-spinner i { animation-duration: 2s; } }
 @media print { .page-loader { display: none !important; } }
+
+/* The loader replaces the grey placeholder blocks: they keep their space but draw nothing. */
+.skeleton, .ua-skel, .farmers-skeleton { visibility: hidden; animation: none !important; }
