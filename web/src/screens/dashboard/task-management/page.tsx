@@ -220,6 +220,10 @@ function Activities({ equipment, blocks, canWrite }: { equipment: any[]; blocks:
       )}
 
       <section className="table-panel">
+        <div className="section-toolbar">
+          <strong>Jobs done by your machinery</strong>
+          {canWrite && <button type="button" className="btn-primary" onClick={() => setForm({})}>Record a job</button>}
+        </div>
         <Filters>
           <Field label="Search"><input className="input-field" placeholder="Machine, operator, block" value={filters.q} onChange={(e) => setFilter('q', e.target.value)} /></Field>
           <Field label="From"><input type="date" className="input-field" value={filters.from} onChange={(e) => setFilter('from', e.target.value)} /></Field>
@@ -264,7 +268,6 @@ function Activities({ equipment, blocks, canWrite }: { equipment: any[]; blocks:
         <Pager meta={data?.meta} onPage={setPage} />
       </section>
 
-      {canWrite && <div style={{ marginTop: 12 }}><button type="button" className="btn-primary" onClick={() => setForm({})}>Record a job</button></div>}
       {form && <ActivityModal activity={form.activity} equipment={form.activity ? equipment : activeEquipment} blocks={blocks} onClose={() => setForm(null)} onSaved={(m) => { setForm(null); setMessage(m); reload(); }} />}
       {paying && <FeePaidModal activity={paying} onClose={() => setPaying(null)} onSaved={(m) => { setPaying(null); setMessage(m); reload(); }} />}
       {cancelling && (
