@@ -59,6 +59,38 @@ export class OpsReportsService {
 
   // ---------- dashboards ----------
 
+  /**
+   * Paddy received into the warehouses in each of the last 12 months (this month included), for the dashboard chart.
+   * Counts confirmed paddy receipts, net of what was rejected; months with nothing are 0 so the line has no gaps.
+   * Months follow East Africa time (UTC+3, no daylight saving).
+   */
+  async paddyByMonth(actor: Actor, now = new Date()) {
+    const EAT = 3 * 3600_000;
+    const local = new Date(now.getTime() + EAT);
+    const keyOf = (y: number, m: number) => `${y}-${String(m + 1).padStart(2, '0')}`;
+    const months: { month: string; label: string; kg: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth() - i, 1));
+      months.push({ month: keyOf(d.getUTCFullYear(), d.getUTCMonth()), label: d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' }), kg: 0 });
+    }
+    const first = months[0].month.split('-').map(Number);
+    const from = new Date(Date.UTC(first[0], first[1] - 1, 1) - EAT);
+    const receipts = await this.prisma.goodsReceipt.findMany({
+      where: { ...scope(actor), status: 'CONFIRMED', product: { category: 'PADDY' }, receivedAt: { gte: from } },
+      select: { receivedAt: true, grossKg: true, rejectedKg: true },
+    });
+    const byKey = new Map(months.map((m) => [m.month, m]));
+    for (const r of receipts) {
+      const d = new Date(r.receivedAt.getTime() + EAT);
+      const row = byKey.get(keyOf(d.getUTCFullYear(), d.getUTCMonth()));
+      if (row) row.kg += Math.max(0, (r.grossKg || 0) - (r.rejectedKg || 0));
+    }
+    for (const m of months) m.kg = r2(m.kg);
+    const totalKg = r2(months.reduce((n, m) => n + m.kg, 0));
+    const top = months.reduce((a, b) => (b.kg > a.kg ? b : a), months[0]);
+    return { months, totalKg, peak: top.kg > 0 ? { label: top.label, kg: top.kg } : null };
+  }
+
   async commercial(actor: Actor, r: Range) {
     const s = scope(actor);
     const [received, runs, awaitingReview, invoices, outstanding, payments, awaitingFulfil, dispatched, position, stockSummary] = await Promise.all([

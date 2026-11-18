@@ -8,8 +8,8 @@ import { printPage } from '@/lib/print';
 import { useAuthStore } from '@/store/auth.store';
 import { BASE, LoadError, useApi, useCan } from '@/screens/dashboard/irrigation/ui';
 import {
-  AllocationSummary, AttentionRow, AttentionTable, BlockStatus, CanalPerformance, ContributionsTrend, CoverageGauge,
-  IrrigationActivity, LeadershipWatch, MembersApprovals, MoneySnapshot, OrdersAndStock, OverviewKpis,
+  AllocationSummary, AttentionRow, AttentionTable, CanalPerformance, CoverageGauge,
+  IrrigationActivity, LeadershipWatch, MembersApprovals, MoneySnapshot, OrdersAndStock, OverviewKpis, PaddyReceivedTrend,
 } from './amcos/sections';
 
 /**
@@ -41,6 +41,7 @@ export function SecretaryDashboard() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const commercial = useApi<any>(schemeId && showOrders ? () => opsApi.commercialDashboard() : null, [schemeId, showOrders]);
+  const paddy = useApi<any>(showOrders ? () => opsApi.paddyMonthly() : null, [showOrders]);
   const contributions = useApi<any>(showContributions ? () => accountingApi.memberContributions() : null, [showContributions]);
 
   const attention: AttentionRow[] = [];
@@ -59,7 +60,7 @@ export function SecretaryDashboard() {
   const settled = (r: { data: unknown; error: string }, wanted: boolean) => !wanted || r.data !== null || !!r.error;
   const ready = settled(schemes, showScheme)
     && (!schemeId || (settled(overview, true) && settled(allocation, showAllocation) && settled(leadership, showLeadership)
-      && settled(commercial, showOrders) && settled(contributions, showContributions)));
+      && settled(commercial, showOrders) && settled(paddy, showOrders) && settled(contributions, showContributions)));
   if (!ready) return <div className="page-shell ov-page"><div className="skeleton" style={{ minHeight: 480 }} /></div>;
 
   return (
@@ -97,7 +98,7 @@ export function SecretaryDashboard() {
             <AllocationSummary distribution={o.blockDistribution} />
           </div>
           <div className="ov-mid">
-            {contributions.data?.contributions?.length ? <ContributionsTrend contributions={contributions.data.contributions} /> : <BlockStatus distribution={o.blockDistribution} blocks={allocation.data?.byBlock ?? null} />}
+            <PaddyReceivedTrend data={showOrders ? paddy.data : null} />
             <div className="ov-stack">
               <CoverageGauge totals={o.totals} />
               {(showOrders || showContributions) && <MoneySnapshot showSales={showOrders} showContributions={showContributions} salesData={commercial.data} contributionsData={contributions.data} />}

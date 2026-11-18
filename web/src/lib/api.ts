@@ -701,6 +701,7 @@ export const opsApi = {
   // dashboards, reports, setup
   reportCatalog: () => api.get('/ops/reports/catalog'),
   commercialDashboard: (params?: object) => api.get('/ops/reports/dashboard/commercial', { params }),
+  paddyMonthly: () => api.get('/ops/reports/dashboard/paddy-monthly'),
   farmDashboard: (params?: object) => api.get('/ops/reports/dashboard/farm', { params }),
   runReport: (key: string, params?: object) => api.get(`/ops/reports/run/${key}`, { params }),
   downloadReport: (key: string, params?: object) => api.get(`/ops/reports/run/${key}`, { params, responseType: 'blob' }),

@@ -237,22 +237,23 @@ export function AllocationSummary({ distribution }: { distribution: { full: numb
   );
 }
 
-/** Member contributions per month, from the contributions the AMCOS has recorded. Omitted when there are none. */
-export function ContributionsTrend({ contributions }: { contributions: any[] }) {
-  const byMonth = new Map<string, number>();
-  for (const c of contributions) {
-    const d = new Date(c.contributionDate);
-    if (Number.isNaN(+d)) continue;
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    byMonth.set(key, (byMonth.get(key) ?? 0) + Number(c.amount || 0));
-  }
-  const data = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-9)
-    .map(([key, amount]) => ({ month: new Date(`${key}-01`).toLocaleString('en-GB', { month: 'short' }), amount: Math.round(amount) }));
-  if (data.length < 2) return null;
+/** Paddy received into the warehouses in each of the last 12 months. */
+export function PaddyReceivedTrend({ data }: { data: any }) {
+  const months: { label: string; kg: number }[] = data?.months ?? [];
+  const tonnes = (data?.peak?.kg ?? 0) >= 10000;
+  const chart = months.map((m) => ({ month: m.label, kg: tonnes ? Math.round(m.kg / 100) / 10 : Math.round(m.kg) }));
   return (
     <section className="ov-card">
-      <h2 className="ov-title">Member contributions by month</h2>
-      <TrendAreaChart data={data} xKey="month" series={[{ key: 'amount', label: 'TZS', color: 'var(--green-500)' }]} height={230} />
+      <h2 className="ov-title">Paddy received, last 12 months</h2>
+      {!data?.totalKg ? <Empty>No paddy has been received in the last 12 months.</Empty> : (
+        <>
+          <p className="muted" style={{ fontSize: 12, margin: '-6px 0 8px' }}>
+            {tonnes ? `${(data.totalKg / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 })} tonnes` : kg(data.totalKg)} in total
+            {data.peak ? ` · busiest month ${data.peak.label} (${kg(data.peak.kg)})` : ''}
+          </p>
+          <TrendAreaChart data={chart} xKey="month" series={[{ key: 'kg', label: tonnes ? 'Tonnes' : 'kg', color: 'var(--green-500)' }]} height={230} />
+        </>
+      )}
     </section>
   );
 }

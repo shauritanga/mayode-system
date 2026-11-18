@@ -413,6 +413,8 @@ export class OpsReportsController {
   catalog() { return this.reports.catalog(); }
   @Get('dashboard/commercial') @RequirePermission('ops_reports', 'VIEW')
   commercial(@CurrentUser() u: U, @Query('from') from?: string, @Query('to') to?: string) { return this.reports.commercial(u, { from, to }); }
+  @Get('dashboard/paddy-monthly') @RequirePermission('ops_reports', 'VIEW')
+  paddyMonthly(@CurrentUser() u: U) { return this.reports.paddyByMonth(u); }
   @Get('dashboard/farm') @RequirePermission('ops_reports', 'VIEW')
   farm(@CurrentUser() u: U, @Query('from') from?: string, @Query('to') to?: string) { return this.reports.farm(u, { from, to }); }
 
