@@ -75,7 +75,7 @@ export function TrendAreaChart({
   data: Record<string, any>[];
   xKey: string;
   series: { key: string; label: string; color: string }[];
-  height?: number;
+  height?: number | `${number}%`;
 }) {
   if (!data.length) return <ChartEmptyState>No trend data yet.</ChartEmptyState>;
   return (

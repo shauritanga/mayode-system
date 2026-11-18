@@ -251,14 +251,14 @@ export function PaymentsTrend({ data }: { data: any }) {
   const chart = months.map((m) => Object.fromEntries([['month', m.label], ...wanted.map((x) => [x.key, Math.round(((m[x.key] || 0) / unit) * 10) / 10])]));
   const total = wanted.reduce((n, x) => n + months.reduce((a, m) => a + (m[x.key] || 0), 0), 0);
   return (
-    <section className="ov-card">
+    <section className="ov-card ov-fill">
       <h2 className="ov-title">Payments received, last 12 months</h2>
       {!wanted.length || !total ? <Empty>No payments have been received in the last 12 months.</Empty> : (
         <>
           <p className="muted" style={{ fontSize: 12, margin: '-6px 0 8px' }}>
             {tzs(total)} in total{data.peak ? ` · busiest month ${data.peak.label} (${tzs(data.peak.amount)})` : ''} · chart in {unitLabel}
           </p>
-          <TrendAreaChart data={chart} xKey="month" series={wanted.map((x) => ({ key: x.key, label: x.label, color: x.color }))} height={230} />
+          <div className="ov-chart-fill"><TrendAreaChart data={chart} xKey="month" series={wanted.map((x) => ({ key: x.key, label: x.label, color: x.color }))} height="100%" /></div>
         </>
       )}
     </section>
