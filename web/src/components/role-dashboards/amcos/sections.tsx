@@ -213,7 +213,7 @@ export function OverviewKpis({ totals }: { totals: any }) {
   return (
     <div className="ov-kpis">
       {cards.map((c) => (
-        <article key={c.label} className="ov-card ov-kpi" style={{ borderLeft: `4px solid ${c.accent}` }}>
+        <article key={c.label} className="ov-card ov-kpi">
           <div className="ov-kpi-top"><span>{c.label}</span><HugeiconsIcon icon={c.icon} size={20} strokeWidth={1.8} /></div>
           <strong>{c.value}</strong>
           <small className={c.good ? 'ov-up' : 'ov-down'}>{c.note}</small>
