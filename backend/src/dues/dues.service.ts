@@ -8,6 +8,7 @@ import { resolveCashAccount } from '../accounting/cash-resolve';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { AccountingService } from '../accounting/accounting.service';
 import { farmIdDisplay } from '../irrigation/irrigation-codes';
+import { holdsOf, splitJson, splitOf } from '../farm-ledger/farm-split';
 import { FORMAT_INFO, render, type ExportFormat } from '../accounting/exports/writers';
 import { longDate } from '../accounting/exports/report-titles';
 import type { ReportDocument, Row } from '../accounting/exports/report-document';
@@ -222,10 +223,12 @@ export class DuesService {
     const p = await this.plan(mamcosId, type);
     if (!p.rows.length) throw new BadRequestException('Every farmer has already been charged for this');
     const label = type.season ? `${type.name} · ${type.season}` : type.name;
+    const holds = await holdsOf(this.prisma, p.rows.map((r) => r.farmerId));
     const made = await this.prisma.farmerDue.createMany({
       data: p.rows.map((r) => ({
         mamcosId, typeId: type.id, farmerId: r.farmerId, category: type.category, description: label, hectares: r.hectares,
         amount: r.amount, issuedOn, dueDate, createdById: actor.id,
+        farmSplit: splitJson(splitOf(holds.get(r.farmerId) ?? [], type.basis === 'PER_HECTARE' ? 'AREA' : 'EQUAL')),
       })),
       skipDuplicates: true,
     });
@@ -260,8 +263,9 @@ export class DuesService {
     const dueDate = dto.dueDate ? day(dto.dueDate) : null;
     if (dueDate && dueDate < today()) throw new BadRequestException('The due date cannot be in the past');
     try {
+      const held = (await holdsOf(this.prisma, [dto.farmerId])).get(dto.farmerId) ?? [];
       return await this.prisma.farmerDue.create({
-        data: { mamcosId, typeId: dto.typeId ?? null, farmerId: dto.farmerId, category: dto.category, description: dto.description.trim(), amount: dto.amount, issuedOn: today(), dueDate, createdById: actor.id },
+        data: { mamcosId, typeId: dto.typeId ?? null, farmerId: dto.farmerId, category: dto.category, description: dto.description.trim(), amount: dto.amount, issuedOn: today(), dueDate, createdById: actor.id, farmSplit: splitJson(splitOf(held, 'AREA')) },
       });
     } catch (e: any) {
       if (e?.code === 'P2002') throw new ConflictException('This farmer has already been charged for that');
@@ -278,8 +282,10 @@ export class DuesService {
     if (dueDate && dueDate < issuedOn) throw new BadRequestException('The due date cannot be before the issue date');
     const amount = cents(dto.quantity * dto.unitPrice);
     const unit = dto.unit?.trim() || 'bags';
+    const held = (await holdsOf(this.prisma, [dto.farmerId])).get(dto.farmerId) ?? [];
     const due = await this.prisma.farmerDue.create({
       data: {
+        farmSplit: splitJson(splitOf(held, 'AREA')),
         mamcosId, farmerId: dto.farmerId, category: 'FERTILISER', description: `${dto.itemName.trim()} · ${dto.quantity} ${unit}`, itemName: dto.itemName.trim(),
         quantity: dto.quantity, unit, unitPrice: dto.unitPrice, amount, issuedOn, dueDate, createdById: actor.id,
       },

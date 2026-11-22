@@ -6,6 +6,7 @@ import { AccountingService } from '../accounting/accounting.service';
 import { InputStockService } from '../input-stock/input-stock.service';
 import { SmsService } from '../messaging/sms.service';
 import { farmIdDisplay } from '../irrigation/irrigation-codes';
+import { holdsOf, splitJson, splitOf } from '../farm-ledger/farm-split';
 import { IssueInputDto } from './dto/staff-tasks.dto';
 import { cents, day, num, tenantOf, today, tzs } from './common';
 
@@ -75,6 +76,7 @@ export class InputDistributionService {
     if (!farmer.user?.phone) throw new BadRequestException('This farmer has no phone number to send the confirmation code to');
     const amount = cents(dto.quantity * unitPrice);
     const plots = await this.farmIdsOf(farmer.id);
+    const split = splitOf((await holdsOf(this.prisma, [farmer.id])).get(farmer.id) ?? [], 'AREA');
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
 
     const issue = await this.prisma.$transaction(async (tx) => {
@@ -87,7 +89,7 @@ export class InputDistributionService {
       // the stock leaves under a lock, from the warehouse chosen (or the default store, then any other that holds it)
       await this.stock.drawOut(tx, { itemId: item.id, quantity: dto.quantity, userId: actor.id, refType: 'DISTRIBUTION', refId: issued.id, note: `Issued to ${farmer.firstName} ${farmer.lastName} (${reference})`, warehouseId: dto.warehouseId ?? null, strict: !!dto.warehouseId, shortMessage: (left, it) => `Only ${left} ${it.unit} of ${it.name} is in stock` });
       const due = await tx.farmerDue.create({
-        data: { mamcosId, farmerId: farmer.id, category: 'FERTILISER', description: `${item.name} · ${dto.quantity} ${item.unit} (${reference})`, itemName: item.name, quantity: dto.quantity, unit: item.unit, unitPrice, amount, issuedOn: today(), dueDate, createdById: actor.id },
+        data: { mamcosId, farmerId: farmer.id, category: 'FERTILISER', description: `${item.name} · ${dto.quantity} ${item.unit} (${reference})`, itemName: item.name, quantity: dto.quantity, unit: item.unit, unitPrice, amount, issuedOn: today(), dueDate, createdById: actor.id, farmSplit: splitJson(split) },
       });
       await tx.inputIssue.update({ where: { id: issued.id }, data: { dueId: due.id } });
       return { ...issued, dueId: due.id };

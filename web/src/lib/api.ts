@@ -1217,6 +1217,12 @@ export const waterApi = {
   resolve: (id: string, resolution: string) => api.post(`/water/logs/${id}/resolve`, { resolution }),
 };
 
+/** Everything charged, paid and still owed, for one farmer or one farm (an irrigation hectare). */
+export const farmLedgerApi = {
+  farmer: (id: string) => api.get(`/farm-ledger/farmer/${id}`),
+  farm: (hectareId: string) => api.get(`/farm-ledger/farm/${hectareId}`),
+};
+
 export const duesApi = {
   list: (params?: object) => api.get('/dues', { params }),
   /** The list or the debts as PDF, Word or Excel (everything that matches, not one page). */

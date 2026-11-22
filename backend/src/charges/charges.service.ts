@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { localDate } from '../accounting/tax';
+import { holdsOf, splitJson, splitOf } from '../farm-ledger/farm-split';
 import { UpdateChargeDto } from './dto/charges.dto';
 
 type Db = Prisma.TransactionClient | PrismaService;
@@ -89,8 +90,9 @@ export class ChargesService {
     if (amount <= 0) return null;
     const existing = await db.farmerDue.findFirst({ where: { mamcosId: p.mamcosId, farmerId: p.farmerId, description, status: 'ACTIVE' }, select: { id: true } });
     if (existing) return null;
+    const held = (await holdsOf(db as any, [p.farmerId])).get(p.farmerId) ?? [];
     return db.farmerDue.create({
-      data: { mamcosId: p.mamcosId, farmerId: p.farmerId, category: 'OTHER', description, amount, issuedOn: dateOf(localDate(new Date())), createdById: p.createdById },
+      data: { mamcosId: p.mamcosId, farmerId: p.farmerId, category: 'OTHER', description, amount, issuedOn: dateOf(localDate(new Date())), createdById: p.createdById, farmSplit: splitJson(splitOf(held, 'AREA')) },
     });
   }
 

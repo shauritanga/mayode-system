@@ -4,11 +4,12 @@ import { farmId } from '@/lib/farm-id';
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { amcosRentalsApi, duesApi, irrigationApi, machineryApi } from '@/lib/api';
+import { amcosRentalsApi, duesApi, farmLedgerApi, irrigationApi, machineryApi } from '@/lib/api';
+import AccountHistory from '@/components/AccountHistory';
 import { CardsSkeleton, Empty, LoadError, Panel, StatCard, StatusBadge, Tabs, fmtDate, fmtHa, fmtNum, titleCase, useApi, useIrrigation } from './ui';
 
 const tzs = (v?: number | null) => `TZS ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
-type Tab = 'activity' | 'payments' | 'charges' | 'history';
+type Tab = 'activity' | 'account' | 'payments' | 'charges' | 'history';
 type Event = { at: string; kind: 'Allocation' | 'Guardian' | 'Transfer' | 'Work in block'; title: string; detail?: string };
 const KIND_COLOR: Record<Event['kind'], string> = { Allocation: '#34D399', Guardian: '#A78BFA', Transfer: '#60A5FA', 'Work in block': '#F59E0B' };
 
@@ -21,6 +22,7 @@ export function HectareDetail({ id }: { id: string }) {
   const { data: h, loading, error, reload } = useApi<any>(() => irrigationApi.hectare(id), [id]);
   const holder = h?.farmer;
   // Charges belong to the farmer, not the hectare, so this is the current holder's account (a farmer holds one hectare here).
+  const account = useApi<any>(can('dues', 'VIEW') ? () => farmLedgerApi.farm(id) : null, [id]);
   const money = useApi<any>(holder && can('dues', 'VIEW') ? () => duesApi.statement(holder.id) : null, [holder?.id]);
   // Rentals of this hectare made through M-LAX, as the cooperative recorded them (no prices).
   const rentals = useApi<any>(h && can('farm_leases', 'VIEW') ? () => amcosRentalsApi.forHectare(h.id) : null, [h?.id]);
@@ -53,7 +55,7 @@ export function HectareDetail({ id }: { id: string }) {
   const payments = dues.flatMap((d) => (d.payments ?? []).filter((p: any) => !p.voidedAt).map((p: any) => ({ ...p, charge: d.description }))).sort((a, b) => String(b.paidOn).localeCompare(String(a.paidOn)));
   const canSeeMoney = can('dues', 'VIEW');
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'activity', label: 'Activity' }, ...(canSeeMoney ? [{ id: 'payments' as Tab, label: 'Payments' }, { id: 'charges' as Tab, label: 'Charges' }] : []), { id: 'history', label: 'Allocation history' },
+    { id: 'activity', label: 'Activity' }, ...(canSeeMoney ? [{ id: 'account' as Tab, label: 'Account' }, { id: 'payments' as Tab, label: 'Payments' }, { id: 'charges' as Tab, label: 'Charges' }] : []), { id: 'history', label: 'Allocation history' },
   ];
   const side = h?.block?.side ? `${titleCase(h.block.side)} side` : null;
 
@@ -193,6 +195,8 @@ export function HectareDetail({ id }: { id: string }) {
               )}
             </Panel>
           )}
+
+          {tab === 'account' && <AccountHistory title="Transactions & balance for this farm" data={account.data} loading={account.loading} error={account.error} onRetry={account.reload} farmerLink />}
 
           {tab === 'payments' && (
             <Panel pad={false}>

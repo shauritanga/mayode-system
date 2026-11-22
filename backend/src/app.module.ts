@@ -64,6 +64,7 @@ import { MachineryModule } from './machinery/machinery.module';
 import { AssetsModule } from './assets/assets.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { DuesModule } from './dues/dues.module';
+import { FarmLedgerModule } from './farm-ledger/farm-ledger.module';
 import { ChargesModule } from './charges/charges.module';
 import { BoardModule } from './board/board.module';
 import { MeetingsModule } from './meetings/meetings.module';
@@ -155,6 +156,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     AssetsModule,
     PayrollModule,
     DuesModule,
+    FarmLedgerModule,
     ChargesModule,
     BoardModule,
     MeetingsModule,

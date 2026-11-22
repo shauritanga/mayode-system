@@ -1,3 +1,4 @@
+import { splitJson, splitOf } from '../farm-ledger/farm-split';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -163,8 +164,10 @@ export class HarvestFeesService {
 
     const allocations = await this.prisma.irrigationHectareAllocation.findMany({
       where: { status: 'ACTIVE', hectare: { blockId: block.id, isActive: true } },
-      select: { farmerId: true, hectare: { select: { areaHectares: true } } },
+      select: { farmerId: true, hectareId: true, hectare: { select: { areaHectares: true } } },
     });
+    const blockHolds = new Map<string, { hectareId: string; area: number }[]>();
+    for (const a of allocations) blockHolds.set(a.farmerId, [...(blockHolds.get(a.farmerId) ?? []), { hectareId: a.hectareId, area: Number(a.hectare.areaHectares) }]);
     const name = typeName(season.name, block.code);
     const existing = await this.prisma.farmerDueType.findUnique({ where: { mamcosId_name: { mamcosId, name } }, select: { id: true, rate: true } });
     // A harvest that is already open keeps the rate it was opened with, so every farmer of the block is charged the same.
@@ -192,6 +195,7 @@ export class HarvestFeesService {
         data: fresh.map((p) => ({
           mamcosId, typeId: type.id, farmerId: p.farmerId, category: 'HARVEST_FEE' as const, description: name,
           hectares: p.hectares, amount: p.amount, issuedOn, dueDate: dto.dueDate ? day(dto.dueDate) : null, createdById: actor.id,
+          farmSplit: splitJson(splitOf(blockHolds.get(p.farmerId) ?? [], 'AREA')),
         })),
         skipDuplicates: true,
       });

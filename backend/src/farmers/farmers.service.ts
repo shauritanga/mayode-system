@@ -16,6 +16,7 @@ import {
   VerificationStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { normalizeFarmId } from '../irrigation/irrigation-codes';
 import { FinanceService } from '../finance/finance.service';
 import { MembershipsService } from '../memberships/memberships.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -306,6 +307,8 @@ export class FarmersService {
               { controlNumber: { contains: search, mode: 'insensitive' } },
               { idNumber: { contains: search.trim(), mode: 'insensitive' } },
               { user: { phone: { contains: search } } },
+              // a Farm ID such as 5:15R-12 finds whoever holds that farm
+              { irrigationAllocations: { some: { status: 'ACTIVE', hectare: { code: normalizeFarmId(search) } } } },
             ],
           }
         : {}),

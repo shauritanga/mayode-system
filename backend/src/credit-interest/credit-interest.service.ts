@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { SmsService } from '../messaging/sms.service';
@@ -152,7 +153,8 @@ export class CreditInterestService {
         try {
           await this.prisma.$transaction(async (tx) => {
             const charge = await tx.farmerDue.create({
-              data: { mamcosId, farmerId: due.farmerId, category: 'INTEREST', description: `Interest ${p.ratePercent}% on ${due.itemName ?? due.description} (${p.label})`, amount, issuedOn: p.end, dueDate: null, createdById: null },
+              data: { mamcosId, farmerId: due.farmerId, category: 'INTEREST', description: `Interest ${p.ratePercent}% on ${due.itemName ?? due.description} (${p.label})`, amount, issuedOn: p.end, dueDate: null, createdById: null,
+                farmSplit: due.farmSplit ?? Prisma.JsonNull },
             });
             await tx.inputInterestAccrual.create({ data: { mamcosId, principalDueId: due.id, interestDueId: charge.id, periodKey: p.key, periodEnd: p.end, basePrincipal: base, ratePercent: p.ratePercent!, amount } });
           });

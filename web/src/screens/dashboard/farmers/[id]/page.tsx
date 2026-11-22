@@ -7,7 +7,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { hasPermission, isPathAllowed } from '@/lib/nav';
 import { useAuthStore } from '@/store/auth.store';
-import { API_BASE_URL, api, farmDefaultsApi, farmersApi, irrigationApi } from '@/lib/api';
+import AccountHistory from '@/components/AccountHistory';
+import { API_BASE_URL, api, farmDefaultsApi, farmLedgerApi, farmersApi, irrigationApi } from '@/lib/api';
 import { EditFarmerModal, LocalVerificationModal, RemoveFarmerModal } from './FarmerActions';
 import { printFarmerId } from './printFarmerId';
 import { BASE, CardsSkeleton, ConfirmDialog, Empty, LoadError, Panel, StatCard, StatusBadge, fmtDate, fmtHa, titleCase, useApi } from '../../irrigation/ui';
@@ -34,6 +35,8 @@ export default function FarmerProfilePage() {
   const person = useApi<any>(() => farmersApi.getOne(id), [id]);
   // Hectare records come from the irrigation scheme; a farmer outside it, or a user without that grant, simply has none to show.
   const land = useApi<any>(() => irrigationApi.farmer(id), [id]);
+  const canSeeAccount = hasPermission(user, 'dues', 'VIEW');
+  const account = useApi<any>(canSeeAccount ? () => farmLedgerApi.farmer(id) : null, [id]);
   const overdue = useApi<any>(hasPermission(user, 'farmers', 'VIEW') ? () => farmDefaultsApi.forFarmer(id) : null, [id]);
   const f = person.data;
   const name = f ? `${f.firstName} ${f.lastName}` : 'Farmer';
@@ -129,6 +132,8 @@ export default function FarmerProfilePage() {
                 </>
               )}
           </Panel>
+
+          {canSeeAccount && <AccountHistory data={account.data} loading={account.loading} error={account.error} onRetry={account.reload} />}
 
           <Panel title="Local verification" pad={false}
             actions={canEdit && f.identifierUsed === 'PHONE_ONLY' || (canEdit && f.registrationTier === 'ALTERNATIVE_ID') ? <button type="button" className="btn-primary" onClick={() => setDialog('verify')}>Add verification</button> : undefined}>

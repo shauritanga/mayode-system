@@ -5646,6 +5646,8 @@ model FarmerDue {
   issuedOn     DateTime    @map("issued_on") @db.Date
   dueDate      DateTime?   @map("due_date") @db.Date
   postedIssue  Boolean     @default(false) @map("posted_issue")
+  /// How this charge divides between the farmer's farms (hectares): [{hectareId, share}], shares add up to 1. Null = not tied to a farm.
+  farmSplit    Json?       @map("farm_split")
   /// When the "due today" SMS went to the farmer (and a digest to their leaders); null until then.
   dueReminderSentAt DateTime? @map("due_reminder_sent_at")
   createdById  String?     @map("created_by_id")
