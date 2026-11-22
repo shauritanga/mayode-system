@@ -204,16 +204,16 @@ export function MoneySnapshot({ showSales, showContributions, salesData, contrib
 export function OverviewKpis({ totals }: { totals: any }) {
   const leaderTotal = (totals.canals || 0) + (totals.blocks || 0);
   const leaderHave = (totals.canalLeaders || 0) + (totals.blockLeaders || 0);
-  const cards: { label: string; value: string; note: string; good?: boolean; icon: any }[] = [
-    { label: 'Registered hectares', value: fmtNum(totals.registeredHectares), note: `${fmtNum(totals.canals)} canals · ${fmtNum(totals.blocks)} blocks`, icon: MapsIcon },
-    { label: 'Allocated hectares', value: fmtNum(totals.allocatedHectares), note: `${totals.completionPct}% allocated`, good: totals.completionPct >= 50, icon: Plant01Icon },
-    { label: 'Farmers with a hectare', value: fmtNum(totals.registeredFarmers), note: totals.membersWithoutHectare ? `${fmtNum(totals.membersWithoutHectare)} members without` : 'All members covered', good: !totals.membersWithoutHectare, icon: UserGroupIcon },
-    { label: 'Leadership coverage', value: `${leaderHave} / ${leaderTotal}`, note: leaderHave < leaderTotal ? `${leaderTotal - leaderHave} posts open` : 'All posts filled', good: leaderHave >= leaderTotal, icon: CheckmarkBadge02Icon },
+  const cards: { label: string; accent: string; value: string; note: string; good?: boolean; icon: any }[] = [
+    { label: 'Registered hectares', accent: '#22c55e', value: fmtNum(totals.registeredHectares), note: `${fmtNum(totals.canals)} canals · ${fmtNum(totals.blocks)} blocks`, icon: MapsIcon },
+    { label: 'Allocated hectares', accent: '#3b82f6', value: fmtNum(totals.allocatedHectares), note: `${totals.completionPct}% allocated`, good: totals.completionPct >= 50, icon: Plant01Icon },
+    { label: 'Farmers with a hectare', accent: '#f59e0b', value: fmtNum(totals.registeredFarmers), note: totals.membersWithoutHectare ? `${fmtNum(totals.membersWithoutHectare)} members without` : 'All members covered', good: !totals.membersWithoutHectare, icon: UserGroupIcon },
+    { label: 'Leadership coverage', accent: '#a855f7', value: `${leaderHave} / ${leaderTotal}`, note: leaderHave < leaderTotal ? `${leaderTotal - leaderHave} posts open` : 'All posts filled', good: leaderHave >= leaderTotal, icon: CheckmarkBadge02Icon },
   ];
   return (
     <div className="ov-kpis">
       {cards.map((c) => (
-        <article key={c.label} className="ov-card ov-kpi">
+        <article key={c.label} className="ov-card ov-kpi" style={{ borderLeft: `4px solid ${c.accent}` }}>
           <div className="ov-kpi-top"><span>{c.label}</span><HugeiconsIcon icon={c.icon} size={20} strokeWidth={1.8} /></div>
           <strong>{c.value}</strong>
           <small className={c.good ? 'ov-up' : 'ov-down'}>{c.note}</small>
