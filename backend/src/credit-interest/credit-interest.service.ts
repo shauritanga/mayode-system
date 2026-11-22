@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { loadTerms } from './loan-quote';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService, RequestUser } from '../common/ownership.service';
 import { SmsService } from '../messaging/sms.service';
@@ -37,14 +38,7 @@ export class CreditInterestService {
   }
 
   async load(mamcosId: string): Promise<{ terms: Terms; rates: Rate[] }> {
-    const [t, r] = await Promise.all([
-      this.prisma.inputCreditTerms.findUnique({ where: { mamcosId } }),
-      this.prisma.inputInterestRate.findMany({ where: { mamcosId }, orderBy: { validFrom: 'asc' } }),
-    ]);
-    return {
-      terms: t ? { enabled: t.enabled, period: t.period as Terms['period'], graceDays: t.graceDays, paymentOrder: t.paymentOrder as Terms['paymentOrder'] } : DEFAULT,
-      rates: r.map((x) => ({ id: x.id, label: x.label, ratePercent: num(x.ratePercent), validFrom: x.validFrom, validTo: x.validTo })),
-    };
+    return loadTerms(this.prisma, mamcosId);
   }
 
   /** The words the farmer reads in the app and the officer sees when giving inputs. */

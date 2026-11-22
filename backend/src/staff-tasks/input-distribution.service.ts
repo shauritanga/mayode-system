@@ -7,6 +7,7 @@ import { InputStockService } from '../input-stock/input-stock.service';
 import { SmsService } from '../messaging/sms.service';
 import { farmIdDisplay } from '../irrigation/irrigation-codes';
 import { holdsOf, splitJson, splitOf } from '../farm-ledger/farm-split';
+import { loadTerms, loanSummary, quoteLoan } from '../credit-interest/loan-quote';
 import { IssueInputDto } from './dto/staff-tasks.dto';
 import { cents, day, num, tenantOf, today, tzs } from './common';
 
@@ -47,14 +48,14 @@ export class InputDistributionService {
     return `ISS-${year}-${String(count + 1).padStart(4, '0')}`;
   }
 
-  private async text(phone: string | null | undefined, language: string | null | undefined, p: { reference: string; item: string; qty: number; unit: string; amount: number; plots: string[]; due: Date | null; code: string }) {
+  private async text(phone: string | null | undefined, language: string | null | undefined, p: { reference: string; item: string; qty: number; unit: string; amount: number; plots: string[]; due: Date | null; code: string; loan?: string }) {
     if (!phone) return false;
     const plots = p.plots.length ? ` (Farm ID ${p.plots.slice(0, 3).join(', ')}${p.plots.length > 3 ? '…' : ''})` : '';
     const en = language === 'en';
     const due = p.due ? (en ? `, due ${p.due.toISOString().slice(0, 10)}` : `, malipo kabla ya ${p.due.toISOString().slice(0, 10)}`) : '';
     const body = en
-      ? `MAYODE ${p.reference}: you received ${p.qty} ${p.unit} of ${p.item}${plots}, ${tzs(p.amount)} on credit${due}. To confirm you received it, give this code to the officer: ${p.code}. Do not share it with anyone else.`
-      : `MAYODE ${p.reference}: umepokea ${p.item} ${p.qty} ${p.unit}${plots}, ${tzs(p.amount)} kwa mkopo${due}. Kuthibitisha umepokea, mpe afisa namba hii: ${p.code}. Usimpe mtu mwingine.`;
+      ? `MAYODE ${p.reference}: you received ${p.qty} ${p.unit} of ${p.item}${plots}, ${tzs(p.amount)} on credit${due}.${p.loan ? ` ${p.loan}` : ''} To confirm you received it, give this code to the officer: ${p.code}. Do not share it with anyone else.`
+      : `MAYODE ${p.reference}: umepokea ${p.item} ${p.qty} ${p.unit}${plots}, ${tzs(p.amount)} kwa mkopo${due}.${p.loan ? ` ${p.loan}` : ''} Kuthibitisha umepokea, mpe afisa namba hii: ${p.code}. Usimpe mtu mwingine.`;
     try { await this.sms.send(phone, body, 'input_issue'); return true; } catch (e) { this.logger.warn(`Could not text an input code: ${e instanceof Error ? e.message : e}`); return false; }
   }
 
@@ -106,7 +107,12 @@ export class InputDistributionService {
       });
       throw e;
     }
-    const texted = opts?.collected ? false : await this.text(farmer.user.phone, farmer.user.language, { reference: issue.reference, item: item.name, qty: dto.quantity, unit: item.unit, amount, plots, due: dueDate, code });
+    let loan: string | undefined;
+    if (!opts?.collected) {
+      try { const { terms, rates } = await loadTerms(this.prisma, mamcosId); loan = loanSummary(quoteLoan(terms, rates, amount, today(), dueDate), farmer.user.language); }
+      catch (e) { this.logger.warn(`Could not work out the loan terms for the input text: ${e instanceof Error ? e.message : e}`); }
+    }
+    const texted = opts?.collected ? false : await this.text(farmer.user.phone, farmer.user.language, { reference: issue.reference, item: item.name, qty: dto.quantity, unit: item.unit, amount, plots, due: dueDate, code, loan });
     return { id: issue.id, reference: issue.reference, amount, farmIds: plots, ackStatus: 'PENDING', codeSent: texted };
   }
 

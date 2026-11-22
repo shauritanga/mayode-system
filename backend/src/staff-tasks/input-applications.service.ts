@@ -10,7 +10,8 @@ import { InputStockService } from '../input-stock/input-stock.service';
 import { InputWarehouseService } from './input-warehouse.service';
 import { InputDistributionService } from './input-distribution.service';
 import { ApplyForInputsDto } from './dto/staff-tasks.dto';
-import { cents, num, tenantOf, tzs } from './common';
+import { cents, num, tenantOf, today, tzs } from './common';
+import { loadTerms, loanSummary, quoteLoan } from '../credit-interest/loan-quote';
 
 export const TERMS_VERSION = 'v1';
 const TERMS = {
@@ -204,7 +205,7 @@ export class InputApplicationsService {
     throw new BadRequestException(fit.length ? 'More than one warehouse can supply this. Choose where the farmer should collect' : 'No single warehouse holds all of these inputs. Choose a warehouse, or ask for fewer inputs');
   }
 
-  private async tellFarmerReady(app: { reference: string; farmerId: string; farmIds: string[] }, code: string, warehouse: { name: string; location: string | null }, lines: { itemName: string; quantity: number; unit: string }[], mamcosId: string, resent = false) {
+  private async tellFarmerReady(app: { reference: string; farmerId: string; farmIds: string[] }, code: string, warehouse: { name: string; location: string | null }, lines: { itemName: string; quantity: number; unit: string; unitPrice?: unknown }[], mamcosId: string, resent = false) {
     const farmer = await this.prisma.farmer.findUnique({ where: { id: app.farmerId }, select: { user: { select: { phone: true, language: true } } } });
     const phone = farmer?.user?.phone; if (!phone) return false;
     const mamcos = await this.prisma.mamcos.findUnique({ where: { id: mamcosId }, select: { name: true } });
@@ -212,9 +213,20 @@ export class InputApplicationsService {
     const items = lines.map((l) => `${l.itemName} ${l.quantity} ${l.unit}`).join(', ');
     const where = `${warehouse.name}${warehouse.location ? ` (${warehouse.location})` : ''}`;
     const plots = app.farmIds.length ? ` Farm ID ${app.farmIds.slice(0, 3).join(', ')}${app.farmIds.length > 3 ? '…' : ''}.` : '';
+    // The first message (approval) tells the farmer exactly what the credit will cost; a re-sent code does not repeat it.
+    let loan = '';
+    if (!resent) {
+      try {
+        const principal = cents(lines.reduce((n, l) => n + num(l.quantity) * num(l.unitPrice), 0));
+        if (principal > 0) {
+          const { terms, rates } = await loadTerms(this.prisma, mamcosId);
+          loan = ` ${loanSummary(quoteLoan(terms, rates, principal, today(), null), farmer?.user?.language)}${en ? ' (based on today\'s prices)' : ' (kwa bei za leo)'}`;
+        }
+      } catch (e) { this.logger.warn(`Could not work out the loan terms for the approval text: ${e instanceof Error ? e.message : e}`); }
+    }
     const body = en
-      ? `${mamcos?.name ?? 'AMCOS'} ${app.reference}: ${resent ? 'new code. ' : 'approved. '}Fertiliser: ${items}.${plots} Collect at: ${where}. Collection code: ${this.pretty(code)}. Show this code to the warehouse keeper. Do not share it with anyone else.`
-      : `${mamcos?.name ?? 'AMCOS'} ${app.reference}: ${resent ? 'namba mpya. ' : 'imekubaliwa. '}Mbolea: ${items}.${plots} Chukua: ${where}. Namba ya kuchukulia: ${this.pretty(code)}. Mwonyeshe mtunza ghala namba hii. Usimpe mtu mwingine.`;
+      ? `${mamcos?.name ?? 'AMCOS'} ${app.reference}: ${resent ? 'new code. ' : 'approved. '}Fertiliser: ${items}.${loan}${plots} Collect at: ${where}. Collection code: ${this.pretty(code)}. Show this code to the warehouse keeper. Do not share it with anyone else.`
+      : `${mamcos?.name ?? 'AMCOS'} ${app.reference}: ${resent ? 'namba mpya. ' : 'imekubaliwa. '}Mbolea: ${items}.${loan}${plots} Chukua: ${where}. Namba ya kuchukulia: ${this.pretty(code)}. Mwonyeshe mtunza ghala namba hii. Usimpe mtu mwingine.`;
     try { await this.sms.send(phone, body, 'input_application'); return true; } catch (e) { this.logger.warn(`Could not text the collection code: ${e instanceof Error ? e.message : e}`); return false; }
   }
 
