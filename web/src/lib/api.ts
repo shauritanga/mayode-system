@@ -288,6 +288,8 @@ export const loansApi = {
   getForFarmer: (farmerId: string) => api.get(`/loans/farmer/${farmerId}`),
   getAll: () => api.get('/loans'),
   create: (data: object) => api.post('/loans', data),
+  /** The loan list as PDF, Word or Excel. */
+  exportFile: (format: 'PDF' | 'DOCX' | 'XLSX') => api.get('/loans/export', { params: { format }, responseType: 'blob' }),
   payoutReport: (params?: { from?: string; to?: string; format?: 'csv' | 'pdf' | 'xlsx' }) =>
     api.get('/loans/lender-payout-report', { params, responseType: 'blob' }),
   lenders: {
@@ -305,6 +307,8 @@ const forAmcos = (params: object = {}) => (accountingMamcosId ? { ...params, mam
 
 export const accountingApi = {
   statements: (params?: object) => api.get('/accounting/statements', { params }),
+  /** A list as PDF, Word or Excel: everything matching the filters, not one page. */
+  exportFile: (params: object) => api.get('/accounting/export', { params: forAmcos(params), responseType: 'blob' }),
   generateReport: (data: object) => api.post('/accounting/report-exports', data),
   reportArchive: (params?: object) => api.get('/accounting/report-exports', { params }),
   downloadReport: (id: string) => api.get(`/accounting/report-exports/${id}/download`, { responseType: 'blob' }),

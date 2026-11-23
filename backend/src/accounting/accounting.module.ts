@@ -9,9 +9,10 @@ import { ReceivablesSchedulerService } from './receivables-scheduler.service';
 import { ReconciliationService } from './reconciliation.service';
 import { TaxService } from './tax.service';
 import { ReportExportService } from './report-export.service';
+import { ListExportService } from './list-export.service';
 @Module({
   controllers: [AccountingController],
-  providers: [AccountingService, ReceivablesSchedulerService, PeriodLockService, ReconciliationService, TaxService, CashTransactionsService, CashAccountsService, FarmerAccountsService, ReportExportService],
+  providers: [AccountingService, ReceivablesSchedulerService, PeriodLockService, ReconciliationService, TaxService, CashTransactionsService, CashAccountsService, FarmerAccountsService, ReportExportService, ListExportService],
   exports: [AccountingService, CashAccountsService],
 })
 export class AccountingModule {}

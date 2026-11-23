@@ -7,6 +7,7 @@ import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 import { Actions, Badge, Card, Head, MoneyAccountSelect, errText, shortDate, today, tzs, useLoad } from './controls';
 import MoneyInput from '@/components/MoneyInput';
+import AccountingExport from '@/components/ListExport';
 
 const payee = (i: { farmerId?: string | null; sellerName?: string | null }) => (i.farmerId ? { farmerId: i.farmerId } : { sellerName: i.sellerName });
 
@@ -20,7 +21,7 @@ export function FarmerAccountsView({ mode, canCreate }: { mode: 'owed' | 'statem
   const d = list.data;
   const items: any[] = d?.items ?? [];
   return <div>
-    <Head text={mode === 'owed' ? 'What the cooperative still has to pay for the paddy it bought.' : 'Everything between the cooperative and one farmer, in one place.'} />
+    <Head text={mode === 'owed' ? 'What the cooperative still has to pay for the paddy it bought.' : 'Everything between the cooperative and one farmer, in one place.'} action={<AccountingExport label="Export what is owed to farmers" name="owed-to-farmers" view="farmers-owed" />} />
     {message && <div className="alert-box" style={{ marginBottom: 12 }} role="status">{message} <button type="button" className="btn-secondary" style={{ marginLeft: 8, padding: '0 8px' }} onClick={() => setMessage('')}>OK</button></div>}
     <ErrorBanner message={list.error} onDismiss={() => list.setError('')} />
     {d && <div className="metric-grid" style={{ marginBottom: 16 }}>

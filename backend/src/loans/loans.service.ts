@@ -12,6 +12,10 @@ import { SmsService } from '../messaging/sms.service';
 import { CreateLoanDto } from './dto/loans.dto';
 import { calculateLoanDeductions } from './deduction';
 import { AccountingService } from '../accounting/accounting.service';
+import { eatDate, listFile, listHeader, todayEat } from '../accounting/exports/list-header';
+import { longDate } from '../accounting/exports/report-titles';
+import type { Row } from '../accounting/exports/report-document';
+import type { ExportFormat } from '../accounting/exports/writers';
 
 @Injectable()
 export class LoansService {
@@ -94,6 +98,19 @@ export class LoansService {
         lender: true,
       },
     });
+  }
+
+  /** The loan records as PDF, Word or Excel: every loan the caller may see, with what was lent and what is still owed. */
+  async exportFile(user: RequestUser, format: ExportFormat) {
+    const loans = await this.findAll(user);
+    const head = await listHeader(this.prisma, user.role === UserRole.SUPER_ADMIN ? undefined : user.mamcosId ?? null, user.id);
+    const rows: Row[] = loans.map((l) => ({ cells: [`${l.farmer.firstName} ${l.farmer.lastName}`, l.farmer.controlNumber ?? '—', l.lender?.name ?? l.lenderName, longDate(eatDate(l.createdAt)), l.originalAmount, l.amountOwed, l.autoDeductPercent ?? null, l.isActive ? 'Active' : 'Closed'] }));
+    rows.push({ cells: [`Total · ${loans.length} loan${loans.length === 1 ? '' : 's'}`, '', '', '', loans.reduce((n, l) => n + l.originalAmount, 0), loans.reduce((n, l) => n + l.amountOwed, 0), null, ''], style: 'total' });
+    const doc = {
+      ...head, kind: 'Loans and Lenders', heading: `Loans and Lenders as at ${longDate(todayEat())}`, periodLine: 'Every farmer loan, what was lent and what is still owed',
+      tables: [{ columns: [{ label: 'Farmer', width: 3.2 }, { label: 'Member no.', width: 2 }, { label: 'Lender', width: 3 }, { label: 'Lent on', width: 2.2 }, { label: 'Original', align: 'right' as const, width: 2 }, { label: 'Still owed', align: 'right' as const, width: 2 }, { label: 'Auto-deduct %', align: 'right' as const, width: 1.6, money: false }, { label: 'Status', width: 1.6 }], rows }],
+    };
+    return listFile(format, doc, 'loans-and-lenders');
   }
 
   /**

@@ -7,6 +7,7 @@ import { accountingApi, suppliersApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 import MoneyInput from '@/components/MoneyInput';
+import AccountingExport from '@/components/ListExport';
 
 export const tzs = (n: number) => `TZS ${(Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 export const today = () => new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
@@ -397,7 +398,7 @@ export function DocumentsView({ kind, canCreate, canEdit, view = 'all' }: { kind
   const showVat = rows.some((x: any) => x.vatAmount);
   const showWht = rows.some((x: any) => x.withholdingAmount);
   return <div>
-    <Head action={canCreate && <button type="button" className="btn-primary" onClick={() => { setErr(''); setOpen(true); }}>{isBill ? 'Record bill' : 'Record invoice'}</button>} />
+    <Head action={<span style={{ display: 'inline-flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}><AccountingExport label={isBill ? 'Export supplier bills' : 'Export customer invoices'} name={isBill ? 'supplier-bills' : 'customer-invoices'} view={isBill ? 'bills' : 'invoices'} params={{ status: tab }} />{canCreate && <button type="button" className="btn-primary" onClick={() => { setErr(''); setOpen(true); }}>{isBill ? 'Record bill' : 'Record invoice'}</button>}</span>} />
     <ErrorBanner message={list.error || err} onDismiss={() => { list.setError(''); setErr(''); }} />
     <section className="table-panel"><div className="section-toolbar" style={{ gap: 8, flexWrap: 'wrap' }}>
       {view === 'all' ? <>{([['unpaid', 'Unpaid'], ['PAID', isBill ? 'Paid' : 'Received'], ['VOID', 'Cancelled']] as const).map(([k, label]) => <button key={k} type="button" className={tab === k ? 'btn-primary' : 'btn-secondary'} onClick={() => setTab(k)}>{label}</button>)}</> : <strong>{view === 'paid' ? (isBill ? 'Payments made' : 'Payments received') : 'Unpaid'}</strong>}

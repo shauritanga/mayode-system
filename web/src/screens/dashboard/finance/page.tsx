@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { accountingApi, financeApi, farmersApi, suppliersApi, loansApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 import MoneyInput from '@/components/MoneyInput';
+import AccountingExport, { ListExportButtons } from '@/components/ListExport';
 
 interface FinanceSummary {
   totalRevenue: number;
@@ -338,6 +339,10 @@ function LedgerTab() {
           <input className="input-field" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
         <button className="btn-primary" onClick={load}>Apply</button>
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span className="muted" style={{ fontSize: 12 }}>Trial balance</span><AccountingExport label="Export trial balance" name="trial-balance" view="trial-balance" params={{ to: to || undefined }} />
+          <span className="muted" style={{ fontSize: 12 }}>Ledger by account</span><AccountingExport label="Export general ledger" name="general-ledger" view="general-ledger" params={{ from: from || undefined, to: to || undefined }} />
+        </span>
       </div>
 
       {loading ? (
@@ -416,7 +421,8 @@ function ReceivablesTab() {
   return (
     <div>
       <ErrorBanner message={err} onDismiss={() => setErr('')} />
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <AccountingExport label="Export receivables" name="customer-invoices-outstanding" view="invoices" params={{ status: 'unpaid' }} />
         <button className="btn-primary" onClick={() => setShowForm(true)}>+ New invoice</button>
       </div>
 
@@ -532,7 +538,8 @@ function PayablesTab() {
   return (
     <div>
       <ErrorBanner message={err} onDismiss={() => setErr('')} />
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <AccountingExport label="Export payables" name="supplier-bills-outstanding" view="bills" params={{ status: 'unpaid' }} />
         <button className="btn-primary" onClick={() => setShowForm(true)}>+ New bill</button>
       </div>
 
@@ -657,7 +664,8 @@ function BudgetsTab() {
   return (
     <div>
       <ErrorBanner message={err} onDismiss={() => setErr('')} />
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <AccountingExport label="Export budgets" name="budgets" view="budgets" />
         <button className="btn-primary" onClick={() => setShowForm(true)}>+ New budget</button>
       </div>
 
@@ -811,7 +819,8 @@ function LoansTab() {
   return (
     <div>
       <ErrorBanner message={err} onDismiss={() => setErr('')} />
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <ListExportButtons label="Export loans and lenders" name="loans-and-lenders" get={(format) => loansApi.exportFile(format)} />
         <button className="btn-secondary" onClick={downloadReport} disabled={downloading}>
           {downloading ? 'Preparing…' : 'Download lender payout report'}
         </button>

@@ -7,6 +7,7 @@ import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 import { Actions, Badge, Card, Head, errText, shortDate, today, tzs, useLoad, KIND_WORDS } from './controls';
 import MoneyInput from '@/components/MoneyInput';
+import AccountingExport from '@/components/ListExport';
 
 // ───────────────────────── Money accounts ─────────────────────────
 export function MoneyAccountsView({ canCreate, canEdit }: { canCreate: boolean; canEdit: boolean }) {
@@ -190,6 +191,7 @@ export function CashBookView({ kind }: { kind?: 'MOBILE_MONEY' }) {
       <label className="form-label">From<input className="input-field" type="date" value={from} max={to || today()} onChange={(e) => setFrom(e.target.value)} /></label>
       <label className="form-label">To<input className="input-field" type="date" value={to} min={from} max={today()} onChange={(e) => setTo(e.target.value)} /></label>
       {(from || to) && <button type="button" className="btn-secondary" onClick={() => { setFrom(''); setTo(''); }}>Clear dates</button>}
+      <AccountingExport label="Export the cashbook" name={kind ? 'mobile-money-cashbook' : 'cashbook'} view="cashbook" params={{ account: account || undefined, kind: account ? undefined : kind, from: from || undefined, to: to || undefined }} />
     </div>
     {b && <div className="metric-grid" style={{ marginBottom: 16 }}>
       <Card label={from ? `Balance before ${shortDate(from)}` : 'Started with'} value={tzs(b.opening)} />

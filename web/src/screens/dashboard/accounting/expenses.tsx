@@ -6,6 +6,7 @@ import { accountingApi, mamcosApi, setAccountingMamcos, uploadsApi } from '@/lib
 import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 import MoneyInput from '@/components/MoneyInput';
+import AccountingExport from '@/components/ListExport';
 import { useAuthStore } from '@/store/auth.store';
 import { Actions, Badge, Head, MoneyAccountSelect, errText, shortDate, today, tzs, useLoad } from './controls';
 
@@ -102,7 +103,7 @@ export function CashTransactionsView({ kind, canCreate, canEdit, canApprove }: {
       </label>
     </section>}
     {blocked ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>Choose a cooperative to see and record its {isExp ? 'expenses' : 'income'}.</div> : <>
-    <Head action={canCreate && <button type="button" className="btn-primary" onClick={openCreate}>{isExp ? 'Record expense' : 'Record income'}</button>} />
+    <Head action={<span style={{ display: 'inline-flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}><AccountingExport label={isExp ? 'Export expenses' : 'Export other income'} name={isExp ? 'expenses' : 'other-income'} view={isExp ? 'expenses' : 'income'} params={{ q: q.trim() || undefined, from: from || undefined, to: to || undefined }} />{canCreate && <button type="button" className="btn-primary" onClick={openCreate}>{isExp ? 'Record expense' : 'Record income'}</button>}</span>} />
     <ErrorBanner message={list.error || err} onDismiss={() => { list.setError(); setErr(''); }} />
     {notice && <div className="glass-card" style={{ padding: 12, marginBottom: 12, color: 'var(--green-400, #4ade80)' }}>{notice}</div>}
     {isExp && canEdit && <section className="glass-card" style={{ padding: 14, marginBottom: 14, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>

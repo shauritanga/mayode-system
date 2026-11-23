@@ -14,6 +14,7 @@ import { BankReconciliationView, DocumentsView, PeriodCloseView, VatReturnView }
 import MoneyInput from '@/components/MoneyInput';
 import { ReportExportView } from './exports';
 import { CashTransactionsView } from './expenses';
+import AccountingExport from '@/components/ListExport';
 import { DepreciationView, EquipmentRegisterView } from './assets-views';
 
 const MENU = [
@@ -598,7 +599,8 @@ export default function AccountingPage() {
         <section className="glass-card" style={{ padding: 20, marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
             <div><h2 style={{ margin: 0, fontSize: 20 }}>Trial Balance</h2><p className="muted" style={{ margin: '6px 0 0' }}>Closing debit and credit balances for every general ledger account.</p></div>
-            <label className="form-label" style={{ minWidth: 190 }}>As of date<input className="input-field" type="date" value={trialBalanceAsOf} onChange={(event) => setTrialBalanceAsOf(event.target.value)} /></label>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, flexWrap: 'wrap' }}><label className="form-label" style={{ minWidth: 190 }}>As of date<input className="input-field" type="date" value={trialBalanceAsOf} onChange={(event) => setTrialBalanceAsOf(event.target.value)} /></label>
+              <AccountingExport label="Export trial balance" name="trial-balance" view="trial-balance" params={{ to: trialBalanceAsOf || undefined }} /></div>
           </div>
         </section>
         <div className="metric-grid" style={{ marginBottom: 16 }}>
@@ -651,7 +653,8 @@ export default function AccountingPage() {
           <input className="input-field" style={{ width: 150 }} type="date" aria-label="From date" value={journalFrom} onChange={(event) => setJournalFrom(event.target.value)} />
           <input className="input-field" style={{ width: 150 }} type="date" aria-label="To date" value={journalTo} onChange={(event) => setJournalTo(event.target.value)} />
           <select className="input-field" style={{ width: 170 }} aria-label="Origin" value={journalOrigin} onChange={(event) => setJournalOrigin(event.target.value)}><option value="">All origins</option><option value="MANUAL_JOURNAL">Manual journals</option><option value="REVERSAL">Reversals</option><option value="Invoice">Invoices</option><option value="Bill">Bills</option><option value="Sale">Sales</option><option value="Payroll">Payroll</option></select>
-          <span className="muted" style={{ marginLeft: 'auto' }}>{journalEntries.length} entries</span></div>
+          <span className="muted" style={{ marginLeft: 'auto' }}>{journalEntries.length} entries</span>
+          <AccountingExport label="Export journal entries" name="journal-entries" view="journal" params={{ q: journalSearch.trim() || undefined, from: journalFrom || undefined, to: journalTo || undefined, sourceType: journalOrigin || undefined }} /></div>
           {loading ? <div style={{ padding: 32, textAlign: 'center' }}>Loading journal entries…</div> : !journalEntries.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No journal entries have been posted.</div> : <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Journal number</th><th>Date</th><th>Origin</th><th>Description</th><th>Account</th><th className="num">Debit (TZS)</th><th className="num">Credit (TZS)</th></tr></thead><tbody>{journalEntries.map((entry: any) => <Fragment key={`${entry.sourceType}:${entry.id}`}>
             {(entry.lines ?? []).map((line: any, index: number) => <tr key={`${entry.sourceType}:${entry.id}:${line.accountId}`}>
               <td style={{ fontWeight: 600 }}>{index === 0 ? <>{entry.entryNumber}{entry.revision > 1 && <div className="muted" style={{ fontSize: 12 }}>Adjustment</div>}{entry.reversed && <div style={{ fontSize: 12, color: 'var(--red-400)' }}>Reversed</div>}{entry.reversesJournalId && <div className="muted" style={{ fontSize: 12 }}>Reversal</div>}</> : ''}</td>

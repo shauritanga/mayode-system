@@ -1,5 +1,5 @@
 import { PermissionResource } from '../auth/role-access';
-import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
@@ -67,6 +67,19 @@ export class LoansController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   reconcile(@Param('saleId') saleId: string) {
     return this.loans.reconcileSalePayouts(saleId);
+  }
+
+  /** The loan list as PDF, Word or Excel; fixed path, so it is not read as a farmer id. */
+  @Get('export')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.AUDITOR, UserRole.FINANCIAL_PROVIDER)
+  @RequirePermission('loans', 'VIEW')
+  async exportLoans(@Query('format') format: 'PDF' | 'DOCX' | 'XLSX', @CurrentUser() user: RequestUser, @Res() res: Response) {
+    if (!['PDF', 'DOCX', 'XLSX'].includes(format)) throw new BadRequestException('Choose PDF, Word or Excel.');
+    const f = await this.loans.exportFile(user, format);
+    res.setHeader('Content-Type', f.mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${f.fileName}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.send(f.buffer);
   }
 
   @Get('lender-payout-report')

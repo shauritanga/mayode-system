@@ -39,7 +39,8 @@ import { PeriodLockService } from './period-lock.service';
 import { ReconciliationService } from './reconciliation.service';
 import { TaxService } from './tax.service';
 import { ReportExportService } from './report-export.service';
-import { GenerateReportDto, ListReportArchiveDto } from './dto/report-export.dto';
+import { GenerateReportDto, ListExportQueryDto, ListReportArchiveDto } from './dto/report-export.dto';
+import { ListExportService } from './list-export.service';
 import type { Response } from 'express';
 import { Res } from '@nestjs/common';
 @ApiTags('accounting')
@@ -57,6 +58,7 @@ export class AccountingController {
     private readonly cashAccounts: CashAccountsService,
     private readonly farmerAccounts: FarmerAccountsService,
     private readonly reportExports: ReportExportService,
+    private readonly listExports: ListExportService,
   ) {}
   // Every report and posting below is confined to one cooperative's books: the caller's own, or — for Super Admin — the
   // one named in ?mamcosId=, or everything when none is named. See AccountingService.scopeFor.
@@ -127,6 +129,16 @@ export class AccountingController {
   @RequirePermission('accounting', 'VIEW')
   generateReport(@Body() dto: GenerateReportDto, @CurrentUser() user: RequestUser, @Query('mamcosId') mamcosId?: string) {
     return this.reportExports.generate(this.accounting.scopeFor(user, mamcosId), user, dto);
+  }
+  /** A list on screen as PDF, Word or Excel (everything matching the filters). Fixed path, so it is declared before any ':id' route. */
+  @Get('export')
+  @RequirePermission('accounting', 'VIEW')
+  async exportList(@Query() q: ListExportQueryDto, @CurrentUser() user: RequestUser, @Res() res: Response, @Query('mamcosId') mamcosId?: string) {
+    const f = await this.listExports.export(user, this.accounting.scopeFor(user, mamcosId), q);
+    res.setHeader('Content-Type', f.mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${f.fileName}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.send(f.buffer);
   }
   @Get('report-exports')
   @RequirePermission('accounting', 'VIEW')
