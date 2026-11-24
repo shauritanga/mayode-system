@@ -15,6 +15,8 @@ import MoneyInput from '@/components/MoneyInput';
 import { ReportExportView } from './exports';
 import { CashTransactionsView } from './expenses';
 import AccountingExport from '@/components/ListExport';
+import ExportIcons, { saveDownload } from '@/components/ExportIcons';
+import { previewBlob, printBlob } from '@/lib/print';
 import { DepreciationView, EquipmentRegisterView } from './assets-views';
 
 const MENU = [
@@ -373,6 +375,19 @@ export default function AccountingPage() {
     : '';
 
   const customKey = `${selectedCategory[1]}/${slug(submenu)}`;
+  /**
+   * The statement on screen, as a file, for the dates chosen above (a financial year when none are chosen).
+   * The server builds it from the books, so the file matches the official report and is kept in the archive.
+   */
+  const statementFile = async (format: 'PDF' | 'DOCX' | 'XLSX') => {
+    const report = customKey === 'financial-reports/balance-sheet' ? 'FINANCIAL_POSITION' : customKey === 'financial-reports/cash-flow-statement' ? 'CASH_FLOWS' : 'COMPREHENSIVE_INCOME';
+    const year = new Date(Date.now() + 3 * 3_600_000).getUTCFullYear();
+    const asAt = report === 'FINANCIAL_POSITION';
+    const period = asAt ? (stTo ? { to: stTo } : { year }) : stFrom && stTo ? { from: stFrom, to: stTo } : { year };
+    const row = (await accountingApi.generateReport({ report, format, ...period })).data;
+    const res = await accountingApi.downloadReport(row.id);
+    return { blob: res.data as Blob, fileName: row.fileName as string };
+  };
   const customView = customKey === 'farmer-accounts/owed-to-farmers' ? <FarmerAccountsView mode="owed" canCreate={!!canCreateAccounting} />
     : customKey === 'farmer-accounts/payouts' ? <PayoutsView canCreate={!!canCreateAccounting} canEdit={!!canEditAccounting} />
     : customKey === 'farmer-accounts/farmer-statements' ? <FarmerAccountsView mode="statements" canCreate={false} />
@@ -434,7 +449,10 @@ export default function AccountingPage() {
           {customKey !== 'financial-reports/balance-sheet' && <label className="form-label" style={{ margin: 0 }}>From<input className="input-field" type="date" value={stFrom} max={stTo || undefined} onChange={(e) => setStFrom(e.target.value)} /></label>}
           <label className="form-label" style={{ margin: 0 }}>{customKey === 'financial-reports/balance-sheet' ? 'As at' : 'To'}<input className="input-field" type="date" value={stTo} min={customKey === 'financial-reports/balance-sheet' ? undefined : stFrom || undefined} onChange={(e) => setStTo(e.target.value)} /></label>
           <button type="button" className="btn-secondary" onClick={() => { setStFrom(''); setStTo(''); }} disabled={!stFrom && !stTo}>All dates</button>
-          <Link href="/dashboard/accounting/financial-reports/export-archive" className="btn-secondary">Download as PDF, Word or Excel</Link>
+          <ExportIcons label="Export this statement"
+            onExport={async (format) => { const r = await statementFile(format); saveDownload({ data: r.blob, headers: undefined }, r.fileName); }}
+            onPrint={async (mode) => { const r = await statementFile('PDF'); if (mode === 'print') await printBlob(r.blob); else previewBlob(r.blob); }} />
+          <Link href="/dashboard/accounting/financial-reports/export-archive" className="btn-secondary">Archive of saved reports</Link>
         </section>
       )}
       {customView ? customView : approvedAllocationReport ? <div className="approved-allocation-report">
