@@ -67,12 +67,12 @@ export class FarmersController {
   })
   async create(@Body() dto: CreateFarmerDto, @CurrentUser() user: RequestUser) {
     const phone = dto.phone?.trim() ? normalizeMsisdn(dto.phone) : undefined;
-    if (dto.password) return this.farmersService.create({ ...dto, phone, password: dto.password }, user);
+    if (dto.password) return this.farmersService.create({ ...dto, phone, password: dto.password }, user, { requireNationalId: true });
     // With no password given the farmer is registered with just their name and phone: a temporary password is generated,
     // texted to them, and they must replace it at first sign-in. They complete the rest of their profile themselves.
     // A farmer with no phone of their own (a supervisor answers for them) has nothing to sign in with by SMS: nothing is sent.
     const password = this.credentials.temporaryPassword();
-    const farmer = await this.farmersService.create({ ...dto, phone, password }, user, { mustChangePassword: true });
+    const farmer = await this.farmersService.create({ ...dto, phone, password }, user, { mustChangePassword: true, requireNationalId: true });
     if (!phone) return { ...farmer, credentialsSms: 'not-needed' };
     const sent = await this.credentials.send(phone, dto.firstName, 'sw', password);
     return { ...farmer, credentialsSms: sent ? 'sent' : 'failed', ...(sent ? {} : { temporaryPassword: password }) };

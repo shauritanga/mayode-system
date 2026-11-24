@@ -18,7 +18,7 @@ import {
 type PhoneOwner = { phone: string; member: { id: string; name: string; memberNumber: string; village?: string | null; canBeSupervisor: boolean } | null };
 
 function AddFarmerModal({ onClose, onCreated }: { onClose: () => void; onCreated: (message: string, password?: string) => void }) {
-  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', village: '' });
+  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', nationalId: '', email: '', village: '' });
   const [hectare, setHectare] = useState<{ id: string; code: string } | null>(null);
   const [guardian, setGuardian] = useState<MemberLite | null>(null);
   // Set when the number typed already belongs to someone: a member of this AMCOS becomes the guardian by themselves.
@@ -52,6 +52,10 @@ function AddFarmerModal({ onClose, onCreated }: { onClose: () => void; onCreated
     const hasPhone = !!form.phone.trim();
     if (hasPhone && !validPhone(form.phone)) found.phone = 'Enter a valid phone number, e.g. +255712345678';
     if (!hasPhone && !guardian) found.phone = 'Enter the farmer’s phone number, or choose the guardian below';
+    const nida = form.nationalId.replace(/[\s-]/g, '');
+    const underGuardian = !!guardian || !!owner?.member;
+    if (!underGuardian && !/^\d{20}$/.test(nida)) found.nationalId = nida ? 'A national ID (NIDA) has 20 digits, e.g. 19900101-12345-00001-23' : 'National ID is required, unless a guardian is chosen';
+    if (underGuardian && nida && !/^\d{20}$/.test(nida)) found.nationalId = 'A national ID (NIDA) has 20 digits, e.g. 19900101-12345-00001-23';
     if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) found.email = 'Enter a valid email address';
     if (!hectare) found.hectare = 'Choose the hectare this farmer holds';
     const known = hasPhone && !found.phone ? (owner ?? await checkPhone()) : null;
@@ -62,6 +66,7 @@ function AddFarmerModal({ onClose, onCreated }: { onClose: () => void; onCreated
     try {
       const res = await farmersApi.create({
         firstName: form.firstName.trim(), lastName: form.lastName.trim(), phone: hasPhone ? form.phone.trim() : undefined,
+        idType: nida ? 'NIDA' : undefined, idNumber: nida || undefined,
         email: form.email.trim() || undefined, village: form.village.trim() || undefined, hectareId: hectare!.id,
         guardianId: known?.member ? undefined : guardian?.id,
       });
@@ -89,6 +94,9 @@ function AddFarmerModal({ onClose, onCreated }: { onClose: () => void; onCreated
           </Row>
           <Field label="Phone" error={errors.phone} hint="Their sign-in name. A number already used by a member makes that member the guardian.">
             <input className="input-field" inputMode="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} onBlur={() => void checkPhone()} placeholder="+255712345678" autoComplete="off" />
+          </Field>
+          <Field label={guardian || ownerIsMember ? 'National ID (NIDA)' : 'National ID (NIDA) *'} error={errors.nationalId} hint="20 digits. Required so the same person cannot be registered twice. Not needed for a farmer registered under a guardian.">
+            <input className="input-field" inputMode="numeric" value={form.nationalId} onChange={(e) => set('nationalId', e.target.value.replace(/[^\d\s-]/g, ''))} placeholder="19900101-12345-00001-23" autoComplete="off" />
           </Field>
           {ownerIsMember && (
             <Callout>This number belongs to <strong>{owner!.member!.name}</strong> ({owner!.member!.memberNumber}). They will be the <strong>guardian</strong>: the member who owns this hectare, registered here under a relative. To give the farmer their own number, change it above.</Callout>

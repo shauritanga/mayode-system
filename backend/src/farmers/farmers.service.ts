@@ -112,7 +112,7 @@ export class FarmersService {
       : {};
   }
 
-  async create(dto: CreateFarmerDto & { password: string }, actor?: RequestUser, options: { mustChangePassword?: boolean } = {}) {
+  async create(dto: CreateFarmerDto & { password: string }, actor?: RequestUser, options: { mustChangePassword?: boolean; requireNationalId?: boolean } = {}) {
     const tenantId = actor ? this.ownership.resolveTenantMamcosId(actor) : null;
     if (tenantId) dto = { ...dto, mamcosId: tenantId };
     // The guardian is always an existing member: the real owner of the hectare, which is registered in this farmer's name
@@ -148,6 +148,11 @@ export class FarmersService {
     }
 
     const identity = await this.resolveIdentity(dto);
+    // Registration needs the farmer's own national (NIDA) ID, so one person cannot be registered twice under different numbers.
+    // The only exception is a farmer registered under a guardian (a relative or dependent who has no ID of their own).
+    if (options.requireNationalId && !guardianId && identity?.idType !== FarmerIdType.NIDA) {
+      throw new BadRequestException('Enter the farmer’s national ID (NIDA number, 20 digits). Only a farmer registered under a guardian may be registered without one');
+    }
 
     // An AMCOS farmer is registered on the hectare they already hold, and that hectare's code is their ID.
     const hectare = dto.hectareId ? await this.hectareForRegistration(dto.hectareId, tenantId) : null;
