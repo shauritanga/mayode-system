@@ -111,7 +111,7 @@ describeDb('Input applications from the app (PostgreSQL)', () => {
     expect(r).toMatchObject({ status: 'READY', warehouse: 'Warehouse 01', codeSent: true });
     const sms = texts.filter((t) => /Collection code/.test(t.text)).pop()!.text;
     expect(sms).toMatch(/Urea .* 50 kg/); expect(sms).toMatch(/Collect at: Warehouse 01 \(Madibira\)/);
-    code = /Collection code: ([A-Z0-9]{4}-[A-Z0-9]{4})/.exec(sms)![1];
+    code = /Collection code: (\d{6})/.exec(sms)![1];
     expect((await prisma.farmInputMovement.aggregate({ where: { itemId }, _sum: { quantity: true } }))._sum.quantity).toBe(100); // nothing deducted yet
     expect(await prisma.inputIssue.count({ where: { applicationId: appId } })).toBe(0);
     await expect(svc.approve(office, appId, wh1)).rejects.toBeInstanceOf(ConflictException);
@@ -119,8 +119,8 @@ describeDb('Input applications from the app (PostgreSQL)', () => {
 
   it('only the keeper of that warehouse can use the code; a wrong code is refused', async () => {
     await expect(svc.lookup(otherKeeper, code)).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(svc.lookup(keeper, 'AAAA-AAAA')).rejects.toBeInstanceOf(NotFoundException);
-    const l: any = await svc.lookup(keeper, code.toLowerCase().replace('-', ' '));
+    await expect(svc.lookup(keeper, '000000')).rejects.toBeInstanceOf(NotFoundException);
+    const l: any = await svc.lookup(keeper, code);
     expect(l).toMatchObject({ reference: expect.stringMatching(/^APP-/), farmer: { name: 'Elisha Test' }, warehouse: { name: 'Warehouse 01' }, farmIds: ['9:1R-1'] });
     expect(l.lines[0]).toMatchObject({ quantity: 50, inStock: 100 });
   });
@@ -159,7 +159,7 @@ describeDb('Input applications from the app (PostgreSQL)', () => {
     alerts.length = 0;
     const a: any = await svc.apply(farmer, form({ lines: [{ itemId, quantity: 20 }] }) as any);
     await svc.approve(office, a.id, wh1);
-    const code2 = /Collection code: ([A-Z0-9-]{9})/.exec(texts.filter((t) => /Collection code/.test(t.text)).pop()!.text)![1];
+    const code2 = /Collection code: (\d{6})/.exec(texts.filter((t) => /Collection code/.test(t.text)).pop()!.text)![1];
     await svc.collect(keeper, code2, undefined); // 60 -> 40, below the minimum of 50
     await new Promise((r) => setTimeout(r, 300));
     expect((await whs.minimums(office) as any).data.find((x: any) => x.warehouseId === wh1 && x.itemId === itemId)).toMatchObject({ balance: 40, minQuantity: 50, low: true });
@@ -185,9 +185,9 @@ describeDb('Input applications from the app (PostgreSQL)', () => {
   it('a lost code is replaced: the old one stops working', async () => {
     const a: any = await svc.apply(farmer, form({ lines: [{ itemId, quantity: 5 }] }) as any);
     await svc.approve(office, a.id, wh1);
-    const first = /Collection code: ([A-Z0-9-]{9})/.exec(texts.filter((t) => /Collection code/.test(t.text)).pop()!.text)![1];
+    const first = /Collection code: (\d{6})/.exec(texts.filter((t) => /Collection code/.test(t.text)).pop()!.text)![1];
     await svc.resend(office, a.id, undefined);
-    const second = /Collection code: ([A-Z0-9-]{9})/.exec(texts.filter((t) => /Collection code/.test(t.text)).pop()!.text)![1];
+    const second = /Collection code: (\d{6})/.exec(texts.filter((t) => /Collection code/.test(t.text)).pop()!.text)![1];
     expect(second).not.toBe(first);
     await expect(svc.lookup(keeper, first)).rejects.toBeInstanceOf(NotFoundException);
     expect(((await svc.lookup(keeper, second)) as any).reference).toBe(a.reference);

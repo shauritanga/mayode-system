@@ -38,8 +38,8 @@ export function Collect({ onChanged }: { onChanged: () => void }) {
       <div style={card}>
         <label style={{ fontSize: 13, fontWeight: 600 }}>Collection code</label>
         <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-          <input className="input-field" style={{ fontSize: 20, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700 }} maxLength={9} placeholder="XXXX-XXXX" value={code} onChange={(e) => { setCode(e.target.value); setFound(null); setError(''); }} onKeyDown={(e) => { if (e.key === 'Enter' && code.replace(/[^A-Za-z0-9]/g, '').length === 8) void check(); }} autoFocus />
-          <button type="button" className="btn-primary" disabled={busy || code.replace(/[^A-Za-z0-9]/g, '').length !== 8} onClick={() => void check()}>{busy && !found ? 'Checking…' : 'Check code'}</button>
+          <input className="input-field" style={{ fontSize: 20, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700 }} inputMode="numeric" maxLength={6} placeholder="000000" value={code} onChange={(e) => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setFound(null); setError(''); }} onKeyDown={(e) => { if (e.key === 'Enter' && code.length === 6) void check(); }} autoFocus />
+          <button type="button" className="btn-primary" disabled={busy || code.length !== 6} onClick={() => void check()}>{busy && !found ? 'Checking…' : 'Check code'}</button>
         </div>
         {error && <div role="alert" style={{ marginTop: 12, color: 'var(--red-400, #f87171)', fontWeight: 600, fontSize: 13 }}>{error}</div>}
       </div>

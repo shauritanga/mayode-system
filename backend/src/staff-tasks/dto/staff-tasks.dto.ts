@@ -123,7 +123,7 @@ export class ApplicationQueryDto {
   @IsOptional() @IsString() mamcosId?: string;
 }
 
-export class CollectCodeDto { @IsString() @MinLength(8) @MaxLength(12) code: string; }
+export class CollectCodeDto { @IsString() @MinLength(6) @MaxLength(7) code: string; }
 export class CollectDto extends CollectCodeDto {
   /** Hand over less than approved: the quantity for each line (never more than approved). */
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CollectLineDto) lines?: CollectLineDto[];

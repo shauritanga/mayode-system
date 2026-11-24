@@ -171,13 +171,11 @@ export class InputApplicationsService {
   // ───────────────────────── approving, and collecting at the warehouse ─────────────────────────
 
   private newCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I: easy to read out and type
-    let c = ''; for (let i = 0; i < 8; i++) c += chars[randomInt(0, chars.length)];
-    return c;
+    return String(randomInt(0, 1_000_000)).padStart(6, '0'); // 6 digits: easy to read out and type
   }
   private norm(code: string) { return code.replace(/[^A-Za-z0-9]/g, '').toUpperCase(); }
   private hashOf(mamcosId: string, code: string) { return createHash('sha256').update(`${mamcosId}:${this.norm(code)}`).digest('hex'); }
-  private pretty(code: string) { return `${code.slice(0, 4)}-${code.slice(4)}`; }
+  private pretty(code: string) { return code; }
 
   /** What the warehouse holds, less what is already promised to other approved farmers, for each requested input. */
   private async shortages(mamcosId: string, warehouseId: string, lines: { itemId: string; itemName: string; unit: string; quantity: number }[], exceptAppId?: string) {
@@ -246,7 +244,7 @@ export class InputApplicationsService {
     for (let attempt = 0; attempt < 5; attempt++) {
       const code = this.newCode();
       try {
-        const claimed = await this.prisma.inputApplication.updateMany({ where: { id, status: 'SUBMITTED' }, data: { status: 'READY', warehouseId: wh.id, collectCodeHash: this.hashOf(mamcosId, code), collectCodeHint: code.slice(-4), readyAt: new Date(), decidedById: actor.id, decidedAt: new Date() } });
+        const claimed = await this.prisma.inputApplication.updateMany({ where: { id, status: 'SUBMITTED' }, data: { status: 'READY', warehouseId: wh.id, collectCodeHash: this.hashOf(mamcosId, code), collectCodeHint: code.slice(-2), readyAt: new Date(), decidedById: actor.id, decidedAt: new Date() } });
         if (!claimed.count) throw new ConflictException('This application has already been dealt with');
         const texted = await this.tellFarmerReady(app, code, wh, app.lines, mamcosId);
         return { id, status: 'READY', warehouse: wh.name, codeSent: texted };
@@ -270,8 +268,11 @@ export class InputApplicationsService {
       const short = await this.shortages(mamcosId, wh.id, lines, app.id);
       if (short.length) throw new ConflictException(`${wh.name} does not have enough: ${short.join('; ')}`);
     }
-    const code = this.newCode();
-    await this.prisma.inputApplication.update({ where: { id }, data: { collectCodeHash: this.hashOf(mamcosId, code), collectCodeHint: code.slice(-4), warehouseId: wh.id } });
+    let code = this.newCode();
+    for (let attempt = 0; ; attempt++) {
+      try { await this.prisma.inputApplication.update({ where: { id }, data: { collectCodeHash: this.hashOf(mamcosId, code), collectCodeHint: code.slice(-2), warehouseId: wh.id } }); break; }
+      catch (e: any) { if (e?.code !== 'P2002' || attempt >= 4) throw e; code = this.newCode(); }
+    }
     return { id, warehouse: wh.name, codeSent: await this.tellFarmerReady(app, code, wh, left, mamcosId, true) };
   }
 
@@ -293,7 +294,7 @@ export class InputApplicationsService {
   /** The warehouse keeper types the code the farmer shows. Only the keeper of that warehouse (or someone with full rights) may use it. */
   private async byCode(actor: RequestUser, rawCode: string, mamcosIdParam?: string) {
     const mamcosId = tenantOf(this.ownership, actor, mamcosIdParam);
-    if (this.norm(rawCode).length !== 8) throw new BadRequestException('A collection code has 8 letters and numbers');
+    if (!/^\d{6}$/.test(this.norm(rawCode))) throw new BadRequestException('A collection code has 6 digits');
     const app = await this.prisma.inputApplication.findFirst({ where: { mamcosId, collectCodeHash: this.hashOf(mamcosId, rawCode), status: { in: ['READY', 'PARTLY_ISSUED'] } }, include: { lines: true } });
     if (!app) throw new NotFoundException('That code is not valid. It may be wrong, already used, or replaced by a newer code');
     const kept = (await this.prisma.warehouseKeeper.findMany({ where: { userId: actor.id }, select: { warehouseId: true } })).map((k) => k.warehouseId);
