@@ -1039,6 +1039,7 @@ export const irrigationApi = {
   transfers: (params?: object) => api.get('/irrigation/transfers', { params }),
   createTransfer: (data: object) => api.post('/irrigation/transfers', data),
   approveTransfer: (id: string) => api.post(`/irrigation/transfers/${id}/approve`),
+  initiateSaleTransfer: (id: string) => api.post(`/irrigation/transfers/${id}/initiate-sale`),
   rejectTransfer: (id: string, data: object) => api.post(`/irrigation/transfers/${id}/reject`, data),
   cancelTransfer: (id: string, data: object) => api.post(`/irrigation/transfers/${id}/cancel`, data),
   leadership: (params?: object) => api.get('/irrigation/leadership', { params }),

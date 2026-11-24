@@ -21,6 +21,6 @@ import { EmancipationService } from './emancipation.service';
     IrrigationScopeService, SchemesService, StructureService, AllocationService,
     LeadershipService, DashboardService, DocumentsService, IrrigationSetupService, LeaderAccessService, DebtExposureService, EmancipationService, TransferRecipientService,
   ],
-  exports: [IrrigationScopeService, LeaderAccessService],
+  exports: [IrrigationScopeService, LeaderAccessService, AllocationService],
 })
 export class IrrigationModule {}

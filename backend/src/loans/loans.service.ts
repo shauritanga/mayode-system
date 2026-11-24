@@ -17,6 +17,8 @@ import { longDate } from '../accounting/exports/report-titles';
 import type { Row } from '../accounting/exports/report-document';
 import type { ExportFormat } from '../accounting/exports/writers';
 
+import { assertFarmUsable } from '../irrigation/farm-debt';
+
 @Injectable()
 export class LoansService {
   constructor(
@@ -33,6 +35,7 @@ export class LoansService {
       select: { id: true },
     });
     if (!held) throw new BadRequestException('This member does not hold that plot');
+    await assertFarmUsable(this.prisma, hectareId);
   }
 
   async setPlot(loanId: string, hectareId: string | null | undefined, user: RequestUser) {

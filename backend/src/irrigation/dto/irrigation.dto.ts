@@ -177,6 +177,10 @@ export class CreateDocumentDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) sizeBytes?: number;
 }
 
+export class VerifySaleCodeDto {
+  @IsString() @IsNotEmpty() @MaxLength(12) code: string;
+}
+
 export class DeclineTransferDto {
   @IsString() @IsNotEmpty() @MaxLength(500) reason: string;
 }

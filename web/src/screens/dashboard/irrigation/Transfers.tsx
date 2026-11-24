@@ -14,7 +14,10 @@ import {
   errMsg, fmtDate, todayISO, useApi, useCanalBlockOptions, useIrrigation, type MemberLite,
 } from './ui';
 
-const STATUSES = ['AWAITING_RECIPIENT', 'PENDING_APPROVAL', 'COMPLETED', 'REJECTED', 'CANCELLED'];
+const STATUSES = ['BUYER_REQUESTED', 'AWAITING_CODE', 'AWAITING_RECIPIENT', 'PENDING_APPROVAL', 'COMPLETED', 'REJECTED', 'CANCELLED'];
+const STATUS_LABEL: Record<string, string> = {
+  BUYER_REQUESTED: 'Buyer asked to buy', AWAITING_CODE: 'Waiting for seller’s code', AWAITING_RECIPIENT: 'Awaiting recipient', PENDING_APPROVAL: 'Pending approval',
+};
 
 function NewTransferModal({ schemeId, presetHectareId, onClose, onSaved }: { schemeId: string; presetHectareId?: string; onClose: () => void; onSaved: (m: string) => void }) {
   const [canalId, setCanalId] = useState('');
@@ -119,6 +122,15 @@ export default function Transfers({ bare = false, adding: addingProp, onAddDone 
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const { data, loading, error, reload } = useApi<any>(schemeId ? () => irrigationApi.transfers({ schemeId, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page, pageSize: 20 }) : null, [schemeId, JSON.stringify(filters), page]);
   const setFilter = (k: string, v: string) => { setFilters((f) => ({ ...f, [k]: v })); setPage(1); };
+  const [sendingId, setSendingId] = useState('');
+  const sendSaleCode = async (t: any) => {
+    setSendingId(t.id);
+    try {
+      await irrigationApi.initiateSaleTransfer(t.id);
+      setMessage({ tone: 'success', text: `A code was texted to ${t.previousFarmer.name}, the seller. The buyer, ${t.newFarmer.name}, must get it from them and enter it in the app.` });
+      reload();
+    } catch (e) { setMessage({ tone: 'error', text: errMsg(e, 'Could not send the code.') }); } finally { setSendingId(''); }
+  };
   const canEdit = can('irrigation_allocations', 'EDIT');
   const canApprove = can('irrigation_transfer_approval', 'EDIT');
   return (
@@ -133,7 +145,7 @@ export default function Transfers({ bare = false, adding: addingProp, onAddDone 
       <section className="table-panel">
         <Filters>
           <Field label="Search member"><input className="input-field" placeholder="Name or member no." value={filters.q} onChange={(e) => setFilter('q', e.target.value)} /></Field>
-          <Field label="Status"><select className="input-field" value={filters.status} onChange={(e) => setFilter('status', e.target.value)}><option value="">All</option>{STATUSES.map((s) => <option key={s} value={s}>{s === 'PENDING_APPROVAL' ? 'Pending approval' : s === 'AWAITING_RECIPIENT' ? 'Awaiting recipient' : s[0] + s.slice(1).toLowerCase()}</option>)}</select></Field>
+          <Field label="Status"><select className="input-field" value={filters.status} onChange={(e) => setFilter('status', e.target.value)}><option value="">All</option>{STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s] ?? s[0] + s.slice(1).toLowerCase()}</option>)}</select></Field>
           <Field label="Effective from"><input type="date" className="input-field" value={filters.from} onChange={(e) => setFilter('from', e.target.value)} /></Field>
           <Field label="Effective to"><input type="date" className="input-field" value={filters.to} onChange={(e) => setFilter('to', e.target.value)} /></Field>
         </Filters>
@@ -150,6 +162,8 @@ export default function Transfers({ bare = false, adding: addingProp, onAddDone 
                 <td><StatusBadge value={t.status} /></td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button type="button" className="btn-secondary" onClick={() => setDocs(t)}>Documents{t.documents.length ? ` (${t.documents.length})` : ''}</button>
+                  {t.isSale && (t.status === 'BUYER_REQUESTED' || t.status === 'AWAITING_CODE') && canApprove && <button type="button" className="btn-primary" disabled={sendingId === t.id} onClick={() => void sendSaleCode(t)}>{sendingId === t.id ? 'Sending…' : t.status === 'BUYER_REQUESTED' ? 'Initiate and text code' : 'Resend code'}</button>}
+                  {(t.status === 'BUYER_REQUESTED' || t.status === 'AWAITING_CODE') && canEdit && <button type="button" className="btn-secondary" onClick={() => setAction({ kind: 'cancel', transfer: t })}>Cancel</button>}
                   {t.status === 'AWAITING_RECIPIENT' && canEdit && <button type="button" className="btn-secondary" onClick={() => setAction({ kind: 'cancel', transfer: t })}>Cancel</button>}
                   {t.status === 'PENDING_APPROVAL' && canEdit && <> {canApprove && <button type="button" className="btn-primary" onClick={() => setAction({ kind: 'approve', transfer: t })}>Sign off</button>} <button type="button" className="btn-secondary" onClick={() => setAction({ kind: 'reject', transfer: t })}>Reject</button> <button type="button" className="btn-secondary" onClick={() => setAction({ kind: 'cancel', transfer: t })}>Cancel</button></>}
                 </td>

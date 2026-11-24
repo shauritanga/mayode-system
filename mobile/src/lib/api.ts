@@ -624,6 +624,21 @@ export const plotTransfersApi = {
   request: (data: { hectareId: string; toMember: string; reason: string }) => api.post('/irrigation/my-plots/transfers', data),
   withdraw: (id: string) => api.post(`/irrigation/my-plots/transfers/${id}/cancel`),
   requestEmancipation: (allocationId: string) => api.post('/irrigation/my-plots/emancipations', { allocationId }),
+  /** The buyer of a farm enters the code the seller was texted. */
+  verifyCode: (id: string, code: string) => api.post(`/irrigation/my-transfers/${id}/verify-code`, { code }),
+};
+
+// ── Farms for sale ──
+export const farmSalesApi = {
+  list: () => api.get('/farm-sales'),
+  mine: () => api.get('/farm-sales/mine'),
+  fee: () => api.get('/farm-sales/fee'),
+  get: (id: string) => api.get(`/farm-sales/${id}`),
+  create: (data: { hectareId: string; askingPrice: number; description?: string; feePaidBy: 'SELLER' | 'BUYER'; phoneNumber?: string }) => api.post('/farm-sales', data),
+  payFee: (id: string, phoneNumber?: string) => api.post(`/farm-sales/${id}/pay-fee`, { phoneNumber }),
+  buy: (id: string, phoneNumber?: string) => api.post(`/farm-sales/${id}/buy`, { phoneNumber }),
+  withdraw: (id: string) => api.post(`/farm-sales/${id}/withdraw`),
+  reconcile: (id: string) => api.post(`/farm-sales/${id}/reconcile`),
 };
 
 // ── Board meetings and the General Meeting: the member's side ──

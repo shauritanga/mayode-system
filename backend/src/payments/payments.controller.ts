@@ -1,3 +1,4 @@
+import { FarmSalesService } from '../farm-sales/farm-sales.service';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import {
   Body,
@@ -100,6 +101,14 @@ export class PaymentsController {
         if (r.matched) matched = true;
       } catch (e) {
         this.logger.debug(`Not an operations invoice payment: ${orderReference}`);
+      }
+      try {
+        // Farm-for-sale listing fees (looked up lazily to avoid a module cycle).
+        const farmSales = this.moduleRef.get(FarmSalesService, { strict: false });
+        await farmSales.reconcileFee(orderReference);
+        matched = true;
+      } catch (e) {
+        this.logger.debug(`Not a farm sale fee: ${orderReference}`);
       }
       if (!matched) {
         this.logger.error(

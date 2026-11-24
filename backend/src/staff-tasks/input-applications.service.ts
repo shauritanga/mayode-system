@@ -1,4 +1,5 @@
 import { createHash, randomInt } from 'crypto';
+import { assertFarmUsable } from '../irrigation/farm-debt';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -102,6 +103,9 @@ export class InputApplicationsService {
     const mine = new Set(hectares.map((h) => h.farmId));
     const farmIds = [...new Set(dto.farmIds)];
     if (farmIds.some((id) => !mine.has(id))) throw new BadRequestException('Choose only hectares that you farm');
+    // A farm bought with dues still owing from before the sale cannot get inputs until the new owner has cleared them.
+    const heldNow = await this.prisma.irrigationHectareAllocation.findMany({ where: { farmerId: f.id, status: 'ACTIVE' }, select: { hectareId: true, hectare: { select: { code: true } } } });
+    for (const a of heldNow) if (farmIds.includes(farmIdDisplay(a.hectare.code))) await assertFarmUsable(this.prisma, a.hectareId);
     const merged = new Map<string, number>();
     for (const l of dto.lines) merged.set(l.itemId, (merged.get(l.itemId) ?? 0) + l.quantity);
     const items = await this.availableItems(f.mamcosId);

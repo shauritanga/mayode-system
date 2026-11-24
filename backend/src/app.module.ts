@@ -58,6 +58,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { ReportsModule } from './reports/reports.module';
 import { LoansModule } from './loans/loans.module';
 import { IrrigationModule } from './irrigation/irrigation.module';
+import { FarmSalesModule } from './farm-sales/farm-sales.module';
 import { StaffModule } from './staff/staff.module';
 import { JoinRequestsModule } from './join-requests/join-requests.module';
 import { MachineryModule } from './machinery/machinery.module';
@@ -150,6 +151,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     LoansModule,
     AccountingModule,
     IrrigationModule,
+    FarmSalesModule,
     StaffModule,
     JoinRequestsModule,
     MachineryModule,

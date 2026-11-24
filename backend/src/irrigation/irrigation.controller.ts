@@ -18,7 +18,7 @@ import { EmancipationService } from './emancipation.service';
 import { IrrigationSetupService } from './irrigation-roles';
 import {
   AllocateHectareDto, AppointLeaderDto, NoteBody, EmancipationDecisionDto, EmancipationRequestDto, MyTransferRequestDto, SetGuardianDto, CreateBlockDto, CreateCanalDto, CreateDocumentDto, CreateHectareDto,
-  CreateSchemeDto, CreateTransferDto, DeclineTransferDto, EndLeadershipDto, ReasonDto, UpdateBlockDto, UpdateCanalDto, UpdateSchemeDto,
+  CreateSchemeDto, CreateTransferDto, DeclineTransferDto, VerifySaleCodeDto, EndLeadershipDto, ReasonDto, UpdateBlockDto, UpdateCanalDto, UpdateSchemeDto,
 } from './dto/irrigation.dto';
 
 type Q = Record<string, string>;
@@ -159,6 +159,9 @@ export class IrrigationController {
   createTransfer(@CurrentUser() u: RequestUser, @Body() dto: CreateTransferDto) { return this.recipients.createTransfer(u, dto); }
   @Post('transfers/:id/approve') @RequirePermission(TRANSFER_APPROVAL, 'EDIT')
   approveTransfer(@CurrentUser() u: RequestUser, @Param('id') id: string) { return this.allocations.approveTransfer(u, id); }
+  /** Farm sales: the AMCOS leader starts the verification, which texts a code to the seller (also used to send a new code). */
+  @Post('transfers/:id/initiate-sale') @RequirePermission(TRANSFER_APPROVAL, 'EDIT')
+  initiateSale(@CurrentUser() u: RequestUser, @Param('id') id: string) { return this.allocations.initiateSale(u, id); }
   @Post('transfers/:id/reject') @RequirePermission(ALLOC, 'EDIT')
   rejectTransfer(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: ReasonDto) { return this.allocations.closeTransfer(u, id, 'REJECTED', dto.reason); }
   @Post('transfers/:id/cancel') @RequirePermission(ALLOC, 'EDIT')
@@ -198,6 +201,9 @@ export class MyTransfersController {
   incoming(@CurrentUser() u: RequestUser) { return this.allocations.incomingTransfers(u); }
   @Post(':id/accept')
   accept(@CurrentUser() u: RequestUser, @Param('id') id: string) { return this.allocations.respondToTransfer(u, id, true); }
+  /** The buyer of a farm enters the code the seller was texted. */
+  @Post(':id/verify-code')
+  verifyCode(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: VerifySaleCodeDto) { return this.allocations.verifySaleCode(u, id, dto.code); }
   @Post(':id/decline')
   decline(@CurrentUser() u: RequestUser, @Param('id') id: string, @Body() dto: DeclineTransferDto) { return this.allocations.respondToTransfer(u, id, false, dto.reason); }
 }

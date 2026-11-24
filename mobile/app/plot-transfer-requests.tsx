@@ -9,6 +9,8 @@ import { useI18n } from '../src/i18n';
 
 type Incoming = {
   id: string;
+  status?: string;
+  isSale?: boolean;
   hectare: { id: string; code: string };
   from: { id: string; name: string; memberNumber: string };
   reason: string;
@@ -29,6 +31,7 @@ export default function PlotTransferRequests() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const [codes, setCodes] = useState<Record<string, string>>({});
 
   const load = useCallback(async (pull = false) => {
     pull ? setRefreshing(true) : setLoading(true);
@@ -68,6 +71,21 @@ export default function PlotTransferRequests() {
         },
       ],
     );
+  };
+
+  const sendCode = async (item: Incoming) => {
+    const code = (codes[item.id] ?? '').replace(/\D/g, '');
+    if (code.length !== 6) { Alert.alert(t('plotTransferRequests'), t('farmSaleCodeHint')); return; }
+    setBusyId(item.id);
+    try {
+      await plotTransfersApi.verifyCode(item.id, code);
+      Alert.alert(t('plotTransferRequests'), t('farmSaleCodeOk'));
+    } catch (e: any) {
+      Alert.alert(t('plotTransferRequests'), apiMessage(e));
+    } finally {
+      setBusyId(null);
+      await load();
+    }
   };
 
   const decline = async (item: Incoming) => {
@@ -110,7 +128,26 @@ export default function PlotTransferRequests() {
               <Text style={styles.line}>{t('plotTransferEffective', { date: item.effectiveDate.slice(0, 10) })}</Text>
               <Text style={styles.line}>{t('plotTransferReason', { reason: item.reason })}</Text>
 
-              {decliningId === item.id ? (
+              {item.isSale ? (
+                <>
+                  <Text style={styles.label}>{t('farmSaleEnterCode')}</Text>
+                  <Text style={styles.line}>{t('farmSaleCodeHint')}</Text>
+                  <TextInput
+                    style={[styles.input, { minHeight: 0, fontSize: 22, letterSpacing: 6, textAlign: 'center', marginTop: 10 }]}
+                    value={codes[item.id] ?? ''}
+                    onChangeText={(v) => setCodes((c) => ({ ...c, [item.id]: v.replace(/\D/g, '').slice(0, 6) }))}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    placeholder="000000"
+                    placeholderTextColor="#9CA3AF"
+                  />
+                  <View style={styles.row}>
+                    <TouchableOpacity style={[styles.btn, styles.btnPrimary, busyId === item.id && { opacity: 0.6 }]} onPress={() => sendCode(item)} disabled={busyId === item.id}>
+                      <Text style={styles.btnText}>{busyId === item.id ? '…' : t('farmSaleCodeSubmit')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : decliningId === item.id ? (
                 <>
                   <Text style={styles.label}>{t('plotTransferDeclineReason')}</Text>
                   <TextInput

@@ -274,6 +274,13 @@ export default function ProfileTab() {
               </View>
               <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#9CA3AF" />
             </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/farms-for-sale')}>
+              <View style={styles.menuItemLeft}>
+                <HugeiconsIcon icon={Agreement01Icon} size={22} color="#10B981" />
+                <Text style={styles.menuItemText}>{t('farmsForSale')}</Text>
+              </View>
+              <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#9CA3AF" />
+            </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/plot-transfer-requests')}>
               <View style={styles.menuItemLeft}>
                 <HugeiconsIcon icon={Agreement01Icon} size={22} color="#10B981" />
