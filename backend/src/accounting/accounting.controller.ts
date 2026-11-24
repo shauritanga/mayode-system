@@ -39,7 +39,7 @@ import { PeriodLockService } from './period-lock.service';
 import { ReconciliationService } from './reconciliation.service';
 import { TaxService } from './tax.service';
 import { ReportExportService } from './report-export.service';
-import { GenerateReportDto, ListExportQueryDto, ListReportArchiveDto } from './dto/report-export.dto';
+import { GenerateReportDto, ListExportQueryDto, ListReportArchiveDto, TableExportDto } from './dto/report-export.dto';
 import { ListExportService } from './list-export.service';
 import type { Response } from 'express';
 import { Res } from '@nestjs/common';
@@ -135,6 +135,16 @@ export class AccountingController {
   @RequirePermission('accounting', 'VIEW')
   async exportList(@Query() q: ListExportQueryDto, @CurrentUser() user: RequestUser, @Res() res: Response, @Query('mamcosId') mamcosId?: string) {
     const f = await this.listExports.export(user, this.accounting.scopeFor(user, mamcosId), q);
+    res.setHeader('Content-Type', f.mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${f.fileName}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.send(f.buffer);
+  }
+  /** Any list on screen as PDF, Word or Excel, from the rows the screen sends. The heading and preparer are the signed-in user's own. */
+  @Post('table-export')
+  @RequirePermission('accounting', 'VIEW')
+  async exportTable(@Body() dto: TableExportDto, @CurrentUser() user: RequestUser, @Res() res: Response, @Query('mamcosId') mamcosId?: string) {
+    const f = await this.listExports.table(user, this.accounting.scopeFor(user, mamcosId), dto);
     res.setHeader('Content-Type', f.mime);
     res.setHeader('Content-Disposition', `attachment; filename="${f.fileName}"`);
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');

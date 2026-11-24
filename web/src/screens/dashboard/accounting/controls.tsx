@@ -7,7 +7,7 @@ import { accountingApi, suppliersApi } from '@/lib/api';
 import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 import MoneyInput from '@/components/MoneyInput';
-import AccountingExport from '@/components/ListExport';
+import AccountingExport, { TableExport } from '@/components/ListExport';
 
 export const tzs = (n: number) => `TZS ${(Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 export const today = () => new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
@@ -118,7 +118,9 @@ export function PeriodCloseView({ canClose, canReopen }: { canClose: boolean; ca
       {mustAdvance && <div className="muted" style={{ marginTop: 10, fontSize: 13 }}>Already closed through {shortDate(closed)}. Choose a later month.</div>}
       {check.data?.warnings?.length > 0 && <ul style={{ margin: '12px 0 0', paddingLeft: 18, fontSize: 13, color: '#fbbf24' }}>{check.data.warnings.map((w: string) => <li key={w}>{w}</li>)}</ul>}
     </section>
-    <section className="table-panel"><div className="section-toolbar"><strong>Close history</strong></div>
+    <section className="table-panel"><div className="section-toolbar"><strong>Close history</strong>
+      {!!lock.data?.events?.length && <TableExport title="Period Close History" name="period-close-history" columns={[{ label: 'When' }, { label: 'Action' }, { label: 'From' }, { label: 'To' }, { label: 'By' }, { label: 'Reason' }]}
+        rows={lock.data.events.map((e: any) => [shortDate(e.createdAt), e.action === 'CLOSE' ? 'Closed' : 'Reopened', shortDate(e.fromDate), e.toDate ? shortDate(e.toDate) : 'Fully open', e.by ?? '—', e.reason ?? '—'])} />}</div>
       {!lock.data?.events?.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No closings yet.</div> :
         <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>When</th><th>Action</th><th>From</th><th>To</th><th>By</th><th>Reason</th></tr></thead><tbody>
           {lock.data.events.map((e: any) => <tr key={e.id}><td>{shortDate(e.createdAt)}</td><td>{e.action === 'CLOSE' ? 'Closed' : 'Reopened'}</td><td>{shortDate(e.fromDate)}</td><td>{e.toDate ? shortDate(e.toDate) : 'Fully open'}</td><td>{e.by ?? '—'}</td><td>{e.reason ?? '—'}</td></tr>)}
@@ -162,7 +164,9 @@ export function BankReconciliationView({ canCreate, canEdit, canDelete }: { canC
       <Card label="Difference" value={s.hasStatements ? tzs(s.difference) : '—'} tone={!s.hasStatements ? undefined : s.reconciled ? 'good' : 'bad'}
         hint={s.hasStatements ? (s.reconciled ? 'Agrees' : `Not in books ${tzs(s.unmatchedLinesNet)} · not on statement ${tzs(s.unmatchedLedgerNet)}`) : undefined} />
     </div>}
-    {s?.byAccount?.length > 0 && <section className="table-panel" style={{ marginBottom: 16 }}><div className="section-toolbar"><strong>Each account against its statement</strong></div>
+    {s?.byAccount?.length > 0 && <section className="table-panel" style={{ marginBottom: 16 }}><div className="section-toolbar"><strong>Each account against its statement</strong>
+      <TableExport title="Bank Reconciliation: Accounts" name="reconciliation-accounts" columns={[{ label: 'Account' }, { label: 'Type' }, { label: 'In your books', align: 'right' }, { label: 'On the latest statement', align: 'right' }, { label: 'Difference', align: 'right' }, { label: 'Result' }]}
+        rows={s.byAccount.map((a: any) => [a.name, KIND_WORDS[a.kind] ?? a.kind, Number(a.books) || 0, a.statement == null ? null : Number(a.statement) || 0, a.difference == null ? null : Number(a.difference) || 0, a.statement == null ? 'No statement yet' : Math.abs(a.difference) < 0.005 ? 'Agrees' : 'Needs checking'])} /></div>
       <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Account</th><th className="num">In your books</th><th className="num">On the latest statement</th><th className="num">Difference</th><th /></tr></thead><tbody>
         {s.byAccount.map((a: any) => <tr key={a.id}><td><strong>{a.name}</strong><div className="muted" style={{ fontSize: 12 }}>{KIND_WORDS[a.kind]}</div></td>
           <td className="num">{tzs(a.books)}</td><td className="num">{a.statement == null ? '—' : tzs(a.statement)}</td>
@@ -170,7 +174,9 @@ export function BankReconciliationView({ canCreate, canEdit, canDelete }: { canC
           <td>{a.statement == null ? <span className="muted">No statement yet</span> : Math.abs(a.difference) < 0.005 ? <Badge tone="good">Agrees</Badge> : <Badge tone="bad">Needs checking</Badge>}</td></tr>)}
       </tbody></table></div>
     </section>}
-    <section className="table-panel"><div className="section-toolbar"><strong>Statements</strong></div>
+    <section className="table-panel"><div className="section-toolbar"><strong>Statements</strong>
+      {!!list.data?.length && <TableExport title="Bank Statements" name="bank-statements" columns={[{ label: 'Account' }, { label: 'Type' }, { label: 'Period' }, { label: 'Opening', align: 'right' }, { label: 'Closing', align: 'right' }, { label: 'Lines', money: false, align: 'right' }, { label: 'Not matched', money: false, align: 'right' }, { label: 'Status' }]}
+        rows={list.data.map((st: any) => [st.accountLabel, String(st.kind).replace('_', ' ').toLowerCase(), `${shortDate(st.periodStart)} – ${shortDate(st.periodEnd)}`, Number(st.openingBalance) || 0, Number(st.closingBalance) || 0, st.lineCount ?? 0, st.unmatched ?? 0, st.status === 'RECONCILED' ? 'Reconciled' : st.arithmeticDifference ? 'Lines do not add up' : 'In progress'])} />}</div>
       {list.loading ? <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div> : !list.data?.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No statements yet. Add one to start reconciling.</div> :
         <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Account</th><th>Period</th><th className="num">Opening</th><th className="num">Closing</th><th>Lines</th><th>Status</th><th /></tr></thead><tbody>
           {list.data.map((st: any) => <tr key={st.id}><td>{st.accountLabel}<div className="muted" style={{ fontSize: 12 }}>{st.kind.replace('_', ' ').toLowerCase()}</div></td><td>{shortDate(st.periodStart)} – {shortDate(st.periodEnd)}</td><td className="num">{tzs(st.openingBalance)}</td><td className="num">{tzs(st.closingBalance)}</td>
@@ -271,7 +277,10 @@ function StatementDetail({ id, canEdit, canDelete, onBack }: { id: string; canEd
         <Card label="Opening → closing" value={`${tzs(st.openingBalance)} → ${tzs(st.closingBalance)}`} hint={st.arithmeticDifference === 0 ? 'Lines add up' : `Lines are off by ${tzs(st.arithmeticDifference)}`} tone={st.arithmeticDifference === 0 ? undefined : 'bad'} />
         <Card label="Unmatched lines" value={String(st.unmatchedLines)} tone={st.unmatchedLines ? 'bad' : 'good'} />
       </div>
-      <section className="table-panel"><div className="section-toolbar"><strong>Statement lines</strong></div>
+      <section className="table-panel"><div className="section-toolbar"><strong>Statement lines</strong>
+        <TableExport title={`Bank Statement: ${st.accountLabel}`} subtitle={`${shortDate(st.periodStart)} – ${shortDate(st.periodEnd)}${st.status === 'RECONCILED' ? ' · reconciled' : ''}`} name="bank-statement-lines"
+          columns={[{ label: 'Date' }, { label: 'Description' }, { label: 'Reference' }, { label: 'Amount', align: 'right' }, { label: 'Cash book' }]}
+          rows={st.lines.map((l: any) => [shortDate(l.date), l.description ?? '', l.reference ?? '—', Number(l.amount) || 0, l.matched ? `${l.matched.entryNumber} ${l.matched.description ?? ''}`.trim() : 'Not in books'])} /></div>
         <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Date</th><th>Description</th><th className="num">Amount</th><th>Cash book</th><th /></tr></thead><tbody>
           {st.lines.map((l: any) => {
             const options = (st.unmatchedLedger ?? []).filter((e: any) => Math.round(e.amount * 100) === Math.round(l.amount * 100));
@@ -339,7 +348,11 @@ export function VatReturnView({ canCreate }: { canCreate: boolean }) {
         <Card label="Withholding to pay" value={tzs(d.withholdingPayableToDate)} hint={d.withholdingCreditToDate ? `Credit from customers: ${tzs(d.withholdingCreditToDate)}` : undefined} />
       </div>
       {[['Sales', d.sales, 'Customer'], ['Purchases', d.purchases, 'Supplier']].map(([title, rows, who]: any) => <section key={title} className="table-panel" style={{ marginBottom: 16 }}>
-        <div className="section-toolbar"><strong>{title}</strong><span className="muted">{rows.length}</span></div>
+        <div className="section-toolbar"><strong>{title}</strong><span className="muted">{rows.length}</span>
+          {rows.length > 0 && <TableExport title={`VAT Return: ${title}`} subtitle={`${shortDate(from)} – ${shortDate(to)}`} name={`vat-${String(title).toLowerCase()}`}
+            columns={[{ label: 'Number' }, ...(who === 'Supplier' ? [{ label: 'Supplier' }] : []), { label: 'Date' }, { label: 'Net', align: 'right' as const }, { label: 'VAT', align: 'right' as const }, { label: 'Total', align: 'right' as const }, { label: 'Withheld', align: 'right' as const }]}
+            rows={rows.map((x: any) => [x.number, ...(who === 'Supplier' ? [x.supplier] : []), shortDate(x.date), Number(x.net) || 0, Number(x.vat) || 0, Number(x.total) || 0, Number(x.withheld) || 0])}
+            totals={['Total', ...(who === 'Supplier' ? [''] : []), '', rows.reduce((n: number, x: any) => n + (Number(x.net) || 0), 0), rows.reduce((n: number, x: any) => n + (Number(x.vat) || 0), 0), rows.reduce((n: number, x: any) => n + (Number(x.total) || 0), 0), rows.reduce((n: number, x: any) => n + (Number(x.withheld) || 0), 0)]} />}</div>
         {!rows.length ? <div className="muted" style={{ padding: 18 }}>None in this period.</div> : <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Number</th>{who === 'Supplier' && <th>Supplier</th>}<th>Date</th><th className="num">Net</th><th className="num">VAT</th><th className="num">Total</th><th className="num">Withheld</th></tr></thead><tbody>
           {rows.map((x: any) => <tr key={x.number}><td>{x.number}</td>{who === 'Supplier' && <td>{x.supplier}</td>}<td>{shortDate(x.date)}</td><td className="num">{tzs(x.net)}</td><td className="num">{tzs(x.vat)}</td><td className="num">{tzs(x.total)}</td><td className="num">{x.withheld ? tzs(x.withheld) : '—'}</td></tr>)}
         </tbody></table></div>}

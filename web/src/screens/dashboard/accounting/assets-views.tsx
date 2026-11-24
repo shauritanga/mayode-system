@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { assetsApi } from '@/lib/api';
 import ErrorBanner from '@/components/ErrorBanner';
 import { Card, Head, shortDate, tzs, useLoad } from './controls';
+import { TableExport } from '@/components/ListExport';
 
 const manage = <Link href="/dashboard/assets" className="btn-secondary">Open Assets to add or change equipment</Link>;
 
@@ -23,6 +24,10 @@ export function EquipmentRegisterView() {
       <Card label="Net book value" value={tzs(t.bookValue)} tone="good" />
     </div>}
     <section className="table-panel">
+      {items.length > 0 && <div className="section-toolbar"><strong>Asset register</strong>
+        <TableExport title="Equipment Register" name="equipment-register" columns={[{ label: 'Tag', money: false }, { label: 'Asset' }, { label: 'Category' }, { label: 'Bought' }, { label: 'Cost', align: 'right' }, { label: 'Depreciation', align: 'right' }, { label: 'Book value', align: 'right' }, { label: 'Status' }]}
+          rows={items.map((a) => [a.tag, a.name, String(a.category ?? '').replace(/_/g, ' ').toLowerCase(), shortDate(a.purchaseDate ?? a.depreciationStart), Number(a.cost) || 0, Number(a.accumulatedDepreciation) || 0, Number(a.bookValue) || 0, String(a.status ?? '').replace(/_/g, ' ').toLowerCase()])}
+          totals={t ? ['Total', '', '', '', Number(t.cost) || 0, Number(t.accumulatedDepreciation) || 0, Number(t.bookValue) || 0, ''] : undefined} /></div>}
       {list.loading && !list.data ? <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div> : !items.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No assets have been registered.</div> :
         <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Tag</th><th>Asset</th><th>Category</th><th>Bought</th><th className="num">Cost</th><th className="num">Depreciation</th><th className="num">Book value</th><th>Status</th></tr></thead><tbody>
           {items.map((a) => <tr key={a.id}><td>{a.tag}</td><td>{a.name}</td><td>{String(a.category ?? '').replace(/_/g, ' ').toLowerCase()}</td><td>{shortDate(a.purchaseDate ?? a.depreciationStart)}</td>
@@ -41,6 +46,10 @@ export function DepreciationView() {
     <Head text="Each month's depreciation, as posted to the books (expense against accumulated depreciation). Run a new month from Assets." action={manage} />
     <ErrorBanner message={runs.error} onDismiss={() => runs.setError()} />
     <section className="table-panel">
+      {rows.length > 0 && <div className="section-toolbar"><strong>Depreciation posted</strong>
+        <TableExport title="Depreciation" name="depreciation" columns={[{ label: 'Month' }, { label: 'Assets', align: 'right', money: false }, { label: 'Depreciation', align: 'right' }, { label: 'Posted' }]}
+          rows={rows.map((r) => [r.period, r.assets ?? 0, Number(r.total) || 0, shortDate(r.createdAt ?? r.postedAt)])}
+          totals={['Total', '', rows.reduce((n, r) => n + (Number(r.total) || 0), 0), '']} /></div>}
       {runs.loading && !runs.data ? <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div> : !rows.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No depreciation has been posted yet.</div> :
         <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Month</th><th className="num">Assets</th><th className="num">Depreciation</th><th>Posted</th></tr></thead><tbody>
           {rows.map((r) => <tr key={r.id}><td>{r.period}</td><td className="num">{r.assets}</td><td className="num">{tzs(r.total)}</td><td>{shortDate(r.createdAt ?? r.postedAt)}</td></tr>)}

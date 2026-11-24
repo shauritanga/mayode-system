@@ -317,6 +317,8 @@ export const accountingApi = {
   cashFlow: (params?: object) => api.get('/accounting/cash-flow', { params: forAmcos(params) }),
   trialBalance: (params?: object) => api.get('/accounting/trial-balance', { params }),
   accountBalances: (params?: object) => api.get('/accounting/account-balances', { params }),
+  /** Any list on screen as PDF, Word or Excel: the rows are sent, the official heading is added by the server. */
+  exportTable: (data: object) => api.post('/accounting/table-export', data, { responseType: 'blob' }),
   journalEntries: (params?: object) => api.get('/accounting/journal-entries', { params }),
   reverseJournal: (journalId: string, data: { reason: string; date?: string }) => api.post(`/accounting/journal-entries/${journalId}/reverse`, data),
   createJournalEntry: (data: object) => api.post('/accounting/journal-entries', data),

@@ -7,7 +7,7 @@ import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 import { Actions, Badge, Card, Head, errText, shortDate, today, tzs, useLoad, KIND_WORDS } from './controls';
 import MoneyInput from '@/components/MoneyInput';
-import AccountingExport from '@/components/ListExport';
+import AccountingExport, { TableExport } from '@/components/ListExport';
 
 // ───────────────────────── Money accounts ─────────────────────────
 export function MoneyAccountsView({ canCreate, canEdit }: { canCreate: boolean; canEdit: boolean }) {
@@ -28,7 +28,10 @@ export function MoneyAccountsView({ canCreate, canEdit }: { canCreate: boolean; 
   const patch = async (id: string, body: object, text: string) => { setErr(''); try { await accountingApi.updateCashAccount(id, body); done(text); } catch (e) { setErr(errText(e, 'Could not save.')); } };
 
   return <div>
-    <Head text="Where the cooperative keeps its money. Every payment you record goes into one of these." action={<span style={{ display: 'flex', gap: 8 }}>
+    <Head text="Where the cooperative keeps its money. Every payment you record goes into one of these." action={<span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      {items.length > 0 && <TableExport title="Money Accounts" name="money-accounts" columns={[{ label: 'Account' }, { label: 'Type' }, { label: 'Details' }, { label: 'Status' }, { label: 'Balance', align: 'right' }]}
+        rows={items.map((a) => [a.name, KIND_WORDS[a.kind] ?? a.kind, [a.provider, a.accountNumber].filter(Boolean).join(' · ') || '—', a.isActive ? (a.isDefault ? 'In use, default' : 'In use') : 'Switched off', Number(a.balance) || 0])}
+        totals={['Total', '', '', '', Number(data?.total) || 0]} />}
       {canCreate && active.length > 0 && <button type="button" className="btn-secondary" onClick={() => setMoving({})}>Move money</button>}
       {canCreate && <button type="button" className="btn-primary" onClick={() => setAdding(true)}>Add an account</button>}
     </span>} />
@@ -71,7 +74,9 @@ export function MoneyAccountsView({ canCreate, canEdit }: { canCreate: boolean; 
     ))}
 
     <section className="table-panel">
-      <div className="section-toolbar"><strong>Money moved between accounts</strong></div>
+      <div className="section-toolbar"><strong>Money moved between accounts</strong>
+        {!!(transfers.data ?? []).length && <TableExport title="Money Moved Between Accounts" name="money-transfers" columns={[{ label: 'No.' }, { label: 'Date' }, { label: 'From' }, { label: 'To' }, { label: 'Amount', align: 'right' }, { label: 'Note' }]}
+          rows={(transfers.data ?? []).map((t) => [t.number, shortDate(t.date), t.from?.name ?? 'Not assigned', t.to?.name ?? 'Not assigned', Number(t.amount) || 0, t.status === 'CANCELLED' ? `Cancelled: ${t.cancelReason}` : t.note ?? '—'])} />}</div>
       {!(transfers.data ?? []).length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No transfers yet. Use “Move money” when you bank cash, withdraw, or top up a wallet.</div> :
         <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>No.</th><th>Date</th><th>From</th><th>To</th><th className="num">Amount</th><th>Note</th><th /></tr></thead><tbody>
           {(transfers.data ?? []).map((t) => <tr key={t.id} style={{ opacity: t.status === 'CANCELLED' ? 0.5 : 1 }}>

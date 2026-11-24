@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { json } from 'express';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -7,6 +8,9 @@ import { I18nResponseInterceptor } from './common/i18n/i18n-response.interceptor
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // The table-export route receives the rows of a list to draw as PDF/Word/Excel, so it may be larger than the default 100 KB.
+  app.use('/api/v1/accounting/table-export', json({ limit: '4mb' }));
 
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');

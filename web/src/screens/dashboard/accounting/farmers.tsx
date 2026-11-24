@@ -7,7 +7,7 @@ import Modal from '@/components/Modal';
 import ErrorBanner from '@/components/ErrorBanner';
 import { Actions, Badge, Card, Head, MoneyAccountSelect, errText, shortDate, today, tzs, useLoad } from './controls';
 import MoneyInput from '@/components/MoneyInput';
-import AccountingExport from '@/components/ListExport';
+import AccountingExport, { TableExport } from '@/components/ListExport';
 
 const payee = (i: { farmerId?: string | null; sellerName?: string | null }) => (i.farmerId ? { farmerId: i.farmerId } : { sellerName: i.sellerName });
 
@@ -66,6 +66,10 @@ export function PayoutsView({ canCreate, canEdit }: { canCreate: boolean; canEdi
     {message && <div className="alert-box" style={{ marginBottom: 12 }} role="status">{message} <button type="button" className="btn-secondary" style={{ marginLeft: 8, padding: '0 8px' }} onClick={() => setMessage('')}>OK</button></div>}
     <ErrorBanner message={payouts.error} onDismiss={() => payouts.setError('')} />
     <section className="table-panel">
+      {!!(payouts.data ?? []).length && <div className="section-toolbar"><strong>Payouts to farmers</strong>
+        <TableExport title="Payouts to Farmers" name="farmer-payouts" columns={[{ label: 'Date' }, { label: 'No.' }, { label: 'Paid to' }, { label: 'Paid from' }, { label: 'Reference' }, { label: 'Status' }, { label: 'Amount', align: 'right' }]}
+          rows={(payouts.data ?? []).map((p) => [shortDate(p.date), p.number, p.name, p.account ?? '—', p.reference ?? '—', p.voided ? 'Cancelled' : 'Paid', Number(p.amount) || 0])}
+          totals={['Total paid', '', '', '', '', '', (payouts.data ?? []).filter((p) => !p.voided).reduce((n, p) => n + (Number(p.amount) || 0), 0)]} /></div>}
       {payouts.loading && !payouts.data ? <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div> : !(payouts.data ?? []).length ? <div className="muted" style={{ padding: 28, textAlign: 'center' }}>No payouts yet. Use “Pay a farmer” when you pay for paddy you bought.</div> :
         <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Date</th><th>No.</th><th>Paid to</th><th>Paid from</th><th>Reference</th><th className="num">Amount</th><th /></tr></thead><tbody>
           {(payouts.data ?? []).map((p) => <tr key={p.id} style={p.voided ? { opacity: 0.55 } : undefined}>
@@ -134,11 +138,27 @@ function CancelPayoutModal({ payout, onClose, onSaved }: { payout: any; onClose:
 }
 
 // ───────────────────────── One farmer's statement ─────────────────────────
+/** One farmer's statement as a single list: the summary, then what was bought, what was paid and what they owe. */
+function statementRows(s: any, withDues: boolean): (string | number | null)[][] {
+  const head = (t: string): (string | number | null)[] => [t.toUpperCase(), '', '', null];
+  return [
+    head('Summary'),
+    ['', '', 'Paddy bought', Number(s.bought) || 0], ['', '', 'Paid to the farmer', Number(s.paid) || 0],
+    ['', '', 'We still owe', Number(s.owed) || 0], ['', '', 'They owe us (dues)', Number(s.debts) || 0],
+    head('Paddy bought'),
+    ...(s.purchases ?? []).map((x: any) => [shortDate(x.date), x.reference ?? '', `${Number(x.kg).toLocaleString('en-US')} kg at ${Number(x.pricePerKg).toLocaleString('en-US')} per kg`, Number(x.value) || 0]),
+    head('Payments to the farmer'),
+    ...(s.payouts ?? []).map((x: any) => [shortDate(x.date), x.number ?? '', `${x.account ?? ''}${x.reference ? ` · ${x.reference}` : ''}${x.voided ? ' · cancelled' : ''}`.replace(/^ · /, ''), Number(x.amount) || 0]),
+    ...(withDues ? [head('What the farmer owes the cooperative'), ...(s.dues ?? []).map((x: any) => [shortDate(x.issuedOn), '', `${x.description} (due ${shortDate(x.dueDate)}, paid ${Number((x.paid || 0) + (x.waived || 0)).toLocaleString('en-US')})`, Number(x.balance) || 0])] : []),
+  ];
+}
+
 function StatementModal({ payee: p, onClose }: { payee: any; onClose: () => void }) {
   const st = useLoad<any>(() => accountingApi.farmerStatement(p.farmerId ? { farmerId: p.farmerId } : { seller: p.sellerName }), [p.key]);
   const s = st.data;
   return <Modal title={`Statement: ${p.name}`} subtitle={s?.payee?.memberNumber ? `Member ${s.payee.memberNumber}${s.payee.phone ? ` · ${s.payee.phone}` : ''}` : undefined} onClose={onClose} width="860px"
-    footer={<><button type="button" className="btn-secondary" onClick={onClose}>Close</button><button type="button" className="btn-primary" onClick={() => window.print()} disabled={!s}>Print</button></>}>
+    footer={<><button type="button" className="btn-secondary" onClick={onClose}>Close</button>{s && <TableExport title={`Farmer Statement: ${p.name}`} name="farmer-statement" subtitle={s?.payee?.memberNumber ? `Member ${s.payee.memberNumber}` : undefined}
+      columns={[{ label: 'Date' }, { label: 'Reference' }, { label: 'Details' }, { label: 'Amount', align: 'right' }]} rows={statementRows(s, !!p.farmerId)} />}<button type="button" className="btn-primary" onClick={() => window.print()} disabled={!s}>Print</button></>}>
     <ErrorBanner message={st.error} onDismiss={() => st.setError('')} />
     {!s ? <div style={{ padding: 24, textAlign: 'center' }}>Loading…</div> : <div style={{ display: 'grid', gap: 18 }}>
       <div className="metric-grid">

@@ -21,3 +21,17 @@ export function ListExportButtons({ get, name, label }: { get: (format: Format) 
 export default function AccountingExport({ view, params, name, label }: { view: string; params?: Record<string, string | undefined>; name: string; label: string }) {
   return <ListExportButtons label={label} name={name} get={(format) => accountingApi.exportFile({ view, format, ...params }) as Promise<Res>} />;
 }
+
+export type ExportColumn = { label: string; align?: 'left' | 'right'; /** false for numbers that are not money (counts, weights) */ money?: boolean };
+export type ExportCell = string | number | null;
+
+/**
+ * The same buttons for a list that has no export of its own: the screen says what it shows (columns, rows, an optional total row)
+ * and the server draws it under the cooperative's official heading. Use it for lists that are loaded in full on the screen.
+ */
+export function TableExport({ title, subtitle, name, label, columns, rows, totals }: {
+  title: string; subtitle?: string; name: string; label?: string; columns: ExportColumn[]; rows: ExportCell[][]; totals?: ExportCell[];
+}) {
+  return <ListExportButtons label={label ?? `Export ${title.toLowerCase()}`} name={name}
+    get={(format) => accountingApi.exportTable({ format, title, subtitle, name, columns, rows, totals }) as Promise<Res>} />;
+}

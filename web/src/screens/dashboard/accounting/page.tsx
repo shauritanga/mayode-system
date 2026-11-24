@@ -14,7 +14,7 @@ import { BankReconciliationView, DocumentsView, PeriodCloseView, VatReturnView }
 import MoneyInput from '@/components/MoneyInput';
 import { ReportExportView } from './exports';
 import { CashTransactionsView } from './expenses';
-import AccountingExport from '@/components/ListExport';
+import AccountingExport, { TableExport } from '@/components/ListExport';
 import ExportIcons, { saveDownload } from '@/components/ExportIcons';
 import { previewBlob, printBlob } from '@/lib/print';
 import { DepreciationView, EquipmentRegisterView } from './assets-views';
@@ -462,7 +462,10 @@ export default function AccountingPage() {
           <div className="glass-card" style={{ padding: 16 }}><div className="muted" style={{ fontSize: 12 }}>Approved budgets</div><strong style={{ display: 'block', marginTop: 6, fontSize: 20 }}>{approvedAllocationReport.budgetCount ?? 0}</strong></div>
           <div className="glass-card" style={{ padding: 16 }}><div className="muted" style={{ fontSize: 12 }}>Account allocations</div><strong style={{ display: 'block', marginTop: 6, fontSize: 20 }}>{approvedAllocationReport.allocationCount ?? 0}</strong></div>
         </div>
-        <section className="table-panel"><div className="section-toolbar"><strong>Approved account allocations</strong></div>
+        <section className="table-panel"><div className="section-toolbar"><strong>Approved account allocations</strong>
+          <TableExport title="Approved Allocations" name="approved-allocations" columns={[{ label: 'Budget' }, { label: 'Cooperative' }, { label: 'Fiscal year', money: false }, { label: 'Period' }, { label: 'Account' }, { label: 'Approved on' }, { label: 'Allocation', align: 'right' }]}
+            rows={(approvedAllocationReport.allocations ?? []).map((a: any) => [a.budgetName, a.cooperative ?? '—', a.fiscalYear != null ? String(a.fiscalYear) : '—', `${scalar(a.periodStart)} – ${scalar(a.periodEnd)}`, `${a.account?.code ?? ''} ${a.account?.name ?? ''}`.trim(), scalar(a.approvedAt), Number(a.amount) || 0])}
+            totals={['Total', '', '', '', '', '', (approvedAllocationReport.allocations ?? []).reduce((n: number, a: any) => n + (Number(a.amount) || 0), 0)]} /></div>
           {!approvedAllocationReport.allocations?.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No budget allocations have been approved.</div> : <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Budget</th><th>Cooperative</th><th>Fiscal year</th><th>Period</th><th>Account</th><th>Approved on</th><th className="num">Allocation (TZS)</th></tr></thead><tbody>
             {approvedAllocationReport.allocations.map((allocation: any) => <tr key={allocation.id}><td>{allocation.budgetName}</td><td>{allocation.cooperative ?? '—'}</td><td>{allocation.fiscalYear ?? '—'}</td><td>{scalar(allocation.periodStart)} – {scalar(allocation.periodEnd)}</td><td>{allocation.account?.code} · {allocation.account?.name}</td><td>{scalar(allocation.approvedAt)}</td><td className="num">{formatTzs(allocation.amount)}</td></tr>)}
           </tbody></table></div>}
@@ -473,7 +476,10 @@ export default function AccountingPage() {
           <div className="glass-card" style={{ padding: 16 }}><div className="muted" style={{ fontSize: 12 }}>Reserve allocations</div><strong style={{ display: 'block', marginTop: 6, fontSize: 20 }}>{formatTzs(reserveReport.totalAllocated)}</strong></div>
           <div className="glass-card" style={{ padding: 16 }}><div className="muted" style={{ fontSize: 12 }}>Allocation entries</div><strong style={{ display: 'block', marginTop: 6, fontSize: 20 }}>{reserveReport.allocationCount ?? 0}</strong></div>
         </div>
-        <section className="table-panel"><div className="section-toolbar"><strong>Reserve allocation register</strong></div>
+        <section className="table-panel"><div className="section-toolbar"><strong>Reserve allocation register</strong>
+          <TableExport title="Cooperative Reserves" name="reserves" columns={[{ label: 'Date' }, { label: 'Cooperative' }, { label: 'Description' }, { label: 'Amount', align: 'right' }]}
+            rows={(reserveReport.allocations ?? []).map((a: any) => [scalar(a.allocationDate), a.mamcos?.name ?? '—', a.description || 'Reserve allocation', Number(a.amount) || 0])}
+            totals={['Total', '', '', (reserveReport.allocations ?? []).reduce((n: number, a: any) => n + (Number(a.amount) || 0), 0)]} /></div>
           {!reserveReport.allocations?.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No reserve allocations have been recorded.</div> : <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Date</th><th>Cooperative</th><th>Description</th><th className="num">Amount (TZS)</th></tr></thead><tbody>
             {reserveReport.allocations.map((allocation: any) => <tr key={allocation.id}><td>{scalar(allocation.allocationDate)}</td><td>{allocation.mamcos?.name ?? '—'}</td><td>{allocation.description || 'Reserve allocation'}</td><td className="num">{formatTzs(allocation.amount)}</td></tr>)}
           </tbody></table></div>}
@@ -494,7 +500,10 @@ export default function AccountingPage() {
           <div className="glass-card" style={{ padding: 16 }}><div className="muted" style={{ fontSize: 12 }}>Contributing members</div><strong style={{ display: 'block', marginTop: 6, fontSize: 20 }}>{memberContributionReport.memberCount ?? 0}</strong></div>
           <div className="glass-card" style={{ padding: 16 }}><div className="muted" style={{ fontSize: 12 }}>Contribution records</div><strong style={{ display: 'block', marginTop: 6, fontSize: 20 }}>{memberContributionReport.paymentCount ?? 0}</strong></div>
         </div>
-        <section className="table-panel"><div className="section-toolbar"><strong>Contribution register</strong></div>
+        <section className="table-panel"><div className="section-toolbar"><strong>Contribution register</strong>
+          <TableExport title="Member Contributions" name="member-contributions" columns={[{ label: 'Date' }, { label: 'Member' }, { label: 'Control number' }, { label: 'Payment method' }, { label: 'Reference' }, { label: 'Description' }, { label: 'Contribution', align: 'right' }]}
+            rows={(memberContributionReport.contributions ?? []).map((c: any) => [scalar(c.contributionDate), c.farmer ? `${c.farmer.firstName} ${c.farmer.lastName}` : '—', c.farmer?.controlNumber ?? '—', c.paymentMethod || '—', c.reference || '—', c.description || '—', Number(c.amount) || 0])}
+            totals={['Total', '', '', '', '', '', (memberContributionReport.contributions ?? []).reduce((n: number, c: any) => n + (Number(c.amount) || 0), 0)]} /></div>
           {!memberContributionReport.contributions?.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No member contributions have been recorded.</div> : <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Date</th><th>Member</th><th>Control number</th><th>Payment method</th><th>Reference</th><th>Description</th><th className="num">Contribution (TZS)</th></tr></thead><tbody>
             {memberContributionReport.contributions.map((contribution: any) => <tr key={contribution.id}><td>{scalar(contribution.contributionDate)}</td><td>{contribution.farmer ? `${contribution.farmer.firstName} ${contribution.farmer.lastName}` : '—'}</td><td>{contribution.farmer?.controlNumber ?? '—'}</td><td>{contribution.paymentMethod || '—'}</td><td>{contribution.reference || '—'}</td><td>{contribution.description || '—'}</td><td className="num">{formatTzs(contribution.amount)}</td></tr>)}
           </tbody></table></div>}
@@ -523,7 +532,7 @@ export default function AccountingPage() {
           <div className="glass-card" style={{ padding: 16 }}><div className="muted" style={{ fontSize: 12 }}>Budgets</div><strong style={{ display: 'block', marginTop: 6, fontSize: 20 }}>{records.length}</strong></div>
           <div className="glass-card" style={{ padding: 16 }}><div className="muted" style={{ fontSize: 12 }}>Total planned allocations</div><strong style={{ display: 'block', marginTop: 6, fontSize: 20 }}>{formatTzs(records.reduce((sum, budget) => sum + (budget.lines ?? []).reduce((lineSum: number, line: any) => lineSum + Number(line.amount || 0), 0), 0))}</strong></div>
         </div>
-        <section className="table-panel"><div className="section-toolbar"><strong>Budget register</strong></div>
+        <section className="table-panel"><div className="section-toolbar"><strong>Budget register</strong><AccountingExport label="Export budgets" name="budgets" view="budgets" /></div>
           {loading ? <div style={{ padding: 32, textAlign: 'center' }}>Loading budgets…</div> : !records.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No annual budgets have been created.</div> : <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Budget</th><th>Fiscal year / season</th><th>Period</th><th>Status</th><th className="num">Planned</th><th className="num">Accounts</th><th>Actions</th></tr></thead><tbody>
             {records.map((budget) => <tr key={budget.id}><td style={{ fontWeight: 600 }}>{budget.name}</td><td>{[budget.fiscalYear, budget.seasonLabel].filter(Boolean).join(' · ') || '—'}</td><td>{scalar(budget.startDate)} – {scalar(budget.endDate)}</td><td><span className={`badge ${budget.status === 'APPROVED' ? 'badge-green' : 'badge-gold'}`}>{budget.status ?? 'DRAFT'}</span></td><td className="num">{formatTzs((budget.lines ?? []).reduce((sum: number, line: any) => sum + Number(line.amount || 0), 0))}</td><td className="num">{budget.lines?.length ?? 0}</td><td style={{ display: 'flex', gap: 6 }}><button type="button" className="btn-secondary" onClick={() => showBudgetActual(budget.id)}>View actuals</button>{budget.status === 'DRAFT' && canEditAccounting && <button type="button" className="btn-primary" disabled={approvingBudgetId === budget.id} onClick={() => void approveBudget(budget.id)}>{approvingBudgetId === budget.id ? 'Approving…' : 'Approve'}</button>}</td></tr>)}
           </tbody></table></div>}
@@ -648,7 +657,10 @@ export default function AccountingPage() {
           <div className="glass-card" style={{ padding: 16 }}><div className="muted" style={{ fontSize: 12 }}>Debit balances shown</div><strong style={{ display: 'block', marginTop: 6, fontSize: 20 }}>{formatTzs(visibleAccountBalances.filter((account: any) => account.balanceSide === 'DEBIT').reduce((sum: number, account: any) => sum + Number(account.balance), 0))}</strong></div>
           <div className="glass-card" style={{ padding: 16 }}><div className="muted" style={{ fontSize: 12 }}>Credit balances shown</div><strong style={{ display: 'block', marginTop: 6, fontSize: 20 }}>{formatTzs(visibleAccountBalances.filter((account: any) => account.balanceSide === 'CREDIT').reduce((sum: number, account: any) => sum + Number(account.balance), 0))}</strong></div>
         </div>
-        <section className="table-panel"><div className="section-toolbar"><strong>General ledger balances</strong><span className="muted">Through {reportDate(accountBalanceReport.asOf)}</span></div>
+        <section className="table-panel"><div className="section-toolbar"><strong>General ledger balances</strong><span className="muted">Through {reportDate(accountBalanceReport.asOf)}</span>
+          <TableExport title="Account Balances" name="account-balances" subtitle={[`Through ${reportDate(accountBalanceReport.asOf)}`, accountBalanceType !== 'ALL' ? `Type: ${titleCase(accountBalanceType.toLowerCase())}` : '', accountBalanceSearch.trim() ? `Search: “${accountBalanceSearch.trim()}”` : ''].filter(Boolean).join(' · ')}
+            columns={[{ label: 'Code', money: false }, { label: 'Account' }, { label: 'Type' }, { label: 'Debits to date', align: 'right' }, { label: 'Credits to date', align: 'right' }, { label: 'Balance side' }, { label: 'Balance', align: 'right' }]}
+            rows={visibleAccountBalances.map((a: any) => [a.code, a.name, titleCase(String(a.type).toLowerCase()), Number(a.debitActivity) || 0, Number(a.creditActivity) || 0, a.balanceSide === 'ZERO' ? '—' : titleCase(a.balanceSide.toLowerCase()), Number(a.balance) || 0])} /></div>
           {loading ? <div style={{ padding: 32, textAlign: 'center' }}>Loading account balances…</div> : !visibleAccountBalances.length ? <div className="muted" style={{ padding: 24, textAlign: 'center' }}>No accounts match your search and type filters.</div> : <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Account code</th><th>Account name</th><th>Type</th><th className="num">Debits to date (TZS)</th><th className="num">Credits to date (TZS)</th><th>Balance side</th><th className="num">Balance (TZS)</th></tr></thead><tbody>
             {visibleAccountBalances.map((account: any) => <tr key={account.id}><td>{account.code}</td><td style={{ fontWeight: 600 }}>{account.name}</td><td>{titleCase(String(account.type).toLowerCase())}</td><td className="num">{formatTzs(account.debitActivity)}</td><td className="num">{formatTzs(account.creditActivity)}</td><td>{account.balanceSide === 'ZERO' ? '—' : titleCase(account.balanceSide.toLowerCase())}</td><td className="num">{formatTzs(account.balance)}</td></tr>)}
           </tbody></table></div>}
@@ -716,7 +728,8 @@ export default function AccountingPage() {
             {reverseError && <div style={{ color: 'var(--red-400)', fontSize: 13 }}>{reverseError}</div>}
           </form>
         </Modal>}
-      </div> : <section className="table-panel"><div className="section-toolbar"><strong>{title}</strong></div>
+      </div> : <section className="table-panel"><div className="section-toolbar"><strong>{title}</strong>
+        {records.length > 0 && <TableExport title={title} name={slug(submenu)} columns={columns.map((c) => ({ label: titleCase(c.replace(/([A-Z])/g, '-$1').replaceAll('_', '-')), money: false }))} rows={records.map((r) => columns.map((c) => scalar(r[c])))} />}</div>
         {loading ? <div style={{ padding: 32, textAlign: 'center' }}>Loading records…</div> : !records.length ? <div style={{ padding: 32, textAlign: 'center' }}><div className="muted">{emptyMessage}</div></div> : <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr>{columns.map((column) => <th key={column}>{titleCase(column.replace(/([A-Z])/g, '-$1').replaceAll('_', '-'))}</th>)}</tr></thead><tbody>{records.map((record, index) => <tr key={record.id ?? index}>{columns.map((column) => <td key={column}>{scalar(record[column])}</td>)}</tr>)}</tbody></table></div>}
       </section>}
     </>
@@ -772,7 +785,10 @@ type FarmerLoanLiability = {
 
 function FarmerLiabilitySection({ title, empty, rows }: { title: string; empty: string; rows: FarmerLoanLiability[] }) {
   return <section className="table-panel" style={{ marginBottom: 16 }}>
-    <div className="section-toolbar"><strong>{title}</strong><strong>{formatTzs(rows.reduce((sum, row) => sum + row.amountOwed, 0))}</strong></div>
+    <div className="section-toolbar"><strong>{title}</strong><strong>{formatTzs(rows.reduce((sum, row) => sum + row.amountOwed, 0))}</strong>
+      {rows.length > 0 && <TableExport title="Farmer Liabilities: Loan Balances" name="farmer-loan-balances" columns={[{ label: 'Farmer' }, { label: 'Control number' }, { label: 'Lender' }, { label: 'Original loan', align: 'right' }, { label: 'Repaid', align: 'right' }, { label: 'Outstanding', align: 'right' }]}
+        rows={rows.map((r) => [`${r.farmer.firstName} ${r.farmer.lastName}`, r.farmer.controlNumber, r.lender, Number(r.originalAmount) || 0, Number(r.repaid) || 0, Number(r.amountOwed) || 0])}
+        totals={['Total', '', '', rows.reduce((n, r) => n + (Number(r.originalAmount) || 0), 0), rows.reduce((n, r) => n + (Number(r.repaid) || 0), 0), rows.reduce((n, r) => n + (Number(r.amountOwed) || 0), 0)]} />}</div>
     {!rows.length ? <div className="muted" style={{ padding: 18 }}>{empty}</div> : <div style={{ overflowX: 'auto' }}><table className="data-table">
       <thead><tr><th>Farmer</th><th>Control number</th><th>Lender</th><th className="num">Original loan</th><th className="num">Repaid</th><th className="num">Outstanding</th></tr></thead>
       <tbody>{rows.map((row) => <tr key={row.id}><td>{row.farmer.firstName} {row.farmer.lastName}</td><td>{row.farmer.controlNumber}</td><td>{row.lender}</td><td className="num">{formatTzs(row.originalAmount)}</td><td className="num">{formatTzs(row.repaid)}</td><td className="num">{formatTzs(row.amountOwed)}</td></tr>)}</tbody>
@@ -793,7 +809,10 @@ type ProcurementPayable = {
 
 function FarmerProcurementSection({ rows }: { rows: ProcurementPayable[] }) {
   return <section className="table-panel" style={{ marginBottom: 16 }}>
-    <div className="section-toolbar"><strong>Unpaid procurement owed to farmers</strong><strong>{formatTzs(rows.reduce((sum, row) => sum + row.amountOwed, 0))}</strong></div>
+    <div className="section-toolbar"><strong>Unpaid procurement owed to farmers</strong><strong>{formatTzs(rows.reduce((sum, row) => sum + row.amountOwed, 0))}</strong>
+      {rows.length > 0 && <TableExport title="Farmer Liabilities: Unpaid Procurement" name="unpaid-procurement" columns={[{ label: 'Delivery date' }, { label: 'Farmer' }, { label: 'Control number' }, { label: 'Delivery' }, { label: 'Weight (kg)', align: 'right', money: false }, { label: 'Purchase value', align: 'right' }, { label: 'Paid', align: 'right' }, { label: 'Outstanding', align: 'right' }]}
+        rows={rows.map((r) => [scalar(r.receivedDate), `${r.farmer.firstName} ${r.farmer.lastName}`, r.farmer.controlNumber, r.trackingCode, Number(r.weightKg).toLocaleString('en-US'), Number(r.totalValue) || 0, Number(r.amountPaid) || 0, Number(r.amountOwed) || 0])}
+        totals={['Total', '', '', '', '', rows.reduce((n, r) => n + (Number(r.totalValue) || 0), 0), rows.reduce((n, r) => n + (Number(r.amountPaid) || 0), 0), rows.reduce((n, r) => n + (Number(r.amountOwed) || 0), 0)]} />}</div>
     {!rows.length ? <div className="muted" style={{ padding: 18 }}>No unpaid procurement balances.</div> : <div style={{ overflowX: 'auto' }}><table className="data-table">
       <thead><tr><th>Delivery date</th><th>Farmer</th><th>Control number</th><th>Delivery</th><th className="num">Weight (kg)</th><th className="num">Purchase value</th><th className="num">Paid</th><th className="num">Outstanding</th></tr></thead>
       <tbody>{rows.map((row) => <tr key={row.id}><td>{scalar(row.receivedDate)}</td><td>{row.farmer.firstName} {row.farmer.lastName}</td><td>{row.farmer.controlNumber}</td><td>{row.trackingCode}</td><td className="num">{Number(row.weightKg).toLocaleString('en-US')}</td><td className="num">{formatTzs(row.totalValue)}</td><td className="num">{formatTzs(row.amountPaid)}</td><td className="num">{formatTzs(row.amountOwed)}</td></tr>)}</tbody>

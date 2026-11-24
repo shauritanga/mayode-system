@@ -10,6 +10,7 @@ import type { Cell, ReportDocument, Row } from './exports/report-document';
 import { longDate } from './exports/report-titles';
 import { eatDate, listFile, listHeader, todayEat } from './exports/list-header';
 import type { ExportFormat } from './exports/writers';
+import type { TableExportDto } from './dto/report-export.dto';
 
 export const LIST_EXPORT_VIEWS = ['journal', 'trial-balance', 'general-ledger', 'cashbook', 'expenses', 'income', 'invoices', 'bills', 'farmers-owed', 'budgets'] as const;
 export type ListExportView = typeof LIST_EXPORT_VIEWS[number];
@@ -117,5 +118,26 @@ export class ListExportService {
       default:
         throw new BadRequestException('That list cannot be exported.');
     }
+  }
+
+  /**
+   * Draws a list the screen is showing. The cooperative's name, who prepared it and when come from the signed-in user,
+   * never from the request; the request only supplies the rows. Everything is checked and clipped before it is drawn.
+   */
+  async table(user: RequestUser, scope: LedgerScope, dto: TableExportDto) {
+    const clip = (v: unknown, n = 300): string => String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, n);
+    const cell = (v: unknown): Cell => (typeof v === 'number' && Number.isFinite(v) ? v : v == null ? null : clip(v));
+    const columns = dto.columns.map((c) => ({ label: clip(c?.label, 60).trim(), align: c?.align === 'right' ? ('right' as const) : undefined, money: c?.money === false ? false : undefined }));
+    if (columns.some((c) => !c.label)) throw new BadRequestException('Every column needs a name.');
+    const fit = (cells: unknown): Cell[] => {
+      if (!Array.isArray(cells)) throw new BadRequestException('Each row must be a list of cells.');
+      return columns.map((_, i) => cell(cells[i]));
+    };
+    const rows: Row[] = dto.rows.map((r) => ({ cells: fit(r) }));
+    if (dto.totals) rows.push(total(fit(dto.totals)));
+    const head = await listHeader(this.prisma, scope.mamcosId, user.id);
+    const title = clip(dto.title, 120).trim() || 'List';
+    const doc: ReportDocument = { ...head, kind: title, heading: `${title} as at ${longDate(todayEat())}`, periodLine: clip(dto.subtitle, 300), tables: [{ columns, rows }] };
+    return listFile(dto.format, doc, dto.name ?? 'list');
   }
 }

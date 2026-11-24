@@ -64,3 +64,39 @@ describe('accounting list exports', () => {
     await expect(svc.export(user, scope, { view: 'journal', format: 'PDF', from: '1/5/2026' })).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe('table export (a list the screen sends)', () => {
+  const dto = (over: any = {}) => ({ format: 'XLSX' as const, title: 'Chart of Accounts', subtitle: 'Search: “cash”', name: 'chart-of-accounts',
+    columns: [{ label: 'Code', money: false }, { label: 'Name' }, { label: 'Balance', align: 'right' as const }],
+    rows: [['1000', 'Cash', 250], ['2000', 'Payables', -40]], totals: ['Total', '', 210], ...over });
+  const sheet = async (d: any) => { const wb = XLSX.read((await svc.table(user, scope, d)).buffer, { type: 'buffer' }); return XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]); };
+
+  it('draws the rows under the signed-in user’s cooperative and name, with the totals row', async () => {
+    const text = await sheet(dto());
+    expect(text).toContain('MAYODE AMCOS');
+    expect(text).toContain('Chart of Accounts as at');
+    expect(text).toContain('Search: “cash”');
+    expect(text).toContain('Payables');
+    expect(text).toContain('Total');
+  });
+
+  it('renders every format and names the file from the request', async () => {
+    for (const format of ['PDF', 'DOCX', 'XLSX'] as const) {
+      const f = await svc.table(user, scope, dto({ format }));
+      expect(f.buffer.length).toBeGreaterThan(500);
+      expect(f.fileName).toMatch(/^chart-of-accounts-\d{4}-\d{2}-\d{2}\./);
+    }
+  });
+
+  it('pads short rows, clips long text and strips control characters', async () => {
+    const text = await sheet(dto({ rows: [['1000'], ['x'.repeat(1000), 'a\u0000b', 1]], totals: undefined }));
+    expect(text).not.toContain('x'.repeat(301));
+    expect(text).toContain('a b');
+  });
+
+  it('refuses a row that is not a list and a column with no name', async () => {
+    await expect(svc.table(user, scope, dto({ rows: ['oops'] }))).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.table(user, scope, dto({ columns: [{ label: '  ' }], rows: [], totals: undefined }))).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
