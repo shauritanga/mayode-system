@@ -10,7 +10,13 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // The table-export route receives the rows of a list to draw as PDF/Word/Excel, so it may be larger than the default 100 KB.
-  app.use('/api/v1/accounting/table-export', json({ limit: '4mb' }));
+  // Wrapped in an arrow function (not passed directly) so this middleware isn't named `jsonParser` —
+  // Nest's own body-parser registration skips adding its global JSON parser if it finds a middleware
+  // with that exact name already in the stack, which would silently empty req.body on every other route.
+  const tableExportJsonParser = json({ limit: '4mb' });
+  app.use('/api/v1/accounting/table-export', (req, res, next) =>
+    tableExportJsonParser(req, res, next),
+  );
 
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
